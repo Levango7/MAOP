@@ -9,7 +9,7 @@ Analyzes execution history from multiple data sources to identify:
 Data sources:
   - TimeSeriesStore: loop_duration_ms, plan/exec/verify durations, analysis_complexity
   - CostTracker: token usage and cost by model/agent/session
-  - delegations table: agent success rates and routing patterns
+  - run_events (``run.step``): agent success rates, routing patterns and errors
 
 Usage:
     analyzer = HistoryAnalyzer(root_dir="/path/to/MAOP")
@@ -75,10 +75,10 @@ class AnalysisReport:
 def _since_to_iso(since: float) -> str:
     """Convert a Unix timestamp to an ISO-8601 string for SQLite TEXT comparison.
 
-    The delegations table stores ``timestamp`` as ISO-8601 (UTC), so we
-    convert the ``since`` Unix epoch float to the same format.
+    ``run_events`` stores seconds-precision UTC timestamps, so compare with the
+    same precision instead of emitting microseconds.
     """
-    return datetime.fromtimestamp(since, tz=timezone.utc).isoformat()
+    return datetime.fromtimestamp(since, tz=timezone.utc).isoformat(timespec="seconds")
 
 
 class HistoryAnalyzer:
@@ -91,7 +91,6 @@ class HistoryAnalyzer:
         # Lazy-loaded data sources
         self._timeseries = None
         self._cost_tracker = None
-        self._db_path = self._root / "data" / "maop.db"
 
     def _get_timeseries(self):
         if self._timeseries is None:
@@ -177,65 +176,44 @@ class HistoryAnalyzer:
             return {"total": 0, "success_rate": 0.0, "avg_duration_ms": 0}
 
     def _cluster_failures(self, since: float) -> list[FailureCluster]:
-        """Cluster similar failures from delegations table.
+        """Cluster similar failures from the ``run_events`` spine.
 
-        The delegations table stores ``timestamp`` as ISO-8601 text and
-        failure detail in the ``stderr`` column (there is no ``error`` column).
+        ``run.step`` is the per-attempt record the old ``delegations`` table
+        was meant to hold; its payload carries the error text and routing key.
         """
-        import sqlite3
+        from maop.core.run_events import failed_steps
+
         clusters: dict[str, FailureCluster] = {}
+        rows = failed_steps(limit=500, since=_since_to_iso(since))
 
-        try:
-            if not self._db_path.exists():
-                return []
+        for row in rows:
+            # Create pattern from error type + agent
+            error = row["error"] or row["stderr"] or "unknown"
+            error_type = error.split(":")[0][:50]  # First part of error
+            pattern = f"{error_type}:agent={row['agent']}"
 
-            since_iso = _since_to_iso(since)
-            conn = sqlite3.connect(str(self._db_path))
-            conn.row_factory = sqlite3.Row
-            # Query failed delegations. Use stderr (not error) — that is the
-            # actual schema column in maop.core.data.
-            try:
-                rows = conn.execute(
-                    """SELECT agent, routing_key, exit_code, stderr, timestamp
-                       FROM delegations
-                       WHERE exit_code != 0 AND timestamp >= ?
-                   ORDER BY timestamp DESC LIMIT 500""",
-                    (since_iso,),
-                ).fetchall()
-            finally:
-                conn.close()
+            if pattern not in clusters:
+                clusters[pattern] = FailureCluster(
+                    pattern=pattern,
+                    count=0,
+                    agents=[],
+                    root_cause_hypothesis=self._hypothesize_root_cause(error_type, row["agent"]),
+                )
 
-            for row in rows:
-                # Create pattern from error type + agent
-                error = row["stderr"] or "unknown"
-                error_type = error.split(":")[0][:50]  # First part of error
-                pattern = f"{error_type}:agent={row['agent']}"
+            cluster = clusters[pattern]
+            cluster.count += 1
+            if row["agent"] not in cluster.agents:
+                cluster.agents.append(row["agent"])
+            if len(cluster.recent_examples) < 3:
+                cluster.recent_examples.append({
+                    "agent": row["agent"],
+                    "routing_key": row["routing_key"],
+                    "exit_code": row["exit_code"],
+                    "error": error,
+                    "timestamp": row["timestamp"],
+                })
 
-                if pattern not in clusters:
-                    clusters[pattern] = FailureCluster(
-                        pattern=pattern,
-                        count=0,
-                        agents=[],
-                        root_cause_hypothesis=self._hypothesize_root_cause(error_type, row["agent"]),
-                    )
-
-                cluster = clusters[pattern]
-                cluster.count += 1
-                if row["agent"] not in cluster.agents:
-                    cluster.agents.append(row["agent"])
-                if len(cluster.recent_examples) < 3:
-                    cluster.recent_examples.append({
-                        "agent": row["agent"],
-                        "routing_key": row["routing_key"],
-                        "exit_code": row["exit_code"],
-                        "error": row["stderr"],
-                        "timestamp": row["timestamp"],
-                    })
-
-            return sorted(clusters.values(), key=lambda c: c.count, reverse=True)[:10]
-        except Exception as exc:
-            logger.warning("[history] Failure clustering failed: %s", exc)
-            return []
+        return sorted(clusters.values(), key=lambda c: c.count, reverse=True)[:10]
 
     def _hypothesize_root_cause(self, error_type: str, agent: str) -> str:
         """Generate a root cause hypothesis based on error pattern."""

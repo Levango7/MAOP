@@ -1,0 +1,101 @@
+// MAOP dashboard 对比度契约 —— 显式配对，不依赖 design-md 的自动命名约定。
+// 格式: <前景token> <背景token> [最小比值]，默认 4.5。
+// 依据: WCAG 2.1 SC 1.4.3 文本 4.5:1；SC 1.4.11 控件边界 3:1。
+//
+// 为什么不用自动配对：
+//   * 本项目品牌色作文字用 --brand-text（--brand 只做边框/填充，自动配对会误判）；
+//   * 可交互边界是 --border-control；--border-strong 只用于 hover/装饰；
+//   * 承载面是 --bg/--surface/--surface-2/--surface-3 与侧栏 --bg2。
+// --surface-4 全项目零引用，故不参与配对；一旦启用需先加到这里。
+
+// ── 文字令牌 × 实际承载面（4.5:1） ─────────────────────────────────────
+text bg
+text bg2
+text surface
+text surface-2
+text surface-3
+text-muted bg
+text-muted bg2
+text-muted surface
+text-muted surface-2
+text-muted surface-3
+text-faint bg
+text-faint bg2
+text-faint surface
+text-faint surface-2
+text-faint surface-3
+brand-text bg
+brand-text bg2
+brand-text surface
+brand-text surface-2
+brand-text surface-3
+success bg
+success bg2
+success surface
+success surface-2
+success surface-3
+warn bg
+warn bg2
+warn surface
+warn surface-2
+warn surface-3
+fail bg
+fail bg2
+fail surface
+fail surface-2
+fail surface-3
+danger bg
+danger bg2
+danger surface
+danger surface-2
+danger surface-3
+
+// ── 实心填充上的文字（4.5:1，SC 1.4.3） ────────────────────────────────
+brand-contrast brand 4.5
+brand-contrast brand-solid 4.5
+brand-contrast fail-solid 4.5
+brand-contrast warn-solid 4.5
+
+// ── 品牌/状态文字令牌 × 承载面（4.5:1） ────────────────────────────────
+brand-strong bg
+brand-strong bg2
+brand-strong surface
+brand-strong surface-2
+brand-strong surface-3
+info bg
+info bg2
+info surface
+info surface-2
+info surface-3
+success-strong bg
+success-strong bg2
+success-strong surface
+success-strong surface-2
+success-strong surface-3
+warn-strong bg
+warn-strong bg2
+warn-strong surface
+warn-strong surface-2
+warn-strong surface-3
+fail-strong bg
+fail-strong bg2
+fail-strong surface
+fail-strong surface-2
+fail-strong surface-3
+info-strong bg
+info-strong bg2
+info-strong surface
+info-strong surface-2
+info-strong surface-3
+
+// ── 柔底徽标：文字必须压在复合后的底色上测（alpha 稀释陷阱） ────────────
+brand-text brand-soft:surface-2 4.5
+success-strong success-soft:surface-2 4.5
+warn-strong warn-soft:surface-2 4.5
+fail-strong fail-soft:surface-2 4.5
+info-strong info-soft:surface-2 4.5
+
+// ── 可交互边框（3:1，SC 1.4.11） ───────────────────────────────────────
+border-control bg 3
+border-control surface 3
+border-control surface-2 3

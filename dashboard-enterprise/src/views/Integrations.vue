@@ -26,6 +26,12 @@
               <Skeleton block height="44px" />
             </div>
             <EmptyState
+              v-else-if="requiresEnterprise"
+              icon="lock"
+              :title="t('view.integrations.requiresEnterprise')"
+              :description="t('view.integrations.requiresEnterpriseDesc')"
+            />
+            <EmptyState
               v-else-if="errors.workflows"
               icon="alert-triangle"
               tone="fail"
@@ -78,7 +84,13 @@
           <!-- Stats overview -->
           <Card :title="t('view.integrations.stats.title')" icon="activity" margin-bottom="var(--sp-4)">
             <EmptyState
-              v-if="errors.workflows"
+              v-if="requiresEnterprise"
+              icon="lock"
+              :title="t('view.integrations.requiresEnterprise')"
+              :description="t('view.integrations.requiresEnterpriseDesc')"
+            />
+            <EmptyState
+              v-else-if="errors.workflows"
               icon="alert-triangle"
               tone="fail"
               :title="t('view.integrations.workflows.failedLoad')"
@@ -273,6 +285,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
+import { useEditionStore } from '../stores/edition.js';
 import { useToast } from '../composables/useToast.js';
 import { useI18n } from '../i18n';
 import ListPageLayout from '../components/ListPageLayout.vue';
@@ -284,8 +297,12 @@ import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
 
 const api = useApiStore();
+const edition = useEditionStore();
 const { t } = useI18n();
 const toast = useToast();
+// n8n 路由由 FeatureFlag 门禁：个人版请求必然 404。与 AlertRules.vue 同款
+// 处理——不发无意义的请求，直接说明需要企业版。
+const requiresEnterprise = computed(() => !edition.isEnterprise);
 
 // ── Tab state ───────────────────────────────────────────────────
 const activeTab = ref('workflows');
@@ -493,6 +510,10 @@ async function loadAll() {
 }
 
 onMounted(() => {
+  if (requiresEnterprise.value) {
+    loading.value = false;
+    return;
+  }
   loadAll();
 });
 </script>

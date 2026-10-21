@@ -98,7 +98,7 @@ class TestControlActionAuditBehavior:
 class TestModelSwitchRuntimeEffect:
     """Model switch must affect the effective model in dispatcher runtime state."""
 
-    def test_dispatcher_without_selector_uses_agent_model(self):
+    def test_dispatcher_without_selector_uses_agent_model(self, tmp_path):
         """Without ModelSelector, dispatcher must use agent's configured model."""
         import sys
         MAOP_ROOT = str(Path(__file__).resolve().parent.parent.parent)
@@ -109,7 +109,7 @@ class TestModelSwitchRuntimeEffect:
         from maop.delegate.dispatcher import Dispatcher
 
         # No model_selector — should use agent's model as-is
-        d = Dispatcher(MAOP_config=None, breaker=CircuitBreaker(), model_selector=None)
+        d = Dispatcher(MAOP_config=None, breaker=CircuitBreaker(tmp_path / "breaker.db"), model_selector=None)
         assert d.effective_model is None, "No selector → no effective model"
 
     def test_dispatch_result_has_model_resolved_flag(self):
@@ -122,7 +122,7 @@ class TestModelSwitchRuntimeEffect:
         assert hasattr(dr, "model_resolved"), "DispatchResult must have model_resolved field"
         assert dr.model_resolved is True, "Default must be True (no selector = not failed)"
 
-    def test_selector_resolution_changes_effective_model(self):
+    def test_selector_resolution_changes_effective_model(self, tmp_path):
         """When ModelSelector resolves, effective_model must be set on dispatcher."""
         from maop.core.reliability.circuit_breaker import CircuitBreaker
         from maop.delegate.dispatcher import Dispatcher
@@ -130,7 +130,7 @@ class TestModelSwitchRuntimeEffect:
 
         registry = _make_registry()
         selector = ModelSelector(registry)
-        d = Dispatcher(MAOP_config=None, breaker=CircuitBreaker(), model_selector=selector)
+        d = Dispatcher(MAOP_config=None, breaker=CircuitBreaker(tmp_path / "breaker.db"), model_selector=selector)
 
         # Call select_for_routing_key to verify it produces a valid EffectiveModel
         em = selector.select_for_routing_key(

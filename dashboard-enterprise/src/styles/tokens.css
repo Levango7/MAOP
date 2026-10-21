@@ -27,7 +27,9 @@
   --accent2: #14b8a6;     /* Teal-500: 青绿色亮变体 */
   --success: #3fb950;
   --warn: #d29922;
-  --fail: #f85149;
+  /* a11y (2026-10-20): 由 #f85149 提亮。原值在 --surface-2 / --surface-3 上
+   * 仅 4.22 / 3.71:1（错误文字、失败徽标都在这些面上）。新值最差面 4.90:1。 */
+  --fail: #fa7d76;
   --radius: 8px;          /* JB: 卡片 8px, 控件 6px */
   --shadow: 0 1px 2px rgba(0, 0, 0, .4);
 
@@ -40,11 +42,17 @@
   --surface-4: #3a3e47;
   --border-strong: #4e545f;
   --text-muted: #9aa3b2;
-  --text-faint: #8a93a3;  /* a11y: 提亮以满足 WCAG AA 4.5:1 (原 #6e7686 仅 3.7:1) */
-  --brand: #0d9488;       /* Teal-600: 青绿色主品牌色, AI 工具中罕见, 高辨识度 */
-  --brand-strong: #14b8a6;  /* Teal-500: 主品牌色亮变体 */
-  --brand-faint: rgba(13, 148, 136, .10);  /* 青绿色极淡背景 */
-  --brand-soft: rgba(13, 148, 136, .18);   /* 青绿色柔背景 */
+  /* a11y (2026-10-20): 由 #8a93a3 提亮。原值在 --surface-3 上仅 4.02:1，
+   * 而 tooltip/hover 行确实落在 surface-3 上。新值最差面 4.79:1。 */
+  --text-faint: #99a1b0;
+  /* a11y (2026-10-20): --brand 与 --brand-solid 同值。--brand 实际被 35 处
+   * 实底按钮当 background 用（白字），而原 #0d9488 + 白字只有 3.74:1。
+   * 现在 --brand 是"承载白字的品牌实底/边框"；品牌色**作文字**用 --brand-text；
+   * --brand-strong 只作亮色点缀，永远不要垫白字（其上白字仅 2.49:1）。 */
+  --brand: #0c857a;
+  --brand-strong: #14b8a6;  /* Teal-500: 主品牌色亮变体（文字/点缀，不垫白字） */
+  --brand-faint: rgba(12, 133, 122, .10);  /* 青绿色极淡背景 */
+  --brand-soft: rgba(12, 133, 122, .18);   /* 青绿色柔背景 */
   --brand-contrast: #ffffff;
   /* MAOP 独有辅助色: 琥珀色(Amber-500), 用于强调与点缀, 与青绿形成互补对比 */
   --accent-warm: #f59e0b;            /* Amber-500: 琥珀色辅助强调色 */
@@ -94,7 +102,7 @@
 
   --success-soft: rgba(63, 185, 80, .15);
   --warn-soft: rgba(210, 153, 34, .15);
-  --fail-soft: rgba(248, 81, 73, .15);
+  --fail-soft: rgba(250, 125, 118, .15);
   --info: #4cc2ff;
   --info-soft: rgba(76, 194, 255, .13);
   /* R7 修复: --chart-5-soft 暗色值与 --chart-5 (#9e8cfc = rgb(158,140,252)) 对齐 */
@@ -105,7 +113,9 @@
    * 暗态: 背景透明度 0.10-0.22, 文字高亮变体 */
   --success-strong: #7ee787;
   --warn-strong: #e3b341;
-  --fail-strong: #ff7b72;
+  /* a11y (2026-10-20): fail-strong 由 #ff7b72 提亮。它压在 fail-soft 复合底上
+   * 只有 4.39:1（失败徽标/告示）；#ff8077 在该复合底上 4.56:1。 */
+  --fail-strong: #ff8077;
   --info-strong: #79c0ff;
   --success-bg: rgba(63, 185, 80, .22);
   --warn-bg: rgba(210, 153, 34, .20);
@@ -142,7 +152,7 @@
   --shadow-lg: 0 12px 28px rgba(0, 0, 0, .42);
   --shadow-topbar: 0 1px 0 rgba(0, 0, 0, .30);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, .40);
-  --shadow-brand: 0 2px 10px rgba(13, 148, 136, .30);
+  --shadow-brand: 0 2px 10px rgba(12, 133, 122, .30);
   --shadow-card: 0 4px 16px rgba(0, 0, 0, .30);
   --shadow-modal: 0 12px 40px rgba(0, 0, 0, .50);
   --shadow-inset-highlight: inset 0 1px 0 rgba(255, 255, 255, .25);
@@ -239,15 +249,15 @@
    * 暗色用白色低透(rgba(255,255,255,.06)), 亮色用黑色低透(见 themes.css)。 */
   --surface-hover: rgba(255, 255, 255, .06);
   --surface-alt: rgba(0, 0, 0, .02);
-  /* --danger: 提亮至 #f05545 以满足 WCAG AA 4.5:1 (原 #c0392b on #1b1d21 ≈ 3.27:1)。
-   * 语义关系: --danger 用于错误/危险状态的"文本与边框"(需满足 AA 对比度);
-   *           --fail  用于图表/徽标等"指示色"(视觉一致性优先, 对比度要求宽松)。
-   * 两者均为红色系, --danger 更亮以保证文本可读性, --fail 保持 GitHub 风格 #f85149。 */
-  --danger: #f05545;
-  --danger-soft: rgba(240, 85, 69, .08);
+  /* --danger: 提亮至 #f57d70 以满足 WCAG AA 4.5:1。
+   * 历史: #c0392b (3.27:1) → #f05545 (4.50 on surface / 4.10 on surface-2)
+   * → 本值 (最差面 surface-3 4.77:1)。--danger 用于错误/危险状态的
+   * "文本与边框"; --fail 用于图表/徽标等指示色。 */
+  --danger: #f57d70;
+  --danger-soft: rgba(245, 125, 112, .08);
   /* 输入框错误状态: 用于表单校验失败时的边框与聚焦环颜色 */
   --input-error-border: var(--danger);
-  --input-error-focus: rgba(240, 85, 69, .22);
+  --input-error-focus: rgba(245, 125, 112, .22);
   --ok: #3fb950;
   --overlay-scrim: rgba(15, 23, 42, .65);
 

@@ -84,6 +84,22 @@ describe('Chat.vue mapMsg field extraction', () => {
     wrapper.unmount();
   });
 
+  it('renders GFM tables and escapes code in assistant messages', async () => {
+    const wrapper = await mountChatWithMessages([
+      {
+        role: 'assistant',
+        content: '| Name | State |\n| --- | --- |\n| run-1 | ok |\n\n```js\nif (a < b) {}\n```',
+      },
+    ]);
+    const table = wrapper.find('.msg-text table');
+    expect(table.exists()).toBe(true);
+    expect(table.text()).toContain('run-1');
+    const code = wrapper.find('.msg-text pre code');
+    expect(code.exists()).toBe(true);
+    expect(code.text()).toContain('if (a < b) {}');
+    wrapper.unmount();
+  });
+
   it('falls back to m.token_count when m.tokens is absent', async () => {
     const wrapper = await mountChatWithMessages([
       { role: 'assistant', content: 'hi', token_count: 88 },

@@ -142,7 +142,7 @@ import { useToast } from '../composables/useToast.js';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import EmptyState from '../components/EmptyState.vue';
-import DOMPurify from 'dompurify';
+import { useMarkdown } from '../composables/useMarkdown.js';
 import { useI18n } from '../i18n';
 import { useConfirm } from '../composables/useConfirm.js';
 
@@ -289,20 +289,12 @@ function toList(d) {
   return [];
 }
 
+const { render: renderMarkdownHtml } = useMarkdown();
+
 function renderMarkdown(text) {
-  if (!text) return '';
-  // TODO(L3): 当前为极简 Markdown 渲染，不支持 GFM 表格。如需表格支持，
-  // 建议迁移至 useMarkdown composable 或引入 marked + dompurify（gfm: true）。
-  const html = text
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="$1">$2</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>');
-  // P0 fix: sanitize HTML to prevent XSS from LLM output
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['pre', 'code', 'strong', 'em', 'br', 'p', 'ul', 'ol', 'li', 'a', 'span'],
-    ALLOWED_ATTR: ['class', 'href', 'target', 'rel'],
-  });
+  // 聊天正文保留单换行（模型常以换行排版），并复用统一的 Markdown 渲染器
+  // 以获得代码块转义、列表、链接与 GFM 表格支持。
+  return renderMarkdownHtml(text, { breaks: true });
 }
 
 function onAgentChange() {

@@ -23,6 +23,8 @@ describe('Integrations.vue', () => {
 
   beforeEach(() => {
     setActivePinia(createPinia());
+    // n8n 端点由企业版能力门禁；默认（personal）页面不再发请求。
+    localStorage.setItem('maop_edition', JSON.stringify({ edition: 'enterprise' }));
     originalFetch = global.fetch;
     global.__VITEST__ = true;
     if (typeof window !== 'undefined') window.__VITEST__ = true;
@@ -30,6 +32,7 @@ describe('Integrations.vue', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+    localStorage.removeItem('maop_edition');
     delete global.__VITEST__;
     if (typeof window !== 'undefined') delete window.__VITEST__;
   });
@@ -172,6 +175,20 @@ describe('Integrations.vue', () => {
     expect(wrapper.find('.integrations-view').exists()).toBe(true);
     // Error state shown for workflows tab
     expect(wrapper.text()).toContain('Failed to load workflows');
+    wrapper.unmount();
+  });
+
+  it('shows the enterprise notice and skips the request in personal edition', async () => {
+    localStorage.removeItem('maop_edition');
+    global.fetch = vi.fn(() => Promise.resolve({
+      ok: true, status: 200,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve('{}'),
+    }));
+    const wrapper = await mountIntegrations();
+    expect(wrapper.text()).toContain('requires the Enterprise edition');
+    expect(wrapper.text()).not.toContain('Failed to load workflows');
+    expect(global.fetch).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 

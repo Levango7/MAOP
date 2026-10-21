@@ -20,11 +20,15 @@
   --text3: #6b7382;
   --accent: #0d9488;      /* Teal-600: 青绿色品牌主色 */
   --accent2: #0f766e;     /* Teal-700: 青绿色暗变体 (亮色主题用深色保证对比度) */
-  --success: #1f883d;
+  /* a11y (2026-10-20): 由 #1f883d 加深。原值在 --bg 上仅 4.07:1、
+   * --surface-3 上 3.96:1（成功提示文字读不清）。新值最差面 4.64:1。 */
+  --success: #19722f;
   /* a11y: 原 #bf8700 作文字色在 --bg 上仅 2.83:1、--surface 上 3.14:1（均不达标）。
    * 修深为 #8a6100 → --bg 4.99:1 / --surface 5.54:1。 */
   --warn: #8a6100;
-  --fail: #d1242f;
+  /* a11y (2026-10-20): 由 #d1242f 加深至 #c8232d。原值在侧栏 --bg2 上
+   * 仅 4.39:1；新值最差面 4.54:1。 */
+  --fail: #c8232d;
   --radius: 8px;
   --shadow: 0 1px 2px rgba(29, 33, 41, .08);
 
@@ -34,11 +38,13 @@
   --surface-3: #eef0f4;
   --surface-4: #e4e7ec;
   --text-muted: #59616e;
-  --text-faint: #6b7382;  /* a11y: 调深以满足 WCAG AA 4.5:1 on white (原 #78808f 仅 4.04:1) */
-  --brand: #0d9488;       /* Teal-600: 青绿色主品牌色 */
-  --brand-strong: #0f766e;  /* Teal-700: 亮色主题用深色变体保证对比度 */
-  --brand-faint: rgba(13, 148, 136, .08);
-  --brand-soft: rgba(13, 148, 136, .12);
+  /* a11y (2026-10-20): 由 #6b7382 加深。侧栏底色是 --bg2 (#e9ebee)，
+   * 原值在上面的对比度只有 4.31:1（实测 nav-section 4.0）。新值 bg2 上 4.56:1。 */
+  --text-faint: #626a78;
+  --brand: #0c857a;       /* 与 --brand-solid 同值：承载白字的实底/边框（白字 4.51:1） */
+  --brand-strong: #0f766e;  /* Teal-700: 亮色主题用深色变体（文字/点缀） */
+  --brand-faint: rgba(12, 133, 122, .08);
+  --brand-soft: rgba(12, 133, 122, .12);
   --brand-contrast: #ffffff;
   /* MAOP 独有辅助色 (亮色): 琥珀色, 与暗色同值 */
   --accent-warm: #f59e0b;
@@ -51,7 +57,7 @@
   --brand-solid-hover: #0a6d64;  /* 白字 6.20:1 */
   --fail-solid: #b3382f;         /* 白字 5.96:1 */
   --warn-solid: #996c00;         /* 白字 4.67:1 */
-  --brand-text: #0b7a6f;         /* 品牌色作文字: 亮底需更暗, 5.21:1 */
+  --brand-text: #0a746a;         /* 品牌色作文字: 亮底需更暗, 含侧栏 --bg2 最差面 4.73:1 */
   /* R9 修复: --on-fail / --on-warn 亮色定义 (与 tokens.css :root 一致) */
   --on-fail: var(--brand-contrast);
   --on-warn: var(--brand-contrast);
@@ -72,11 +78,14 @@
   --chart-warn: #bf8700;
   --chart-fail: #d1242f;
 
-  --success-soft: rgba(31, 136, 61, .10);
+  --success-soft: rgba(25, 114, 47, .10);
   --warn-soft: rgba(191, 135, 0, .12);
-  --fail-soft: rgba(209, 36, 47, .10);
-  --info: #0a7ea4;
-  --info-soft: rgba(10, 126, 164, .10);
+  --fail-soft: rgba(200, 35, 45, .10);
+  /* a11y (2026-10-20): 由 #0a7ea4 加深。原值在 --bg2 上仅 3.88:1、
+   * --surface-3 上 4.06:1（info 徽标/状态文字读不清）。新值最差面 4.56:1，
+   * 在 info-soft 复合底上 4.98:1。 */
+  --info: #097295;
+  --info-soft: rgba(9, 114, 149, .10);
   /* P3: --chart-5-soft 亮色主题值 (暗色定义在 tokens.css, 此前亮色缺失导致回退到暗色值) */
   --chart-5-soft: rgba(124, 99, 224, .10);
 
@@ -125,13 +134,14 @@
   /* P2 修复: --surface-tint-faint 亮色覆写 (暗色定义在 tokens.css :root, 此前亮色缺失
    * 导致回退到暗色值 rgba(15,23,42,.03)。亮色用 #1d2129 基底极淡色调, 与亮色阴影色系一致。 */
   --surface-tint-faint: rgba(29, 33, 41, .03);
-  /* --danger 亮色: 统一为 --fail 亮色值 #d1242f (原 #c0392b, 语义关系见 tokens.css)。
-   * #d1242f on #f2f3f5 ≈ 5.4:1, 满足 WCAG AA。 */
-  --danger: #d1242f;
-  --danger-soft: rgba(209, 36, 47, .08);
+  /* --danger 亮色: 统一为 --fail 亮色值 (原 #c0392b)。
+   * a11y (2026-10-20): #d1242f 在侧栏 --bg2 上仅 4.39:1，与 --fail 同步加深。
+   * 新值 #c8232d 最差面（--bg2）4.71:1。 */
+  --danger: #c8232d;
+  --danger-soft: rgba(200, 35, 45, .08);
   /* 输入框错误状态 (亮色): 与 --danger 同色系 */
   --input-error-border: var(--danger);
-  --input-error-focus: rgba(209, 36, 47, .18);
+  --input-error-focus: rgba(200, 35, 45, .18);
   --ok: #3fb950;
   --overlay-scrim: rgba(15, 23, 42, .65);
 

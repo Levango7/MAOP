@@ -643,7 +643,8 @@ async function loadQuota() {
   quotaError.value = '';
   try {
     const data = await api.get(`/api/quota/${encodeURIComponent(selectedAgent.value)}`);
-    quotaData.value = data;
+    // 后端返回 {status, agent_name, quota}；解包 quota，旧形态兼容。
+    quotaData.value = data.quota || data;
   } catch (err) {
     quotaData.value = null;
     quotaError.value = (err && err.message) || t('view.agentBilling.failedLoad');
@@ -754,8 +755,11 @@ async function doReset() {
 // ── API: Records ────────────────────────────────────────────────
 function recordsQueryParams() {
   const params = new URLSearchParams();
-  if (recordsFilter.agent) params.set('agent', recordsFilter.agent);
-  if (recordsFilter.range && recordsFilter.range !== 'all') params.set('range', recordsFilter.range);
+  if (recordsFilter.agent) params.set('agent_name', recordsFilter.agent);
+  // 后端按 ISO 时间戳过滤；与落库格式一致用 +00:00 且秒级精度。
+  const spans = { '1h': 3600e3, '24h': 86400e3, '7d': 7 * 86400e3, '30d': 30 * 86400e3 };
+  const ms = spans[recordsFilter.range];
+  if (ms) params.set('since', new Date(Date.now() - ms).toISOString().slice(0, 19) + '+00:00');
   return params.toString();
 }
 
@@ -783,18 +787,17 @@ async function loadSummary() {
   summaryLoading.value = true;
   summaryError.value = '';
   try {
-    // If we have agents, fetch per-agent summaries in parallel; otherwise fetch a
-    // global summary endpoint as a fallback.
+    // 全局 /api/billing/summary 不存在：没有 agent 时保持空列表，
+    // 不要调用一个必然 404 的端点（会在控制台留下错误并触发错误态）。
     if (agents.value.length) {
       const results = await Promise.allSettled(
         agents.value.map((a) => api.get(`/api/billing/summary/${encodeURIComponent(a)}`)),
       );
       summaryList.value = results
         .filter((r) => r.status === 'fulfilled' && r.value)
-        .map((r) => r.value);
+        .map((r) => r.value.summary || r.value);
     } else {
-      const data = await api.get('/api/billing/summary');
-      summaryList.value = data.summaries || data.items || [];
+      summaryList.value = [];
     }
   } catch (err) {
     summaryList.value = [];

@@ -628,7 +628,7 @@ defineExpose({
 .wf-palette-item__icon { grid-area: icon; color: var(--text-muted); }
 .wf-palette-item__label { grid-area: label; font-weight: 600; font-size: var(--fs-sm); }
 .wf-palette-item__desc { grid-area: desc; font-size: var(--fs-xs); color: var(--text-muted); }
-.wf-palette-item--agent .wf-palette-item__icon { color: var(--brand); }
+.wf-palette-item--agent .wf-palette-item__icon { color: var(--brand-text); }
 .wf-palette-item--tool .wf-palette-item__icon { color: var(--success); }
 .wf-palette-item--condition .wf-palette-item__icon { color: var(--warn); }
 .wf-palette-item--parallel .wf-palette-item__icon { color: var(--info); }

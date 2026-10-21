@@ -153,10 +153,11 @@ def _register_enterprise_routers(app: FastAPI) -> None:
 
 def _register_core_routers(app: FastAPI) -> None:
     """Register core dashboard routers (data / control / model / memory / system / auth)."""
-    from maop.dashboard.routers import control, data, evolve_insights, memory, model, system
+    from maop.dashboard.routers import control, data, evolve_insights, memory, model, runs, system
 
     app.include_router(data.router)
     app.include_router(control.router)
+    app.include_router(runs.router)
     app.include_router(model.router)
     app.include_router(evolve_insights.router)
     app.include_router(memory.router)

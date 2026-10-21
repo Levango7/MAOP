@@ -265,9 +265,10 @@ describe('Notifications.vue', () => {
     mockFetch({
       ...defaultRoutes(),
       '/api/notifications/preferences': {
-        preferences: {
-          email: { enabled: true, min_level: 'warning' },
-          in_app: { enabled: true, min_level: 'info' },
+        status: 'ok',
+        preference: {
+          channel_enabled: { email: false, in_app: true },
+          event_level_min: {},
         },
       },
     });
@@ -279,7 +280,27 @@ describe('Notifications.vue', () => {
     await prefBtn.trigger('click');
     await flushPromises();
     expect(wrapper.find('.modal-overlay').exists()).toBe(true);
-    expect(wrapper.find('.pref-table').exists()).toBe(true);
+    const rows = wrapper.find('.pref-table').findAll('tbody tr');
+    expect(rows.length).toBe(4);
+    const checkboxes = rows.map((r) => r.find('input[type="checkbox"]').element.checked);
+    expect(checkboxes[0]).toBe(false); // email disabled on the server
+    expect(checkboxes[2]).toBe(true); // in_app enabled
+
+    // Saving must speak the backend contract: {channel_enabled: {...}}.
+    const saveBtn = wrapper.findAll('.modal-actions button')
+      .find((b) => b.text().includes('Save'));
+    expect(saveBtn).toBeTruthy();
+    await saveBtn.trigger('click');
+    await flushPromises();
+    const put = global.fetch.mock.calls.find(
+      ([u, init]) => String(u).startsWith('/api/notifications/preferences')
+        && (init?.method || 'GET') === 'PUT',
+    );
+    expect(put).toBeTruthy();
+    const body = JSON.parse(put[1].body);
+    expect(body.channel_enabled.email).toBe(false);
+    expect(body.channel_enabled.in_app).toBe(true);
+    expect(body.preferences).toBeUndefined();
     wrapper.unmount();
   });
 

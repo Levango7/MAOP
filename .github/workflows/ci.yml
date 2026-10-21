@@ -474,12 +474,23 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard-enterprise/package-lock.json
 
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
       - name: Install dependencies
         working-directory: dashboard-enterprise
         run: npm ci
 
       - name: Lint frontend
         run: npm run lint
+        working-directory: dashboard-enterprise
+
+      - name: Design tokens (WCAG contrast gate)
+        # 契约在 dashboard-enterprise/DESIGN.md；配对清单 design/contrast-pairs.txt。
+        # --self-test 先证明颜色数学、解析器、"坏配对必须红"三项都活着，
+        # --min-pairs 164 防止清单被删空后门禁空跑成绿。
+        run: npm run design:contrast
         working-directory: dashboard-enterprise
 
       - name: Type check (vue-tsc)

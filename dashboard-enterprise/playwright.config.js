@@ -46,10 +46,34 @@ export default defineConfig({
     // P2 fix (2026-08-14): 同时起后端(9079) + vite(5174)，使 e2e 可真实联调。
     // vite 已配置 /api → localhost:9079 代理，前端调用可直接打到后端。
     {
-      command: 'MAOP_AUTH_ENABLED=0 MAOP_ENV=test python ../py/start_dashboard.py',
+      // env 走 webServer.env 而不是 POSIX 内联写法：Windows 的 cmd.exe 把
+      // `MAOP_AUTH_ENABLED=0 python …` 当成命令名，整条 e2e 在 Windows 上
+      // 起不来（本机实测 "'MAOP_AUTH_ENABLED' is not recognized"）。
+      // 显式带 process.env 打底，避免覆盖掉 PATH 等基础变量。
+      //
+      // MAOP_OWNER_MODE=1：只关认证是不够的。关掉认证但不开 owner 模式时，
+      // middleware 只给 ["read"]（见 maop/core/security/middleware.py 的
+      // _disabled_auth_roles），所有 admin 端点一律 403 —— 实测后端日志里
+      // 成片的 "Admin role required"，worktrees / hooks / edition / live /
+      // runs / routing 全是空的，e2e 一直在验证一个降级应用。回环 + owner
+      // 才是 `maop start` 在个人版里给的真实身份。
+      //
+      // MAOP_MULTIMODAL_PROVIDER=hash：否则后端启动会去 huggingface 拉 CLIP
+      // 权重（本机实测因此花 87 秒，且网络被重置时靠 5 次重试耗满超时）。
+      // e2e 不测多模态嵌入，哈希回退是确定性且足够快的选择——与
+      // py/scripts/first_run_smoke.py 里同一开关的理由一致。
+      // timeout 60s→180s：给慢机器留余量，CI 上不改变行为。
+      command: 'python ../py/start_dashboard.py',
+      env: {
+        ...process.env,
+        MAOP_AUTH_ENABLED: '0',
+        MAOP_OWNER_MODE: '1',
+        MAOP_ENV: 'test',
+        MAOP_MULTIMODAL_PROVIDER: 'hash',
+      },
       port: 9079,
       reuseExistingServer: true,
-      timeout: 60_000,
+      timeout: 180_000,
     },
     {
       command: 'npm run dev',

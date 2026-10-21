@@ -175,6 +175,25 @@ cd py && pytest -m "not slow"
 cd dashboard-enterprise && npm test
 ```
 
+浏览器级 E2E 在 `dashboard-enterprise/e2e/`（Playwright，8 个 spec × 3 浏览器），
+与上表的 `py/tests/e2e/` 是两套东西：
+
+```bash
+cd dashboard-enterprise && npm run test:e2e          # 全跑三浏览器
+npx playwright test --project=chromium              # 只跑 chromium
+```
+
+两个坑（都是本机实测踩出来的）：
+
+- **worktree 里跑 e2e 会测到别人那份代码**：`playwright.config.js` 的 webServer 起的是
+  `python ../py/start_dashboard.py`，而 `python` 解析到的是 site-packages 里那份
+  **可编辑安装**（例如主仓 checkout），不是当前 worktree。改完 API 在 worktree 里跑 e2e
+  却"行为没变"，多半是这个。要么在主仓改，要么显式带上 worktree：
+  `PYTHONPATH=<worktree>/py npx playwright test --project=chromium`。
+- **后端冷启动会去 huggingface 拉 CLIP 权重**：本机实测因此耗掉 87 秒（网络被重置时还要
+  重试 5 次），配置里已给 webServer 设 `MAOP_MULTIMODAL_PROVIDER=hash` 走确定性哈希回退；
+  新加 webServer 时别把这个开关丢了（`py/scripts/first_run_smoke.py` 用的是同一个开关）。
+
 ### 4.3 编写测试
 
 - 使用 `pytest-asyncio`：`@pytest.mark.asyncio`

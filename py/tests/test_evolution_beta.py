@@ -12,9 +12,7 @@ isolated temp directory, so DB state never leaks between tests.
 
 from __future__ import annotations
 
-import sqlite3
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -28,43 +26,29 @@ from maop.history_analyzer import (
 
 # ── Helpers ────────────────────────────────────────────────────────
 
-def _make_delegations_db(db_path: Path, rows: list[dict]) -> None:
-    """Create a delegations table and insert rows for testing."""
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS delegations (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          timestamp TEXT,
-          agent TEXT,
-          task TEXT,
-          routing_key TEXT,
-          exit_code INT,
-          stdout TEXT,
-          stderr TEXT,
-          duration_ms INT,
-          trace_id TEXT
-        )"""
-    )
-    for r in rows:
-        conn.execute(
-            """INSERT INTO delegations
-               (timestamp, agent, task, routing_key, exit_code, stdout, stderr, duration_ms, trace_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                r.get("timestamp", datetime.now(timezone.utc).isoformat()),
-                r.get("agent", "claude"),
-                r.get("task", ""),
-                r.get("routing_key", ""),
-                r.get("exit_code", 0),
-                r.get("stdout", ""),
-                r.get("stderr", ""),
-                r.get("duration_ms", 0),
-                r.get("trace_id", ""),
-            ),
+def _make_failure_events(rows: list[dict]) -> None:
+    """Seed failed ``run.step`` events — the spine HistoryAnalyzer reads."""
+    from maop.core.run_events import record_run_event
+
+    for i, r in enumerate(rows):
+        stored = record_run_event(
+            "beta-trace",
+            "run.step",
+            agent=r.get("agent", "claude"),
+            step=i + 1,
+            status="failed",
+            duration_ms=r.get("duration_ms", 0),
+            payload={
+                "task": r.get("task", ""),
+                "routing_key": r.get("routing_key", ""),
+                "exit_code": r.get("exit_code", 0),
+                "stdout": r.get("stdout", ""),
+                "stderr": r.get("stderr", ""),
+                "error": r.get("error", ""),
+                "attempt": i + 1,
+            },
         )
-    conn.commit()
-    conn.close()
+        assert stored, "run_events store rejected the seeded event"
 
 
 def _reset_cost_tracker_singleton() -> None:
@@ -126,8 +110,7 @@ class TestHistoryAnalyzer:
     def test_failure_clusters_with_data(self, tmp_path: Path) -> None:
         """Failed delegations are clustered by error type + agent."""
         _reset_cost_tracker_singleton()
-        _make_delegations_db(
-            tmp_path / "data" / "maop.db",
+        _make_failure_events(
             [
                 {"agent": "claude", "exit_code": 1, "stderr": "timeout: exec took too long"},
                 {"agent": "claude", "exit_code": 1, "stderr": "timeout: exec took too long"},
@@ -148,8 +131,7 @@ class TestHistoryAnalyzer:
     def test_recommendations_generated(self, tmp_path: Path) -> None:
         """Recommendations are generated when issues exist."""
         _reset_cost_tracker_singleton()
-        _make_delegations_db(
-            tmp_path / "data" / "maop.db",
+        _make_failure_events(
             [
                 {"agent": "claude", "exit_code": 1, "stderr": "timeout: too slow"},
                 {"agent": "claude", "exit_code": 1, "stderr": "timeout: too slow"},
@@ -429,8 +411,7 @@ class TestAutoEvolve:
         """auto_evolve generates suggestions when failures exist."""
         _reset_cost_tracker_singleton()
         from maop.evolve import EvolveEngine
-        _make_delegations_db(
-            tmp_path / "data" / "maop.db",
+        _make_failure_events(
             [
                 {"agent": "claude", "exit_code": 1, "stderr": "timeout: too slow"},
                 {"agent": "claude", "exit_code": 1, "stderr": "timeout: too slow"},

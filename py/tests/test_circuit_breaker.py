@@ -26,6 +26,26 @@ def breaker() -> CircuitBreaker:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TestDefaultPath:
+    def test_default_path_is_the_unified_dashboard_db(self, tmp_path, monkeypatch):
+        """Breaker state and the dashboard must share one SQLite file.
+
+        Regression: the default used to be parents[3]/data/maop.db, which is
+        py/data/maop.db — not db_utils.unified_db_path(). DataProxy reads
+        circuit_breaker_state from the unified DB, so every column was unknown.
+        """
+        monkeypatch.setenv("MAOP_DATA_DIR", str(tmp_path))
+        cb = CircuitBreaker()
+
+        assert cb._path == tmp_path / "maop.db"
+        import sqlite3
+        with sqlite3.connect(cb._path) as con:
+            tables = {r[0] for r in con.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )}
+        assert "circuit_breaker_state" in tables
+
+
 class TestCircuitBreaker:
     def test_init_seeds_default_agents(self, breaker: CircuitBreaker):
         entry = breaker.get("claude")

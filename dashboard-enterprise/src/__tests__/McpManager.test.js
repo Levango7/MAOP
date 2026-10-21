@@ -177,6 +177,37 @@ describe('McpManager.vue', () => {
     wrapper.unmount();
   });
 
+  it('loads editable server config before opening the edit modal', async () => {
+    mockFetch(defaultRoutes({
+      '/api/mcp/servers': {
+        servers: [{ id: 's1', name: 'remote', transport: 'sse', status: 'disconnected' }],
+      },
+      '/api/mcp/servers/s1': {
+        status: 'ok',
+        server: {
+          id: 's1', name: 'remote', transport: 'sse',
+          url: 'https://mcp.example/sse', command: '', args: [],
+          timeout_s: 12, auth_type: 'bearer', has_auth: true,
+        },
+      },
+    }));
+    const wrapper = await mountMcp();
+    await wrapper.find('.srv-table__row .icon-btn').trigger('click');
+    await flushPromises();
+
+    const overlay = document.querySelector('.modal-overlay');
+    expect(overlay).toBeTruthy();
+    const inputs = overlay.querySelectorAll('input');
+    expect(inputs[0].value).toBe('remote');
+    expect(inputs[1].value).toBe('https://mcp.example/sse');
+    const selects = overlay.querySelectorAll('select');
+    expect(selects[0].value).toBe('sse');
+    expect(selects[1].value).toBe('bearer');
+    // 超时以秒为单位，详情里是 12，不能再按毫秒渲染成 12000
+    expect(inputs[inputs.length - 1].value).toBe('12');
+    wrapper.unmount();
+  });
+
   it('does not crash when all API endpoints fail', async () => {
     global.fetch = vi.fn(() => Promise.resolve({
       ok: false, status: 500,

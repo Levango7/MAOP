@@ -299,7 +299,7 @@ onMounted(fetchUsers);
 .users-uname { font-weight: 600; color: var(--text); }
 .users-self {
   font-size: var(--fs-3xs); padding: 1px 5px; border-radius: var(--r-sm);
-  background: var(--brand-soft); color: var(--brand-strong); font-weight: 600;
+  background: var(--brand-soft); color: var(--brand-text); font-weight: 600;
 }
 
 .users-role {
@@ -307,9 +307,9 @@ onMounted(fetchUsers);
   border-radius: var(--r-sm); font-size: var(--fs-2xs); font-weight: 600;
   background: var(--surface-3); color: var(--text-muted);
 }
-.users-role--admin { background: var(--fail-soft); color: var(--fail); }
-.users-role--superadmin { background: var(--brand-soft); color: var(--chart-6); }
-.users-role--operator, .users-role--write { background: var(--info-soft); color: var(--info); }
+.users-role--admin { background: var(--fail-soft); color: var(--fail-strong); }
+.users-role--superadmin { background: var(--brand-soft); color: var(--brand-text); }
+.users-role--operator, .users-role--write { background: var(--info-soft); color: var(--info-strong); }
 .users-role--read { background: var(--surface-3); color: var(--text-muted); }
 
 /* 弹窗 */

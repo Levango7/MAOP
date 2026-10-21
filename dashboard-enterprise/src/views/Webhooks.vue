@@ -40,10 +40,7 @@
               <code class="wh-mono wh-url">{{ h.url }}</code>
             </div>
             <div class="wh-cell wh-cell--events" role="cell">
-              <template v-if="(h.events || []).length">
-                <Badge v-for="e in (h.events || []).slice(0, 2)" :key="e" tone="neutral">{{ eventLabel(e) }}</Badge>
-                <span v-if="(h.events || []).length > 2" class="wh-more">+{{ h.events.length - 2 }}</span>
-              </template>
+              <Badge v-if="h.event" tone="neutral">{{ h.event }}</Badge>
               <span v-else class="wh-muted">—</span>
             </div>
             <div class="wh-cell wh-cell--status" role="cell">
@@ -95,39 +92,21 @@
             <span>{{ t('view.webhooks.fieldUrl') }}</span>
             <input v-model="form.url" class="input" type="text" :placeholder="t('view.webhooks.placeholderUrl')" />
           </label>
-          <div class="form-label">
-            <span>{{ t('view.webhooks.fieldEvents') }}</span>
-            <div class="event-chips">
-              <label v-for="e in EVENT_TYPES" :key="e" class="event-chip">
-                <input v-model="form.events" type="checkbox" :value="e" />
-                <span>{{ eventLabel(e) }}</span>
-              </label>
-            </div>
-          </div>
           <label class="form-label">
-            <span>{{ t('view.webhooks.fieldAuth') }}</span>
-            <select v-model="form.auth_type" class="input">
-              <option value="none">{{ t('view.webhooks.authNone') }}</option>
-              <option value="hmac">{{ t('view.webhooks.authHmac') }}</option>
-              <option value="bearer">{{ t('view.webhooks.authBearer') }}</option>
+            <span>{{ t('view.webhooks.fieldEvent') }}</span>
+            <select v-model="form.event" class="input">
+              <option value="">{{ t('view.webhooks.selectEvent') }}</option>
+              <option v-for="e in eventOptions" :key="e.name" :value="e.name">{{ e.name }}</option>
             </select>
           </label>
-          <label v-if="form.auth_type === 'hmac'" class="form-label">
-            <span>{{ t('view.webhooks.fieldAuthSecret') }}</span>
-            <input v-model="form.auth_secret" class="input" type="password" :placeholder="t('view.webhooks.placeholderSecret')" />
-          </label>
-          <label v-if="form.auth_type === 'bearer'" class="form-label">
-            <span>{{ t('view.webhooks.fieldBearerToken') }}</span>
-            <input v-model="form.auth_token" class="input" type="password" :placeholder="t('view.webhooks.placeholderToken')" />
-          </label>
-          <div class="form-row">
+          <div class="wh-form-row">
             <label class="form-label">
               <span>{{ t('view.webhooks.fieldTimeout') }}</span>
-              <input v-model.number="form.timeout_s" class="input" type="number" min="1" placeholder="30" />
+              <input v-model.number="form.timeout" class="input" type="number" min="1" max="300" />
             </label>
             <label class="form-label">
               <span>{{ t('view.webhooks.fieldRetry') }}</span>
-              <input v-model.number="form.retry_count" class="input" type="number" min="0" placeholder="3" />
+              <input v-model.number="form.retry_count" class="input" type="number" min="0" max="10" />
             </label>
           </div>
           <label class="form-label form-label--inline">
@@ -189,15 +168,17 @@ const api = useApiStore();
 const toast = useToast();
 const { showConfirm } = useConfirm();
 
-// 可订阅的事件类型
-const EVENT_TYPES = [
-  'agent.dispatch',
-  'task.complete',
-  'alert.triggered',
-  'cost.threshold',
-  'system.health',
-  'audit.event',
-];
+// 可订阅的事件类型（以后端 /api/hooks/events 为唯一真相源）
+const eventOptions = ref([]);
+
+async function loadEvents() {
+  try {
+    const d = await api.get('/api/hooks/events');
+    eventOptions.value = Array.isArray(d?.events) ? d.events : [];
+  } catch {
+    eventOptions.value = [];
+  }
+}
 
 // ── 列表状态 ──
 const hooks = ref([]);
@@ -223,12 +204,9 @@ function defaultForm() {
   return {
     name: '',
     url: '',
-    events: [],
-    auth_type: 'none',
-    auth_secret: '',
-    auth_token: '',
-    timeout_s: 30,
-    retry_count: 3,
+    event: '',
+    timeout: 10,
+    retry_count: 0,
     enabled: true,
   };
 }
@@ -242,18 +220,6 @@ const historyCols = computed(() => [
 ]);
 
 // ── 工具函数 ──
-function eventLabel(e) {
-  const map = {
-    'agent.dispatch': t('view.webhooks.eventAgentDispatch'),
-    'task.complete': t('view.webhooks.eventTaskComplete'),
-    'alert.triggered': t('view.webhooks.eventAlertTriggered'),
-    'cost.threshold': t('view.webhooks.eventCostThreshold'),
-    'system.health': t('view.webhooks.eventSystemHealth'),
-    'audit.event': t('view.webhooks.eventAuditEvent'),
-  };
-  return map[e] || e;
-}
-
 function formatRel(ts) {
   if (ts === null || ts === undefined || ts === '') return '—';
   const d = new Date(typeof ts === 'number' ? ts : String(ts));
@@ -281,16 +247,16 @@ async function load() {
 }
 
 function normalizeList(d) {
-  const items = Array.isArray(d) ? d : (d.items || d.webhooks || d.data || []);
+  // 后端返回 { hooks, count }；保留旧字段兜底以免其他部署形态白屏。
+  const items = Array.isArray(d) ? d : (d.hooks || d.items || d.webhooks || d.data || []);
   return items.map((h) => ({
     id: h.id,
     name: h.name || '',
     url: h.url || '',
-    events: h.events || [],
-    auth_type: h.auth_type || 'none',
+    event: h.event || '',
+    timeout: h.timeout ?? 10,
+    retry_count: h.retry_count ?? 0,
     enabled: h.enabled !== false,
-    timeout_s: h.timeout_s || 30,
-    retry_count: h.retry_count || 0,
     last_triggered_at: h.last_triggered_at || h.last_triggered || null,
   }));
 }
@@ -307,12 +273,9 @@ function openEdit(h) {
   form.value = {
     name: h.name || '',
     url: h.url || '',
-    events: [...(h.events || [])],
-    auth_type: h.auth_type || 'none',
-    auth_secret: '',
-    auth_token: '',
-    timeout_s: h.timeout_s || 30,
-    retry_count: h.retry_count || 0,
+    event: h.event || '',
+    timeout: h.timeout ?? 10,
+    retry_count: h.retry_count ?? 0,
     enabled: h.enabled !== false,
   };
   showForm.value = true;
@@ -335,16 +298,8 @@ function validate() {
     toast.warn(t('view.webhooks.validateUrlInvalid'));
     return false;
   }
-  if (!form.value.events.length) {
+  if (!form.value.event) {
     toast.warn(t('view.webhooks.validateEventsRequired'));
-    return false;
-  }
-  if (form.value.auth_type === 'hmac' && !form.value.auth_secret.trim()) {
-    toast.warn(t('view.webhooks.validateSecretRequired'));
-    return false;
-  }
-  if (form.value.auth_type === 'bearer' && !form.value.auth_token.trim()) {
-    toast.warn(t('view.webhooks.validateTokenRequired'));
     return false;
   }
   return true;
@@ -356,15 +311,12 @@ async function save() {
   try {
     const payload = {
       name: form.value.name.trim(),
+      event: form.value.event,
       url: form.value.url.trim(),
-      events: form.value.events,
-      auth_type: form.value.auth_type,
-      timeout_s: Number(form.value.timeout_s) || 30,
+      timeout: Number(form.value.timeout) || 10,
       retry_count: Number(form.value.retry_count) || 0,
       enabled: form.value.enabled,
     };
-    if (form.value.auth_type === 'hmac') payload.auth_secret = form.value.auth_secret;
-    if (form.value.auth_type === 'bearer') payload.auth_token = form.value.auth_token;
 
     if (editingId.value) {
       await api.put(`/api/hooks/${encodeURIComponent(editingId.value)}`, payload);
@@ -399,8 +351,10 @@ async function testHook(h) {
   testingId.value = h.id;
   try {
     const d = await api.post(`/api/hooks/${encodeURIComponent(h.id)}/test`, {});
-    if (d && d.success) {
-      toast.success(t('view.webhooks.testSuccess', { ms: d.latency_ms ?? d.latency ?? 0 }));
+    if (d && typeof d.response === 'string' && d.response.startsWith('no listener')) {
+      toast.info(t('view.webhooks.testNoListener'));
+    } else if (d && d.success) {
+      toast.success(t('view.webhooks.testSuccess', { ms: d.duration_ms ?? d.latency_ms ?? d.latency ?? 0 }));
     } else if (d && d.error) {
       toast.error(t('view.webhooks.testFailed', { error: d.error }));
     } else {
@@ -450,7 +404,9 @@ function closeHistory() {
   historyRecords.value = [];
 }
 
-onMounted(load);
+onMounted(async () => {
+  await Promise.all([load(), loadEvents()]);
+});
 </script>
 
 <style scoped>
@@ -481,6 +437,9 @@ onMounted(load);
 .btn-icon--danger:hover { color: var(--fail); border-color: var(--fail); }
 .spinning { animation: maop-spin 1s linear infinite; }
 @keyframes maop-spin { to { transform: rotate(360deg); } }
+
+/* ── 表单 ── */
+.wh-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 
 /* ── 提示 ── */
 .wh-hint {

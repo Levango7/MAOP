@@ -438,11 +438,12 @@ def get_agent_billing_summary(agent_name: str) -> dict[str, Any]:
 
 def get_billing_records(
     agent_name: str = "",
+    since: str = "",
     limit: int = 100,
 ) -> list[dict[str, Any]]:
     """获取计费记录列表，返回 model_dump(mode="json") 后的 dict 列表。"""
     engine = _get_billing_engine()
-    records = engine.get_billing_records(agent_name=agent_name, limit=limit)
+    records = engine.get_billing_records(agent_name=agent_name, since=since, limit=limit)
     return [r.model_dump(mode="json") for r in records]
 
 

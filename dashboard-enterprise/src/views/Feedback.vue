@@ -628,7 +628,7 @@ onMounted(() => {
   cursor: pointer;
   transition: background var(--motion) var(--ease);
 }
-.btn-primary:hover { background: var(--brand-strong); }
+.btn-primary:hover { background: var(--brand-solid-hover); }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 
 .btn-danger {
@@ -638,14 +638,14 @@ onMounted(() => {
   padding: var(--sp-2) var(--sp-4);
   border: none;
   border-radius: var(--r-md);
-  background: var(--fail);
-  color: var(--on-fail);
+  background: var(--fail-solid);
+  color: var(--brand-contrast);
   font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
   transition: background var(--motion) var(--ease);
 }
-.btn-danger:hover { background: var(--fail-strong); }
+.btn-danger:hover { background: color-mix(in srgb, var(--fail-solid) 86%, #000); }
 .btn-danger:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ── Icon buttons ─────────────────────────────────────────────── */

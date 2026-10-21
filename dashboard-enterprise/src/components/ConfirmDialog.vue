@@ -112,16 +112,16 @@ function onCancel() { resolve(false); }
 }
 .confirm-dialog__confirm:active { transform: scale(0.98); }
 .confirm-dialog__confirm--danger {
-  background: var(--fail);
+  background: var(--fail-solid);
 }
 .confirm-dialog__confirm--danger:hover {
-  background: var(--fail-strong);
+  background: color-mix(in srgb, var(--fail-solid) 86%, #000);
 }
 .confirm-dialog__confirm--info {
-  background: var(--brand);
+  background: var(--brand-solid);
 }
 .confirm-dialog__confirm--info:hover {
-  background: var(--brand-strong);
+  background: var(--brand-solid-hover);
 }
 
 /* a11y: 键盘焦点环 (P0 focus-visible 补充) */

@@ -16,13 +16,14 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-import sqlite3  # P2-fix: 从函数内提升到模块级（标准库，无循环导入风险）
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from maop.core.run_events import recent_steps
 
 logger = logging.getLogger(__name__)
 
@@ -91,50 +92,39 @@ class EvolveResult(BaseModel):
 
 # ── Observability data loader ─────────────────────────────────
 
-def _load_observability_data_from_db(
-    db_path: Path,
+def _load_observability_data_from_events(
     limit: int = 5000,
 ) -> list[dict[str, Any]]:
-    """Load delegation history from SQLite (maop.db).
+    """Load delegation history from the ``run_events`` spine.
 
-    This is the primary data source in production — delegations are
-    persisted via MaopDatabase.insert_delegation().  Returns rows in the
-    same dict shape that _compute_stats expects::
+    ``run.step`` is the per-attempt record that actually gets written;
+    ``delegations`` had the right columns but no production writer, so this
+    engine used to fall through to ``logs/delegations.json`` on every run.
+
+    Returns rows in the same dict shape that _compute_stats expects::
 
         {"agent": str, "routing_key": str, "result": {"exit_code": int, "duration_ms": int}}
 
     Parameters
     ----------
-    db_path : Path
-        Path to the SQLite database file.
     limit : int
-        Maximum number of recent delegation rows to load (default 5000).
-        P1-7 fix: 原硬编码 5000 改为可配置参数，调用方可按需调整采样窗口大小。
+        Maximum number of recent delegation attempts to load (default 5000).
     """
-    if not db_path.exists():
-        return []
     try:
-
-        with sqlite3.connect(str(db_path)) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                "SELECT agent, routing_key, exit_code, duration_ms FROM delegations ORDER BY id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+        rows = recent_steps(limit=limit)
         return [
             {
                 "agent": r["agent"] or "unknown",
                 "routing_key": r["routing_key"] or "",
                 "result": {
                     "exit_code": r["exit_code"] if r["exit_code"] is not None else -1,
-                    "duration_ms": r["duration_ms"] if r["duration_ms"] is not None else 0,
+                    "duration_ms": r["duration_ms"] or 0,
                 },
             }
             for r in rows
         ]
     except Exception as exc:
-        # P2-fix: 删除冗余函数内 import logging，改用模块级 logger
-        logger.warning("[evolve] Failed to load from DB %s: %s", db_path, exc)
+        logger.warning("[evolve] Failed to load run_events: %s", exc)
         return []
 
 
@@ -321,15 +311,14 @@ class EvolveEngine:
             root_dir = Path.cwd()
         self._root = Path(root_dir)
         self._log_dir = self._root / "logs"
-        self._db_path = self._root / "data" / "maop.db"
         self._suggestions_file = self._root / "data" / "evolve-suggestions.json"
-        # P1-7 fix: 可配置的历史采样行数，替代 _load_observability_data_from_db
+        # P1-7 fix: 可配置的历史采样行数，替代 _load_observability_data_from_events
         # 内的硬编码 5000。
         self._history_limit = max(1, history_limit)
 
     def _load_data(self) -> list[dict[str, Any]]:
-        """Load delegation history: SQLite first, JSON fallback."""
-        data = _load_observability_data_from_db(self._db_path, limit=self._history_limit)
+        """Load delegation history: run_events first, JSON fallback."""
+        data = _load_observability_data_from_events(limit=self._history_limit)
         if data:
             return data
         return _load_observability_data(self._log_dir)

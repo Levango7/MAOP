@@ -42,7 +42,30 @@ class RegisterAgentRequest(BaseModel):
     max_concurrent: int = Field(default=1, ge=1, description="最大并发数")
     rate_limit_per_min: int = Field(default=0, ge=0, description="每分钟速率限制")
     timeout_s: float = Field(default=30.0, gt=0, description="超时秒数")
+    retry_count: int = Field(default=3, ge=0, description="重试次数")
+    fallback_agents: list[str] = Field(default_factory=list, description="降级链")
     enabled: bool = Field(default=True, description="是否启用")
+
+
+class UpdateAgentRequest(BaseModel):
+    """PUT /api/agent-catalog/agents/{name} 请求体（部分更新）。
+
+    只有显式提供的字段会被修改，未提供的字段保留原值。
+    """
+
+    display_name: str | None = Field(default=None, max_length=256)
+    vendor: str | None = Field(default=None, max_length=128)
+    version: str | None = Field(default=None, max_length=64)
+    adapter_type: str | None = Field(default=None, max_length=32)
+    capabilities: list[str] | None = None
+    billing_model: str | None = None
+    auth_method: str | None = None
+    max_concurrent: int | None = Field(default=None, ge=1)
+    rate_limit_per_min: int | None = Field(default=None, ge=0)
+    timeout_s: float | None = Field(default=None, gt=0)
+    retry_count: int | None = Field(default=None, ge=0)
+    fallback_agents: list[str] | None = None
+    enabled: bool | None = None
 
 
 class UpdateHealthRequest(BaseModel):
@@ -113,10 +136,32 @@ async def api_register_agent(
             max_concurrent=body.max_concurrent,
             rate_limit_per_min=body.rate_limit_per_min,
             timeout_s=body.timeout_s,
+            retry_count=body.retry_count,
+            fallback_agents=body.fallback_agents,
             enabled=body.enabled,
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    return {"status": "ok", "agent": agent}
+
+
+@router.put("/api/agent-catalog/agents/{name}")
+@handle_api_errors(
+    "Update agent",
+    error_value={"status": "error", "agent": None, "error": "Update failed"},
+)
+async def api_update_agent(
+    name: str, body: UpdateAgentRequest, request: Request
+) -> dict[str, Any]:
+    """部分更新 Agent 元数据；未提供的字段保留原值。"""
+    require_admin(request)
+    changes = body.model_dump(exclude_unset=True)
+    try:
+        agent = agent_service.update_agent(name, changes)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if agent is None:
+        raise HTTPException(404, f"Agent not found: {name}")
     return {"status": "ok", "agent": agent}
 
 

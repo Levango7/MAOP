@@ -195,10 +195,11 @@ class TestADR011StateSourceTruth:
         from maop.core.backends.db_backup import DEFAULT_DATABASES
         assert "human_queue.db" in DEFAULT_DATABASES
 
-    def test_circuit_breaker_default_path_is_maop_db(self):
+    def test_circuit_breaker_default_path_is_maop_db(self, tmp_path, monkeypatch):
         from maop.core.reliability.circuit_breaker import CircuitBreaker
+        monkeypatch.setenv("MAOP_DATA_DIR", str(tmp_path))
         cb = CircuitBreaker()
-        assert cb._path.name == "maop.db"
+        assert cb._path == tmp_path / "maop.db"
 
     def test_human_proxy_uses_sqlite_not_json(self):
         import inspect

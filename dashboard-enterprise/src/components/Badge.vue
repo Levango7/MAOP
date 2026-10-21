@@ -30,9 +30,9 @@ defineProps({
   letter-spacing: .01em;
 }
 .badge--neutral { background: var(--surface-2); color: var(--text-muted); border-color: var(--border-subtle, var(--border)); }
-.badge--brand   { background: var(--brand-soft); color: var(--brand-strong); border-color: color-mix(in srgb, var(--brand) 30%, transparent); box-shadow: 0 1px 2px color-mix(in srgb, var(--brand) 12%, transparent); }
-.badge--success { background: var(--success-soft); color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
-.badge--warn    { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
-.badge--fail    { background: var(--fail-soft); color: var(--fail); border-color: color-mix(in srgb, var(--fail) 30%, transparent); }
-.badge--info    { background: var(--info-soft); color: var(--info); border-color: color-mix(in srgb, var(--info) 30%, transparent); }
+.badge--brand   { background: var(--brand-soft); color: var(--brand-text); border-color: color-mix(in srgb, var(--brand) 30%, transparent); box-shadow: 0 1px 2px color-mix(in srgb, var(--brand) 12%, transparent); }
+.badge--success { background: var(--success-soft); color: var(--success-strong); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
+.badge--warn    { background: var(--warn-soft); color: var(--warn-strong); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.badge--fail    { background: var(--fail-soft); color: var(--fail-strong); border-color: color-mix(in srgb, var(--fail) 30%, transparent); }
+.badge--info    { background: var(--info-soft); color: var(--info-strong); border-color: color-mix(in srgb, var(--info) 30%, transparent); }
 </style>

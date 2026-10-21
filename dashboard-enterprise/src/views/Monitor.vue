@@ -636,21 +636,21 @@ onUnmounted(() => {
 }
 .pill-normal {
   background: var(--success-soft);
-  color: var(--success);
+  color: var(--success-strong);
 }
 .pill-normal .pill-dot {
   background: var(--success);
 }
 .pill-drained {
   background: var(--fail-soft);
-  color: var(--fail);
+  color: var(--fail-strong);
 }
 .pill-drained .pill-dot {
   background: var(--fail);
 }
 .pill-recovering {
   background: var(--warn-soft);
-  color: var(--warn);
+  color: var(--warn-strong);
 }
 .pill-recovering .pill-dot {
   background: var(--warn);

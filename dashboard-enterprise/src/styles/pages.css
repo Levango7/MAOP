@@ -272,9 +272,9 @@
  * （方向反了 —— hover 应加深）。--fail/--warn 同理。详见 tokens.css 注释。 */
 .btn--primary { background: var(--brand-solid); border-color: var(--brand-solid); color: var(--brand-contrast); box-shadow: var(--shadow-brand); }
 .btn--primary:hover { background: var(--brand-solid-hover); border-color: var(--brand-solid-hover); }
-.btn--danger { background: var(--fail-soft); border-color: var(--fail); color: var(--fail); }
+.btn--danger { background: var(--fail-soft); border-color: var(--fail); color: var(--fail-strong); }
 .btn--danger:hover { background: var(--fail-solid); border-color: var(--fail-solid); color: var(--on-fail, #fff); }
-.btn--warn { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.btn--warn { background: var(--warn-soft); border-color: var(--warn); color: var(--warn-strong); }
 .btn--warn:hover { background: var(--warn-solid); border-color: var(--warn-solid); color: var(--on-warn, #fff); }
 .btn--ghost { background: transparent; border-color: var(--border); }
 .btn--ghost:hover { background: var(--surface-2); border-color: var(--border-strong); }
@@ -292,19 +292,11 @@
   width: 100%;
 }
 
-/* Tone modifiers for action buttons — full palette matching ControlPanel template */
-.tone-green, .tone-success { --tone-bg: var(--success-soft); --tone-border: color-mix(in srgb, var(--success) 35%, transparent); --tone-text: var(--success); }
-.tone-orange, .tone-warn { --tone-bg: var(--warn-soft); --tone-border: color-mix(in srgb, var(--warn) 35%, transparent); --tone-text: var(--warn); }
-.tone-blue, .tone-info { --tone-bg: var(--brand-soft); --tone-border: color-mix(in srgb, var(--brand) 35%, transparent); --tone-text: var(--brand); }
-.tone-red, .tone-danger, .tone-fail { --tone-bg: var(--fail-soft); --tone-border: color-mix(in srgb, var(--fail) 35%, transparent); --tone-text: var(--fail); }
-.tone-purple { --tone-bg: var(--chart-5-soft); --tone-border: color-mix(in srgb, var(--chart-5) 35%, transparent); --tone-text: var(--chart-5); }
-.tone-teal { --tone-bg: color-mix(in srgb, var(--chart-6) 10%, transparent); --tone-border: color-mix(in srgb, var(--chart-6) 35%, transparent); --tone-text: var(--chart-6); }
-.tone-cyan { --tone-bg: var(--info-soft); --tone-border: color-mix(in srgb, var(--info) 35%, transparent); --tone-text: var(--info); }
-.tone-pink { --tone-bg: color-mix(in srgb, var(--chart-7) 10%, transparent); --tone-border: color-mix(in srgb, var(--chart-7) 35%, transparent); --tone-text: var(--chart-7); }
-.tone-lime { --tone-bg: color-mix(in srgb, var(--chart-9) 10%, transparent); --tone-border: color-mix(in srgb, var(--chart-9) 35%, transparent); --tone-text: var(--chart-9); }
-.tone-sky { --tone-bg: var(--info-soft); --tone-border: color-mix(in srgb, var(--info) 35%, transparent); --tone-text: var(--info); }
-.tone-slate { --tone-bg: var(--neutral-bg); --tone-border: color-mix(in srgb, var(--text-muted) 30%, transparent); --tone-text: var(--text-muted); }
-.tone-amber { --tone-bg: var(--warn-soft); --tone-border: color-mix(in srgb, var(--warn) 35%, transparent); --tone-text: var(--warn-strong); }
+/* Tone modifier — 语义色只留给破坏性动作（停止/删除）。
+ * 2026-10-20 移除了 11 色 pastel 调色板：同级动作被染成 5-6 种颜色时，
+ * 颜色不再表示危险等级，只表示"每个按钮都很重要"，层级反而消失。
+ * 其余动作一律用中性 --surface-2 二级按钮，主操作用 .btn--primary。 */
+.tone-danger { --tone-bg: var(--fail-soft); --tone-border: color-mix(in srgb, var(--fail) 35%, transparent); --tone-text: var(--fail); }
 
 .ctrl-btn {
   display: inline-flex; align-items: center; gap: var(--sp-2);
@@ -322,8 +314,8 @@
 .ctrl-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
 /* Result bar status colors */
-.result-bar.ok { border-color: var(--success); background: var(--success-soft); color: var(--success); }
-.result-bar.err { border-color: var(--fail); background: var(--fail-soft); color: var(--fail); }
+.result-bar.ok { border-color: var(--success); background: var(--success-soft); color: var(--success-strong); }
+.result-bar.err { border-color: var(--fail); background: var(--fail-soft); color: var(--fail-strong); }
 
 /* Small modifier for action buttons */
 .act-btn.small, .ctrl-btn.small { height: 28px; padding: 0 var(--sp-2); font-size: var(--fs-xs); }
@@ -638,9 +630,29 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .msg-row.user .msg-bubble { background: var(--brand-solid); border-color: var(--brand-solid); color: var(--brand-contrast); }
 .msg-row.user .msg-bubble .msg-text { color: inherit; }
 .msg-content { line-height: 1.65; }
-.msg-text { white-space: pre-wrap; word-break: break-word; }
+.msg-text { white-space: normal; word-break: break-word; }
+.msg-text p { margin: 0 0 var(--sp-2); }
+.msg-text p:last-child { margin-bottom: 0; }
 .msg-text pre { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-3); overflow-x: auto; margin: var(--sp-2) 0; }
 .msg-text code { font-family: var(--font-mono); font-size: .9em; }
+.msg-text a { color: var(--brand-text); text-decoration: underline; }
+.msg-text ul, .msg-text ol { margin: var(--sp-2) 0; padding-left: var(--sp-5); }
+.msg-text blockquote {
+  margin: var(--sp-2) 0; padding-left: var(--sp-3);
+  border-left: 3px solid var(--border-control); color: var(--text-muted);
+}
+.msg-text table { width: 100%; border-collapse: collapse; margin: var(--sp-2) 0; font-size: var(--fs-sm); }
+.msg-text th, .msg-text td {
+  border: 1px solid var(--border); padding: 6px var(--sp-2);
+  text-align: left; vertical-align: top;
+}
+.msg-text th { background: var(--surface-2); font-weight: 600; }
+.msg-text h1, .msg-text h2, .msg-text h3, .msg-text h4 {
+  margin: var(--sp-3) 0 var(--sp-2); line-height: 1.3;
+}
+.msg-text h1 { font-size: var(--fs-lg); }
+.msg-text h2 { font-size: var(--fs-md); }
+.msg-text h3, .msg-text h4 { font-size: var(--fs-sm); }
 .msg-meta { font-size: var(--fs-xs); color: var(--text-faint); margin-top: var(--sp-1); display: flex; gap: var(--sp-3); flex-wrap: wrap; }
 .msg-image { max-width: 240px; border-radius: var(--r-md); margin-top: var(--sp-2); border: 1px solid var(--border); }
 /* R7 修复: shimmer 时长统一使用 var(--motion-slow) (与 Skeleton.vue:49 一致) */
@@ -705,7 +717,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   white-space: nowrap;
   letter-spacing: .01em;
 }
-.live-tag.active { color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); background: var(--success-soft); }
+.live-tag.active { color: var(--success-strong); border-color: color-mix(in srgb, var(--success) 30%, transparent); background: var(--success-soft); }
 .live-tag .pulse-once, .sse-dot { width: 7px; height: 7px; border-radius: var(--r-full); background: var(--success); }
 /* R11 修复: .sse-indicator 状态切换统一为 .is-connected/:not(.is-connected) 方式,
  * 删除第1202-1205行的 .on/.off 重复定义 (两种方式并存导致不一致) */
@@ -1082,7 +1094,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .btn-primary:hover { background: var(--brand-solid-hover); border-color: var(--brand-solid-hover); }
 .btn-ghost { background: transparent; border: 1px solid var(--border-control); color: var(--text-muted); }
 .btn-ghost:hover { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
-.btn-danger { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail); }
+.btn-danger { background: var(--fail-soft); border: 1px solid var(--fail); color: var(--fail-strong); }
 /* R7 修复: 原 :hover background 与默认相同, 无视觉反馈; 增加 border-color + transform */
 .btn-danger:hover { background: var(--fail-soft); border-color: var(--fail-strong); transform: translateY(-1px); }
 /* R7 修复: 添加 :active 状态, 提供按下反馈 */
@@ -1217,7 +1229,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .margin-top { margin-top: var(--sp-5); }
 .view-error {
   display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-4);
-  padding: var(--sp-3) var(--sp-4); color: var(--fail); font-size: var(--fs-sm);
+  padding: var(--sp-3) var(--sp-4); color: var(--fail-strong); font-size: var(--fs-sm);
   background: var(--fail-soft); border: 1px solid color-mix(in srgb, var(--fail) 30%, transparent); border-radius: var(--r-md);
 }
 /* Budget meters */

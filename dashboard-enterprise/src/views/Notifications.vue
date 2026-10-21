@@ -190,7 +190,6 @@
             <tr>
               <th>{{ t('view.notifications.prefChannel') }}</th>
               <th>{{ t('view.notifications.prefEnabled') }}</th>
-              <th>{{ t('view.notifications.prefLevels') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -202,13 +201,6 @@
                   type="checkbox"
                   :aria-label="t('view.notifications.prefEnabled')"
                 />
-              </td>
-              <td>
-                <select v-model="preferences[ch.key].min_level" class="input">
-                  <option value="info">{{ t('view.notifications.levelInfo') }}</option>
-                  <option value="warning">{{ t('view.notifications.levelWarning') }}</option>
-                  <option value="error">{{ t('view.notifications.levelError') }}</option>
-                </select>
               </td>
             </tr>
           </tbody>
@@ -273,10 +265,10 @@ const channels = ref([
   { key: 'sms' },
 ]);
 const preferences = reactive({
-  email: { enabled: true, min_level: 'info' },
-  webhook: { enabled: false, min_level: 'warning' },
-  in_app: { enabled: true, min_level: 'info' },
-  sms: { enabled: false, min_level: 'error' },
+  email: { enabled: true },
+  webhook: { enabled: false },
+  in_app: { enabled: true },
+  sms: { enabled: false },
 });
 
 // ── Filter schema for ListPageLayout ──
@@ -505,17 +497,13 @@ async function openPreferences() {
   prefError.value = '';
   try {
     const d = await api.get('/api/notifications/preferences');
-    const prefs = d.preferences || d || {};
-    channels.value = (d.channels || prefs.channels || [
-      { key: 'email' }, { key: 'webhook' }, { key: 'in_app' }, { key: 'sms' },
-    ]).map((c) => ({ key: typeof c === 'string' ? c : c.key }));
-    // Reset to defaults then merge server values
+    // 后端返回 {status, preference:{channel_enabled, event_level_min, ...}}。
+    const prefs = d.preference || d.preferences || {};
+    const enabledMap = prefs.channel_enabled || {};
+    const keys = new Set(['email', 'webhook', 'in_app', 'sms', ...Object.keys(enabledMap)]);
+    channels.value = [...keys].map((key) => ({ key }));
     for (const ch of channels.value) {
-      const src = prefs[ch.key] || {};
-      preferences[ch.key] = {
-        enabled: src.enabled !== undefined ? !!src.enabled : true,
-        min_level: src.min_level || 'info',
-      };
+      preferences[ch.key] = { enabled: enabledMap[ch.key] !== false };
     }
   } catch (e) {
     prefError.value = e.message || t('view.notifications.prefLoadError');
@@ -525,7 +513,9 @@ async function openPreferences() {
 async function savePreferences() {
   prefSaving.value = true;
   try {
-    await api.put('/api/notifications/preferences', { preferences });
+    const channel_enabled = {};
+    for (const ch of channels.value) channel_enabled[ch.key] = !!preferences[ch.key]?.enabled;
+    await api.put('/api/notifications/preferences', { channel_enabled });
     toast.success(t('view.notifications.prefSaved'));
     prefOpen.value = false;
   } catch (e) {

@@ -1,18 +1,19 @@
 /**
- * useMarkdown — 极简 Markdown → HTML 渲染（无外部依赖）。
+ * useMarkdown — 轻量 Markdown → HTML 渲染（无外部依赖）。
  *
  * 设计目标:
  *   - 不引入 marked / markdown-it 等重量级库，保持 dashboard 零依赖增量。
- *   - 覆盖后端 EvolutionNarrative 输出的 Markdown 子集:
- *     标题(#~####)、有序/无序列表、加粗、行内代码、代码块、引用、分隔线、段落。
+ *   - 覆盖后端 EvolutionNarrative / Chat 输出常用的 Markdown 子集:
+ *     标题(#~####)、有序/无序列表、加粗/斜体、行内代码、代码块、引用、
+ *     分隔线、链接、GFM 表格、段落。
  *   - 输出经过 DOMPurify 净化，防 XSS。
  *
  * 用法:
  *   const { render } = useMarkdown();
  *   const html = render('# Hello\n- item');
+ *   const chat = render('line1\nline2', { breaks: true });
  *
- * 不是完整 Markdown 规范实现：不处理嵌套列表、表格、链接图片等复杂语法。
- * 如需完整渲染，后续可替换为 marked + dompurify。
+ * 不是完整 Markdown 规范实现：不处理嵌套列表、图片等复杂语法。
  */
 import DOMPurify from 'dompurify';
 
@@ -41,6 +42,13 @@ function inline(s) {
   });
   // 加粗 **text**
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // 斜体 *text*（不吞掉已处理的 **）
+  out = out.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+  // 链接 [text](url) — 只放行 http(s)/mailto/站内相对路径
+  out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (match, text, href) => {
+    if (!/^(https?:\/\/|mailto:|\/|#)/i.test(href)) return match;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  });
   // 还原行内代码占位符。
   // \x00 在此是有意的**占位符哨兵**：先把行内代码替换成 \x00CODE<n>\x00，
   // 待其余 Markdown 规则处理完再还原，避免代码内容被后续正则误伤。
@@ -50,13 +58,25 @@ function inline(s) {
   return out;
 }
 
+function parseTableRow(line) {
+  const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  return trimmed.split('|').map((cell) => cell.trim());
+}
+
+function isTableSeparator(line) {
+  const cells = parseTableRow(line);
+  return cells.length > 0 && cells.every((c) => /^:?-+:?$/.test(c));
+}
+
 /**
  * 将 Markdown 文本转为 HTML 片段。
  * @param {string} md Markdown 源文本
+ * @param {{ breaks?: boolean }} [options] breaks=true 时段内换行渲染为 <br />
  * @returns {string} 净化后的 HTML
  */
-function renderMarkdown(md) {
+function renderMarkdown(md, options = {}) {
   if (!md || typeof md !== 'string') return '';
+  const breaks = options.breaks === true;
   const lines = md.replace(/\r\n/g, '\n').split('\n');
   const out = [];
   let i = 0;
@@ -66,7 +86,7 @@ function renderMarkdown(md) {
 
   const flushParagraph = (buf) => {
     if (buf.length) {
-      out.push('<p>' + buf.map(inline).join(' ') + '</p>');
+      out.push('<p>' + buf.map(inline).join(breaks ? '<br />' : ' ') + '</p>');
       buf.length = 0;
     }
   };
@@ -156,6 +176,26 @@ function renderMarkdown(md) {
       continue;
     }
 
+    // GFM 表格：当前行含 | 且下一行是分隔行
+    if (line.includes('|') && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+      flushParagraph(paraBuf);
+      const headerCells = parseTableRow(line);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') {
+        rows.push(parseTableRow(lines[i]));
+        i++;
+      }
+      out.push(
+        '<table><thead><tr>' +
+        headerCells.map((c) => `<th>${inline(c)}</th>`).join('') +
+        '</tr></thead><tbody>' +
+        rows.map((r) => '<tr>' + r.map((c) => `<td>${inline(c)}</td>`).join('') + '</tr>').join('') +
+        '</tbody></table>'
+      );
+      continue;
+    }
+
     // 普通段落行
     paraBuf.push(line);
     i++;
@@ -171,8 +211,12 @@ function renderMarkdown(md) {
   // DOMPurify 净化：允许常见文档标签，禁用脚本/事件
   try {
     return DOMPurify.sanitize(raw, {
-      ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'code', 'pre', 'blockquote', 'hr', 'br', 'span'],
-      ALLOWED_ATTR: ['class'],
+      ALLOWED_TAGS: [
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li',
+        'strong', 'em', 'code', 'pre', 'blockquote', 'hr', 'br', 'span', 'a',
+        'table', 'thead', 'tbody', 'tr', 'th', 'td',
+      ],
+      ALLOWED_ATTR: ['class', 'href', 'target', 'rel'],
     });
   } catch {
     // dompurify 在 SSR/测试环境可能不可用 — 返回转义后的原文作为保底

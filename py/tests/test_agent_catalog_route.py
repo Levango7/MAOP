@@ -214,6 +214,83 @@ class TestRegisterAgent:
         # 确认 catalog 中只有 1 个
         assert catalog.count() == 1
 
+    def test_register_persists_fallback_and_retry_count(
+        self, client: TestClient, catalog: AgentCatalog
+    ) -> None:
+        """降级链与重试次数必须落库（此前被请求模型静默丢弃）。"""
+        resp = client.post("/api/agent-catalog/agents", json={
+            "name": "chain-agent",
+            "fallback_agents": ["claude-code"],
+            "retry_count": 5,
+        })
+        assert resp.status_code == 200
+        stored = catalog.get("chain-agent")
+        assert stored is not None
+        assert stored.fallback_agents == ["claude-code"]
+        assert stored.retry_count == 5
+
+
+# ── 4b. PUT /api/agent-catalog/agents/{name} ─────────────────────
+
+
+class TestUpdateAgent:
+    """PUT /api/agent-catalog/agents/{name} 部分更新端点测试。"""
+
+    def test_partial_update_preserves_other_fields(
+        self, client: TestClient, catalog: AgentCatalog
+    ) -> None:
+        """只改 enabled，其它字段保持不变。"""
+        _register_sample_agents(catalog)
+        resp = client.put("/api/agent-catalog/agents/claude-code", json={"enabled": False})
+        assert resp.status_code == 200
+        agent = resp.json()["agent"]
+        assert agent["enabled"] is False
+        assert agent["display_name"] == "Claude Code"
+        assert agent["vendor"] == "Anthropic"
+        assert agent["capabilities"] == ["code_generation", "tool_use"]
+        assert catalog.get("claude-code").enabled is False
+
+    def test_update_fallback_chain_persisted(
+        self, client: TestClient, catalog: AgentCatalog
+    ) -> None:
+        """降级链更新写入 catalog（AgentRegistry 保存按钮的路径）。"""
+        _register_sample_agents(catalog)
+        resp = client.put(
+            "/api/agent-catalog/agents/claude-code",
+            json={"fallback_agents": ["gpt-4"]},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["agent"]["fallback_agents"] == ["gpt-4"]
+        assert catalog.get("claude-code").fallback_agents == ["gpt-4"]
+
+    def test_update_rejects_self_fallback(
+        self, client: TestClient, catalog: AgentCatalog
+    ) -> None:
+        """降级链包含自身时返回 400，且原值不被改写。"""
+        _register_sample_agents(catalog)
+        resp = client.put(
+            "/api/agent-catalog/agents/claude-code",
+            json={"fallback_agents": ["claude-code"]},
+        )
+        assert resp.status_code == 400
+        assert catalog.get("claude-code").fallback_agents == []
+
+    def test_update_invalid_adapter_type(
+        self, client: TestClient, catalog: AgentCatalog
+    ) -> None:
+        """无效 adapter_type 返回 400。"""
+        _register_sample_agents(catalog)
+        resp = client.put(
+            "/api/agent-catalog/agents/claude-code",
+            json={"adapter_type": "invalid"},
+        )
+        assert resp.status_code == 400
+
+    def test_update_not_found(self, client: TestClient) -> None:
+        """更新不存在的 Agent 返回 404。"""
+        resp = client.put("/api/agent-catalog/agents/nonexistent", json={"enabled": False})
+        assert resp.status_code == 404
+
 
 # ── 4. DELETE /api/agent-catalog/agents/{name} ───────────────────
 

@@ -1019,7 +1019,7 @@ onMounted(() => {
   color: var(--text-faint);
 }
 .loop-enabled.on {
-  color: var(--success);
+  color: var(--success-strong);
   border-color: var(--success);
   background: var(--success-soft, transparent);
 }

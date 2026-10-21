@@ -28,6 +28,10 @@ export const messages = {
     'view.debate.history.failedLoad': 'Failed to load debate history',
     'view.debate.history.refresh': 'Refresh',
 
+    // ── Dispatcher not configured (404 on /api/debate/history) ──
+    'view.debate.notConfigured': 'Debate dispatcher is not configured',
+    'view.debate.notConfiguredHint': 'This page needs a DebateDispatcher registered in the ServiceContainer before it can start debates or save config. The button is disabled to avoid a guaranteed error.',
+
     // ── History table columns ────────────────────────────────────
     'view.debate.col.id': 'Debate ID',
     'view.debate.col.question': 'Question',
@@ -112,6 +116,10 @@ export const messages = {
     'view.debate.history.emptyHint': '在「发起」标签页发起一场辩论即可在此查看裁决。',
     'view.debate.history.failedLoad': '加载辩论历史失败',
     'view.debate.history.refresh': '刷新',
+
+    // ── 调度器未配置（/api/debate/history 返回 404）───────────
+    'view.debate.notConfigured': '辩论调度器未配置',
+    'view.debate.notConfiguredHint': '需要先在 ServiceContainer 中注册 DebateDispatcher，才能发起辩论或保存配置。相关按钮已禁用，避免必然失败的请求。',
 
     // ── 历史表格列 ───────────────────────────────────────────────
     'view.debate.col.id': '辩论 ID',

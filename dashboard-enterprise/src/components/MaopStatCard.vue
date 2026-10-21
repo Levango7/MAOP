@@ -122,11 +122,11 @@ const isDown = computed(() => props.trend !== null && props.trend !== undefined 
   color: var(--text-faint);
 }
 .maop-stat--up .maop-stat__trend {
-  color: var(--success);
+  color: var(--success-strong);
   background: var(--success-soft);
 }
 .maop-stat--down .maop-stat__trend {
-  color: var(--fail);
+  color: var(--fail-strong);
   background: var(--fail-soft);
 }
 .maop-stat__arrow {

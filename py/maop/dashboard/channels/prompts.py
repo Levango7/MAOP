@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from maop.core.run_events import agent_rollup
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +75,9 @@ class PromptsMixin:
         start = time.monotonic()
         try:
             queue = await self.queue_stats()
-            config_agents = await self._query_maop(
-                "SELECT agent, COUNT(*) as cnt FROM delegations GROUP BY agent"
+            # 从 run_events 事实源取每 agent 的尝试数；delegations 表从未有产品写入
+            agent_rows = await asyncio.get_running_loop().run_in_executor(
+                None, agent_rollup
             )
             # Build teams from agent config groups
             teams = []
@@ -90,7 +94,7 @@ class PromptsMixin:
                 logger.warning("[bridge] silent except: %s", exc)
             result = {
                 "queue": queue,
-                "active_agents": [r["agent"] for r in config_agents],
+                "active_agents": [r["agent"] for r in agent_rows],
                 "teams": teams,
             }
         except Exception as exc:

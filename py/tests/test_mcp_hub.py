@@ -60,6 +60,37 @@ class TestMCPServerConfig:
         assert cfg.max_reconnect_attempts == 3
 
 
+class TestMCPServerConfigPersistence:
+    def test_headers_and_timeout_roundtrip_by_id(self, hub):
+        """Dashboard 详情/编辑依赖按 id 读回完整 config（含认证头与超时）。"""
+        import uuid
+
+        name = f"cfg-{uuid.uuid4().hex[:8]}"
+        hub.add_server(MCPServerConfig(
+            name=name,
+            transport=TransportType.STDIO,
+            command="npx",
+            args=["-y", "server"],
+            headers={"Authorization": "Bearer token"},
+            timeout_s=7.5,
+        ))
+        try:
+            sid = hub.find_server_id_by_name(name)
+            assert sid
+            cfg = hub.get_server_config_by_id(sid)
+            assert cfg is not None
+            assert cfg.command == "npx"
+            assert cfg.args == ["-y", "server"]
+            assert cfg.headers == {"Authorization": "Bearer token"}
+            assert cfg.timeout_s == 7.5
+
+            cfg.timeout_s = 9.0
+            assert hub.update_server(sid, cfg) is True
+            assert hub.get_server_config_by_id(sid).timeout_s == 9.0
+        finally:
+            hub.remove_server(name)
+
+
 class TestMCPHubConnect:
     @pytest.mark.asyncio
     async def test_connect_sse(self, hub):

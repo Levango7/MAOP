@@ -730,7 +730,7 @@ onMounted(() => {
 }
 .heatmap__cell--empty { background: var(--surface); color: var(--text-faint); }
 .heatmap__cell--hi { background: var(--success-bg); color: var(--success-strong); font-weight: 600; }
-.heatmap__cell--mid { background: var(--success-soft); color: var(--success); }
+.heatmap__cell--mid { background: var(--success-soft); color: var(--success-strong); }
 .heatmap__cell--lo { background: var(--fail-bg); color: var(--fail-strong); }
 
 .muted { color: var(--text-muted); }

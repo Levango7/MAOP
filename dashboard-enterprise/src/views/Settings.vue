@@ -813,12 +813,11 @@ async function onToggleHook(hook, enabled) {
 async function onTestHook(hook) {
   try {
     const result = await api.post(`/api/hooks/${hook.id}/test`);
-    if (result.success) {
-      if (result.response === 'no listener') {
-        toast.warn(t('view.hooks.testNoListener'));
-      } else {
-        toast.success(t('view.hooks.testSuccess', { ms: result.duration_ms || 0 }));
-      }
+    // 后端无匹配结果时返回 {success: true, response: "no listeners"}。
+    if (typeof result.response === 'string' && result.response.startsWith('no listener')) {
+      toast.warn(t('view.hooks.testNoListener'));
+    } else if (result.success) {
+      toast.success(t('view.hooks.testSuccess', { ms: result.duration_ms || 0 }));
     } else {
       toast.error(t('view.hooks.testFailed', { error: result.error || 'unknown' }));
     }
@@ -1020,7 +1019,7 @@ async function onTestHook(hook) {
   color: var(--brand-contrast);
 }
 .hooks-btn.primary:hover:not(:disabled) {
-  background: var(--brand-strong);
+  background: var(--brand-solid-hover);
 }
 .hooks-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 

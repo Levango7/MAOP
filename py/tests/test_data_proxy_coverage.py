@@ -243,19 +243,6 @@ def _init_maop_db(root: Path) -> Path:
     return root / "data" / "maop.db"
 
 
-def _insert_rows(db_path: Path, table: str, rows: list[dict]) -> None:
-    """Insert rows into a table by dict column names."""
-    if not rows:
-        return
-    cols = list(rows[0].keys())
-    placeholders = ",".join("?" * len(cols))
-    sql = f"INSERT INTO {table} ({','.join(cols)}) VALUES ({placeholders})"
-    with sqlite3.connect(str(db_path)) as conn:
-        for r in rows:
-            conn.execute(sql, tuple(r[c] for c in cols))
-        conn.commit()
-
-
 # ── _ensure_db_schema exception path (80-84) ────────────────────────
 
 
@@ -271,49 +258,106 @@ class TestEnsureDbSchemaError:
             assert any("schema" in rec.message.lower() for rec in caplog.records)
 
 
-# ── report() with data (158-167) ────────────────────────────────────
+# ── report() with data ──────────────────────────────────────────────
 
 
 class TestReportWithData:
-    def test_report_with_delegations(self, tmp_path):
-        from datetime import datetime, timedelta, timezone
-        now = datetime.now(timezone.utc)
-        ts1 = (now - timedelta(hours=1)).isoformat()
-        ts2 = (now - timedelta(hours=2)).isoformat()
-        ts3 = (now - timedelta(hours=3)).isoformat()
+    def test_report_counts_run_events_not_delegations(self, tmp_path):
+        """report() reads the run.step spine; the ``delegations`` table has no writer."""
+        from maop.core import run_events as ev
+
         db_path = _init_maop_db(tmp_path)
-        _insert_rows(db_path, "delegations", [
-            {"timestamp": ts1, "agent": "claude",
-             "task": "t1", "routing_key": "", "exit_code": 0,
-             "stdout": "", "stderr": "", "duration_ms": 100, "trace_id": ""},
-            {"timestamp": ts2, "agent": "claude",
-             "task": "t2", "routing_key": "", "exit_code": 1,
-             "stdout": "", "stderr": "", "duration_ms": 200, "trace_id": ""},
-            {"timestamp": ts3, "agent": "codex",
-             "task": "t3", "routing_key": "", "exit_code": 0,
-             "stdout": "", "stderr": "", "duration_ms": 50, "trace_id": ""},
-        ])
+        for agent, status in (("claude", "ok"), ("claude", "failed"), ("codex", "ok")):
+            ev.record_run_event(f"rep-{agent}-{status}", "run.step",
+                                agent=agent, status=status)
+        # The hours window has to actually filter, otherwise report(hours=1) and
+        # report(hours=48) are the same call and nothing pins the boundary.
+        ev.record_run_event("rep-stale", "run.step", agent="claude", status="ok")
+        with sqlite3.connect(str(db_path)) as conn:
+            conn.execute(
+                "UPDATE run_events SET timestamp = '2000-01-01T00:00:00+00:00' "
+                "WHERE trace_id = 'rep-stale'"
+            )
+            conn.commit()
+
         proxy = _make_proxy(tmp_path)
         result = asyncio.run(proxy.report(hours=48))
         assert result["total_delegations"] == 3
-        assert "claude" in result["by_agent"]
-        assert "codex" in result["by_agent"]
-        assert result["by_agent"]["claude"]["success"] == 1
-        assert result["by_agent"]["claude"]["failure"] == 1
-        assert 0 < result["success_rate"] <= 100
+        assert result["by_agent"]["claude"] == {"total": 2, "success": 1, "failure": 1}
+        assert result["by_agent"]["codex"] == {"total": 1, "success": 1, "failure": 0}
+        assert result["success_rate"] == 66.7
 
 
-# ── agent_stats() with circuit_breaker_state (204-207, 233-234) ─────
+# ── failures() / timeseries() read the event spine ────────────────
+
+
+class TestFailuresAndTimeseriesFromRunEvents:
+    def test_failures_lists_failed_attempts_with_error(self, tmp_path):
+        from maop.core import run_events as ev
+
+        _init_maop_db(tmp_path)
+        ev.record_run_event("f-ok", "run.step", agent="claude", status="ok",
+                            payload={"task": "成的", "exit_code": 0})
+        ev.record_run_event("f-bad", "run.step", agent="codex", status="failed",
+                            duration_ms=40,
+                            payload={"task": "崩的", "exit_code": 78, "error": "认证失败"})
+        proxy = _make_proxy(tmp_path)
+        rows = asyncio.run(proxy.failures(hours=24))
+        assert [r["task"] for r in rows] == ["崩的"]
+        assert rows[0]["error"] == "认证失败"
+        assert rows[0]["exit_code"] == 78
+        assert rows[0]["trace_id"] == "f-bad"
+
+    def test_timeseries_buckets_attempt_counts(self, tmp_path):
+        from maop.core import run_events as ev
+
+        _init_maop_db(tmp_path)
+        ev.record_run_event("s-1", "run.step", agent="claude", status="ok", duration_ms=100)
+        ev.record_run_event("s-2", "run.step", agent="claude", status="failed", duration_ms=200)
+        proxy = _make_proxy(tmp_path)
+        buckets = asyncio.run(proxy.timeseries(hours=168))
+        assert sum(b["total"] for b in buckets) == 2
+        assert sum(b["successes"] for b in buckets) == 1
+
+
+# ── live() recent-attempt feed ──────────────────────────────────────
+
+
+class TestLiveFromRunEvents:
+    def test_live_surfaces_recent_attempts_with_trace_link(self, tmp_path):
+        from maop.core import run_events as ev
+
+        db_path = _init_maop_db(tmp_path)
+        ev.record_run_event("live-1", "run.step", agent="claude", status="ok",
+                            duration_ms=250,
+                            payload={"task": "整理台账", "exit_code": 0})
+        ev.record_run_event("live-old", "run.step", agent="claude", status="ok",
+                            payload={"task": "早上的任务", "exit_code": 0})
+        with sqlite3.connect(str(db_path)) as conn:
+            conn.execute(
+                "UPDATE run_events SET timestamp = '2000-01-01T00:00:00+00:00' "
+                "WHERE trace_id = 'live-old'"
+            )
+            conn.commit()
+
+        proxy = _make_proxy(tmp_path)
+        result = asyncio.run(proxy.live())
+        rows = result["recent_delegations"]
+        assert [r["agent"] for r in rows] == ["claude"]
+        assert rows[0]["task"] == "整理台账"
+        assert rows[0]["trace_id"] == "live-1"
+        assert result["requests_per_min"] == 0.2
+
+
+# ── agent_stats() with circuit_breaker_state ────────────────────────
 
 
 class TestAgentStatsWithCB:
     def test_with_circuit_breaker_state(self, tmp_path):
+        from maop.core import run_events as ev
+
         db_path = _init_maop_db(tmp_path)
-        _insert_rows(db_path, "delegations", [
-            {"timestamp": "2026-01-01T00:00:00+00:00", "agent": "claude",
-             "task": "t", "routing_key": "", "exit_code": 0,
-             "stdout": "", "stderr": "", "duration_ms": 10, "trace_id": ""},
-        ])
+        ev.record_run_event("cb-1", "run.step", agent="claude", status="ok")
         # Create the view/table the bridge queries
         with sqlite3.connect(str(db_path)) as conn:
             conn.execute(
@@ -330,20 +374,19 @@ class TestAgentStatsWithCB:
         assert claude["circuit_breaker"] == "open"
         assert claude["failures"] == 7
         assert claude["threshold"] == 5
+        assert claude["total_delegations"] == 1
 
     def test_config_fallback_exception(self, tmp_path):
-        """If ConfigLoader.load raises, the warning branch (233-234) runs."""
-        db_path = _init_maop_db(tmp_path)
-        _insert_rows(db_path, "delegations", [
-            {"timestamp": "2026-01-01T00:00:00+00:00", "agent": "claude",
-             "task": "t", "routing_key": "", "exit_code": 0,
-             "stdout": "", "stderr": "", "duration_ms": 10, "trace_id": ""},
-        ])
+        """If ConfigLoader.load raises, the warning branch runs."""
+        from maop.core import run_events as ev
+
+        _init_maop_db(tmp_path)
+        ev.record_run_event("cfg-1", "run.step", agent="claude", status="ok")
         proxy = _make_proxy(tmp_path)
         with patch("maop.config.loader.ConfigLoader") as MockLoader:
             MockLoader.return_value.load.side_effect = RuntimeError("cfg boom")
             result = asyncio.run(proxy.agent_stats())
-        # Should still return the claude row from delegations
+        # Should still return the claude row from the event spine
         assert any(r["agent"] == "claude" for r in result)
 
 
@@ -923,24 +966,22 @@ class TestSuccessPaths:
 class TestAgentStatsConfigFallback:
     def test_config_adds_unseen_agents(self, tmp_path):
         from unittest.mock import MagicMock
-        db_path = _init_maop_db(tmp_path)
-        _insert_rows(db_path, "delegations", [
-            {"timestamp": "2026-01-01T00:00:00+00:00", "agent": "claude",
-             "task": "t", "routing_key": "", "exit_code": 0,
-             "stdout": "", "stderr": "", "duration_ms": 10, "trace_id": ""},
-        ])
+
+        from maop.core import run_events as ev
+
+        _init_maop_db(tmp_path)
+        ev.record_run_event("cfg-2", "run.step", agent="claude", status="ok")
         proxy = _make_proxy(tmp_path)
         with patch("maop.config.loader.ConfigLoader") as MockLoader:
             mock_cfg = MockLoader.return_value.load.return_value
-            # 'codex' is in config but not in delegations
+            # 'codex' is configured but has no recorded attempt
             mock_cfg.agents = {"claude": MagicMock(), "codex": MagicMock()}
             result = asyncio.run(proxy.agent_stats())
-        agents = {r["agent"] for r in result}
-        assert "claude" in agents
-        assert "codex" in agents  # added by config fallback
-        codex = next(r for r in result if r["agent"] == "codex")
-        assert codex["total_delegations"] == 0
-        assert codex["circuit_breaker"] == "closed"
+        by_agent = {r["agent"]: r for r in result}
+        assert by_agent["claude"]["total_delegations"] == 1
+        assert "codex" in by_agent  # added by config fallback
+        assert by_agent["codex"]["total_delegations"] == 0
+        assert by_agent["codex"]["circuit_breaker"] == "closed"
 
 
 # ── _window with non-dict records (414) ─────────────────────────────

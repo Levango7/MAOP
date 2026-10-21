@@ -17,6 +17,10 @@ export const messages = {
     'nav.integrations': 'Integrations',
     'nav.integrations.subtitle': 'N8N and external system integrations',
 
+    // ── Edition gate ─────────────────────────────────────────────
+    'view.integrations.requiresEnterprise': 'n8n integration requires the Enterprise edition',
+    'view.integrations.requiresEnterpriseDesc': 'This feature is gated by the N8N_INTEGRATION capability. Switch to Enterprise to manage workflows and executions.',
+
     // ── Tabs ─────────────────────────────────────────────────────
     'view.integrations.tab.workflows': 'Workflows',
     'view.integrations.tab.executions': 'Executions',
@@ -102,6 +106,10 @@ export const messages = {
     // ── 页头与导航 ───────────────────────────────────────────────
     'nav.integrations': '集成',
     'nav.integrations.subtitle': 'N8N 与外部系统集成',
+
+    // ── 版本门禁 ─────────────────────────────────────────────────
+    'view.integrations.requiresEnterprise': 'n8n 集成需要企业版',
+    'view.integrations.requiresEnterpriseDesc': '该功能由 N8N_INTEGRATION 能力门禁。切换到企业版后可管理工作流与执行记录。',
 
     // ── 标签页 ───────────────────────────────────────────────────
     'view.integrations.tab.workflows': '工作流',

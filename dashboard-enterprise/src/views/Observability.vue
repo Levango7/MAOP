@@ -353,7 +353,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .edition-badge.enterprise {
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-text);
 }
 .tracing-badge {
   display: inline-flex;
@@ -371,7 +371,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .tracing-badge.on {
   background: var(--success-soft);
-  color: var(--success);
+  color: var(--success-strong);
 }
 .tracing-badge.on .dot { background: var(--success); }
 .tracing-badge.off {
@@ -449,11 +449,11 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .pipeline-status.ok {
   background: var(--success-soft);
-  color: var(--success);
+  color: var(--success-strong);
 }
 .pipeline-status.bad {
   background: var(--fail-soft);
-  color: var(--fail);
+  color: var(--fail-strong);
 }
 
 /* ── Config rows ────────────────────────────────────────────────── */
@@ -520,15 +520,17 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
 }
 .type-tag.counter {
   background: var(--brand-soft);
-  color: var(--brand);
+  color: var(--brand-text);
 }
 .type-tag.histogram {
+  /* chart-5 on chart-5-soft was 3.94:1 in light; hue encodes the type,
+   * the label itself uses body text for readability. */
   background: var(--chart-5-soft);
-  color: var(--chart-5);
+  color: var(--text);
 }
 .type-tag.gauge {
   background: var(--warn-soft);
-  color: var(--warn);
+  color: var(--warn-strong);
 }
 
 /* ── Health & trace ─────────────────────────────────────────────── */
@@ -542,7 +544,7 @@ onUnmounted(() => { if (pollTimer) clearInterval(pollTimer); });
   display: inline-flex;
   align-items: center;
 }
-.refresh-btn:hover { color: var(--brand); border-color: var(--brand); }
+.refresh-btn:hover { color: var(--brand-text); border-color: var(--brand); }
 .refresh-btn:disabled { opacity: var(--op-disabled); cursor: not-allowed; }
 
 .health-skel, .config-skel {

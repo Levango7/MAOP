@@ -7,8 +7,9 @@ service 调用 / 响应格式化 / 错误处理。
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -25,14 +26,16 @@ router = APIRouter(prefix="/api/mcp", tags=["mcp"])
 
 class ServerCreate(BaseModel):
     name: str
-    transport: str = "stdio"
+    transport: Literal["stdio", "sse", "websocket", "streamable_http"] = "stdio"
     command: str = ""
     args: list[str] = []
     url: str = ""
     env: dict[str, str] = {}
+    auth_type: Literal["none", "bearer", "basic", "apikey"] = "none"
+    token: str = ""
+    timeout_s: float = 30.0
     enabled: bool = True
     auto_connect: bool = False
-    timeout: float = 30.0
 
 
 class ToolCallRequest(BaseModel):
@@ -97,6 +100,17 @@ async def list_servers(request: Request) -> dict[str, Any]:
     return {"status": "ok", **result}
 
 
+@router.get("/servers/{server_id}")
+@handle_api_errors
+async def get_server(server_id: str, request: Request) -> dict[str, Any]:
+    """返回单个 server 的可编辑配置（不返回 token/headers 原值）。"""
+    require_admin(request)
+    detail = plugin_service.get_server_detail(server_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Server {server_id} not found")
+    return {"status": "ok", "server": detail}
+
+
 @router.post("/servers")
 @handle_api_errors
 async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
@@ -107,7 +121,10 @@ async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
         command=body.command,
         args=body.args,
         url=body.url,
-        env=body.env,
+        env=body.env or None,
+        auth_type=body.auth_type,
+        token=body.token,
+        timeout_s=body.timeout_s,
     )
 
 
@@ -128,7 +145,10 @@ async def update_server(server_id: str, body: ServerCreate, request: Request) ->
         command=body.command,
         args=body.args,
         url=body.url,
-        env=body.env,
+        env=body.env or None,
+        auth_type=body.auth_type,
+        token=body.token,
+        timeout_s=body.timeout_s,
     )
     if result is None:
         raise HTTPException(status_code=404, detail=f"Server {server_id} not found")
@@ -266,7 +286,8 @@ async def marketplace_tools(request: Request) -> dict[str, Any]:
     返回空列表而非 500, 前端 ``SkillMarket.vue`` 降级为 EmptyState.
     """
     require_admin(request)
-    result = plugin_service.marketplace_tools()
+    # fetch_catalog 会同步访问 registry 网络；放在事件循环里会阻塞所有请求。
+    result = await asyncio.to_thread(plugin_service.marketplace_tools)
     return {"status": "ok", **result}
 
 
@@ -294,7 +315,8 @@ async def marketplace_install(tool_id: str, request: Request) -> dict[str, Any]:
     if not tool_id or not tool_id.strip():
         raise HTTPException(status_code=400, detail="tool_id must not be empty")
     try:
-        result = plugin_service.marketplace_install(tool_id)
+        # 下载 + checksum 校验是同步网络 IO，不能占住事件循环。
+        result = await asyncio.to_thread(plugin_service.marketplace_install, tool_id)
     except ValueError as exc:
         # 批次3A: 脱敏——安装错误细节不暴露给客户端，仅日志记录。
         msg = str(exc)

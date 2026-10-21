@@ -93,6 +93,7 @@ class HookResponse(BaseModel):
     description: str = ""
     created_at: str = ""
     source: str = "api"
+    last_triggered_at: str = ""
 
 
 class HookListResponse(BaseModel):
@@ -124,13 +125,40 @@ class HookTestResponse(BaseModel):
 
 
 # ── 辅助函数（响应格式化，留在 router 层）─────────────────────────────
-def _hook_def_to_response(hook_def: Any, name: str = "") -> HookResponse:
+# 这些请求头常携带凭据；GET 响应里一律脱敏，更新时收到脱敏值则保留原值。
+_SENSITIVE_HEADER_NAMES = frozenset({
+    "authorization", "proxy-authorization", "cookie", "set-cookie",
+    "x-api-key", "api-key", "x-auth-token", "x-token",
+})
+_REDACTED = "***"
+
+
+def _redact_headers(headers: dict[str, str]) -> dict[str, str]:
+    return {
+        k: (_REDACTED if k.lower() in _SENSITIVE_HEADER_NAMES else v)
+        for k, v in (headers or {}).items()
+    }
+
+
+def _restore_redacted_headers(
+    incoming: dict[str, str], existing: dict[str, str],
+) -> dict[str, str]:
+    """把客户端回传的 ``***`` 还原为库中已存值，避免编辑时误清凭据。"""
+    by_lower = {k.lower(): v for k, v in existing.items()}
+    return {
+        k: (by_lower[k.lower()] if v == _REDACTED and k.lower() in by_lower else v)
+        for k, v in incoming.items()
+    }
+
+
+def _hook_def_to_response(
+    hook_def: Any, name: str = "", last_triggered_at: str = "",
+) -> HookResponse:
     """将 HookManager.HookDef 转为 HookResponse。
 
-    ``HookDef`` 没有 name/headers/timeout/retry_count 字段，
-    这里从 description 中解析（兼容旧数据），缺失则用默认值。
+    ``HookDef`` 没有独立 name 列，name 复用 description（兼容旧数据）。
+    敏感请求头在此脱敏。
     """
-    # description 字段复用为 name（持久化层无独立 name 列）
     display_name = name or hook_def.description or hook_def.id
     return HookResponse(
         id=hook_def.id,
@@ -138,14 +166,15 @@ def _hook_def_to_response(hook_def: Any, name: str = "") -> HookResponse:
         event=hook_def.event,
         url=hook_def.url,
         method="POST",
-        headers={},
+        headers=_redact_headers(hook_def.headers),
         enabled=hook_def.enabled,
-        timeout=10,
-        retry_count=0,
+        timeout=int(hook_def.timeout_s),
+        retry_count=hook_def.retry_count,
         priority=hook_def.priority,
         description=hook_def.description,
         created_at=hook_def.created_at,
         source=hook_def.source,
+        last_triggered_at=last_triggered_at,
     )
 
 
@@ -158,8 +187,17 @@ async def api_hooks_list(request: Request, event: str = "") -> HookListResponse:
     require_admin(request)
     mgr = _get_hook_mgr()
     hooks = execution_service.hooks_list(mgr, event)
+    last_map: dict[str, str] = {}
+    if hooks:
+        raw_map = getattr(mgr, "get_last_triggered_map", None)
+        candidate = raw_map() if callable(raw_map) else {}
+        if isinstance(candidate, dict):
+            last_map = candidate
     return HookListResponse(
-        hooks=[_hook_def_to_response(h) for h in hooks],
+        hooks=[
+            _hook_def_to_response(h, last_triggered_at=last_map.get(h.id, ""))
+            for h in hooks
+        ],
         count=len(hooks),
     )
 
@@ -185,6 +223,8 @@ async def api_hooks_create(body: HookCreateRequest, request: Request) -> HookRes
     try:
         hdef = execution_service.hooks_create(
             mgr, name=body.name, event=body.event, url=body.url,
+            headers=body.headers, timeout_s=float(body.timeout),
+            retry_count=body.retry_count,
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc))
@@ -218,7 +258,12 @@ async def api_hooks_get(hook_id: str, request: Request) -> HookResponse:
     hdef = execution_service.hooks_get(mgr, hook_id)
     if hdef is None:
         raise HTTPException(404, f"Hook {hook_id} not found")
-    return _hook_def_to_response(hdef)
+    last_map: dict[str, str] = {}
+    raw_map = getattr(mgr, "get_last_triggered_map", None)
+    candidate = raw_map() if callable(raw_map) else {}
+    if isinstance(candidate, dict):
+        last_map = candidate
+    return _hook_def_to_response(hdef, last_triggered_at=last_map.get(hook_id, ""))
 
 
 @router.put("/api/hooks/{hook_id}", response_model=HookResponse)
@@ -241,6 +286,12 @@ async def api_hooks_update(hook_id: str, body: HookUpdateRequest, request: Reque
     new_url = body.url if body.url is not None else existing.url
     new_name = body.name if body.name is not None else (existing.description or hook_id)
     new_enabled = body.enabled if body.enabled is not None else existing.enabled
+    new_headers = (
+        _restore_redacted_headers(body.headers, existing.headers)
+        if body.headers is not None else existing.headers
+    )
+    new_timeout = body.timeout if body.timeout is not None else int(existing.timeout_s)
+    new_retry = body.retry_count if body.retry_count is not None else existing.retry_count
 
     # SSRF 防护：拒绝指向内网/云元数据端点的 URL
     try:
@@ -258,6 +309,9 @@ async def api_hooks_update(hook_id: str, body: HookUpdateRequest, request: Reque
             new_url=new_url,
             new_name=new_name,
             new_enabled=new_enabled,
+            new_headers=new_headers,
+            new_timeout_s=float(new_timeout),
+            new_retry_count=new_retry,
         )
     except ValueError as exc:
         raise HTTPException(400, str(exc))

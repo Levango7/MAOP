@@ -29,6 +29,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 from contextlib import asynccontextmanager, suppress
 from typing import Any
 
@@ -141,14 +142,24 @@ async def lifespan(app: FastAPI) -> Any:
     # the CLIP model load (~600 MB) inline on a request path. Gated by the
     # same background-tasks flag as the schedulers: with workers>1 every
     # worker would otherwise load its own copy of the weights.
+    #
+    # Runs on a daemon thread on purpose: provider resolution may download
+    # weights, and uvicorn binds its socket only after lifespan startup. A
+    # synchronous warm-up therefore leaves the dashboard unreachable for
+    # minutes on a fresh/offline machine.
     if _bg_enabled:
-        try:
-            from maop.memory.multimodal import warm_multimodal_space
-            logger.info(
-                "[lifespan] multimodal space: %s", warm_multimodal_space()
-            )
-        except Exception as exc:
-            logger.warning("[lifespan] multimodal provider warm-up failed: %s", exc)
+        def _warm_multimodal() -> None:
+            try:
+                from maop.memory.multimodal import warm_multimodal_space
+                logger.info(
+                    "[lifespan] multimodal space: %s", warm_multimodal_space()
+                )
+            except Exception as exc:
+                logger.warning("[lifespan] multimodal provider warm-up failed: %s", exc)
+
+        threading.Thread(
+            target=_warm_multimodal, name="maop-multimodal-warmup", daemon=True
+        ).start()
 
     # ── Auto-start backup & log-rotation schedulers ────────────
     _backup_scheduler = None

@@ -379,7 +379,8 @@ async function loadAll() {
     // 加载 webhook 列表供渠道选择(失败不阻塞)
     try {
       const wh = await api.get('/api/hooks');
-      webhooks.value = Array.isArray(wh) ? wh : (wh.items || wh.webhooks || wh.data || []);
+      // 后端返回 {hooks, count}；保留旧字段兜底以免其他部署形态空列表。
+      webhooks.value = Array.isArray(wh) ? wh : (wh.hooks || wh.items || wh.webhooks || wh.data || []);
     } catch { /* webhook 列表可选 */ }
   } catch (e) {
     error.value = e.message || String(e);
@@ -515,7 +516,7 @@ async function openHistory(r) {
   historyRecords.value = [];
   try {
     const d = await api.get('/api/audit/alert/history', { rule_id: r.id });
-    const items = Array.isArray(d) ? d : (d.items || d.history || d.records || []);
+    const items = Array.isArray(d) ? d : (d.alerts || d.items || d.history || d.records || []);
     historyRecords.value = items.map((h) => ({
       id: h.id || h.ts || Math.random(),
       time: h.time || h.triggered_at || h.ts,

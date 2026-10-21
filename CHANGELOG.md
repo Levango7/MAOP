@@ -39,6 +39,388 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 通知偏好：读错键、存错结构（2026-10-21）
+
+- `GET /api/notifications/preferences` 返回 `{preference: {channel_enabled, event_level_min}}`，
+  页面读复数 `preferences` 并按频道嵌套解析 ⇒ 服务器配置从不回填。
+- `PUT` 发送 `{preferences: {channel: {enabled, min_level}}}`，后端模型只认
+  `channel_enabled` / `event_level_min` ⇒ 保存被静默丢弃。
+- 对话框改为真实契约：按 `channel_enabled` 回填开关、保存发 `channel_enabled`；
+  按频道的“最低级别”列从未有后端语义（后端是按事件类型配置），先移除该列。
+- 验证：Notifications vitest 12 passed（键名与保存结构的变异验证）。
+
+### Agent 计费：额度卡片恒为 0、记录筛选静默失效（2026-10-21）
+
+- `GET /api/quota/{agent}` 返回 `{quota: {...}}`，页面直接读顶层桶 ⇒ 额度卡片
+  恒显示空值。改为解包 `quota`。
+- `/api/billing/summary/{agent}` 返回 `{summary: {...}}`，汇总 Tab 同样把
+  整个信封当行数据 ⇒ 每行 Agent 名为空、金额为 0。改为解包 `summary`。
+- 记录页发送 `agent`/`range`，后端只认 `agent_name`（`range` 根本不存在）⇒
+  两个筛选器都无效。后端新增 `since` 过滤与筛选结果 `summary`，前端改发
+  `agent_name` + 秒级 `since`，汇总卡片恢复。
+- 验证：后端 billing 55 passed（新增 since/summary 用例）；前端新增
+  AgentBilling vitest 3 条（含信封解包与筛选参数的变异验证）。
+
+### Hook 测试「无监听者」被误报为成功（2026-10-21）
+
+- 后端无匹配结果时返回 `{success: true, response: "no listeners"}`，Settings 只
+  匹配单数 `"no listener"` ⇒ 提示“成功 0ms”；Webhooks 的成功分支同样先命中。
+  两处改为前缀匹配并给出“无监听者”提示；Settings 新增回归测试（已做变异验证）。
+
+### 告警页的 Webhook 选项与触发历史恒为空（2026-10-21）
+
+- `GET /api/hooks` 返回 `{hooks, count}`，但 AlertRules 只读
+  `items/webhooks/data` ⇒ 「通知渠道 = Webhook」下拉框永远没有可选项。
+- `GET /api/audit/alert/history` 返回 `{alerts, count}`，页面只读
+  `items/history/records` ⇒ 告警历史的抽屉永远为空。
+- 两处均补上真实键名并保留旧键兜底；新增 `AlertRules` vitest 2 条，
+  已做变异验证（去掉对应键后测试转红）。
+
+### Webhooks 投递配置真正生效 + 最近触发时间（2026-10-21）
+
+- **配置被静默丢弃**：`HookCreateRequest`/`HookUpdateRequest` 接受
+  `headers`/`timeout`/`retry_count`，但 `HookDef`、SQLite 与投递链都没有这些
+  字段，响应还把三者硬编码为默认值。现补齐 hooks 表三列（含旧库 ALTER 迁移）、
+  `register/list/get` 读写；`_invoke_webhook` 使用自定义 headers 与单次超时，
+  对网络错误 / HTTP 429 / 5xx 按 `retry_count` 重试（4xx 不重试）。
+- **敏感头脱敏**：GET 响应中 Authorization/Cookie/X-Api-Key 等值显示为 `***`；
+  PUT 回传 `***` 时保留库中已存值，改其它字段不会误清凭据。
+- **「最近触发」列**：列表/详情返回 `last_triggered_at`（hook_logs 按 hook_id
+  聚合），不再是永远“从未”。上文契约对齐记录中的两项已知缺口就此补齐。
+- **Webhooks 表单**恢复“超时 (秒) / 重试次数”输入（此前因后端不支持被移除）。
+- **安全依赖**：certifi 2026.7.22 → 2026.10.19（PYSEC-2026-4320，pip-audit）。
+- 验证：后端 hooks 相关测试 91 passed（新增配置持久化/脱敏/占位还原/重试/
+  最近触发共 10 条）；前端 Webhooks 3 passed；ruff 与 mypy 通过。
+
+### Webhooks 页与 /api/hooks 契约对齐（2026-10-21）
+
+- **列表永远为空**：后端返回 `{hooks, count}`，前端只认 `items/webhooks/data`。
+  改为优先读 `hooks`。
+- **事件名全部无效**：前端硬编码 `agent.dispatch` / `task.complete` 等，后端
+  `LifecycleEvent` 实际是 `agent.pre_dispatch` / `step.post_run` 等，创建必 400。
+  改为从 `GET /api/hooks/events` 拉取真实事件，表单改为单选 `event`。
+- **提交字段不匹配**：前端发 `events[]`/`auth_type`/HMAC/bearer/`timeout_s`/
+  `retry_count`，后端请求模型只认 `name/event/url/enabled`。移除这些后端
+  不支持的假控件，按真实契约提交。
+- 测试耗时改读后端 `duration_ms`（原读 `latency_ms` 恒为 0）。
+- 验证：新增 `Webhooks` vitest **2 passed**，eslint 与 `npm run build` 通过。
+- 已知缺口：`HookDef` 本身仍不持久化自定义 headers/超时/重试，补齐需扩展
+  HookDef、SQLite 列与投递链；`last_triggered_at` 也尚未由列表端点返回。
+
+### MCP server 配置链路：编辑不再清空 URL/命令，认证/超时真正生效（2026-10-21）
+
+- **编辑覆盖丢配置**：`GET /api/mcp/servers` 只回 id/name/transport/status，
+  而编辑弹窗用 `s.url`/`s.command` 回填 ⇒ 打开编辑再保存会把 url/command
+  写空。新增 `GET /api/mcp/servers/{id}` 详情端点（不回显 token/headers），
+  前端编辑前先取详情。
+- **认证/超时被静默丢弃**：请求模型没有 auth/token/timeout_s 字段。现在
+  `auth_type` 映射为 `Authorization: Bearer|Basic` 或 `X-API-Key`，`timeout_s`
+  落入 `MCPServerConfig` 并用于 stdio/SSE/WebSocket/streamable-http 四种传输
+  （默认 30s 保持原行为）。编辑时 token 留空保留原值，显式切到 `none` 才清除；
+  未暴露的 env/权限范围/重连策略在更新时保留。
+- **transport 选项无效**：前端默认 `http`，但后端 `TransportType` 只有
+  `stdio/sse/websocket/streamable_http`，创建必失败；改为有效选项，stdio
+  增加 command/args 输入。
+- 验证：`test_mcp_route_crud.py` **12 passed**（新增 5 条）、`test_mcp_hub.py`
+  **46 passed**（新增真实 SQLite 往返）、相关 MCP 套件 **176 passed**；
+  McpManager vitest **10 passed**；ruff/mypy 通过。
+
+### Agent 目录写路径与聊天 Markdown 纠偏（2026-10-21）
+
+- 静态契约审计（前端 231 个 `/api` 路径 × 后端 447 条 OpenAPI 路径，按 HTTP
+  方法比对）发现个人版唯一的非企业断点：`PUT /api/agent-catalog/agents/{name}`
+  后端不存在，而 AgentRegistry 的保存降级链/编辑/启停三处都调用它（点击必
+  405）；`POST` 请求模型缺 `fallback_agents`/`retry_count`，创建时两字段被
+  静默丢弃。新增 `UpdateAgentRequest` + `PUT` 路由 + `service.update_agent`
+  （未提供字段保留原值，降级链自引用返回 400），注册接口透传两字段。
+- Chat 消息改用统一 `useMarkdown`：原实现把代码块内容直接拼进 HTML（模型输出
+  `a < b` 会被浏览器当标签吞掉），且不支持表格/链接/列表。`useMarkdown` 增加
+  GFM 表格、链接协议白名单（http(s)/mailto/相对路径）、斜体与 `breaks` 选项，
+  DOMPurify 白名单同步扩展。
+- 验证：`test_agent_catalog_route.py` **29 passed**，ruff/mypy 通过；
+  vitest Chat + useMarkdown **21 passed**，eslint 通过，`npm run build` 通过。
+- 其余 29 条未匹配路径均为企业版路由（`requiresEnterprise` 守卫）、动态拼接
+  或帮助文本，个人版不会发起。
+
+### UI 可达性纠偏：40 条路由真实渲染审计，修三处"页面上写着的错"
+
+用 dev server + 真后端（隔离空库、owner 身份）逐条导航 40 条路由，
+收集 pageerror / console.error / 非 2xx 的 `/api` 响应 / 空页：
+
+- **技能市场**：数据源为空时横幅写"🔜 即将上线，预计 v5.2.0 上线"——
+  当前已是 5.4.0，且端点与一键安装早已可用。文案改为"仓库源不可用 /
+  未配置 registry 或网络不可达"；同时修掉触发条件：原先搜索无命中也会
+  弹出"数据源不可用"，现在只在 `tools` 整体为空时显示（新增用例钉住）。
+- **Agent 计费**：无 agent 时兜底调用不存在的 `GET /api/billing/summary`
+  （后端只有 `/{agent_name}`），每次进页面必留一条 404。删掉该兜底。
+- **集成（n8n）**：个人版仍请求企业版才注册的 `/api/n8n/workflows`，
+  页面显示"加载失败 / 404"。按 `AlertRules.vue` 同款做法接入 edition
+  门禁：个人版不发请求，直接说明需要企业版；企业版行为不变。
+- **辩论**：`DebateDispatcher` 在 `maop/` 里没有任何实例化点，页面默认
+  必 404。不再把 404 渲染成"加载失败"：改为顶部说明"调度器未配置"并
+  禁用发起/保存（避免必然失败的请求）。为区分 404 与其他失败，API
+  store 的错误对象现在带 `status`/`body`。
+- 实时复核：三条修复后的路由不再产生 `/api` 失败；辩论页显示说明与
+  两个禁用按钮。`npx vitest` 相关 4 文件 **52 passed**、eslint 通过、
+  `npm run build` 44.22s 通过、对比度门禁 164 对全过。
+
+### 后端可达性纠偏：全量 GET 探针抓到的四个"看起来能跑"的缺陷
+
+对隔离空库起的看板（owner 模式、274 条 GET）逐条打真实请求，配合直接
+`app.openapi()`，抓到的问题都不在业务逻辑里，而在"接线"上：
+
+- **一条路由让整个 OpenAPI 生不出来**：`GET /api/bb-m3/metrics` 写了
+  `response_class=None`，FastAPI 的断言会让 `get_openapi()` 整体失败 ⇒
+  非生产环境的 `/api/docs` 拿不到 schema。改为 `PlainTextResponse`，
+  新增 `tests/test_openapi_schema.py` 对**完整 app** 断言 447 条路径可生成、
+  该端点文档为 `text/plain`（子 app 测试抓不到这类问题）。
+- **中转平台注册表每次请求 500**：`RelayPlatformManager` 无参构造用
+  `:memory:`，但每个方法各开连接 ⇒ 建表与 `SELECT` 落在两个互不相干的
+  空库上（`no such table: relay_platforms`）。改为进程私有临时库（`close()`
+  删除），看板全局单例改落 `unified_db_path()`，平台凭据不再随重启丢失。
+  空库实测 `/api/relay-platforms/recommend/claude` 由 500 → 200。
+- **MCP Marketplace 把事件循环钉住**：`fetch_catalog()`/`install()` 是同步
+  网络 IO，却直接在 async 端点里调用。冷请求实测让后续**至少 22 条** GET
+  各超时 8s（探针按字母序整段变红）。两处改 `asyncio.to_thread`，并加
+  "执行线程 ≠ 调用线程" 的回归用例（不做计时断言，避免机器差异假红）。
+- **首次启动先下 600 MB 模型，下载期间端口都不监听**：lifespan 在
+  uvicorn bind 之前同步 `warm_multimodal_space()`；外网不通时实测 4 分钟
+  仍未监听（连接停在 SYN_SENT）。改为专用 daemon 线程，启动日志先
+  `Application startup complete`，warm-up 完成后再记一行。无 provider
+  覆盖变量实测 10s 内 `/api/health` 200；lifespan 用例同时断言 warm-up
+  跑在 `maop-multimodal-warmup` 线程。
+- E2E `seeded-pages.spec.js` 的 agent 名断言改为限定 `.agent-health-list`：
+  页面级的 `getByText('copilot', {exact:true})` 会同时命中路由列表，属于
+  strict-mode 假红，且是否触发取决于当时后端快照（CI 本轮即因此红）。
+
+验证：受影响 10 个测试文件 `192 passed`；ruff 对全部改动文件通过。
+
+### 数据层纠偏第三片：prompts / evolve / history_analyzer 也离开空表（#55 收口）
+
+- `coordination_report` 的每-agent 计数改读 `run_events.agent_rollup()`（线程池执行），
+  `active_agents` 从此来自真实尝试而不是空表。
+- `HistoryAnalyzer._cluster_failures` 改读 `failed_steps()`；`run.step` 的 payload
+  本来就带 `routing_key`/`error`，这次把两者一并投影出来（`_step_projection`）。
+- `EvolveEngine` 改读 `recent_steps()`；`delegations` 无产品写入，旧实现每次都是
+  空读后回退 `logs/delegations.json`，现在只有账本为空才回退。
+- 棘轮 `LEGACY_READERS` 从 11 降到 **8**：只剩 `core/backends/data.py` 2 处
+  （表自身的测试专用读写）与 `dashboard/provider.py` 6 处（导出但从未实例化）。
+- 测试：`test_evolve.py` 的 fixture 用 `MAOP_DATA_DIR` 把账本隔离到 tmp（不再读真实库）；
+  新增 `test_run_events_consumers.py` 证明 coordination 的 active_agents 与失败聚类
+  在真实写入事件后**不为空**，且成功事件不会被当成失败。
+
+### 熔断器写库与看板读库不是同一个文件（2026-10-20）
+
+实测路径（同一进程内比较 `Path(circuit_breaker.__file__).parents[3]/data/maop.db`
+与 `db_utils.unified_db_path()`）：
+
+- `CircuitBreaker()` 默认：`<repo>/py/data/maop.db`
+- 看板 `DataProxy` 读取：`<repo>/data/maop.db`（`MAOP_DATA_DIR` / 项目根解析）
+- `same file? False`
+
+因此 `chat_engine` / `execution_service` / `maop_execute` / `agent_executor`
+这些不传 `breaker=` 的 `Dispatcher` 把熔断状态写进了另一张库，而 `/api/live`、
+`/api/agents/stats` 从统一库读 `circuit_breaker_state` ⇒ 界面上熔断列永远是
+`unknown`/`closed`。默认路径改为 `unified_db_path()`；回归测试用 `MAOP_DATA_DIR`
+指向 tmp，断言落盘文件就是 `<tmp>/maop.db` 且表已建（避免测试污染真实库）。
+
+### 设计契约与 UI 纠偏：Run 页去彩虹化 + 两套主题对比度实测（2026-10-20）
+
+用户反馈"UI 有很多问题"。这次不再凭观感改样式：先用真实浏览器（`vite preview` +
+注入 owner 会话）对暗/亮两套主题逐元素量有效前景/背景（含 alpha 复合），并用
+`#777 on #fff = 4.48` 的正控证明探针没失明；修复前亮色 `/home` 实测 **12 处违规**，
+修复后 `dark/light × /home,/run` 四组均为 **0 违规**（每组审计 100-107 个文本节点）。
+
+- **新增 `dashboard-enterprise/DESIGN.md`**（YAML 令牌 + 11 节正文）：单一品牌青绿、
+  语义色只做状态、实底（`--brand-solid`）与品牌文字（`--brand-text`）拆分、
+  可交互边界用 `--border-control`、平铺 + 1px 描边、组件状态与 Known Gaps。
+- **Run 页按钮层级**：任务输入的主操作改为品牌实底主按钮；执行控制 5 个按钮里
+  只有"停止"保留危险色，其余中性；维护操作整组中性并移到运行记录之后。
+  删除 `pages.css` 里 11 色 `tone-*` pastel 调色板（仅保留 `tone-danger`）——
+  同屏 11 种彩色按钮不再表示优先级，只表示"每个都很重要"。
+- **对比度（实测修复值）**：暗色 `--text-faint` 在 surface-3 4.02→4.79、
+  `--fail` 4.22/3.71→5.56/4.90、`--danger` 4.10/3.61→5.42/4.77；
+  亮色 `--text-faint` 4.30/4.18→4.91/4.57、`--success` 4.07/3.96→5.42/4.64、
+  `--fail`/`--danger` 4.39（bg2）→4.71、`--brand-text` 4.37→4.73、
+  `--info` 3.88→4.56、`--fail-strong` 压在 fail-soft 上 4.39→4.56。
+  头像白字从 `--brand`(3.74) 改 `--brand-solid`(4.51)；页脚分隔点从 1.84 改为可读的
+  `--text-faint`；亮色激活导航文字改正文色（teal-700 压在 brand-soft 上仅 3.97）。
+- **系统性实底缺陷**：35 处实底按钮用 `--brand` 垫白字（3.74:1）。把 `--brand`
+  改为与 `--brand-solid` 同值 `#0c857a`；11 处 hover 用更亮的 `--brand-strong`
+  （白字仅 2.49:1）改为 `--brand-solid-hover`；9 处 `--brand` 作文字改
+  `--brand-text`；4 处 danger 实底（确认弹窗 + 3 个视图的 `.btn-danger`）改
+  `--fail-solid`。
+- **令牌漂移**：`ControlPanel.vue`/`RunTimeline.vue` 引用了不存在的
+  `--text-primary`、`--text-secondary`、`--surface-sunken`、`--radius-md`、
+  `--radius-sm`（静默回落）；`AgentRegistry.vue` 引用 `--on-danger`/`--text-inverse`。
+  全部改回现有令牌。Badge 5 种色调文字改用 `*-strong`，避免柔底 alpha 稀释。
+- **柔底状态文字扩面**：扩面审计又抓到错误条 / 状态 pill / 热力格 / 角色徽标等
+  33 处仍是「柔底 + 基础色文字」（实测暗色 4.3-4.4、亮色 3.9-4.3），统一改为
+  `fail-strong/warn-strong/success-strong/info-strong`；`histogram` 标签（chart-5
+  压在 chart-5-soft 上亮色 3.94）改用正文色，色相只承担类型编码。
+- **对比度门禁进 CI**：`dashboard-enterprise/scripts/wcag.py`（vendored，含
+  `--self-test`、`--pairs-only`、rgba 复合、`--min-pairs`）+ `design/contrast-pairs.txt`
+  显式 164 对配对（8 文字令牌 × 5 承载面 + 实底/边框/柔底徽标），接入
+  `Frontend Build` 的 `npm run design:contrast`。删空清单或漏检会判红，不会空跑成绿。
+
+验证：`npm run design:contrast` 164 对全 PASS（自测覆盖"坏配对必须红/缺令牌必须红"）；
+`npm run lint` 0 error；`npx vite build` 通过；前端全量 `57 files / 489 tests` 通过；
+浏览器实测：修复前亮色 `/home` 12 处违规；修复后 18 个主要路由 × 暗/亮共 36 组
+页面均 **0 违规**，正控 4.48 仍能报警。约束：其余路由与 hover 态仍靠令牌门禁兜底
+（已写进 DESIGN.md Known Gaps）。
+
+### 数据层纠偏第二片：`/api/failures` 与 `/api/timeseries` 也离开空表（#55 优先级 A）
+
+上一片把棘轮基线钉在 13；本片减到 **11**（独立复算：AST 数产品码里的
+`FROM/INTO delegations` 字面量 = 11，与门禁常数一致）。
+
+- `DataProxy.failures()` → 失败尝试改读 `run_events.failed_steps(limit, since)`：
+  一行 `run.step` 且 `status='failed'` 就是一次失败，错误正文取 payload 的 `error`，
+  并额外带回 `trace_id`（前端从此能跳到那次的完整时间线）。
+- `DataProxy.timeseries()` → 小时聚合改读 `run_events.hourly_rollup(since)`，
+  `strftime('%Y-%m-%dT%H:00:00', timestamp)` 与旧的 `successes / avg_duration_ms`
+  键名保持不变，只把"来源"从空表换成账本。
+- `recent_steps`/`failed_steps` 共用同一个 `_step_projection`，两条喂口的字段口径
+  从此只有 SQL 谓词这一处差异；不在两处各写一份映射（两份映射一定会有一份先改）。
+- `provider.py` 那 6 处**刻意没动**并写下理由：`DashboardProvider(` 在整个 `maop/`
+  包里只出现在它自己的 docstring 里，运行时零实例化（只被 `dashboard/__init__.py`
+  当公共导出 re-export，MAOS 侧对 `delegations` 零引用）⇒ 改它界面数字一个都不变。
+  顺序按可达性，不按台账行数。
+
+验证：`tests/test_run_events.py` 新增 4 例（失败行保留 error/exit_code 且不含成功行、
+小时分桶含跨小时的那一格、窗口外的小时被排除、两个新读法在存储错误时退化为空），
+`test_data_proxy_coverage.py` 新增 2 例（`failures()`/`timeseries()` 在真写事件之后
+**数字不为 0**：total 2 / successes 1）；棘轮登记表同步删掉 `dashboard/data_proxy.py`
+那一行、`BASELINE_TOTAL` 13→11（门禁的"虚账"检查本身就逼着删干净）。
+实测 `129 passed`（bridge + data 路由）、`21 passed`（棘轮 + 事件源）、ruff/mypy 通过。
+
+### M1 补全：运行记录列表进 UI（`GET /api/runs` 此前没有任何调用方）
+
+第一片写完事实源与两个只读端点，但前端**只用了详情那一条**：`grep -rn "api/runs" src/`
+实测只有 `/api/runs/${traceId}`（作业抽屉里的时间线）。列表端点与 `fetch_recent_runs()`
+没有任何 UI 消费 ⇒ **从命令行 `maop run` 发起的运行在界面上完全看不见**，
+"可复盘"只覆盖了从面板发起的那一半。
+
+- `ControlPanel.vue`（`/run` 页的 structured Tab；旧 `/control` 会重定向到此）新增"运行记录"卡片：任务、agent、
+  步数、耗时、开始时间与三态结论（成功 / 失败 / 未结束），点行开运行抽屉看完整时间线。
+  未写 `run.finished` 的运行**不许显示成成功或失败**，只能是"未结束"（中性色）。
+- 时间线渲染抽成 `src/components/RunTimeline.vue`，作业抽屉与运行抽屉共用一份；
+  状态→色调的映射由调用方以函数 props 传入，不在组件里再写一套口径。
+- 卡片读账本失败时只让列表为空、由空态说明，不参与 `loading`——
+  不能让"读历史"把任务输入框一起锁住。
+- i18n 补 `runHistory`/`viewRun`/`runSteps`/`runIncomplete` 等 15 个键（en+zh 成对）。
+
+验证：`ControlPanel.test.js` 新增 2 例——列表两行的渲染与 finished/incomplete 的色调区分
+（断言 `.badge--success` 与 `.badge--neutral`，不吃翻译文案）、点开抽屉断言
+`.run-timeline` 含事件正文；另加"账本读 500 时面板不炸"一例。
+变异反证：把 `runDrawer.run` 恒置 null ⇒ 恰好 1 例红，且报的是我写的断言消息
+（`run timeline missing`），还原后文件与备份 sha1 逐字节一致、CR 计数 0。
+`npx vitest run` 相关两文件 15 passed；`npm run build` 18.58s 通过；
+`py/scripts/check_api_contract.py` 仍 `OK: 无新增错配`（新增的 `/api/runs?limit=20` 被解析命中）。
+本机全量 vitest 分两段才凑齐：默认 forks 池只起得来 26 个文件（31 个 worker 启动超时），
+`--pool=threads` 起到 49 个（仍 8 个起不来），把那 8 个单独串行再跑 ⇒ **8/8、64 passed**，
+合计 **57 个文件 / 489 个用例全过**（57 = 本机 `src/__tests__/*.test.js` 的文件数）。
+worker 起不来是 worktree 的 `node_modules` 是指向主仓的 junction、加上本机同时压着
+两桩长跑导致的，与被测代码无关；终判仍以 CI `Frontend Build` 为准。
+
+### 数据层纠偏：看板统计此前一直读一张没人写的表（#54）
+
+`delegations` 表 schema 完备、列齐全，但 `MaopDatabase.insert_delegation()`
+**只有测试在调用**（实测：产品码里除定义处零调用点）。于是所有读它的地方不是报错、
+而是**自信地报 0**——`_query_maop_sync` 把异常吞成 `logger.warning` + `[]`。
+`delegations` 的读者按 AST 数（剥掉 docstring/散文）共 **13 处**，本次改掉其中 3 处：
+
+- `DataProxy.report()`（`/api/report`）、`agent_stats()`（Overview 的每 agent
+  `total_delegations`/成功率）、`live()`（`recent_delegations` 与 `requests_per_min`）
+  改读 `run_events`：一次 `run.step` 事件 = 一次委派尝试（`status='ok'` 计成功）。
+  新增 `run_events.agent_rollup(since)` 与 `recent_steps(limit, since)`，
+  由本模块自己解析库路径（`MAOP_DB_PER_MODULE=1` 时与 `get_db_path()` 不同文件，
+  把口径留在事实源那一侧）。
+- 时间窗改为**秒精度的 ISO** 比较（`timespec="seconds"`）：事实源写的是秒，
+  旧代码写的带微秒，字典序比较在"同一秒"上会把该算进去的行漏掉。
+- 保留期：`prune_run_events(older_than_days=30)`（append-only 不等于不许有界），
+  挂进 `POST /api/control/maintain` 的 `prune` 动作并回 `run_events_pruned`，
+  排在 memory store 之前执行——记账清理不该被别的子系统的失败带走。
+  `older_than_days` 下限钳到 1，防一句 `0` 把审计线清空。
+- 新增棘轮门禁 `py/tests/test_delegations_table_readers.py`：产品码里
+  "`FROM/INTO/UPDATE/JOIN delegations`" 的字符串字面量只准减不准加，
+  未登记的文件、超基线的总数、台账里的虚账三类都判红。基线 **13** = 本表自己的
+  写入/读取方法一对（2，只有测试调用）+ 还没改的读者 11：`provider.py` 6、
+  `data_proxy.failures()/timeseries()` 2、`channels/prompts.py` 1、`evolve.py` 1、
+  `history_analyzer.py` 1 —— 后 11 处是下一片的清单。
+- `docs/database-schema.md` 补 `run_events` 表节（§2b）并把 `delegations` 标成
+  "无写入方、读它一律 0、不要再加读者"；`evolve.py` 的 docstring 原话是
+  "This is the primary data source in production — delegations are persisted via
+  `insert_delegation()`"，与实测相反（那条路恒空，真正喂演进的是
+  `logs/delegations.json` 兜底），改为如实描述先后顺序与去处。
+
+验证：`tests/test_run_events.py` 13 例（新增 rollup/window/limit/clamp/错误退化各例）
++ `test_data_proxy_coverage.py` 改写 4 例 + 新增 `live()` 1 例 + `test_router_control.py`
+新增 1 例（从 HTTP 入口跑通 prune 真的删掉了过期事件）—— 相关三文件 **170 passed**；
+门禁自检另证：喂一份"docstring 里提到 `FROM delegations` + 代码里真读一次"的合成文件，
+只数到 1（散文不误报），且真树数到 13 == 基线。ruff/mypy/文档一致性门禁通过。
+
+### e2e 可移植性：Windows 上整条 Playwright 腿"根本没跑"（#53）
+
+`dashboard-enterprise/playwright.config.js` 的 webServer 用 POSIX 内联赋值起后端
+（`MAOP_AUTH_ENABLED=0 python …`）。Windows 的 cmd.exe 把 `MAOP_AUTH_ENABLED=0` 当命令名，
+本机实测报 `'MAOP_AUTH_ENABLED' is not recognized`——症状不是"红了"而是"一条都没跑"。
+
+- 改走 Playwright 的 `webServer.env`，并显式以 `process.env` 打底（否则会连 PATH 一起覆盖掉）。
+- 加 `MAOP_MULTIMODAL_PROVIDER=hash`：否则后端启动先去 huggingface 拉 CLIP 权重，本机实测
+  **87 秒**；网络被重置时靠 5 次重试耗满启动超时。e2e 不测多模态嵌入，哈希回退是确定性且
+  快的选择——与 `py/scripts/first_run_smoke.py` 里同一开关、同一理由。
+- webServer `timeout` 60s→180s：给慢机器留余量，CI 上不改变行为。
+- `docs/contributing.md` 记两条当场踩到的坑：worktree 里的 e2e 默认 import **主仓**的
+  editable `maop`（要 `PYTHONPATH=<worktree>/py` 才测得到本 worktree 的代码）；以及上面的权重开关。
+- `.gitignore` 新增 `dashboard-enterprise/data/` 规则：e2e 的 webServer 以前端目录为 cwd 起后端，
+  会在该目录落 `notifications.db` 与 `degradation.log`；仓库根的 `data/*` 规则带斜杠、只匹配根目录，
+  所以这两件此前对 `git add -A` 是可见的（改前实测 `git check-ignore` 两条都 rc=1，改后均命中）。
+- `e2e/seeded-pages.spec.js` 两处 agent 名断言加 `exact: true`：同一页还挂着实时事件流，其
+  `event-msg` 元素里是原始 JSON（实测命中 `{"type":"snapshot",…,"live_agents":["copilot"]}`），
+  子串匹配会同时命中健康行与事件流 ⇒ strict mode violation；撞不撞取决于那一刻快照里有没有这个
+  agent 名，是一条与时序有关的假红。
+
+验证：`--workers=1` 下单跑 3 条目标用例（agent-billing / settings / agent health rows）50.6s 全过；
+`e2e/seeded-pages.spec.js` 整文件 8 条（含两处改后的断言）39.9s 全过。
+
+**未解决，如实记录**：本机全量 chromium 套件（88 条）仍会在约第 65 条之后成批失败——25 条红里
+22 条根因是 `net::ERR_CONNECTION_REFUSED at localhost:5174`（vite dev server 中途消失，
+`[WebServer]` 日志同步停在同一处），其余 3 条单独复跑全绿。同一 commit 在 CI 的
+`Playwright E2E`（chromium + firefox + webkit）为 success ⇒ 判本机 dev-server 稳定性问题，
+不据此宣称已修好，也不把"本地全量绿"当验收口径。
+
+### M1 第一片：单次运行可复盘（run_events 事实源 + /api/runs）
+
+M0 之后作业详情只有捕获到的 stdout，"这次运行到底发生了什么"在进程退出后
+就查不到了。Explore 实测定位到根因（file:line 已核）：`delegations` 表 schema
+完备但 `insert_delegation` **只在测试里被调用**；plan 步骤/stdout/verify 结果
+只活在内存 `LoopResult`（`maop_loop_phases.py`）与 `logs/MAOP-structured.log`
+文本行；`cost_entries` 只在 metadata JSON 里带 trace_id；无任何 run_events 表。
+
+- 新增 `maop/core/run_events.py`：append-only `run_events`（trace_id + seq +
+  kind + agent/step/status/duration/payload），字符串入库前截断到 2000 字符；
+  写失败只记日志不抛出（记账不能弄死运行），读失败退化为空列表。
+- 落点：`run.started`（`maop_loop.py`）、`run.plan`、`run.step`（含 feedback
+  重试的每一次尝试）、`run.verify`（门禁结论与 gates 明细）、`run.cost`、
+  `run.finished`（`maop_loop_phases.py`）。
+- 新增只读端点 `GET /api/runs`、`GET /api/runs/{trace_id}`（admin gate；
+  个人版回环 owner 模式即满足），响应走 `{status,data}` 信封；
+  router 薄、逻辑在 `dashboard/services/run_service.py`。
+- `maop run` 现在打印独占一行的 `[TRACE] <id>`，`system_service` 解析后写进
+  job 记录（`trace_id`），作业详情因此能链到时间线；正则要求整行且十六进制，
+  agent 自己引用这个标记不算数。
+- 前端 job 抽屉增加"运行时间线"（步骤/校验/成本按序展示，DetailDrawer 内容
+  Teleport 到 body，故测试断言走 `document.querySelector`）。
+- README 的 `core/` 计数 7→8 files（`scripts/doc_reconcile.py` 复验通过）。
+
+实测：`test_run_events.py` 6 条（含**真跑一次 `MaopLoop.run`** 断言事件序列与
+seq 连续，证明写入点不是死代码）、`test_router_runs.py` 6 条（列表/详情/未知
+trace 404/只读角色 403）、`test_router_control.py` 62 条（含新增 trace 解析与
+落库 2 条）、loop + 文档门禁 + 质量门禁 + 死接线清单合计 190 passed；
+前端 lint 0 error、`vue-tsc` 0、相关用例 20 passed。
+
+
 ### 修复：自引用 agent 的跨进程 fork 炸弹（2026-10-20）
 
 `config/agents.yaml` 的 `MAOP` 自引用条目 `cli_args: -m maop.cli run --task "{task}"`

@@ -817,7 +817,7 @@ onUnmounted(() => {
   border-radius: var(--r-full);
   background: var(--surface-2);
 }
-.live-hint.is-live { color: var(--success); background: var(--success-soft); }
+.live-hint.is-live { color: var(--success-strong); background: var(--success-soft); }
 .live-tail {
   margin-bottom: var(--sp-3);
   padding: var(--sp-2) var(--sp-3);

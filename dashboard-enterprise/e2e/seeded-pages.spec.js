@@ -108,8 +108,14 @@ test.describe('seeded data rendering (real backend shapes)', () => {
     })
     // Monitor.vue 挂在 /operate（operate 组落地页；旧 /monitor 重定向到此）
     await page.goto('/operate')
-    await expect(page.getByText('claude')).toBeVisible()
-    await expect(page.getByText('copilot')).toBeVisible()
+    // exact：这页同时挂着实时事件流，其 <span class="event-msg"> 里是原始 JSON
+    // （形如 {"type":"snapshot",…,"live_agents":["copilot"]}），路由列表也有
+    // 同名 agent。页面级匹配会命中多个元素 ⇒ strict mode violation，且是否
+    // 撞上取决于那一刻后端快照里有没有这个 agent 名，是一条与时序有关的假红。
+    // 本条要钉的是健康行，所以作用域限定在 .agent-health-list。
+    const health = page.locator('.agent-health-list')
+    await expect(health.getByText('claude', { exact: true })).toBeVisible()
+    await expect(health.getByText('copilot', { exact: true })).toBeVisible()
     expect(problems, `runtime problems on /operate`).toEqual([])
   })
 
@@ -167,7 +173,7 @@ test.describe('seeded data rendering (real backend shapes)', () => {
     })
     await page.goto('/home')
     // KPI：agents_total / version / fail_ranking 行 / activity 事件
-    await expect(page.getByText('copilot')).toBeVisible() // fail_ranking agent
+    await expect(page.getByText('copilot', { exact: true })).toBeVisible() // fail_ranking agent
     await expect(page.getByText('timeout')).toBeVisible() // fail_ranking error
     await expect(page.getByText('任务完成-e2e')).toBeVisible() // activity
     await expect(page.getByText('5.3.1').first()).toBeVisible() // version

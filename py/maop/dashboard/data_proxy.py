@@ -39,6 +39,12 @@ from typing import Any
 from pydantic import BaseModel
 
 from maop.core.backends.db_utils import get_db_path, get_pool
+from maop.core.run_events import (
+    agent_rollup,
+    failed_steps,
+    hourly_rollup,
+    recent_steps,
+)
 from maop.dashboard.channels.mcp import McpMixin
 from maop.dashboard.channels.models import ModelsMixin
 from maop.dashboard.channels.prompts import PromptsMixin
@@ -165,29 +171,32 @@ class DataProxy(
         Returns delegation stats, success rates, and agent breakdown.
         """
         start = time.monotonic()
-        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        # timespec="seconds" matches the timestamps run_events writes, so the
+        # lexicographic window filter cannot drift by sub-second rounding.
+        since = (
+            datetime.now(timezone.utc) - timedelta(hours=hours)
+        ).isoformat(timespec="seconds")
 
-        rows = await self._query_maop(
-            "SELECT agent, exit_code, COUNT(*) as cnt "
-            "FROM delegations WHERE timestamp >= ? "
-            "GROUP BY agent, exit_code ORDER BY agent",
-            (since,),
+        # One attempt = one run.step event. This used to aggregate the
+        # ``delegations`` table, which has no production writer — every number
+        # below was therefore a confident zero.
+        rows = await asyncio.get_running_loop().run_in_executor(
+            None, agent_rollup, since
         )
+        rows = sorted(rows, key=lambda r: r["agent"])  # the old SQL ordered by agent
 
         by_agent: dict[str, dict] = {}
         total = 0
         successes = 0
         for r in rows:
-            agent = r["agent"]
-            if agent not in by_agent:
-                by_agent[agent] = {"total": 0, "success": 0, "failure": 0}
-            by_agent[agent]["total"] += r["cnt"]
-            total += r["cnt"]
-            if r["exit_code"] == 0:
-                by_agent[agent]["success"] += r["cnt"]
-                successes += r["cnt"]
-            else:
-                by_agent[agent]["failure"] += r["cnt"]
+            failures = r["total"] - r["successes"]
+            by_agent[r["agent"]] = {
+                "total": r["total"],
+                "success": r["successes"],
+                "failure": failures,
+            }
+            total += r["total"]
+            successes += r["successes"]
 
         self._record_latency(start)
         return {
@@ -208,18 +217,14 @@ class DataProxy(
 
         # Perf opt: 两个独立查询并行执行，总延迟从 sum(两查询)
         # 降为 max(两查询)。原串行实现每次调用阻塞 ~2 × 单查询延迟。
-        rows, cb_rows = await asyncio.gather(
-            self._query_maop(
-                "SELECT agent, "
-                "COUNT(*) as total, "
-                "SUM(CASE WHEN exit_code = 0 THEN 1 ELSE 0 END) as successes, "
-                "AVG(CASE WHEN exit_code = 0 THEN 1.0 ELSE 0.0 END) as success_rate "
-                "FROM delegations GROUP BY agent ORDER BY total DESC"
-            ),
+        loop = asyncio.get_running_loop()
+        rollup, cb_rows = await asyncio.gather(
+            loop.run_in_executor(None, agent_rollup),
             self._query_maop(
                 "SELECT agent, state, failures, threshold FROM circuit_breaker_state"
             ),
         )
+        rows = sorted(rollup, key=lambda r: r["total"], reverse=True)
         cb_map = {r["agent"]: r for r in cb_rows}
 
         result = []
@@ -269,14 +274,13 @@ class DataProxy(
 
         # Perf opt: 三个独立 DB 查询并行执行，总延迟从 3 × 单查询
         # 降为 1 × 最慢查询。原串行实现每次调用阻塞 ~3 × 单查询延迟。
-        since = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+        # timespec="seconds" keeps this comparable with run_events timestamps.
+        since = (
+            datetime.now(timezone.utc) - timedelta(minutes=5)
+        ).isoformat(timespec="seconds")
+        loop = asyncio.get_running_loop()
         recent, open_breakers, errors = await asyncio.gather(
-            self._query_maop(
-                "SELECT agent, task, exit_code, duration_ms, timestamp "
-                "FROM delegations WHERE timestamp >= ? "
-                "ORDER BY timestamp DESC LIMIT 20",
-                (since,),
-            ),
+            loop.run_in_executor(None, recent_steps, 20, since),
             self._query_maop(
                 "SELECT agent, state, failures FROM circuit_breaker_state "
                 "WHERE state = 'open'"
@@ -351,13 +355,11 @@ class DataProxy(
     async def failures(self, hours: int = 24) -> list[dict[str, Any]]:
         """Failure report — replaces correlation.ps1 -Action failures."""
         start = time.monotonic()
-        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-
-        rows = await self._query_maop(
-            "SELECT agent, task, exit_code, error, duration_ms, timestamp "
-            "FROM delegations WHERE exit_code != 0 AND timestamp >= ? "
-            "ORDER BY timestamp DESC LIMIT 50",
-            (since,),
+        since = (
+            datetime.now(timezone.utc) - timedelta(hours=hours)
+        ).isoformat(timespec="seconds")
+        rows = await asyncio.get_running_loop().run_in_executor(
+            None, failed_steps, 50, since
         )
 
         self._record_latency(start)
@@ -366,20 +368,14 @@ class DataProxy(
     async def timeseries(self, hours: int = 168) -> list[dict[str, Any]]:
         """Time series data — replaces correlation.ps1 -Action timeseries.
 
-        Returns hourly aggregation of delegations.
+        Returns hourly aggregation of delegation attempts.
         """
         start = time.monotonic()
-        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-
-        rows = await self._query_maop(
-            "SELECT "
-            "  strftime('%Y-%m-%dT%H:00:00', timestamp) as hour, "
-            "  COUNT(*) as total, "
-            "  SUM(CASE WHEN exit_code = 0 THEN 1 ELSE 0 END) as successes, "
-            "  AVG(duration_ms) as avg_duration_ms "
-            "FROM delegations WHERE timestamp >= ? "
-            "GROUP BY hour ORDER BY hour",
-            (since,),
+        since = (
+            datetime.now(timezone.utc) - timedelta(hours=hours)
+        ).isoformat(timespec="seconds")
+        rows = await asyncio.get_running_loop().run_in_executor(
+            None, hourly_rollup, since
         )
 
         self._record_latency(start)

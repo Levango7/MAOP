@@ -43,12 +43,9 @@ class TestEvolveEngine:
 
 
 class TestEvolveFunctions:
-    def test_load_observability_data_from_db_nonexistent(self, tmp_path):
-        from pathlib import Path
-
-        from maop.evolve import _load_observability_data_from_db
-        result = _load_observability_data_from_db(Path(tmp_path / "nonexistent.db"))
-        assert result == []
+    def test_load_observability_data_from_events_empty(self):
+        from maop.evolve import _load_observability_data_from_events
+        assert _load_observability_data_from_events() == []
 
     def test_load_observability_data_nonexistent(self, tmp_path):
         from pathlib import Path

@@ -27,6 +27,9 @@ NOSEC_INVENTORY: frozenset[str] = frozenset({
     "maop/core/agent/auth/agent_proxy_gateway.py:B608:10",
     "maop/core/agent/auth/credential_vault.py:B608:9",
     "maop/core/agent/auth/harness_auth.py:B608:8",
+    # 2026-10-21 billing records：where 只由 "agent_name = ?" / "timestamp >= ?"
+    # 两段字面量拼成，值一律走 params 绑定 ⇒ 无注入路径。
+    "maop/core/agent/billing/billing_abstraction.py:B608:1",
     "maop/core/agent/delegation/subagent_db.py:B608:1",
     "maop/core/agent/delegation/subagent_lifecycle.py:B608:1",
     "maop/core/agent/lifecycle/agent_registry.py:B608:1",

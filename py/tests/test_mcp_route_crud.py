@@ -86,6 +86,10 @@ class _FakeHub:
         })
         return True
 
+    def get_server_config_by_id(self, server_id: str):
+        row = self._servers.get(server_id)
+        return row["config"] if row else None
+
     def remove_server(self, name: str) -> bool:
         for sid, d in list(self._servers.items()):
             if d["name"] == name:
@@ -154,6 +158,91 @@ class TestUpdateServer:
         assert [s["name"] for s in servers] == ["new"]
 
 
+# ── GET /api/mcp/servers/{server_id} + 认证/超时透传 ──────────────
+
+
+class TestServerDetailAndConfig:
+    def test_detail_returns_editable_config_without_secret(
+        self, client: TestClient, hub: _FakeHub
+    ):
+        """详情要填回编辑表单，但绝不能回显 token 原值。"""
+        client.post("/api/mcp/servers", json={
+            "name": "fs", "transport": "stdio", "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+            "timeout_s": 12,
+        })
+        sid = client.get("/api/mcp/servers").json()["servers"][0]["id"]
+        resp = client.get(f"/api/mcp/servers/{sid}")
+        assert resp.status_code == 200
+        d = resp.json()["server"]
+        assert d["command"] == "npx"
+        assert d["args"] == ["-y", "@modelcontextprotocol/server-filesystem"]
+        assert d["timeout_s"] == 12
+        assert "token" not in d and "headers" not in d
+        stored = hub.get_server_config_by_id(sid)
+        assert stored.timeout_s == 12
+
+    def test_detail_unknown_id_returns_404(self, client: TestClient):
+        assert client.get("/api/mcp/servers/nope").status_code == 404
+
+    def test_bearer_auth_becomes_header_and_is_preserved_on_edit(
+        self, client: TestClient, hub: _FakeHub
+    ):
+        """表单的 auth_type/token 必须落成 Authorization 头；再次编辑不重输 token 不应清掉。"""
+        client.post("/api/mcp/servers", json={
+            "name": "remote", "transport": "sse", "url": "https://mcp.example/sse",
+            "auth_type": "bearer", "token": "s3cret",
+        })
+        sid = client.get("/api/mcp/servers").json()["servers"][0]["id"]
+        cfg = hub.get_server_config_by_id(sid)
+        assert cfg.headers["Authorization"] == "Bearer s3cret"
+
+        detail = client.get(f"/api/mcp/servers/{sid}").json()["server"]
+        assert detail["auth_type"] == "bearer"
+
+        # 模拟打开编辑框：auth_type 回填为 bearer，token 留空
+        resp = client.put(f"/api/mcp/servers/{sid}", json={
+            "name": "remote", "transport": "sse", "url": "https://mcp.example/sse",
+            "auth_type": "bearer", "token": "",
+        })
+        assert resp.status_code == 200
+        assert hub.get_server_config_by_id(sid).headers["Authorization"] == "Bearer s3cret"
+
+    def test_switching_auth_to_none_clears_header(
+        self, client: TestClient, hub: _FakeHub
+    ):
+        client.post("/api/mcp/servers", json={
+            "name": "remote", "transport": "sse", "url": "https://mcp.example/sse",
+            "auth_type": "bearer", "token": "s3cret",
+        })
+        sid = client.get("/api/mcp/servers").json()["servers"][0]["id"]
+        client.put(f"/api/mcp/servers/{sid}", json={
+            "name": "remote", "transport": "sse", "url": "https://mcp.example/sse",
+            "auth_type": "none",
+        })
+        assert hub.get_server_config_by_id(sid).headers == {}
+
+    def test_update_does_not_wipe_unexposed_fields(
+        self, client: TestClient, hub: _FakeHub
+    ):
+        """编辑只暴露部分字段，未暴露的 env/权限范围必须保留。"""
+        client.post("/api/mcp/servers", json={
+            "name": "fs", "transport": "stdio", "command": "npx",
+            "env": {"HOME": "/home/me"},
+        })
+        sid = client.get("/api/mcp/servers").json()["servers"][0]["id"]
+        cfg = hub.get_server_config_by_id(sid)
+        cfg.allowed_tools = ["read_file"]
+        hub.update_server(sid, cfg)
+
+        client.put(f"/api/mcp/servers/{sid}", json={
+            "name": "fs", "transport": "stdio", "command": "npx",
+        })
+        updated = hub.get_server_config_by_id(sid)
+        assert updated.env == {"HOME": "/home/me"}
+        assert updated.allowed_tools == ["read_file"]
+
+
 # ── GET /api/mcp/topology ────────────────────────────────────────
 
 
@@ -202,3 +291,28 @@ class TestTopology:
         assert resp.status_code == 200
         assert resp.json()["agents"] == []
         assert len(resp.json()["servers"]) == 1
+
+
+def test_marketplace_tools_runs_off_the_event_loop(monkeypatch):
+    """catalog 抓取是同步网络 IO，必须交给线程池。
+
+    放在事件循环里执行时，一个 registry 超时会把整个看板拖住（实测
+    一次冷启动后所有请求串行超时 8s+）。
+    """
+    import asyncio
+    import threading
+
+    seen: dict[str, int] = {}
+
+    def _fake_marketplace_tools() -> dict[str, Any]:
+        seen["thread"] = threading.get_ident()
+        return {"tools": [], "count": 0}
+
+    monkeypatch.setattr(plugin_service, "marketplace_tools", _fake_marketplace_tools)
+    monkeypatch.setattr(mcp_route, "require_admin", lambda request: None)
+
+    caller = threading.get_ident()
+    result = asyncio.run(mcp_route.marketplace_tools(object()))
+
+    assert result == {"status": "ok", "tools": [], "count": 0}
+    assert seen["thread"] != caller, "marketplace_tools 仍在事件循环线程里执行"

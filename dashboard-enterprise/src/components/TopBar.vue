@@ -376,7 +376,8 @@ onMounted(() => {
 .topbar__avatar {
   width: 34px; height: 34px; flex-shrink: 0;
   border-radius: var(--r-full);
-  background: var(--brand);
+  /* 实底承载白字必须用 --brand-solid（白字 4.51:1）；--brand 只有 3.74:1。 */
+  background: var(--brand-solid);
   color: var(--brand-contrast); font-size: var(--fs-base); font-weight: 700;
   display: grid; place-items: center;
   box-shadow: var(--shadow-brand), var(--shadow-inset-highlight);

@@ -45,6 +45,7 @@ describe('ControlPanel.vue', () => {
     return {
       '/api/control/status': { jobs: [] },
       '/api/agent/upgrade': { agents: [] },
+      '/api/runs?limit=20': { status: 'ok', data: { items: [], total: 0 } },
       ...overrides,
     };
   }
@@ -66,7 +67,7 @@ describe('ControlPanel.vue', () => {
   it('renders execution control buttons (run/pause/resume/stop)', async () => {
     mockFetch(defaultRoutes());
     const wrapper = await mountControlPanel();
-    // execActions has 6 entries; each renders a .ctrl-btn
+    // composer 的提交按钮 + execActions 5 个 + maintActions 6 个
     const ctrlBtns = wrapper.findAll('.ctrl-btn');
     expect(ctrlBtns.length).toBeGreaterThanOrEqual(6);
     wrapper.unmount();
@@ -114,6 +115,41 @@ describe('ControlPanel.vue', () => {
     wrapper.unmount();
   });
 
+  it('loads the run timeline when the job carries a trace_id', async () => {
+    mockFetch(defaultRoutes({
+      '/api/control/run': { status: 'ok', job_id: 'j9' },
+      '/api/control/jobs/j9': {
+        job: { id: 'j9', task: 't', status: 'completed', trace_id: 'tr1', stdout: 'x' },
+      },
+      '/api/runs/tr1': {
+        status: 'ok',
+        data: {
+          summary: { trace_id: 'tr1' },
+          events: [
+            { seq: 1, kind: 'run.step', agent: 'claude', status: 'ok', duration_ms: 1234,
+              payload: { stdout: 'agent said done' } },
+            { seq: 2, kind: 'run.verify', agent: 'claude', status: 'passed', duration_ms: 5,
+              payload: { summary: '门禁全部通过' } },
+          ],
+          decisions: [],
+        },
+      },
+    }));
+    const wrapper = await mountControlPanel();
+    await wrapper.find('#maop-task-input').setValue('重构 auth');
+    await wrapper.find('.task-composer__run').trigger('click');
+    await flushPromises();
+    await flushPromises();
+    expect(global.fetch.mock.calls.some(([url]) => String(url) === '/api/runs/tr1')).toBe(true);
+    // DetailDrawer 内容 Teleport 到 body，wrapper.text() 看不见。
+    const timeline = document.querySelector('.run-timeline');
+    expect(timeline, 'teleported timeline missing').not.toBe(null);
+    expect(timeline.textContent).toContain('agent said done');
+    expect(timeline.textContent).toContain('1234ms');
+    expect(timeline.textContent).toContain('门禁全部通过');
+    wrapper.unmount();
+  });
+
   it('renders agent upgrade rows when /api/agent/upgrade returns agents', async () => {
     mockFetch(defaultRoutes({
       '/api/agent/upgrade': {
@@ -124,6 +160,78 @@ describe('ControlPanel.vue', () => {
     }));
     const wrapper = await mountControlPanel();
     expect(wrapper.text()).toContain('claude');
+    wrapper.unmount();
+  });
+
+  it('lists recorded runs and opens a run timeline from the list', async () => {
+    mockFetch(defaultRoutes({
+      '/api/runs?limit=20': {
+        status: 'ok',
+        data: {
+          items: [
+            { trace_id: 'tr-a', task: '整理台账', agent: 'claude', steps: 2,
+              duration_ms: 900, success: true, status: 'finished',
+              started_at: '2026-10-20T10:00:00+00:00' },
+            { trace_id: 'tr-b', task: '半路断掉的', agent: '', steps: 1,
+              duration_ms: 0, success: null, status: 'incomplete',
+              started_at: '2026-10-20T09:00:00+00:00' },
+          ],
+          total: 2,
+        },
+      },
+      '/api/runs/tr-a': {
+        status: 'ok',
+        data: {
+          summary: {
+            trace_id: 'tr-a', task: '整理台账', agent: 'claude', status: 'finished',
+            success: true, steps: 2, duration_ms: 900, verify_status: 'passed',
+            started_at: '2026-10-20T10:00:00+00:00',
+          },
+          events: [
+            { seq: 1, kind: 'run.step', agent: 'claude', status: 'ok', duration_ms: 900,
+              payload: { stdout: '台账已归并' } },
+          ],
+          decisions: [],
+        },
+      },
+    }));
+    const wrapper = await mountControlPanel();
+    // 作业列表为空 ⇒ 这两行只能来自运行账本
+    const rows = wrapper.findAll('.row-item');
+    expect(rows.length).toBe(2);
+    expect(rows[0].text()).toContain('整理台账');
+    expect(rows[0].find('.badge--success').exists()).toBe(true);
+    // 没有 run.finished 的运行不能报成成功，也不能报成失败
+    expect(rows[1].text()).toContain('半路断掉的');
+    expect(rows[1].find('.badge--neutral').exists()).toBe(true);
+
+    await rows[0].findAll('button')[0].trigger('click');
+    await flushPromises();
+    expect(global.fetch.mock.calls.some(([url]) => String(url) === '/api/runs/tr-a')).toBe(true);
+    const timeline = document.querySelector('.run-timeline');
+    expect(timeline, 'run timeline missing').not.toBe(null);
+    expect(timeline.textContent).toContain('台账已归并');
+    wrapper.unmount();
+  });
+
+  it('keeps the run card usable when the ledger is unreadable', async () => {
+    global.fetch = vi.fn((url) => {
+      const u = String(url);
+      if (u === '/api/runs?limit=20') {
+        return Promise.resolve({
+          ok: false, status: 500,
+          json: () => Promise.resolve({}), text: () => Promise.resolve(''),
+        });
+      }
+      const body = defaultRoutes()[u] ?? {};
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: () => Promise.resolve(body), text: () => Promise.resolve(JSON.stringify(body)),
+      });
+    });
+    const wrapper = await mountControlPanel();
+    expect(wrapper.findAll('.row-item').length).toBe(0);
+    expect(wrapper.find('.control-panel').exists()).toBe(true);
     wrapper.unmount();
   });
 
