@@ -69,6 +69,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ``test_router_control.py`` 补 prune 端到端接线 1 条；quota/billing/control
   相关 550 passed / 7 skipped；ruff+mypy 干净；前端 515 passed、build exit 0。
 
+### 安全：certifi 升到 2026.10.19（GHSA-6q48-6c7w-9gw2 / PYSEC-2026-4320，Critical 9.1）
+
+2026-10-20 当天入库的新披露漏洞，**使此前一直绿的 `pip-audit` 作业对所有仍钉
+`certifi 2026.7.22` 的分支转红**——凡在飞 PR 一并被 `CI merge gate` 挡住。
+本条把「为什么突然变红」与「为什么取 2026.10.19 而不是 2026.10.18」记清楚，
+免得下一个同类 advisory 再让排查从零开始。
+
+**漏洞内容**：certifi 的 CA bundle 带着 emSign ECC Root CA - G3 根证书，
+而链到该根的 **8 张 eMudhra 中间 CA 证书私钥已泄露并被签发机构吊销**。
+拿到泄露私钥的攻击者可以签发「看起来合法」的任意主机名证书；
+若同时位于链路上，即可拦截或篡改信任 certifi bundle 的客户端的 TLS 流量
+（`requests` / `urllib3` / `pip` / Python.org 的 macOS 安装器都在此列）。
+属 CWE-295（证书验证不当），CVSS 9.1。
+
+**版本取 2026.10.19 而非 2026.10.18**：2026.10.18 先把**全部** emSign 根移出 bundle，
+2026.10.19 再把**未受影响**的那些加回 ⇒ 目标版本是 2026.10.19。
+
+**为什么只动 `py/requirements.frozen.txt`**（1 行）：它是 pip-audit / SBOM / CI 缓存键的
+**唯一输入**，改它即同时修正三处；`requirements.lock` 是非权威参考文件
+（传递依赖 `>=` 下界），按其定位保持不动。certifi 由 `httpcore` / `httpx`
+传递引入、**不是** pyproject 直依赖 ⇒ 抬 pin 不触碰 pyproject 约束。
+
+- 生效版本：certifi `2026.7.22` → **`2026.10.19`**（受影响区间 `>= 2019.03.09, < 2026.10.19`）。
+- 验证：`pip-audit -r requirements.frozen.txt` **由 1 条已知漏洞（certifi 2026.7.22 /
+  PYSEC-2026-4320）变为 `No known vulnerabilities found`**；
+  CI 的 `lock-drift` 偏好模式（以提交版锁为偏好集重编译后剥注释比对）**零漂移**；
+  `tests/test_frozen_lock.py` + `test_requirements_lock_sync.py` + `test_ci_path_scope.py`
+  **42 passed**；`scripts/check_docs_consistency.py --gate` 通过。
+
 ### 通知偏好：读错键、存错结构（2026-10-21）
 
 - `GET /api/notifications/preferences` 返回 `{preference: {channel_enabled, event_level_min}}`，
