@@ -39,6 +39,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### MCP：enabled / auto_connect 从假字段变成真能力（2026-10-21）
+
+`ServerCreate` 早就声明了 `enabled` / `auto_connect`，但 `MCPServerConfig` 里没有
+这两个属性、也没有任何消费者 ⇒ 用户勾了等于没勾。本次把它变成真语义：
+
+- `MCPServerConfig.enabled`（默认 True）+ `auto_connect`（默认 False）落进配置
+  JSON；`MCPHub.connect()` 开头就拒绝停用配置（抛 `ValueError`），手动连接与
+  启动期自动连接走同一道闸门。
+- 路由：连接被拒回 **409**（"先启用再连接"），与"连接失败"区分开；PUT 不带
+  `enabled` 视为**不改**（复用同一模型时缺省不得把已停用的服务悄悄恢复）。
+- 停用立即生效：`enabled=false` 更新后真的断开该服务器的活动连接，不留"显示停用
+  但还在跑"的状态。
+- 启动播种后新增 `plugin_service.auto_connect_servers()`，只挑
+  `enabled && auto_connect && 当前 disconnected` 的服务器；作为后台任务跑，
+  不可达的 MCP 服务不拖慢也不阻断仪表板启动，关停时取消任务。
+- `GET /api/mcp/servers` 现在回报 `enabled` / `auto_connect`，列表页据此显示
+  「已停用」徽标（此前"断开"与"停用"混在一起）。
+- **YAML 侧同样修**：`config/mcp_servers.yaml` 里早已写着 `enabled: true` 与
+  `timeout: 30`，但加载器不透传 ⇒ 写了不生效。`MCPDiscovery` 现在接
+  `enabled` / `auto_connect` / `timeout(_s)`（保留 `timeout` 旧拼写）。
+- 验证：`test_mcp_route_crud.py` 新增 7 条（持久化 / 409 / PUT 不缺省翻回 /
+  停用即断开 / 自动连接筛选）、`test_mcp_hub.py` 真实 hub 闸门 1 条 + 往返断言、
+  `test_mcp_discovery.py` YAML 透传 1 条；MCP 相关 5 个文件 130 passed；
+  server 生命周期相关 31 passed；新增前端 3 条，全量 516 passed、build exit 0、
+  eslint 0 error、对比度 164 对全通过；对"连接闸门"与"add 透传"做变异回验
+  （去掉后 5 条测试转红）。
+
 ### 安全：certifi 升到 2026.10.19（GHSA-6q48-6c7w-9gw2 / PYSEC-2026-4320，Critical 9.1）
 
 2026-10-20 当天入库的新披露漏洞，**使此前一直绿的 `pip-audit` 作业对所有仍钉
