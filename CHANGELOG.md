@@ -39,26 +39,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 通知页的分页参数从没离开过浏览器（2026-10-21）
+### Chat：`stream` 从被丢掉的字段变成真的开关（2026-10-21）
 
-`api.get(url, opts)` 的第二个参数是 **fetch init**（内部只有 `opts.headers` 会被读），
-不是查询参数。`Notifications.vue` 两处都按后者写：
-`api.get('/api/notifications/list', { limit: PAGE_SIZE, offset })` ⇒ 参数被静默丢掉，
-后端按自己的 `limit=100` 返回，前端 `PAGE_SIZE=20` 形同虚设；"加载更多"把
-`offset` 加到 20 再请求一次，拿到的还是同一批 100 条并 append ——
-**点一次"加载更多"，整个列表重复一遍**，然后 `length > total` 让按钮自己消失。
+`ChatRequestBody.stream` 早就声明了，但两个处理器都把值写死 —— `/api/chat`
+恒 `stream=False`、`/api/chat/stream` 恒 `stream=True`。后果不是"少个功能"而是
+**没有任何失败信号**：客户端在 JSON 端点上要求流式，会安静地拿到一个整包响应，
+与根本没发这个字段一模一样。（自查静默丢弃字段时扫出，同批还有
+`control.run.agent`，见下。）
 
-同一次全仓扫描（`api.get(含对象第二参数`）只找出 3 个点：这两处 + AlertRules
-的历史抽屉（`{ rule_id }` 从未发出，抽屉把所有规则的历史当成一条的），后者已在
-#131 里一并修掉。其余 6 处 `api.put(url, {...})` 的第二参数是请求体，用法正确。
+- `/api/chat` 现在按 `body.stream` 决定响应形状：`true` 走 SSE，缺省仍是 JSON。
+- `/api/chat/stream` 语义不变（路径本身就是选择，body 写 `false` 也不改）。
+- 两处 SSE 响应合并为一个 `_sse_response()`：头信息原先手写两份，正是漂移的
+  来源；`test_both_stream_paths_share_one_header_set` 把"同一份头"钉成断言。
 
-- 参数改进 URL：`?limit=${PAGE_SIZE}&offset=0` / `&offset=${next}`。
-- 新增 2 条测试：首屏必须带 `limit=20&offset=0`；"加载更多"必须带 `offset=20`
-  且合并后不出现重复行（每行同时渲染 title 与 message，所以按"含 n1 的行数"判定，
-  不是按出现次数 —— 后者一行就命中两次，会把断言写成假绿）。
-- 变异回验：把两处还原成 fetch-init 形状后新用例转红。
+未做的一致性说明：同批扫出的 `RunRequest.agent` **没有**一并处理。它需要的不是
+透传 —— `start_control_run()` 起的是 `python -m maop.cli run --task …`，CLI 没有
+agent 相关旗标，主运行链路（MaopLoop）也不构造带 `preferred_agent` 的
+`RoutingContext`（只有 `/api/agent-router` 那条支路用得到）。把"指定 agent"做成
+真能力需要路由侧的产品决策（指定对象不在候选集里时报错还是回退自动路由？），
+所以这里留白，不写一个假装生效的透传。
 
-验证：Notifications 14 passed（原 12 + 新 2）、AlertRules 7 passed。
+验证：`test_chat_stream_field.py` 5 条（缺省 JSON / `stream=true` 真流式且不再调
+`send_chat` / `/stream` 不受 body 值影响 / 两端点头一致 / 其余字段仍全量透传）；
+`pytest -k chat` 178 passed 3 skipped（含 batch-coverage 里对 `/api/chat` 的既有
+断言，确认默认行为未变）；`tests/stability` 16 passed；ruff + mypy 干净。
 
 ### 静默丢弃字段扫描：engine 单步、hooks enabled/method（2026-10-21）
 
@@ -164,6 +168,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 对话框改为真实契约：按 `channel_enabled` 回填开关、保存发 `channel_enabled`；
   按频道的“最低级别”列从未有后端语义（后端是按事件类型配置），先移除该列。
 - 验证：Notifications vitest 12 passed（键名与保存结构的变异验证）。
+
+### 通知页的分页参数从没离开过浏览器（2026-10-21）
+
+`api.get(url, opts)` 的第二个参数是 **fetch init**（内部只有 `opts.headers` 会被读），
+不是查询参数。`Notifications.vue` 两处都按后者写：
+`api.get('/api/notifications/list', { limit: PAGE_SIZE, offset })` ⇒ 参数被静默丢掉，
+后端按自己的 `limit=100` 返回，前端 `PAGE_SIZE=20` 形同虚设；"加载更多"把
+`offset` 加到 20 再请求一次，拿到的还是同一批 100 条并 append ——
+**点一次"加载更多"，整个列表重复一遍**，然后 `length > total` 让按钮自己消失。
+
+同一次全仓扫描（`api.get(含对象第二参数`）只找出 3 个点：这两处 + AlertRules
+的历史抽屉（`{ rule_id }` 从未发出，抽屉把所有规则的历史当成一条的），后者已在
+#131 里一并修掉。其余 6 处 `api.put(url, {...})` 的第二参数是请求体，用法正确。
+
+- 参数改进 URL：`?limit=${PAGE_SIZE}&offset=0` / `&offset=${next}`。
+- 新增 2 条测试：首屏必须带 `limit=20&offset=0`；"加载更多"必须带 `offset=20`
+  且合并后不出现重复行（每行同时渲染 title 与 message，所以按"含 n1 的行数"判定，
+  不是按出现次数 —— 后者一行就命中两次，会把断言写成假绿）。
+- 变异回验：把两处还原成 fetch-init 形状后新用例转红。
+
+验证：Notifications 14 passed（原 12 + 新 2）、AlertRules 7 passed。
 
 ### Agent 计费：额度卡片恒为 0、记录筛选静默失效（2026-10-21）
 
