@@ -1,7 +1,7 @@
 """MAOP Dashboard — Chat API with SSE streaming and three-layer memory.
 
 Endpoints:
-  POST /api/chat          — Send a message, get full response
+  POST /api/chat          — Send a message; JSON, or SSE when body.stream is true
   POST /api/chat/stream   — Send a message, get SSE streaming response
   GET  /api/chat/sessions — List chat sessions
   GET  /api/chat/{id}     — Get chat session messages
@@ -70,10 +70,34 @@ class MemorySearchRequest(BaseModel):
 
 # ── Chat Endpoints ───────────────────────────────────────────────
 
+def _sse_response(engine: Any, chat_req: Any) -> StreamingResponse:
+    """Wrap a chat request as an SSE ``StreamingResponse``.
+
+    Kept as one function because both chat endpoints can stream now: the
+    headers used to be spelled out twice, which is how the two paths drifted
+    apart in the first place.
+    """
+    return StreamingResponse(
+        chat_service.stream_chat_chunks(engine, chat_req),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.post("")
 @handle_api_errors("chat")
-async def chat(request_body: ChatRequestBody, request: Request) -> dict[str, Any]:
-    """Send a chat message and get a full response."""
+async def chat(request_body: ChatRequestBody, request: Request) -> Any:
+    """Send a chat message; JSON by default, SSE when ``stream`` is set.
+
+    ``stream`` used to be declared on the body and then dropped on the floor:
+    asking for a stream on this endpoint silently returned one JSON blob, and
+    only ``/api/chat/stream`` could stream. Both now honour the flag, so the
+    field means what it says.
+    """
     require_admin(request)
     engine = _get_engine()
     chat_req = chat_service.build_chat_request(
@@ -83,10 +107,12 @@ async def chat(request_body: ChatRequestBody, request: Request) -> dict[str, Any
         agent=request_body.agent,
         model=request_body.model,
         system_prompt=request_body.system_prompt,
-        stream=False,
+        stream=request_body.stream,
         max_tokens=request_body.max_tokens,
         temperature=request_body.temperature,
     )
+    if request_body.stream:
+        return _sse_response(engine, chat_req)
     return await chat_service.send_chat(engine, chat_req)
 
 
@@ -96,6 +122,7 @@ async def chat_stream(request_body: ChatRequestBody, request: Request) -> Any:
     """Send a chat message and get an SSE streaming response."""
     require_admin(request)
     engine = _get_engine()
+    # 这个端点永远流式：body 里带 stream=false 也不改语义，路径本身就是选择。
     chat_req = chat_service.build_chat_request(
         session_id=request_body.session_id,
         message=request_body.message,
@@ -107,18 +134,7 @@ async def chat_stream(request_body: ChatRequestBody, request: Request) -> Any:
         max_tokens=request_body.max_tokens,
         temperature=request_body.temperature,
     )
-
-    # StreamingResponse construction stays in the router; the async
-    # iterable (generator) is owned by the service.
-    return StreamingResponse(
-        chat_service.stream_chat_chunks(engine, chat_req),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    return _sse_response(engine, chat_req)
 
 
 @router.get("/models")
