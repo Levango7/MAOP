@@ -3,7 +3,7 @@
     <ListPageLayout
       :loading="loading"
       :error="error"
-      :empty="!rules.length"
+      :empty="!rules.length && !inbound.length"
       :error-title="t('view.alerts.loadError')"
       :empty-title="requiresEnterprise ? t('view.alerts.requiresEnterprise') : t('view.alerts.empty')"
       :empty-desc="requiresEnterprise ? t('view.alerts.requiresEnterpriseDesc') : t('view.alerts.emptyDesc')"
@@ -104,6 +104,41 @@
             </div>
           </div>
         </div>
+
+        <section class="al-inbound" aria-labelledby="al-inbound-heading">
+          <h3 id="al-inbound-heading" class="al-section-title">
+            {{ t('view.alerts.inboundTitle') }}
+            <span v-if="!inboundUnavailable" class="al-muted">{{ inboundTotal }}</span>
+          </h3>
+          <p class="al-hint">{{ t('view.alerts.inboundDesc') }}</p>
+          <p v-if="inboundUnavailable" class="al-hint al-inbound__warn">{{ t('view.alerts.inboundUnavailable') }}</p>
+          <p v-else-if="!inbound.length" class="al-hint">{{ t('view.alerts.inboundEmpty') }}</p>
+          <div v-else class="ai-table" role="table" :aria-label="t('view.alerts.inboundTitle')">
+            <div class="ai-row ai-row--head" role="row">
+              <div class="al-cell" role="columnheader">{{ t('view.alerts.inboundColAlert') }}</div>
+              <div class="al-cell" role="columnheader">{{ t('view.alerts.inboundColSeverity') }}</div>
+              <div class="al-cell" role="columnheader">{{ t('view.alerts.inboundColStatus') }}</div>
+              <div class="al-cell" role="columnheader">{{ t('view.alerts.inboundColInstance') }}</div>
+              <div class="al-cell" role="columnheader">{{ t('view.alerts.inboundColSummary') }}</div>
+              <div class="al-cell" role="columnheader">{{ t('view.alerts.inboundColTime') }}</div>
+            </div>
+            <div
+              v-for="a in inbound"
+              :key="`${a.fingerprint}|${a.status}|${a.starts_at}`"
+              class="ai-row"
+              role="row"
+            >
+              <div class="al-cell" role="cell"><span class="al-name">{{ a.alertname }}</span></div>
+              <div class="al-cell" role="cell"><Badge :tone="severityTone(a.severity)">{{ a.severity || '—' }}</Badge></div>
+              <div class="al-cell" role="cell">
+                <Badge :tone="a.status === 'resolved' ? 'success' : 'warn'">{{ inboundStatusLabel(a.status) }}</Badge>
+              </div>
+              <div class="al-cell" role="cell"><code class="al-mono">{{ a.instance || '—' }}</code></div>
+              <div class="al-cell" role="cell"><span class="al-text">{{ a.summary || a.description || '—' }}</span></div>
+              <div class="al-cell" role="cell"><span class="al-num">{{ formatTs(a.received_at) }}</span></div>
+            </div>
+          </div>
+        </section>
       </template>
     </ListPageLayout>
 
@@ -261,6 +296,11 @@ const stats = ref(null);
 const loading = ref(true);
 const error = ref('');
 
+// ── Alertmanager 入站告警（个人版也能用，与上面的企业版规则是两条来源）──
+const inbound = ref([]);
+const inboundTotal = ref(0);
+const inboundUnavailable = ref(false);
+
 // ── 创建/编辑对话框 ──
 const showForm = ref(false);
 const saving = ref(false);
@@ -358,6 +398,9 @@ function alertStatusLabel(s) {
 async function loadAll() {
   loading.value = true;
   error.value = '';
+  // 入站告警必须在规则读失败时也完成加载：个人版没有 /api/audit/alert/*（404），
+  // 若把它排在 try 之后，整页就永远看不到已经收到的告警。
+  const inboundPromise = loadInbound();
   try {
     // 2026-09-23 修复：路径原为 /api/alerts/*，但后端从未在此前缀下实现过
     // 告警规则（alerts.py 只提供 POST /api/alerts/webhook）。真正的实现在
@@ -383,10 +426,57 @@ async function loadAll() {
       webhooks.value = Array.isArray(wh) ? wh : (wh.hooks || wh.items || wh.webhooks || wh.data || []);
     } catch { /* webhook 列表可选 */ }
   } catch (e) {
-    error.value = e.message || String(e);
+    // 个人版没有企业版规则 API（404），那不是页面故障：当成"这里没有规则"，
+    // 让下面的 Alertmanager 入站告警照常渲染。企业版下仍然报真错误。
     rules.value = [];
+    if (!requiresEnterprise.value) error.value = e.message || String(e);
   } finally {
+    await inboundPromise;
     loading.value = false;
+  }
+}
+
+/**
+ * 读 Alertmanager 推给我们的事件。这一段必须与规则 CRUD 分开失败：
+ * 个人版没有 /api/audit/alert/*（404），但入站告警是有数据的；反过来入站读
+ * 失败也不能把整页判成"没有告警"——空与读不到是两件事，混在一起就是假信息。
+ */
+async function loadInbound() {
+  try {
+    const d = await api.get('/api/alerts?limit=50');
+    inbound.value = Array.isArray(d?.alerts) ? d.alerts : [];
+    inboundTotal.value = Number(d?.total ?? inbound.value.length);
+    inboundUnavailable.value = false;
+  } catch {
+    inbound.value = [];
+    inboundTotal.value = 0;
+    inboundUnavailable.value = true;
+  }
+}
+
+function severityTone(s) {
+  const key = String(s || '').toLowerCase();
+  if (key === 'critical' || key === 'page') return 'fail';
+  if (key === 'warning') return 'warn';
+  if (key === 'info') return 'info';
+  return 'neutral';
+}
+
+function inboundStatusLabel(s) {
+  const map = {
+    firing: t('view.alerts.inboundFiring'),
+    resolved: t('view.alerts.alertResolved'),
+  };
+  return map[s] || s || '—';
+}
+
+function formatTs(ts) {
+  if (!ts) return '—';
+  try {
+    const d = new Date(ts * 1000);
+    return isNaN(d.getTime()) ? String(ts) : d.toLocaleString();
+  } catch {
+    return String(ts);
   }
 }
 
@@ -515,7 +605,12 @@ async function openHistory(r) {
   historyLoading.value = true;
   historyRecords.value = [];
   try {
-    const d = await api.get('/api/audit/alert/history', { rule_id: r.id });
+    // api.get 的第二个参数是 fetch init（只有 .headers 会被用），不是查询参数：
+    // 原先写成 { rule_id: r.id } 会被静默丢掉，抽屉于是把"最近 100 条全部规则
+    // 的告警"当成这条规则的历史显示。参数必须进 URL。
+    const d = await api.get(
+      `/api/audit/alert/history?rule_id=${encodeURIComponent(r.id)}`,
+    );
     const items = Array.isArray(d) ? d : (d.alerts || d.items || d.history || d.records || []);
     historyRecords.value = items.map((h) => ({
       id: h.id || h.ts || Math.random(),
@@ -538,10 +633,13 @@ function closeHistory() {
   historyRecords.value = [];
 }
 
-// 个人版下不发请求：后端必然 404，只会产生一条无意义的报错。
+// 个人版下不发企业版规则请求：后端必然 404，只会产生一条无意义的报错。
+// 但入站告警是个人版就有的数据源，不能跟着一起跳过 —— 否则这一页在个人版
+// 永远是空壳，而 data/maop.db 里其实躺着收到的告警。
 onMounted(() => {
   if (requiresEnterprise.value) {
-    loading.value = false;
+    loading.value = true;
+    loadInbound().finally(() => { loading.value = false; });
     return;
   }
   loadAll();
@@ -609,6 +707,33 @@ onMounted(() => {
 .al-num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); color: var(--text); }
 .al-muted { color: var(--text-muted); font-size: var(--fs-sm); }
 
+/* ── Alertmanager 入站告警（个人版可用的唯一一块）── */
+.al-inbound { margin-top: var(--sp-6); }
+.al-section-title {
+  display: flex; align-items: baseline; gap: var(--sp-2);
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-base); font-weight: 700; color: var(--text);
+}
+.al-inbound__warn { color: var(--warn); }
+.ai-table {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.ai-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.7fr 0.7fr 1fr 1.6fr 1fr;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-base);
+}
+.ai-row:last-child { border-bottom: none; }
+.ai-row--head {
+  background: var(--surface-2);
+  font-size: var(--fs-xs); font-weight: 700; color: var(--text-faint);
+  text-transform: uppercase; letter-spacing: .05em;
+}
+
 /* ── 模态 ── */
 .modal-overlay {
   position: fixed; inset: 0; background: var(--overlay-scrim);
@@ -659,9 +784,14 @@ onMounted(() => {
   .al-row { grid-template-columns: 1fr 1fr 0.6fr 0.8fr 100px; }
   .al-cell--metric, .al-cell--channel { display: none; }
   .form-row { grid-template-columns: 1fr; }
+  /* 入站表：先藏实例与接收时间，保留"哪条告警/什么级别/是否还在烧/说了什么" */
+  .ai-row { grid-template-columns: 1.2fr 0.7fr 0.7fr 1.6fr; }
+  .ai-row > .al-cell:nth-child(4), .ai-row > .al-cell:nth-child(6) { display: none; }
 }
 @media (max-width: 640px) {
   .al-row { grid-template-columns: 1fr 80px; }
   .al-cell--cond, .al-cell--threshold, .al-cell--status { display: none; }
+  .ai-row { grid-template-columns: 1.2fr 0.7fr 0.7fr; }
+  .ai-row > .al-cell:nth-child(5) { display: none; }
 }
 </style>

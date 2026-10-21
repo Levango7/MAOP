@@ -37,6 +37,10 @@ NOSEC_INVENTORY: frozenset[str] = frozenset({
     "maop/core/agent/ops/sandbox_executor.py:B602:2",
     "maop/core/agent/plugins_hooks/hook_manager.py:B608:1",
     "maop/core/agent/tools/tool_audit.py:B608:5",
+    # 2026-10-21 alert_ingest：where 只由 "status = ?" / "severity = ?" /
+    # "alertname = ?" / "received_at >= ?" 四段字面量拼成，筛选值一律走 params
+    # 绑定 ⇒ 无注入路径，登记而非改写。
+    "maop/core/alert_ingest.py:B608:1",
     "maop/core/backends/data.py:B608:6",
     "maop/core/backends/image_store.py:B608:2",
     "maop/core/backends/kv_store.py:B608:1",
