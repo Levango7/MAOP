@@ -58,6 +58,13 @@ RUN npm run build
 # CI 可通过 --build-arg PYTHON_IMAGE=python:3.13-slim 覆盖为 Docker Hub 直连
 FROM ${PYTHON_IMAGE} AS builder
 
+# ARG 作用域：文件顶部（第一个 FROM 之前）声明的 PIP_INDEX_URL 只对 FROM 插值可见，
+# **stage 内的 RUN 用不到它** —— 必须在 stage 内重新声明一次，不带值即继承全局默认。
+# 2026-10-21 实测踩过：少了这一行，`-i ${PIP_INDEX_URL}` 被 shell 展开成空字符串，
+# pip 直接报 "-i option requires 1 argument"，退避重试 3 次后 Docker build 失败，
+# 连带 Container Scan (trivy) 被跳过。
+ARG PIP_INDEX_URL
+
 WORKDIR /build
 
 # Install build dependencies
