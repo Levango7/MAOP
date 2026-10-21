@@ -75,6 +75,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   engine+hooks+mcp 相关 8 个测试文件 160 passed；对两处修复做变异验证
   （回退透传、去掉停用 ⇒ 对应测试转红）。
 
+### 安全：certifi 升到 2026.10.19（GHSA-6q48-6c7w-9gw2 / PYSEC-2026-4320，Critical 9.1）
+
+2026-10-20 当天入库的新披露漏洞，**使此前一直绿的 `pip-audit` 作业对所有仍钉
+`certifi 2026.7.22` 的分支转红**——凡在飞 PR 一并被 `CI merge gate` 挡住。
+本条把「为什么突然变红」与「为什么取 2026.10.19 而不是 2026.10.18」记清楚，
+免得下一个同类 advisory 再让排查从零开始。
+
+**漏洞内容**：certifi 的 CA bundle 带着 emSign ECC Root CA - G3 根证书，
+而链到该根的 **8 张 eMudhra 中间 CA 证书私钥已泄露并被签发机构吊销**。
+拿到泄露私钥的攻击者可以签发「看起来合法」的任意主机名证书；
+若同时位于链路上，即可拦截或篡改信任 certifi bundle 的客户端的 TLS 流量
+（`requests` / `urllib3` / `pip` / Python.org 的 macOS 安装器都在此列）。
+属 CWE-295（证书验证不当），CVSS 9.1。
+
+**版本取 2026.10.19 而非 2026.10.18**：2026.10.18 先把**全部** emSign 根移出 bundle，
+2026.10.19 再把**未受影响**的那些加回 ⇒ 目标版本是 2026.10.19。
+
+**为什么只动 `py/requirements.frozen.txt`**（1 行）：它是 pip-audit / SBOM / CI 缓存键的
+**唯一输入**，改它即同时修正三处；`requirements.lock` 是非权威参考文件
+（传递依赖 `>=` 下界），按其定位保持不动。certifi 由 `httpcore` / `httpx`
+传递引入、**不是** pyproject 直依赖 ⇒ 抬 pin 不触碰 pyproject 约束。
+
+- 生效版本：certifi `2026.7.22` → **`2026.10.19`**（受影响区间 `>= 2019.03.09, < 2026.10.19`）。
+- 验证：`pip-audit -r requirements.frozen.txt` **由 1 条已知漏洞（certifi 2026.7.22 /
+  PYSEC-2026-4320）变为 `No known vulnerabilities found`**；
+  CI 的 `lock-drift` 偏好模式（以提交版锁为偏好集重编译后剥注释比对）**零漂移**；
+  `tests/test_frozen_lock.py` + `test_requirements_lock_sync.py` + `test_ci_path_scope.py`
+  **42 passed**；`scripts/check_docs_consistency.py --gate` 通过。
+
 ### 通知偏好：读错键、存错结构（2026-10-21）
 
 - `GET /api/notifications/preferences` 返回 `{preference: {channel_enabled, event_level_min}}`，
@@ -1497,6 +1526,7 @@ env 自动探测+默认执行）、dispatch 注入（声明 agent 收到 preambl
   矩阵按此过滤；应用自身 error/JS 异常/5xx 仍全量抓捕。
 - 测试：新增 store 用例 2 例（403 不记 error 且版本保持 personal 安全默认 /
   非 403 失败仍记 error）。
+
 ### 分布式注册表批量化（派发热路径性能）
 
 - `capable_workers`（每次派发的选工路径）与 `detect_failures`（失败检测循环
@@ -1619,6 +1649,7 @@ Chat 页把**原始 i18n key 当可见文本**展示：输入框 placeholder
 9 例（游标一次性/意外节点推进/150 节点大层回归/
 超时触发/默认无超时/单次扫描/检测器每任务一次/
 取消后上报+ACK/stop 强杀卡死 handler）。
+
 ### 泄漏与可见性审计修复
 
 2026-10-09 后端审计第二批（分布式路径之外）：
