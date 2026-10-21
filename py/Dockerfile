@@ -16,6 +16,20 @@
 # P1 supply-chain fix (2026-09-17): digest pinning prevents tag re-push attacks.
 # To obtain digest: docker pull python:3.13-slim && docker inspect --format='{{index .RepoDigests 0}}' python:3.13-slim
 # CI should inject --build-arg PYTHON_IMAGE=python:3.13-slim@sha256:<digest> for reproducible builds.
+#
+# pip index. Default is official PyPI (same 64d2732 rule: ARG must precede ANY FROM).
+#
+# 2026-10-21：这里原先写死清华源，而 frozen 锁的是 certifi==2026.10.19。实测清华源
+# 当时最新只到 2026.7.22 —— 于是镜像装出 certifi@2026.6.17，trivy 报
+# GHSA-6q48-6c7w-9gw2 (CRITICAL)，而同一个 commit 的 pip-audit 是绿的。
+# 写死单一镜像源还有一个更一般的代价：**安全补丁的到达时间被源的同步节奏绑定**，
+# 锁文件升了级、镜像却装不到。
+#
+# GitHub-hosted runner 在海外，官方源既有最新版也更快，所以默认官方。
+# CN-local 无梯子构建时覆盖它：
+#   docker build --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple .
+# 覆盖源的可用版本可能滞后于 frozen —— 装不到 pin 会让构建红，那是要的信号。
+ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG PYTHON_IMAGE=python:3.13-slim
 # 2026-09-29: node:20 → node:24，与 CI 的 env.NODE_VERSION 对齐。jsdom@30.1.1
 # （lockfile 实装）engines = ^22.22.2 || ^24.15.0 || >=26.0.0，node 20 不在区间；
@@ -61,17 +75,21 @@ WORKDIR /build
 #
 # 换成精确 pin 后，镜像依赖与审计依赖读同一份文件：pip-audit / SBOM / 镜像。
 COPY py/requirements.frozen.txt .
-# P1-5: pip 使用清华源（避免无梯子时 pip install 超时）。
+# P1-5 的初衷（无梯子时 pip install 超时）改由文件顶部的 PIP_INDEX_URL 承担：
+# 默认官方 PyPI，CN-local 构建时用 --build-arg 覆盖。仍是单一 index，不多信一个源。
+# 2026-10-21：原先写死清华源是这次 trivy 红的另一半原因 —— frozen 锁 certifi==2026.10.19，
+# 而清华源当时最新只到 2026.7.22，只改锁文件不改成官方源，构建会直接找不到版本。
+# --trusted-host 一并去掉：默认源与清华源都是 https，该选项只对 http 索引有意义。
 # 2026-09-28: 外面套一层最多 3 次的退避重试。起因是 master `cd4099e5` 上
 # `Container Scan (trivy)` 红、而同一个 commit 的 `Docker build` / `Compose Smoke` 都绿 ——
 # 日志是镜像偶发返回空候选集：
 #   ERROR: Could not find a version that satisfies the requirement pyyaml<7.0.0,>=6.0.2 (from versions: none)
 # "from versions: none" 是索引没给东西，不是版本区间无解，属于瞬时故障（重跑即恢复）。
-# 有意**不**加第二个 index 主机：多信一个源就是扩大供应链面，而用清华源本身是网络可达性决定
-# 的（P1-5 原注释）。3 次仍失败则让构建照常红 —— 这不是把失败藏起来，只是不被一次抖动骗过。
+# 有意**不**加第二个 index 主机：多信一个源就是扩大供应链面。3 次仍失败则让构建照常红
+# —— 这不是把失败藏起来，只是不被一次抖动骗过。
 RUN for attempt in 1 2 3; do \
       pip install --no-cache-dir --prefix=/install -r requirements.frozen.txt \
-        -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn \
+        -i ${PIP_INDEX_URL} \
         && break; \
       if [ "$attempt" = 3 ]; then echo "pip install 连续 3 次失败，放弃" >&2; exit 1; fi; \
       echo "pip install 第 $attempt 次失败，退避 $((attempt * 20))s 后重试" >&2; \
