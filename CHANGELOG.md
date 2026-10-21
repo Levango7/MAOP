@@ -66,6 +66,10 @@ alerts"** —— 这条链"接通了"，但每条告警只变成一行日志：�
   ≠ 超出量，上界就不再可证 —— 两条测试分别钉住）。
 - **内存上界**：`WebhookPayload.alerts` 加 `max_length=1000`。AM 侧
   `max_alerts: 0` 不截断，所以这一刀只能接收端来（越界 422，且 422 不落库）。
+- **批次状态不是摆设**：单条没带 `status` 时退回 `payload.status`（日志侧一直是
+  `alert.status or payload.status`，落库若写死 `firing` 就会与日志互相矛盾）。
+  这条是自查静默丢弃字段扫出来的，`test_batch_status_flows_into_rows_without_their_own`
+  与另 3 条把它钉住（把 router 的透传删掉后转红）。
 - 落库失败**仍回 200** 并报 `stored=0`：回 4xx/5xx 会让 Alertmanager 无限重试。
 
 企业版那套 `AuditAlertEngine` 不能直接接手：`_record_alert` 按 `rule_id` 做 60 s
@@ -83,10 +87,11 @@ PG 写了不回读（`:332`），进程重启即空。所以个人版另起一�
 过，抽屉把所有规则的历史当成这一条的显示。参数改进 URL，`test_scopes_the_history_drawer…`
 钉住（把修复回退后该测试转红）。
 
-验证：`test_alert_ingest.py` 17 条 + `test_alerts_endpoint_persistence.py` 13 条 +
+验证：`test_alert_ingest.py` 20 条 + `test_alerts_endpoint_persistence.py` 14 条 +
 `test_alertmanager_e2e.py` 52 条全过（e2e 的 `webhook_client` 补了 tmp_path 隔离，
-否则每条用例都在往开发者本地 `data/maop.db` 写真行）；三处变异回验（去重关闭 /
-不刷新 received_at / stored 计数对重复失明）全部转红；前端 518 passed、build exit 0、
+否则每条用例都在往开发者本地 `data/maop.db` 写真行）；四处变异回验（去重关闭 /
+不刷新 received_at / stored 计数对重复失明 / router 不透传批次状态）全部转红；
+前端 518 passed、build exit 0、
 eslint 0 error、对比度 164 对全过；`check_silent_exceptions` / `check_file_size` /
 `check_docs_consistency --gate` / ruff / mypy 全绿（README 的 `core/` 计数 8→9 随新模块更新）。
 

@@ -93,6 +93,7 @@ async def alertmanager_webhook(payload: WebhookPayload, request: Request) -> Any
         external_url=payload.externalURL,
         common_labels=payload.commonLabels,
         common_annotations=payload.commonAnnotations,
+        fallback_status=payload.status,
     )
     return {"status": "ok", "received": received, **stored}
 

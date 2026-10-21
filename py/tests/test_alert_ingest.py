@@ -159,6 +159,32 @@ def test_missing_fingerprint_is_stable_across_key_order(db: Path) -> None:
     assert result["duplicate"] == 1
 
 
+def test_batch_status_is_the_fallback_for_alerts_without_one(db: Path) -> None:
+    """单条没带 status 时用批次 status，而不是写死 firing。
+
+    日志侧 (`notification_service`) 一直是 `alert.status or payload.status`；
+    落库若忽略批次状态，同一批数据在日志里是 resolved、在库里是 firing。
+    """
+    alert_ingest.record_alerts(
+        [{"labels": {"alertname": "MAOPDown"}, "annotations": {}, "startsAt": "s1",
+          "fingerprint": "nofield"}],
+        fallback_status="resolved",
+    )
+    assert alert_ingest.list_alerts()[0]["status"] == "resolved"
+
+
+def test_alert_status_beats_batch_status(db: Path) -> None:
+    alert_ingest.record_alerts(
+        [_alert(status="firing")], fallback_status="resolved",
+    )
+    assert alert_ingest.list_alerts()[0]["status"] == "firing"
+
+
+def test_missing_everything_still_defaults_to_firing(db: Path) -> None:
+    alert_ingest.record_alerts([{"labels": {}, "annotations": {}}])
+    assert alert_ingest.list_alerts()[0]["status"] == "firing"
+
+
 def test_common_labels_used_when_alert_omits_them(db: Path) -> None:
     """Alertmanager 把同组共享的标签放在 commonLabels；单条告警可以不带。"""
     alert_ingest.record_alerts(

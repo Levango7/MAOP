@@ -163,6 +163,19 @@ def test_out_of_range_query_params_are_rejected(client: TestClient) -> None:
     assert client.get("/api/alerts", params={"since_hours": -1}).status_code == 422
 
 
+def test_batch_status_flows_into_rows_without_their_own(client: TestClient) -> None:
+    """send_resolved=true 时批次里每条都带 status，但 schema 允许单条省略 ——
+    省略就必须退回批次状态，否则历史里全是 firing，日志里却是 resolved。"""
+    body = _payload({"labels": {"alertname": "MAOPDown", "severity": "critical"},
+                     "annotations": {"summary": "back up"},
+                     "startsAt": "2026-10-21T06:41:30.000Z",
+                     "fingerprint": "fp-nostatus"})
+    body["status"] = "resolved"
+    client.post("/api/alerts/webhook", json=body, headers=_HEADERS)
+    rows = client.get("/api/alerts").json()["alerts"]
+    assert [r["status"] for r in rows] == ["resolved"]
+
+
 # ── 上界：批量大小 ──────────────────────────────────────────────
 
 

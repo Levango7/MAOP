@@ -94,10 +94,14 @@ def _fingerprint(alert: dict[str, Any], labels: dict[str, str]) -> str:
 
 
 def _row_from(alert: dict[str, Any], *, receiver: str, external_url: str,
-              common_labels: dict[str, str], common_annotations: dict[str, str]) -> tuple:
+              common_labels: dict[str, str], common_annotations: dict[str, str],
+              fallback_status: str = "") -> tuple:
     labels = {str(k): str(v) for k, v in (alert.get("labels") or {}).items()}
     annotations = {str(k): str(v) for k, v in (alert.get("annotations") or {}).items()}
-    status = _clip(alert.get("status", ""), 20) or "firing"
+    # 单条没带 status 时退回批次 status（Alertmanager 两者都会给）；日志侧一直是
+    # 这么处理的，落库若直接写死 "firing" 就会与日志互相矛盾。
+    status = (_clip(alert.get("status", ""), 20)
+              or _clip(fallback_status, 20) or "firing")
     starts_at = _clip(alert.get("startsAt", ""), 40)
     summary = annotations.get("summary") or common_annotations.get("summary") or ""
     description = annotations.get("description") or common_annotations.get("description") or ""
@@ -132,7 +136,8 @@ _TOUCH = (
 
 def record_alerts(alerts: list[dict[str, Any]], *, receiver: str = "",
                   external_url: str = "", common_labels: dict[str, str] | None = None,
-                  common_annotations: dict[str, str] | None = None) -> dict[str, int]:
+                  common_annotations: dict[str, str] | None = None,
+                  fallback_status: str = "") -> dict[str, int]:
     """Persist one inbound batch. Returns ``{"received", "stored", "duplicate"}``.
 
     ``stored`` counts new (事件, 状态) rows; a repeat notification of the same
@@ -146,7 +151,8 @@ def record_alerts(alerts: list[dict[str, Any]], *, receiver: str = "",
     common_annotations = {str(k): str(v) for k, v in (common_annotations or {}).items()}
     rows = [
         _row_from(alert, receiver=receiver, external_url=external_url,
-                  common_labels=common_labels, common_annotations=common_annotations)
+                  common_labels=common_labels, common_annotations=common_annotations,
+                  fallback_status=fallback_status)
         for alert in alerts
     ]
     stored = 0
