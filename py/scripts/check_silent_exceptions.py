@@ -62,7 +62,10 @@ SILENT_EXCEPTION_BASELINE: frozenset[str] = frozenset({
 })
 
 #: Ratchet for ``contextlib.suppress(...)`` (same swallowing semantics).
-SUPPRESS_BASELINE = 47
+#: 2026-10-21: 47 → 46 —— dashboard/server.py 关停期的两处
+#: ``with suppress(asyncio.CancelledError)`` 合并成 ``drain_cancelled()``
+#: 一个带理由标记的处理器（顺带让这条关停路径变得可测）。
+SUPPRESS_BASELINE = 46
 
 
 def _iter_py_files() -> Iterator[pathlib.Path]:

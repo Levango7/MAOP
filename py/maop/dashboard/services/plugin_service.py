@@ -268,13 +268,17 @@ async def connect_server(server_name: str) -> dict[str, Any] | None:
     Returns
     -------
     dict | None
-        ``{"status": ..., "server": server_name}``；若 server 配置不存在返回 None。
+        ``{"status": "ok" | "failed" | "disabled", "server": server_name}``；
+        若 server 配置不存在返回 None。``disabled`` 表示配置里被停用，
+        路由层应回 409 而不是当成连接失败。
     """
     hub = _get_hub()
     # δ-1: use MCPHub.connect(config) — look up previously registered config by name
     config = hub.get_server_config(server_name)
     if config is None:
         return None
+    if not config.enabled:
+        return {"status": "disabled", "server": server_name}
     # Clear the old record so connect() inserts a fresh connected record
     hub.remove_server(server_name)
     server_id = await hub.connect(config)
@@ -289,6 +293,33 @@ async def disconnect_server(server_name: str) -> dict[str, Any]:
     if server_id is not None:
         await hub.disconnect(server_id)
     return {"status": "ok", "server": server_name}
+
+
+async def auto_connect_servers() -> dict[str, Any]:
+    """启动播种后，连接所有 ``enabled && auto_connect`` 且尚未连接的服务器。
+
+    尽力而为：单台失败只记日志，绝不让仪表板启动失败或卡住 —— 一台不可达的
+    MCP 服务不是整个产品的启动依赖。调用方（lifespan）把它作为后台任务跑。
+    """
+    hub = _get_hub()
+    connected: list[str] = []
+    failed: list[str] = []
+    for info in hub.list_servers():
+        if not info.enabled or not info.auto_connect:
+            continue
+        if info.status.value != "disconnected":
+            continue  # 已连接/连接中/报错的都不重复触发
+        try:
+            result = await connect_server(info.name)
+        except Exception as exc:
+            logger.warning("[mcp] auto-connect failed for '%s': %s", info.name, exc)
+            failed.append(info.name)
+            continue
+        if result and result.get("status") == "ok":
+            connected.append(info.name)
+        else:
+            failed.append(info.name)
+    return {"connected": connected, "failed": failed, "count": len(connected)}
 
 
 def list_servers() -> dict[str, Any]:
@@ -351,6 +382,8 @@ def get_server_detail(server_id: str) -> dict[str, Any] | None:
         "command": cfg.command,
         "args": list(cfg.args),
         "timeout_s": cfg.timeout_s,
+        "enabled": cfg.enabled,
+        "auto_connect": cfg.auto_connect,
         "auth_type": _auth_type_from_headers(cfg.headers),
         "has_auth": _auth_type_from_headers(cfg.headers) != "none",
     }
@@ -367,6 +400,8 @@ def add_server(
     auth_type: str = "none",
     token: str = "",
     timeout_s: float = 30.0,
+    enabled: bool = True,
+    auto_connect: bool = False,
 ) -> dict[str, Any]:
     """添加 MCP server 配置。返回 ``{"status": "ok", "server": name}``。"""
     from maop.core.mcp.mcp_hub import MCPServerConfig, TransportType
@@ -380,6 +415,8 @@ def add_server(
         env=env or {},
         headers=_apply_auth({}, auth_type, token),
         timeout_s=timeout_s,
+        enabled=enabled,
+        auto_connect=auto_connect,
     )
     hub.add_server(config)
     return {"status": "ok", "server": name}
@@ -397,11 +434,14 @@ def update_server(
     auth_type: str = "none",
     token: str = "",
     timeout_s: float = 30.0,
+    enabled: bool | None = None,
+    auto_connect: bool | None = None,
 ) -> dict[str, Any] | None:
     """按 id 更新 MCP server 配置。返回 ``None`` 表示该 id 不存在。
 
     保留详情表单未暴露的字段（session_id、权限范围、重连策略、env），
-    避免一次编辑把用户此前的配置抹掉。
+    避免一次编辑把用户此前的配置抹掉。``enabled`` / ``auto_connect`` 传
+    ``None`` 表示"这次不改"，与表单未渲染该控件的情况一致。
     """
     from maop.core.mcp.mcp_hub import MCPServerConfig, TransportType
     hub = _get_hub()
@@ -420,6 +460,10 @@ def update_server(
     })
     if env is not None:
         data["env"] = env
+    if enabled is not None:
+        data["enabled"] = enabled
+    if auto_connect is not None:
+        data["auto_connect"] = auto_connect
     config = MCPServerConfig(**data)
     ok = hub.update_server(server_id, config)
     if not ok:

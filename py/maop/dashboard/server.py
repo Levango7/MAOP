@@ -30,7 +30,7 @@ import os
 import signal
 import sys
 import threading
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
@@ -109,6 +109,28 @@ from maop.dashboard.routers import auth as _auth_mod
 
 
 # ── Lifespan ───────────────────────────────────────────────────────
+async def drain_cancelled(*tasks: asyncio.Task | None) -> int:
+    """Cancel the given still-pending tasks and wait for the cancellation.
+
+    Returns how many tasks were cancelled. ``None`` entries and already-done
+    tasks are skipped, so callers can pass optional handles directly.
+
+    This is a function rather than inline ``with suppress(...)`` blocks for
+    two reasons: the shutdown path is otherwise untested, and every extra
+    suppress site adds to the ``check_silent_exceptions`` baseline, a ratchet
+    that may only shrink.
+    """
+    pending = [t for t in tasks if t is not None and not t.done()]
+    for task in pending:
+        task.cancel()
+    if pending:
+        try:
+            await asyncio.gather(*pending)
+        except asyncio.CancelledError:  # silent-ok: interrupt — 取消由本函数自己发起，取消即结果
+            pass
+    return len(pending)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Any:
     if _auth_mod._auth_enabled:
@@ -208,14 +230,31 @@ async def lifespan(app: FastAPI) -> Any:
             # 播种失败不应阻塞启动 —— 它只是配置同步，不是服务依赖
             logger.warning("[lifespan] MCP config seed failed: %s", exc)
 
+        # ── 自动连接标了 auto_connect 的 MCP 服务器 ───────────────
+        # 后台任务，不 await：一台不可达的 MCP 服务不该拖慢或卡住仪表板启动。
+        async def _mcp_auto_connect() -> None:
+            try:
+                from maop.dashboard.services import plugin_service as _ps
+                res = await _ps.auto_connect_servers()
+                if res["connected"] or res["failed"]:
+                    logger.info(
+                        "[lifespan] MCP auto-connect: connected=%s failed=%s",
+                        res["connected"], res["failed"],
+                    )
+            except Exception as exc:
+                logger.warning("[lifespan] MCP auto-connect failed: %s", exc)
+
+        app.state.mcp_autoconnect_task = asyncio.create_task(_mcp_auto_connect())
+
     try:
         yield
     finally:
-        if _ws_manager._ws_push_task is not None:
-            _ws_manager._ws_push_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await _ws_manager._ws_push_task
-            _ws_manager._ws_push_task = None
+        # 关停期要取消的后台任务统一交给 drain_cancelled：每多一处
+        # ``with suppress(asyncio.CancelledError)`` 都是给"吞异常"基线加一笔，
+        # 而这个 ratchet 只允许减少。
+        _autoconnect = getattr(app.state, "mcp_autoconnect_task", None)
+        await drain_cancelled(_autoconnect, _ws_manager._ws_push_task)
+        _ws_manager._ws_push_task = None
         # ── Stop schedulers on shutdown ────────────────────────
         if _backup_scheduler is not None:
             try:

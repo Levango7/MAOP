@@ -44,6 +44,7 @@ class _FakeHub:
         self._servers: dict[str, dict[str, Any]] = {}
         self._tools: list[dict[str, Any]] = []
         self._seq = 0
+        self.disconnects: list[str] = []
 
     # ── servers ──
     def list_servers(self) -> list[Any]:
@@ -56,6 +57,8 @@ class _FakeHub:
                 transport=d["transport"],
                 status=d["status"],
                 tools_count=d["tools_count"],
+                enabled=d["config"].enabled,
+                auto_connect=d["config"].auto_connect,
             )
             for sid, d in self._servers.items()
         ]
@@ -89,6 +92,38 @@ class _FakeHub:
     def get_server_config_by_id(self, server_id: str):
         row = self._servers.get(server_id)
         return row["config"] if row else None
+
+    def get_server_config(self, name: str):
+        for d in self._servers.values():
+            if d["name"] == name:
+                return d["config"]
+        return None
+
+    def find_server_id_by_name(self, name: str):
+        for sid, d in self._servers.items():
+            if d["name"] == name:
+                return sid
+        return None
+
+    async def connect(self, config) -> str:
+        """镜像真实 MCPHub.connect 的停用闸门：停用的配置一律拒绝连接。"""
+        if not config.enabled:
+            raise ValueError(f"MCP server is disabled: {config.name}")
+        self._seq += 1
+        sid = f"srv{self._seq}"
+        self._servers[sid] = {
+            "name": config.name,
+            "transport": config.transport,
+            "status": "connected",
+            "tools_count": 0,
+            "config": config,
+        }
+        return sid
+
+    async def disconnect(self, server_id: str) -> None:
+        self.disconnects.append(server_id)
+        if server_id in self._servers:
+            self._servers[server_id]["status"] = "disconnected"
 
     def remove_server(self, name: str) -> bool:
         for sid, d in list(self._servers.items()):
@@ -316,3 +351,93 @@ def test_marketplace_tools_runs_off_the_event_loop(monkeypatch):
 
     assert result == {"status": "ok", "tools": [], "count": 0}
     assert seen["thread"] != caller, "marketplace_tools 仍在事件循环线程里执行"
+
+
+# ── enabled / auto_connect 真能力（2026-10-21）────────────────────
+
+
+class TestServerEnablement:
+    def test_create_disabled_is_persisted_and_surfaced(self, client: TestClient, hub: _FakeHub):
+        """``enabled: false`` 不能只是收下就算 —— 列表与详情都得如实回报。"""
+        resp = client.post("/api/mcp/servers", json={
+            "name": "paused", "transport": "stdio", "command": "node",
+            "enabled": False, "auto_connect": True,
+        })
+        assert resp.status_code == 200
+        sid = client.get("/api/mcp/servers").json()["servers"][0]["id"]
+        listed = client.get("/api/mcp/servers").json()["servers"][0]
+        assert listed["enabled"] is False
+        assert listed["auto_connect"] is True
+        detail = client.get(f"/api/mcp/servers/{sid}").json()["server"]
+        assert detail["enabled"] is False
+        assert detail["auto_connect"] is True
+
+    def test_connect_disabled_returns_409_and_never_connects(self, client: TestClient, hub: _FakeHub):
+        client.post("/api/mcp/servers", json={
+            "name": "paused", "transport": "stdio", "command": "node", "enabled": False,
+        })
+        resp = client.post("/api/mcp/connect/paused")
+        assert resp.status_code == 409
+        assert "disabled" in resp.json()["error"]
+        assert all(not d["config"].enabled for d in hub._servers.values())
+
+    def test_connect_enabled_succeeds(self, client: TestClient, hub: _FakeHub):
+        client.post("/api/mcp/servers", json={
+            "name": "live", "transport": "stdio", "command": "node",
+        })
+        resp = client.post("/api/mcp/connect/live")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+    def test_put_without_enabled_does_not_reenable(self, client: TestClient, hub: _FakeHub):
+        """PUT 复用同一模型：缺省必须是"不改"，否则一次编辑就把停用抹掉了。"""
+        client.post("/api/mcp/servers", json={
+            "name": "svc", "transport": "stdio", "command": "node", "enabled": False,
+        })
+        sid = client.get("/api/mcp/servers").json()["servers"][0]["id"]
+        resp = client.put(f"/api/mcp/servers/{sid}", json={
+            "name": "svc", "transport": "stdio", "command": "node",
+        })
+        assert resp.status_code == 200
+        assert hub.get_server_config_by_id(sid).enabled is False
+
+    def test_disabling_updates_config_and_disconnects(self, client: TestClient, hub: _FakeHub):
+        """停用要立刻生效：配置改掉，已经在跑的传输也得真的断开。"""
+        client.post("/api/mcp/servers", json={
+            "name": "svc2", "transport": "stdio", "command": "node",
+        })
+        assert client.post("/api/mcp/connect/svc2").status_code == 200
+        sid = client.get("/api/mcp/servers").json()["servers"][0]["id"]
+
+        resp = client.put(f"/api/mcp/servers/{sid}", json={
+            "name": "svc2", "transport": "stdio", "command": "node", "enabled": False,
+        })
+        assert resp.status_code == 200
+        assert hub.get_server_config_by_id(sid).enabled is False
+        assert hub.disconnects, "停用后仍保留活动连接，enabled 就成了装饰字段"
+
+
+class TestAutoConnectServers:
+    def test_only_enabled_auto_connect_disconnected_are_started(
+        self, client: TestClient, hub: _FakeHub,
+    ):
+        import asyncio
+
+        client.post("/api/mcp/servers", json={
+            "name": "boot-me", "transport": "stdio", "command": "node",
+            "auto_connect": True,
+        })
+        client.post("/api/mcp/servers", json={
+            "name": "manual", "transport": "stdio", "command": "node",
+        })
+        client.post("/api/mcp/servers", json={
+            "name": "paused", "transport": "stdio", "command": "node",
+            "enabled": False, "auto_connect": True,
+        })
+
+        result = asyncio.run(plugin_service.auto_connect_servers())
+        assert result["connected"] == ["boot-me"]
+        assert result["count"] == 1
+        statuses = {s["name"]: s for s in client.get("/api/mcp/servers").json()["servers"]}
+        assert statuses["manual"]["status"] == "disconnected"
+        assert statuses["paused"]["status"] == "disconnected"
