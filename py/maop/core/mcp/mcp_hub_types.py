@@ -44,6 +44,11 @@ class MCPServerConfig(BaseModel):
     # Per-server request timeout for transports (stdio line waits, HTTP
     # requests, WebSocket recv). Defaults keep the previous hard-coded 30s.
     timeout_s: float = Field(default=30.0, gt=0)
+    # 停用 = 拒绝连接（含启动期自动连接与手动 connect）。配置保留，随时可再启用。
+    enabled: bool = True
+    # 启动播种后是否自动发起连接。默认 False：连不上会拖慢/噪音化冷启动，
+    # 由用户在管理页显式勾选"启动时自动连接"。
+    auto_connect: bool = False
     auto_reconnect: bool = True
     max_reconnect_attempts: int = 3
     reconnect_delay_s: float = 5.0
@@ -137,3 +142,7 @@ class ServerInfo(BaseModel):
     tools_count: int = 0
     resources_count: int = 0
     error: str = ""
+    # 来自存储的配置：停用的服务器会被 connect() 拒绝；auto_connect 决定是否在
+    # 启动播种后自动连接。列表页要靠这两个字段才能区分"断开"与"被停用"。
+    enabled: bool = True
+    auto_connect: bool = False

@@ -208,9 +208,30 @@ async def lifespan(app: FastAPI) -> Any:
             # 播种失败不应阻塞启动 —— 它只是配置同步，不是服务依赖
             logger.warning("[lifespan] MCP config seed failed: %s", exc)
 
+        # ── 自动连接标了 auto_connect 的 MCP 服务器 ───────────────
+        # 后台任务，不 await：一台不可达的 MCP 服务不该拖慢或卡住仪表板启动。
+        async def _mcp_auto_connect() -> None:
+            try:
+                from maop.dashboard.services import plugin_service as _ps
+                res = await _ps.auto_connect_servers()
+                if res["connected"] or res["failed"]:
+                    logger.info(
+                        "[lifespan] MCP auto-connect: connected=%s failed=%s",
+                        res["connected"], res["failed"],
+                    )
+            except Exception as exc:
+                logger.warning("[lifespan] MCP auto-connect failed: %s", exc)
+
+        app.state.mcp_autoconnect_task = asyncio.create_task(_mcp_auto_connect())
+
     try:
         yield
     finally:
+        _autoconnect = getattr(app.state, "mcp_autoconnect_task", None)
+        if _autoconnect is not None and not _autoconnect.done():
+            _autoconnect.cancel()
+            with suppress(asyncio.CancelledError):
+                await _autoconnect
         if _ws_manager._ws_push_task is not None:
             _ws_manager._ws_push_task.cancel()
             with suppress(asyncio.CancelledError):

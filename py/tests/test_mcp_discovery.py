@@ -142,6 +142,38 @@ mcp_servers:
     assert configs[0].name == "alt-server"
 
 
+def test_discover_yaml_enablement_and_timeout_are_honoured(tmp_path):
+    """配置文件里写的 enabled/auto_connect/timeout 必须落到 MCPServerConfig。
+
+    这三个键早已写在 ``config/mcp_servers.yaml``，但加载器原先不透传 ⇒
+    写 ``enabled: false`` 的服务器照样会被连接，写 ``timeout: 45`` 无效。
+    """
+    cfg = tmp_path / "config" / "mcp_servers.yaml"
+    cfg.parent.mkdir(parents=True)
+    cfg.write_text("""
+servers:
+  - name: paused
+    transport: stdio
+    command: node
+    enabled: false
+    auto_connect: true
+    timeout: 45
+  - name: defaults
+    transport: stdio
+    command: node
+""", encoding="utf-8")
+    disc = MCPDiscovery(root_dir=tmp_path)
+    with patch.object(MCPDiscovery, "_scan_paths", lambda self: [cfg]):
+        configs, _ = disc.discover()
+    by_name = {c.name: c for c in configs}
+    assert by_name["paused"].enabled is False
+    assert by_name["paused"].auto_connect is True
+    assert by_name["paused"].timeout_s == 45.0
+    assert by_name["defaults"].enabled is True
+    assert by_name["defaults"].auto_connect is False
+    assert by_name["defaults"].timeout_s == 30.0
+
+
 def test_discover_yaml_invalid_transport_falls_back_to_stdio(tmp_path):
     """An unknown transport string falls back to STDIO."""
     cfg = tmp_path / "config" / "mcp_servers.yaml"

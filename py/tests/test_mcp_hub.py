@@ -73,6 +73,8 @@ class TestMCPServerConfigPersistence:
             args=["-y", "server"],
             headers={"Authorization": "Bearer token"},
             timeout_s=7.5,
+            enabled=False,
+            auto_connect=True,
         ))
         try:
             sid = hub.find_server_id_by_name(name)
@@ -83,6 +85,13 @@ class TestMCPServerConfigPersistence:
             assert cfg.args == ["-y", "server"]
             assert cfg.headers == {"Authorization": "Bearer token"}
             assert cfg.timeout_s == 7.5
+            assert cfg.enabled is False
+            assert cfg.auto_connect is True
+
+            # 列表页要能区分"断开"与"被停用"
+            info = next(s for s in hub.list_servers() if s.id == sid)
+            assert info.enabled is False
+            assert info.auto_connect is True
 
             cfg.timeout_s = 9.0
             assert hub.update_server(sid, cfg) is True
@@ -92,6 +101,17 @@ class TestMCPServerConfigPersistence:
 
 
 class TestMCPHubConnect:
+    @pytest.mark.asyncio
+    async def test_connect_refuses_disabled_config(self, hub):
+        """停用是配置级闸门：真实 hub.connect() 必须先拒绝，而不是先连再判。"""
+        from maop.core.mcp.mcp_hub_types import MCPServerConfig, TransportType
+
+        with pytest.raises(ValueError, match="disabled"):
+            await hub.connect(MCPServerConfig(
+                name="paused-server", transport=TransportType.STDIO,
+                command="true", enabled=False,
+            ))
+
     @pytest.mark.asyncio
     async def test_connect_sse(self, hub):
         cfg = MCPServerConfig(

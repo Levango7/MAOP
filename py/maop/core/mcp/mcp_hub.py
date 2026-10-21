@@ -230,7 +230,13 @@ class MCPHub(MCPHubMetricsMixin, MCPHubOpsMixin, MCPHubCompatMixin):
         return sqlite_connect(self._db_path, foreign_keys=False)
 
     async def connect(self, config: MCPServerConfig) -> str:
-        """Connect to an MCP server. Returns the server ID."""
+        """Connect to an MCP server. Returns the server ID.
+
+        Raises ``ValueError`` when the stored config is disabled —— 停用是配置级
+        开关，手动 connect 与启动期自动连接都必须走同一道闸门。
+        """
+        if not config.enabled:
+            raise ValueError(f"MCP server is disabled: {config.name}")
         with otel.span(
             self._tracer,
             "mcp.connect",

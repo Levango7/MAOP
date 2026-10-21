@@ -245,6 +245,13 @@ class MCPDiscovery:
                 auto_reconnect=server_info.get("auto_reconnect", True),
                 max_reconnect_attempts=server_info.get("max_reconnect_attempts", 3),
                 reconnect_delay_s=server_info.get("reconnect_delay_s", 5.0),
+                # 配置文件里这些键早就写好了（含 `timeout:` 这一旧拼写）；
+                # 不接就是"写了不生效"。timeout_s 缺省时沿用模型默认值。
+                enabled=bool(server_info.get("enabled", True)),
+                auto_connect=bool(server_info.get("auto_connect", False)),
+                timeout_s=float(
+                    server_info.get("timeout_s", server_info.get("timeout", 30.0)) or 30.0
+                ),
                 allowed_tools=server_info.get("allowed_tools"),
                 denied_tools=server_info.get("denied_tools"),
                 allowed_users=server_info.get("allowed_users"),

@@ -54,7 +54,8 @@
                   <div class="srv-table__url mono">{{ s.url || '—' }}</div>
                 </div>
                 <div class="srv-table__td" role="cell">
-                  <Badge :tone="isConnected(s) ? 'success' : 'neutral'">
+                  <Badge v-if="s.enabled === false" tone="warn">{{ t('view.mcp.status.disabled') }}</Badge>
+                  <Badge v-else :tone="isConnected(s) ? 'success' : 'neutral'">
                     {{ isConnected(s) ? t('view.mcp.status.connected') : t('view.mcp.status.disconnected') }}
                   </Badge>
                 </div>
@@ -340,6 +341,16 @@
               <span class="field__label">{{ t('view.mcp.modal.timeout') }}</span>
               <input v-model.number="serverForm.timeout_s" class="field__input" type="number" min="1" step="1" placeholder="30" />
             </label>
+            <div class="field-row field-row--checks">
+              <label class="check">
+                <input v-model="serverForm.enabled" type="checkbox" />
+                <span>{{ t('view.mcp.modal.enabled') }}</span>
+              </label>
+              <label class="check">
+                <input v-model="serverForm.auto_connect" type="checkbox" />
+                <span>{{ t('view.mcp.modal.autoConnect') }}</span>
+              </label>
+            </div>
           </div>
           <div class="modal__foot">
             <button class="btn-ghost" type="button" @click="closeServerModal">{{ t('common.cancel') }}</button>
@@ -437,6 +448,8 @@ const serverForm = reactive({
   auth_type: 'none',
   token: '',
   timeout_s: 30,
+  enabled: true,
+  auto_connect: false,
 });
 
 function resetServerForm() {
@@ -448,6 +461,8 @@ function resetServerForm() {
   serverForm.auth_type = 'none';
   serverForm.token = '';
   serverForm.timeout_s = 30;
+  serverForm.enabled = true;
+  serverForm.auto_connect = false;
 }
 
 function openAddServer() {
@@ -473,6 +488,8 @@ async function openEditServer(s) {
   serverForm.argsText = Array.isArray(cfg?.args) ? cfg.args.join(' ') : '';
   serverForm.auth_type = cfg?.auth_type || 'none';
   serverForm.timeout_s = cfg?.timeout_s ?? 30;
+  serverForm.enabled = cfg?.enabled ?? s.enabled ?? true;
+  serverForm.auto_connect = cfg?.auto_connect ?? s.auto_connect ?? false;
   showServerModal.value = true;
 }
 
@@ -495,6 +512,8 @@ async function submitServer() {
         : [],
       auth_type: serverForm.auth_type,
       timeout_s: Number(serverForm.timeout_s) || 30,
+      enabled: serverForm.enabled !== false,
+      auto_connect: serverForm.auto_connect === true,
     };
     if (serverForm.auth_type !== 'none' && serverForm.token) {
       payload.token = serverForm.token;
@@ -1091,6 +1110,12 @@ onMounted(() => {
 .field__input::placeholder { color: var(--text-faint); }
 .field__select { cursor: pointer; appearance: none; -webkit-appearance: none; background-image: var(--icon-chevron); background-repeat: no-repeat; background-position: right var(--sp-2) center; padding-right: var(--sp-7); }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.field-row--checks { align-items: center; }
+.check {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-sm); color: var(--text); cursor: pointer;
+}
+.check input { width: auto; accent-color: var(--brand); }
 
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 900px) {
