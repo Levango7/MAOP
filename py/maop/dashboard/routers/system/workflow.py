@@ -82,13 +82,14 @@ async def api_workflow_run(body: WorkflowRunRequest, request: Request) -> dict[s
     # H4 fix: 保存 task 引用到 active_jobs 字典，避免未保存的 task 引用被
     # GC 回收时触发 "Task was destroyed but it is pending" warning。
     _drain_task = asyncio.create_task(proc.communicate())
-    # H3 fix: 用 active_jobs_lock 保护并发读写。
-    with _deps.active_jobs_lock:
-        _deps.active_jobs[job_id] = {
-            "action": "workflow", "status": "running",
-            "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "task": wf_name, "process": proc, "_drain_task": _drain_task,
-        }
+    # H3 fix: 用 active_jobs_lock 保护并发读写；register_job 在同一把锁下
+    # 插入并执行保留上限（此前没有任何地方删过条目，看板会按运行次数累积
+    # 带着 stdout/stderr 的已完成作业）。
+    _deps.register_job(job_id, {
+        "action": "workflow", "status": "running",
+        "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "task": wf_name, "process": proc, "_drain_task": _drain_task,
+    })
     return {"job_id": job_id, "status": "started", "workflow": wf_name}
 
 

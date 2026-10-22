@@ -7,6 +7,22 @@ import { useI18n } from '../i18n/index.js';
 // 保留 USER_KEY 用于存储非敏感的用户名信息（UI 显示登录状态）。
 const USER_KEY = 'maop_user';
 
+/**
+ * Everything the UI derives from *who is logged in*. These are cleared together
+ * on logout/401: leaving `maop_roles` or `maop_edition` behind means the next
+ * session (possibly a different user, or the same user re-logging after a
+ * license downgrade) renders the previous identity's role set and edition
+ * until the async hydrate lands — a stale-permission window, not just stale UI.
+ * `maop_token` is listed only so the pre-M6 (localStorage token) leftovers die.
+ */
+const AUTH_SCOPED_KEYS = ['maop_user', 'maop_roles', 'maop_edition', 'maop_auth_enabled', 'maop_token'];
+
+function clearAuthKeys() {
+  try {
+    for (const key of AUTH_SCOPED_KEYS) localStorage.removeItem(key);
+  } catch { /* storage unavailable (private mode) — nothing else to do */ }
+}
+
 // L3 fix: 提取硬编码的 API 路径为命名常量，便于统一维护与路径变更。
 const API_ENDPOINTS = {
   AUTH_REFRESH: '/api/auth/refresh',
@@ -166,10 +182,8 @@ async function handleUnauthorized() {
   if (refreshed) return;  // Caller should retry the original request
 
   // Refresh failed — clear auth state
-  // M6 fix: token 由后端 httpOnly cookie 管理，前端只需清除 user 信息。
-  try {
-    localStorage.removeItem(USER_KEY);
-  } catch { /* ignore */ }
+  // M6 fix: token 由后端 httpOnly cookie 管理，前端只需清除身份派生缓存。
+  clearAuthKeys();
   // 仅在浏览器环境且非测试环境触发重定向，避免 vitest 中 jsdom 缺少路由
   if (typeof window !== 'undefined' && !window.__VITEST__ && window.location) {
     // 触发一个自定义事件，让 App.vue 决定如何展示登录态（不强制刷新整页）
@@ -344,10 +358,8 @@ export const useApiStore = defineStore('api', () => {
     try {
       await fetchWithTimeout(API_ENDPOINTS.AUTH_LOGOUT, withAuth({ method: 'POST' }, {}));
     } catch { /* best-effort — clear locally anyway */ }
-    // M6 fix: 后端会通过 Set-Cookie 清除 httpOnly cookie，前端只需清除 user 信息。
-    try {
-      localStorage.removeItem(USER_KEY);
-    } catch { /* ignore */ }
+    // M6 fix: 后端会通过 Set-Cookie 清除 httpOnly cookie，前端清掉身份派生缓存。
+    clearAuthKeys();
   }
 
   return {
@@ -366,4 +378,4 @@ export const useApiStore = defineStore('api', () => {
 // 模块级导出（便于非 Pinia 上下文使用，如 App.vue 直接 import）
 // R7 fix: getAuthToken 为内部实现细节（始终返回空字符串，token 由 httpOnly cookie 管理），
 // 不再对外导出。登录状态应通过 isLoggedIn() 判断。
-export { withAuth, handleUnauthorized, isLoggedIn, fetchWithTimeout };
+export { withAuth, handleUnauthorized, isLoggedIn, fetchWithTimeout, clearAuthKeys, AUTH_SCOPED_KEYS };

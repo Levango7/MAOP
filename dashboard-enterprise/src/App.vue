@@ -91,7 +91,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, onErrorCaptured, watchEffect } from 'vue';
 import { useEditionStore } from './stores/edition.js';
-import { useApiStore } from './stores/api.js';
+import { useApiStore, clearAuthKeys } from './stores/api.js';
 import { useRealtimeStore } from './stores/realtime.js';
 import { useUiStore } from './stores/ui.js';
 import AppIcon from './components/AppIcon.vue';
@@ -266,7 +266,9 @@ async function checkAuthEnabled() {
     // overlay immediately. M6: presence = isLoggedIn(), not authToken()
     // (token lives in an httpOnly cookie and is unreadable from JS).
     if (authEnabled.value && d && d.has_token === false && api.isLoggedIn()) {
-      try { localStorage.removeItem('maop_token'); localStorage.removeItem('maop_user'); } catch { /* ignore */ }
+      // 一条口径：cookie 已死就把所有"谁在登录"派生的缓存一起清掉，
+      // 否则 maop_roles / maop_edition 会带着上一个身份继续渲染。
+      clearAuthKeys();
     }
   } catch { authEnabled.value = false; }
 }

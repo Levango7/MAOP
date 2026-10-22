@@ -162,8 +162,13 @@ def health_check(root_dir: str | Path, timeout_s: float = 5.0) -> list[Component
     db_path = root / "data" / "maop.db"
     if db_path.is_file():
         try:
-            import sqlite3
-            with sqlite3.connect(str(db_path), timeout=timeout_s) as conn:
+            from maop.core.backends.db_utils import sqlite_connect
+            # 只读探针：不改别人的 journal 模式，但只要 timeout + 一定 close。
+            # 原先写成 `with sqlite3.connect(...)` —— sqlite 的连接上下文管理器
+            # 只管事务提交，**不关连接**；这条健康检查按周期反复跑，句柄会一直
+            # 捏着 maop.db（Windows 上后续 unlink/重建直接 WinError 32）。
+            with sqlite_connect(str(db_path), timeout=timeout_s, wal=False,
+                                foreign_keys=False, row_factory=None) as conn:
                 conn.execute("SELECT 1")
             results.append(ComponentHealth(
                 name="database",
@@ -189,8 +194,10 @@ def health_check(root_dir: str | Path, timeout_s: float = 5.0) -> list[Component
     mem_path = root / "data" / "memory.db"
     if mem_path.is_file():
         try:
-            import sqlite3
-            with sqlite3.connect(str(mem_path), timeout=timeout_s) as conn:
+            from maop.core.backends.db_utils import sqlite_connect
+            # 同 database 探针：连接的 with 不等于关闭，必须走 sqlite_connect。
+            with sqlite_connect(str(mem_path), timeout=timeout_s, wal=False,
+                                foreign_keys=False, row_factory=None) as conn:
                 conn.execute("SELECT 1")
             results.append(ComponentHealth(
                 name="memory",

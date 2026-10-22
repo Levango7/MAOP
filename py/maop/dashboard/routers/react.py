@@ -142,7 +142,11 @@ async def save_artifact(body: SaveArtifactRequest, request: Request) -> dict[str
 
 @router.get("/artifacts/{name}")
 @handle_api_errors
-async def load_artifact(request: Request, name: str, version: int | None = Query(None)) -> dict[str, Any]:
+async def load_artifact(
+    request: Request,
+    name: str,
+    version: int | None = Query(None, ge=1),
+) -> dict[str, Any]:
     require_admin(request)
     store = _get_artifact_store()
     content = chat_service.load_artifact(store, name, version=version)

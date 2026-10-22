@@ -49,6 +49,54 @@ cache_lock = asyncio.Lock()
 active_jobs: dict[str, Any] = {}
 active_jobs_lock = threading.Lock()
 
+# ── Job registry retention ─────────────────────────────────────────
+# 每一条 job 记录都带着它的子进程句柄与捕获到的 stdout/stderr。此前**没有任何
+# 地方删除过条目**（全仓 `active_jobs` 只有写入与迭代，没有 pop/clear），所以
+# 7×24 运行的看板是按每次运行累积"已完成作业的输出一坨"，而不是"活动作业"。
+JOB_RETENTION_MAX = 200
+
+#: Statuses that will never change again — only these are eligible for eviction.
+TERMINAL_JOB_STATUSES = frozenset({
+    "completed", "failed", "cancelled", "done", "error", "timeout", "stopped",
+})
+
+
+def _prune_locked(max_entries: int = JOB_RETENTION_MAX) -> int:
+    """Evict the oldest finished jobs above the ceiling. Caller holds the lock."""
+    overflow = len(active_jobs) - max_entries
+    if overflow <= 0:
+        return 0
+    finished = sorted(
+        (str(job.get("start") or ""), key)
+        for key, job in active_jobs.items()
+        if str(job.get("status", "")).lower() in TERMINAL_JOB_STATUSES
+    )
+    dropped = 0
+    for _start, key in finished:
+        if dropped >= overflow:
+            break
+        active_jobs.pop(key, None)
+        dropped += 1
+    return dropped
+
+
+def register_job(job_id: str, job: dict[str, Any]) -> None:
+    """Insert a job and enforce retention, under the registry lock.
+
+    Writing through here (instead of ``active_jobs[job_id] = …``) is what keeps
+    the ceiling honest: the only other way to bound growth would be a cleaner
+    that some caller might forget to run.
+    """
+    with active_jobs_lock:
+        active_jobs[job_id] = job
+        _prune_locked()
+
+
+def prune_active_jobs(max_entries: int = JOB_RETENTION_MAX) -> int:
+    """Drop finished jobs above the ceiling. Returns the number dropped."""
+    with active_jobs_lock:
+        return _prune_locked(max_entries)
+
 # ── Subsystem Registry ─────────────────────────────────────────────
 _SUBSYSTEMS: dict[str, Any] = {}
 

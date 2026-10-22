@@ -29,6 +29,8 @@ from maop.dashboard.routers.state import (
     get_bridge,  # noqa: F401
     get_subsystems,  # noqa: F401
     init_subsystems,  # noqa: F401
+    prune_active_jobs,  # noqa: F401
+    register_job,  # noqa: F401
     start_time,  # noqa: F401
 )
 

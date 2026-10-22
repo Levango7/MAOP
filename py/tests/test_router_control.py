@@ -422,7 +422,8 @@ class TestControlMaintain:
         resp = client.post("/api/control/maintain", json={"action": "prune"})
         assert resp.status_code == 200
         body = resp.json()
-        for key in ("run_events_pruned", "quota_audit_pruned", "alert_rows_pruned"):
+        for key in ("run_events_pruned", "quota_audit_pruned", "alert_rows_pruned",
+                    "retention_rows_pruned", "retention_by_table"):
             assert key in body, f"prune 响应缺 {key}：那张表不再被裁"
         assert body["alert_rows_pruned"]["expired"] >= 1
         assert alert_ingest.count_alerts() == 0

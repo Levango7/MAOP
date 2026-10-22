@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
 import time
 from pathlib import Path
 from typing import Any, cast
@@ -119,13 +118,14 @@ class DashboardProvider:
         if not db_path.exists():
             return 0
         try:
-            conn = sqlite3.connect(str(db_path), timeout=5)
-            try:
+            from maop.core.backends.db_utils import sqlite_connect
+            # 只读计数：wal=False 不去改别人的 journal 模式；其余口径
+            # （busy_timeout、一定关闭）与全项目一致。
+            with sqlite_connect(str(db_path), timeout=5, wal=False,
+                                foreign_keys=False) as conn:
                 cursor = conn.execute("SELECT COUNT(*) FROM delegations")
                 row = cursor.fetchone()
                 return row[0] if row else 0
-            finally:
-                conn.close()
         except Exception as exc:
             logger.warning("[provider] _count_delegations failed: %s", exc)
             return 0
@@ -136,8 +136,10 @@ class DashboardProvider:
         if not db_path.exists():
             return 0.0
         try:
-            conn = sqlite3.connect(str(db_path), timeout=5)
-            try:
+            from maop.core.backends.db_utils import sqlite_connect
+            # 同 _count_delegations：只读统计走中心助手，不再自带一套 close。
+            with sqlite_connect(str(db_path), timeout=5, wal=False,
+                                foreign_keys=False) as conn:
                 cursor = conn.execute("SELECT COUNT(*) FROM delegations")
                 total = cursor.fetchone()[0]
                 if total == 0:
@@ -147,8 +149,6 @@ class DashboardProvider:
                 )
                 success = cursor.fetchone()[0]
                 return cast(float, round((success / total) * 100, 1))
-            finally:
-                conn.close()
         except Exception as exc:
             logger.warning("[provider] _compute_success_rate failed: %s", exc)
             return 0.0

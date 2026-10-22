@@ -226,8 +226,11 @@ class ABTestFramework:
                 logger.warning("[ab_test] Prompt DB not found at %s", db_path)
                 return False
 
-            import sqlite3
-            with sqlite3.connect(str(db_path)) as conn:
+            from maop.core.backends.db_utils import sqlite_connect
+            # 提升是写路径：裸 sqlite3.connect 既没有 busy_timeout（并发写直接
+            # "database is locked"），`with` 也不关连接。两个问题一起交给
+            # sqlite_connect 处理；row_factory 保持原来的元组语义。
+            with sqlite_connect(str(db_path), row_factory=None) as conn:
                 cur = conn.execute(
                     "UPDATE prompt_templates SET current_version=? WHERE id=?",
                     (exp.treatment_version, exp.template_name),

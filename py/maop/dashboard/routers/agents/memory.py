@@ -59,7 +59,7 @@ async def store_agent_memory(name: str, body: MemoryStoreRequest, request: Reque
 async def clear_agent_memory(
     name: str,
     request: Request,
-    memory_id: int = Query(0, description="Specific memory ID to delete, 0 = all"),
+    memory_id: int = Query(0, ge=0, description="Specific memory ID to delete, 0 = all"),
 ):
     """清除 agent 的记忆（全部或指定条目）。"""
     require_admin(request)

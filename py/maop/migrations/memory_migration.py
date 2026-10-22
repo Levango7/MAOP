@@ -253,7 +253,11 @@ def _migrate_table(
         return result
 
     try:
-        with sqlite3.connect(str(src_path)) as src:
+        # 迁移是长时间批量读写，源库只读：不改它的 journal 模式，但一定要关连接
+        # （`with sqlite3.connect(...)` 只提交事务、不关闭，迁移循环会把句柄攒起来）。
+        from maop.core.backends.db_utils import sqlite_connect
+        with sqlite_connect(str(src_path), wal=False, foreign_keys=False,
+                            row_factory=None) as src:
             src.row_factory = sqlite3.Row
             if not _table_exists(src, table):
                 result.duration_s = time.time() - start
