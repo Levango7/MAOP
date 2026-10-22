@@ -1404,8 +1404,15 @@ class TestChannelConfigMasking:
                 {
                     "channel_id": "ch_raw",
                     "name": "raw",
+                    "type": "webhook",
                     "config": {"api_key": "plain-key", "auth_token": "plain-token", "host": "h"},
+                    "description": "",
                     "tenant_id": "t1",
+                    "enabled": True,
+                    "status": "active",
+                    "created_at": 0.0,
+                    "updated_at": 0.0,
+                    "last_error": "",
                 },
             ]
 
@@ -1414,3 +1421,118 @@ class TestChannelConfigMasking:
         cfg = client.get("/api/notifications/channels").json()["channels"][0]["config"]
         assert cfg == {"api_key": "***", "auth_token": "***", "host": "h"}
         assert seen == {"all_tenants": True}
+
+# ── P1-b: response model contract ─────────────────────────────────
+
+
+class TestResponseModelContract:
+    """The router must expose a typed OpenAPI contract for every operation."""
+
+    def test_every_route_declares_a_typed_response(self):
+        from fastapi import FastAPI
+
+        from maop.dashboard.routers import notifications as notif_router
+
+        app = FastAPI()
+        app.include_router(notif_router.router)
+        schema = app.openapi()
+
+        untyped: list[str] = []
+        count = 0
+        for path, methods in schema["paths"].items():
+            if not path.startswith("/api/notifications"):
+                continue
+            for method, op in methods.items():
+                if method not in ("get", "post", "put", "patch", "delete"):
+                    continue
+                count += 1
+                resp = (
+                    op.get("responses", {}).get("200")
+                    or op.get("responses", {}).get("201")
+                    or {}
+                )
+                sch = (resp.get("content") or {}).get("application/json", {}).get("schema") or {}
+                typed = (
+                    "$ref" in sch
+                    or "properties" in sch
+                    or "$ref" in (sch.get("items") or {})
+                )
+                if not typed:
+                    untyped.append(f"{method.upper()} {path}")
+
+        assert count == 26, count
+        assert untyped == []
+        # Anti-vacuous: the schema really contains the notification routes.
+        assert "/api/notifications/channels" in schema["paths"]
+
+    def test_channel_crud_envelope(self, client):
+        created = client.post(
+            "/api/notifications/channels",
+            json={"name": "ops", "type": "inapp", "config": {}},
+        )
+        assert created.status_code == 200
+        body = created.json()
+        assert body["status"] == "ok"
+        assert body["channel"]["channel_id"]
+        assert body["channel"]["type"] == "inapp"
+        ch_id = body["channel"]["channel_id"]
+
+        listed = client.get("/api/notifications/channels").json()
+        assert listed["status"] == "ok"
+        assert listed["count"] == 1
+        assert listed["channels"][0]["channel_id"] == ch_id
+
+        deleted = client.delete(f"/api/notifications/channels/{ch_id}").json()
+        assert deleted == {"status": "ok", "deleted": True}
+
+    def test_rule_and_template_envelopes(self, client):
+        rule = client.post(
+            "/api/notifications/rules",
+            json={"name": "r", "event_type": "task_failed", "channel_ids": []},
+        ).json()
+        assert rule["status"] == "ok" and rule["rule"]["rule_id"]
+        assert client.get("/api/notifications/rules").json()["count"] == 1
+
+        tpl = client.post(
+            "/api/notifications/templates", json={"name": "t", "body": "B"}
+        ).json()
+        assert tpl["status"] == "ok" and tpl["template"]["template_id"]
+        assert client.get("/api/notifications/templates").json()["count"] == 1
+        deleted = client.delete(
+            f"/api/notifications/templates/{tpl['template']['template_id']}"
+        ).json()
+        assert deleted["deleted"] is True
+
+    def test_notification_list_uses_notification_response_fields(self, client):
+        ch = client.post(
+            "/api/notifications/channels",
+            json={"name": "inbox", "type": "inapp", "config": {}},
+        ).json()["channel"]
+        sent = client.post(
+            "/api/notifications/send",
+            json={"channel_id": ch["channel_id"], "title": "t", "body": "b"},
+        ).json()
+        assert sent["notification"]["notification_id"]
+
+        lst = client.get("/api/notifications/list").json()
+        assert lst["status"] == "ok"
+        assert lst["total"] == 1 and lst["count"] == 1
+        item = lst["notifications"][0]
+        assert item["notification_id"] == sent["notification"]["notification_id"]
+        assert item["body"] == "b"
+        assert item["read_at"] == 0
+        # Legacy names the dashboard used to read must not exist in the contract.
+        assert "id" not in item and "message" not in item
+
+    def test_preferences_and_unread_envelopes(self, client):
+        pref = client.get("/api/notifications/preferences?user_id=u1").json()
+        assert pref["status"] == "ok"
+
+        updated = client.put(
+            "/api/notifications/preferences?user_id=u1",
+            json={"channel_enabled": {"inapp": True}},
+        ).json()
+        assert updated["preference"]["channel_enabled"]["inapp"] is True
+
+        unread = client.get("/api/notifications/unread-count?user_id=u1").json()
+        assert unread == {"status": "ok", "unread_count": 0}
