@@ -146,10 +146,17 @@ jobs:
             repeats: 2
             xdist: '-n 0'
     runs-on: ${{ matrix.os }}
-    # 超时按实测定（run 477 的同一套 CI 腿）：ubuntu 6min / macos 3min /
-    # windows-3.12 14min —— 且那是**含** --reruns=3 的耗时。最慢腿 windows 跑 2 遍
-    # 约 28min，60min 给约 2 倍余量；矩阵并行，总墙钟由最慢腿决定。
-    timeout-minutes: 60
+    # 超时按实测定。2026-10-22 复核：原注释估"windows 跑 2 遍约 28min"已严重偏低
+    # （那是 run 477 的数，之后套件持续变长）。实测 windows-latest/3.12 这条腿：
+    #   10-21 run 39559254937 → 49 分 3 秒（success）
+    #   10-22 run 39738042722 → 60 分 14 秒（**超时，conclusion=cancelled**）
+    # 60min 正好卡在分布尾部，与 ci.yml test job 50→90（#134）是同一类问题。
+    # 按实测最大值的 2 倍给到 120min。矩阵并行，总墙钟由最慢腿决定。
+    #
+    # 认这个形态：**超时在这里表现为整条 run 转 cancelled**，而不是某个 job 报 failure。
+    # 后果是"nightly 没结果"很容易被误读成"测试还是红的"——10-20 与 10-22 两次都被这样
+    # 误判过（实际 flaky 修复早在 10-21 的 49 分钟成功腿里验证通过了）。
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
