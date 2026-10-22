@@ -456,6 +456,8 @@ async def maintain_prune() -> dict[str, Any]:
         # First, and never raising: a memory-store failure below must not cost
         # the caller the timeline prune they asked for.
         run_events_pruned = prune_run_events(older_than_days=DEFAULT_RETENTION_DAYS)
+        from maop.core import alert_ingest
+        alert_rows_pruned = alert_ingest.prune_alerts()
         from maop.memory.store import MemoryStore
         store = MemoryStore(root_dir=str(state.MAOP_ROOT))
         stats_before = store.stats()
@@ -485,6 +487,7 @@ async def maintain_prune() -> dict[str, Any]:
                 "remaining": total_after, "total_before": total_before,
                 "pruned_ids": list(pruned_ids)[:20],
                 "run_events_pruned": run_events_pruned,
+                "alert_rows_pruned": alert_rows_pruned,
                 "quota_audit_pruned": quota_audit.prune_audit()}
     except Exception:
         logger.exception("Prune failed")

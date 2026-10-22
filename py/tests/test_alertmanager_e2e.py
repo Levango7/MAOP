@@ -418,13 +418,23 @@ def test_docker_compose_base_alertmanager() -> None:
 
 
 @pytest.fixture
-def webhook_client(monkeypatch) -> TestClient:
+def webhook_client(tmp_path, monkeypatch) -> TestClient:
     """构造仅挂载 alerts 路由的 TestClient（无需认证）.
 
     R8 fix: 设置 ALERTS_WEBHOOK_SECRET 以通过 fail-closed 守卫。
     来源：2026-09-11-external-webhook-endpoint-signature-verification-required
+
+    告警现在会落库（alert_ingest），所以这里必须把库指到 tmp_path —— 否则本
+    模块每条用例都会往开发者本地的 data/maop.db 写真实行，测试之间互相污染、
+    跑完还留残渣。
     """
     monkeypatch.setenv("ALERTS_WEBHOOK_SECRET", "test-secret")
+    from maop.core import alert_ingest
+
+    monkeypatch.setattr(
+        alert_ingest, "get_db_path",
+        lambda *a, **k: tmp_path / "alerts.db",
+    )
     from maop.dashboard.routers.alerts import router
 
     app = FastAPI()

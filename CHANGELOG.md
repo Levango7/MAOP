@@ -217,6 +217,62 @@ agent 相关旗标，主运行链路（MaopLoop）也不构造带 `preferred_age
 - 两处均补上真实键名并保留旧键兜底；新增 `AlertRules` vitest 2 条，
   已做变异验证（去掉对应键后测试转红）。
 
+### Alertmanager 入站告警落库（有界）+ 读回端点（2026-10-21）
+
+`POST /api/alerts/webhook` 的模块 docstring 写着 **"deliberately does NOT persist
+alerts"** —— 这条链"接通了"，但每条告警只变成一行日志：重启即失忆、无法查询、
+个人版还没有任何告警历史可读（`/api/audit/alert/*` 由企业版 `FeatureFlag.AUDIT_LOG`
+门禁，个人版 404）。要不要落库先算清代价：用与实现同构的表建一份临时 SQLite，
+插入 100/1 000/10 000 行后 VACUUM，取整库字节数除以行数（一次性实测脚本，不在仓库内）：
+
+| 行形状 | 每行 | 10 000 行 |
+|---|---|---|
+| 标签与注解各存一份 JSON + 再存整包 raw | 2 123 B | 21.2 MB |
+| 同上，但不存 raw | 892 B | 8.9 MB |
+| **采用**：常用标签提升为列、文本裁剪、不存 raw | **461 B** | **4.6 MB** |
+
+参照物：本机 `data/maop.db` 当前 208 KB。所以"要不要落库"真正的问法是"上界是多少"：
+
+- **行数由去重键决定，而不是通知次数**。键为 `(fingerprint, status, starts_at)`，
+  `alertmanager.yml` 的 `repeat_interval: 4h` 反复推同一事件时 `INSERT OR IGNORE`
+  直接收敛 ⇒ 行数正比于**事件数**。`test_repeat_notification_reports_duplicate` 钉住
+  这条（received=1 / stored=0 / duplicate=1）。
+- **重复通知仍然要刷新 `received_at`**，否则一条持续 firing 的告警会在 30 天后被
+  保留期裁掉，而它其实还活着（`test_repeat_notification_collapses_and_refreshes`）。
+- **硬上界两条**：30 天 + 10 000 行，谁先到以谁为准；裁的是"最旧的整行"，
+  绝不按 fingerprint 裁（那样会把同一事件的 firing/resolved 一起删掉，删除行数
+  ≠ 超出量，上界就不再可证 —— 两条测试分别钉住）。
+- **内存上界**：`WebhookPayload.alerts` 加 `max_length=1000`。AM 侧
+  `max_alerts: 0` 不截断，所以这一刀只能接收端来（越界 422，且 422 不落库）。
+- **批次状态不是摆设**：单条没带 `status` 时退回 `payload.status`（日志侧一直是
+  `alert.status or payload.status`，落库若写死 `firing` 就会与日志互相矛盾）。
+  这条是自查静默丢弃字段扫出来的，`test_batch_status_flows_into_rows_without_their_own`
+  与另 3 条把它钉住（把 router 的透传删掉后转红）。
+- 落库失败**仍回 200** 并报 `stored=0`：回 4xx/5xx 会让 Alertmanager 无限重试。
+
+企业版那套 `AuditAlertEngine` 不能直接接手：`_record_alert` 按 `rule_id` 做 60 s
+去重（MAOS `audit_enhanced.py:45`、`:479`），一批 200 条不同告警会被压成"每条规则
+一行"；它的历史是 `deque(maxlen=10000)`（`:222`），`list_alerts()` 只读内存、
+PG 写了不回读（`:332`），进程重启即空。所以个人版另起一张有界 SQLite 表是必要的，
+不是重复造轮子。
+
+**消费端也补上了**：`AlertRules.vue` 增加「Alertmanager 入站告警」区块（两条数据源
+分开的空态：读不到 ≠ 没有），并且修掉个人版下这一页的死路 —— 原先
+`onMounted` 见个人版直接 return（"不发请求，后端必然 404"），于是有入站告警也不显示。
+
+顺带发现并修掉一处静默丢弃：历史抽屉 `api.get('/api/audit/alert/history', { rule_id })`
+—— `api.get` 的第二参数是 fetch init（只有 `.headers` 会被读），`rule_id` 从来没发出去
+过，抽屉把所有规则的历史当成这一条的显示。参数改进 URL，`test_scopes_the_history_drawer…`
+钉住（把修复回退后该测试转红）。
+
+验证：`test_alert_ingest.py` 20 条 + `test_alerts_endpoint_persistence.py` 14 条 +
+`test_alertmanager_e2e.py` 52 条全过（e2e 的 `webhook_client` 补了 tmp_path 隔离，
+否则每条用例都在往开发者本地 `data/maop.db` 写真行）；四处变异回验（去重关闭 /
+不刷新 received_at / stored 计数对重复失明 / router 不透传批次状态）全部转红；
+前端 518 passed、build exit 0、
+eslint 0 error、对比度 164 对全过；`check_silent_exceptions` / `check_file_size` /
+`check_docs_consistency --gate` / ruff / mypy 全绿（README 的 `core/` 计数 8→9 随新模块更新）。
+
 ### Webhooks 投递配置真正生效 + 最近触发时间（2026-10-21）
 
 - **配置被静默丢弃**：`HookCreateRequest`/`HookUpdateRequest` 接受
