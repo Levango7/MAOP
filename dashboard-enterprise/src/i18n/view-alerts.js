@@ -98,6 +98,19 @@ export const messages = {
     'view.alerts.alertResolved': 'Resolved',
     'view.alerts.alertAcknowledged': 'Acknowledged',
 
+    // ── Alertmanager inbound alerts (personal edition too) ──────
+    'view.alerts.inboundTitle': 'Alertmanager inbound alerts',
+    'view.alerts.inboundDesc': 'Events pushed to POST /api/alerts/webhook. Kept for 30 days, capped at 10 000 rows.',
+    'view.alerts.inboundColAlert': 'Alert',
+    'view.alerts.inboundColSeverity': 'Severity',
+    'view.alerts.inboundColStatus': 'Status',
+    'view.alerts.inboundColInstance': 'Instance',
+    'view.alerts.inboundColSummary': 'Summary',
+    'view.alerts.inboundColTime': 'Received',
+    'view.alerts.inboundEmpty': 'No inbound alerts yet',
+    'view.alerts.inboundUnavailable': 'Could not read inbound alerts',
+    'view.alerts.inboundFiring': 'Firing',
+
     // ── Stats ───────────────────────────────────────────────────
     'view.alerts.statTotalRules': 'Total Rules',
     'view.alerts.statActiveRules': 'Active Rules',
@@ -206,6 +219,19 @@ export const messages = {
     'view.alerts.alertFired': '已触发',
     'view.alerts.alertResolved': '已恢复',
     'view.alerts.alertAcknowledged': '已确认',
+
+    // ── Alertmanager 入站告警（个人版同样可用）──────────────────
+    'view.alerts.inboundTitle': 'Alertmanager 入站告警',
+    'view.alerts.inboundDesc': '由 Alertmanager 推送到 POST /api/alerts/webhook 的事件；保留 30 天，最多 10 000 行。',
+    'view.alerts.inboundColAlert': '告警',
+    'view.alerts.inboundColSeverity': '级别',
+    'view.alerts.inboundColStatus': '状态',
+    'view.alerts.inboundColInstance': '实例',
+    'view.alerts.inboundColSummary': '摘要',
+    'view.alerts.inboundColTime': '接收时间',
+    'view.alerts.inboundEmpty': '暂无入站告警',
+    'view.alerts.inboundUnavailable': '无法读取入站告警',
+    'view.alerts.inboundFiring': '触发中',
 
     // ── Stats ───────────────────────────────────────────────────
     'view.alerts.statTotalRules': '规则总数',

@@ -262,6 +262,14 @@ class MCPHubOpsMixin:
                     "SELECT COUNT(*) FROM mcp_resources WHERE server_id = ?", (sid,),
                 ).fetchone()[0]
 
+            # 停用/自动连接存在 config JSON 里；解析失败按默认值（启用、不自动连）。
+            try:
+                cfg = json.loads(r.get("config") or "{}")
+                if not isinstance(cfg, dict):
+                    cfg = {}
+            except (TypeError, ValueError):
+                cfg = {}
+
             infos.append(ServerInfo(
                 id=sid,
                 name=r.get("name", ""),
@@ -270,6 +278,8 @@ class MCPHubOpsMixin:
                 tools_count=tools_count,
                 resources_count=resources_count,
                 error=r.get("error", ""),
+                enabled=bool(cfg.get("enabled", True)),
+                auto_connect=bool(cfg.get("auto_connect", False)),
             ))
         return infos
 

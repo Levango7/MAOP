@@ -34,8 +34,10 @@ class ServerCreate(BaseModel):
     auth_type: Literal["none", "bearer", "basic", "apikey"] = "none"
     token: str = ""
     timeout_s: float = 30.0
-    enabled: bool = True
-    auto_connect: bool = False
+    # None = 本次不改（PUT 复用同一模型时，缺省不能被当成"重新启用"）；
+    # POST 时 None 走默认值 enabled=True / auto_connect=False。
+    enabled: bool | None = None
+    auto_connect: bool | None = None
 
 
 class ToolCallRequest(BaseModel):
@@ -82,6 +84,12 @@ async def connect_server(server_name: str, request: Request) -> dict[str, Any]:
     result = await plugin_service.connect_server(server_name)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Server {server_name} not found")
+    if result.get("status") == "disabled":
+        # 停用是配置意图，不是连接故障 —— 用 409 让 UI 能区分并提示先启用。
+        raise HTTPException(
+            status_code=409,
+            detail=f"Server {server_name} is disabled; enable it before connecting",
+        )
     return result
 
 
@@ -125,6 +133,8 @@ async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
         auth_type=body.auth_type,
         token=body.token,
         timeout_s=body.timeout_s,
+        enabled=True if body.enabled is None else body.enabled,
+        auto_connect=False if body.auto_connect is None else body.auto_connect,
     )
 
 
@@ -149,9 +159,14 @@ async def update_server(server_id: str, body: ServerCreate, request: Request) ->
         auth_type=body.auth_type,
         token=body.token,
         timeout_s=body.timeout_s,
+        enabled=body.enabled,
+        auto_connect=body.auto_connect,
     )
     if result is None:
         raise HTTPException(status_code=404, detail=f"Server {server_id} not found")
+    if body.enabled is False:
+        # 停用要立刻生效：已在跑的传输必须真的断开，否则"停用"只是个装饰字段。
+        await plugin_service.disconnect_server(body.name)
     return result
 
 

@@ -1,11 +1,14 @@
 """MAOP Dashboard — Alertmanager webhook receiver.
 
-Minimal endpoint that accepts Alertmanager webhook payloads
-(``POST /api/alerts/webhook``) and records them in the application log.
+Accepts Alertmanager webhook payloads (``POST /api/alerts/webhook``), records
+them in the application log and stores them in the bounded
+``alertmanager_alerts`` table so ``GET /api/alerts`` can serve history.
 
-It deliberately does NOT persist alerts or perform any side effects — it is
-the lowest-friction sink so the monitoring chain (Prometheus → Alertmanager →
-here) is fully wired even before a richer notification backend exists.
+Persistence is deliberately capped (see :mod:`maop.core.alert_ingest`): rows
+are keyed by ``(fingerprint, status, startsAt)`` so Alertmanager's
+``repeat_interval`` re-notifications collapse into one row, retention is 30
+days with a 10 000-row ceiling, and a storage failure is logged rather than
+raised (the endpoint still answers 200 so Alertmanager stops retrying).
 
 Business logic (alert logging) lives in
 :mod:`maop.dashboard.services.notification_service`; this router only does
@@ -19,9 +22,11 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from maop.core import alert_ingest
+from maop.core.alert_ingest import MAX_ALERTS_PER_WEBHOOK
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import notification_service
 
@@ -36,6 +41,10 @@ class _Alert(BaseModel):
     status: str = ""
     labels: dict[str, str] = Field(default_factory=dict)
     annotations: dict[str, str] = Field(default_factory=dict)
+    #: Alertmanager's stable per-incident id — the dedupe key for history.
+    fingerprint: str = ""
+    startsAt: str = ""
+    endsAt: str = ""
 
 
 class WebhookPayload(BaseModel):
@@ -43,7 +52,9 @@ class WebhookPayload(BaseModel):
 
     receiver: str = ""
     status: str = ""  # "firing" | "resolved"
-    alerts: list[_Alert] = Field(default_factory=list)
+    #: Memory ceiling for one inbound batch: Alertmanager ships with
+    #: ``max_alerts: 0`` (no truncation), so the receiver has to set the bound.
+    alerts: list[_Alert] = Field(default_factory=list, max_length=MAX_ALERTS_PER_WEBHOOK)
     commonLabels: dict[str, str] = Field(default_factory=dict)
     commonAnnotations: dict[str, str] = Field(default_factory=dict)
     externalURL: str = ""
@@ -52,11 +63,12 @@ class WebhookPayload(BaseModel):
 @router.post("/webhook")
 @handle_api_errors
 async def alertmanager_webhook(payload: WebhookPayload, request: Request) -> Any:
-    """Receive Alertmanager webhook posts and log each alert.
+    """Receive Alertmanager webhook posts, log and persist each alert.
 
     Logs ``alertname`` / ``severity`` / ``summary`` for every alert so
-    operators can triage from the dashboard logs. Returns a 200 so
-    Alertmanager does not retry indefinitely.
+    operators can triage from the dashboard logs, then stores the batch in
+    ``alertmanager_alerts`` for ``GET /api/alerts``. Returns a 200 either way
+    so Alertmanager does not retry indefinitely.
 
     Security: when the ``ALERTS_WEBHOOK_SECRET`` environment variable is
     set, the request must carry a matching ``X-Webhook-Secret`` header.
@@ -75,7 +87,36 @@ async def alertmanager_webhook(payload: WebhookPayload, request: Request) -> Any
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     received = notification_service.process_alertmanager_webhook(payload)
-    return {"status": "ok", "received": received}
+    stored = alert_ingest.record_alerts(
+        [alert.model_dump() for alert in payload.alerts],
+        receiver=payload.receiver,
+        external_url=payload.externalURL,
+        common_labels=payload.commonLabels,
+        common_annotations=payload.commonAnnotations,
+        fallback_status=payload.status,
+    )
+    return {"status": "ok", "received": received, **stored}
+
+
+@router.get("")
+@handle_api_errors
+async def list_stored_alerts(
+    limit: int = Query(50, ge=1, le=MAX_ALERTS_PER_WEBHOOK),
+    status: str = Query("", max_length=20),
+    severity: str = Query("", max_length=40),
+    alertname: str = Query("", max_length=200),
+    since_hours: int = Query(0, ge=0, le=24 * 90),
+) -> dict[str, Any]:
+    """读回 Alertmanager 入站告警历史（最新在前）。
+
+    与 ``/api/audit/alert/history``（企业版规则引擎的触发历史）是两条独立来源：
+    这里是外部 Alertmanager 推给我们的事件，个人版也可用。
+    """
+    alerts = alert_ingest.list_alerts(
+        limit=limit, status=status, severity=severity,
+        alertname=alertname, since_hours=since_hours,
+    )
+    return {"alerts": alerts, "count": len(alerts), "total": alert_ingest.count_alerts()}
 
 
 __all__ = ["router"]

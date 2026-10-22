@@ -195,9 +195,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: lint
     # P0 fix (2026-08-29): 兜底超时 —— 历史证据显示收尾挂起/慢测试可让 job
-    # 无限运行（无显式 timeout 时 GitHub 默认 360 分钟）。50 分钟足够
-    # 串行跑完整套件（windows -n 0），并行矩阵更快；超时即失败而非挂死。
-    timeout-minutes: 50
+    # 无限运行（无显式 timeout 时 GitHub 默认 360 分钟）。超时即失败而非挂死。
+    #
+    # 2026-10-21: 50 → 90。原注释说"50 分钟足够串行跑完整套件（windows -n 0）"，
+    # 但实测 master `d816405` 上 `pytest (windows-latest, Python 3.12)` 跑了
+    # 50 分 10 秒，正好卡在 timeout 上被取消（conclusion=**cancelled**，不是 failure），
+    # 整条 `test` job 连带 `CI merge gate` 转红，`docker` 也因 needs 未满足而被跳过。
+    # 同批其他 Windows 腿是 28 / 33 / 42 分钟 —— 50 分钟卡在分布的尾部，而 runner
+    # 负载波动会继续把它推过线。认这个形态：**超时在 check-run 上显示为 cancelled**。
+    timeout-minutes: 90
     defaults:
       run:
         working-directory: py

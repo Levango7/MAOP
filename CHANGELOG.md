@@ -39,6 +39,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Chat：`stream` 从被丢掉的字段变成真的开关（2026-10-21）
+
+`ChatRequestBody.stream` 早就声明了，但两个处理器都把值写死 —— `/api/chat`
+恒 `stream=False`、`/api/chat/stream` 恒 `stream=True`。后果不是"少个功能"而是
+**没有任何失败信号**：客户端在 JSON 端点上要求流式，会安静地拿到一个整包响应，
+与根本没发这个字段一模一样。（自查静默丢弃字段时扫出，同批还有
+`control.run.agent`，见下。）
+
+- `/api/chat` 现在按 `body.stream` 决定响应形状：`true` 走 SSE，缺省仍是 JSON。
+- `/api/chat/stream` 语义不变（路径本身就是选择，body 写 `false` 也不改）。
+- 两处 SSE 响应合并为一个 `_sse_response()`：头信息原先手写两份，正是漂移的
+  来源；`test_both_stream_paths_share_one_header_set` 把"同一份头"钉成断言。
+
+未做的一致性说明：同批扫出的 `RunRequest.agent` **没有**一并处理。它需要的不是
+透传 —— `start_control_run()` 起的是 `python -m maop.cli run --task …`，CLI 没有
+agent 相关旗标，主运行链路（MaopLoop）也不构造带 `preferred_agent` 的
+`RoutingContext`（只有 `/api/agent-router` 那条支路用得到）。把"指定 agent"做成
+真能力需要路由侧的产品决策（指定对象不在候选集里时报错还是回退自动路由？），
+所以这里留白，不写一个假装生效的透传。
+
+验证：`test_chat_stream_field.py` 5 条（缺省 JSON / `stream=true` 真流式且不再调
+`send_chat` / `/stream` 不受 body 值影响 / 两端点头一致 / 其余字段仍全量透传）；
+`pytest -k chat` 178 passed 3 skipped（含 batch-coverage 里对 `/api/chat` 的既有
+断言，确认默认行为未变）；`tests/stability` 16 passed；ruff + mypy 干净。
+
 ### 静默丢弃字段扫描：engine 单步、hooks enabled/method（2026-10-21）
 
 新增 AST 扫描（比对请求模型的每个字段是否在 handler 里被读取或整体 dump），扫出
@@ -144,6 +169,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   按频道的“最低级别”列从未有后端语义（后端是按事件类型配置），先移除该列。
 - 验证：Notifications vitest 12 passed（键名与保存结构的变异验证）。
 
+### 通知页的分页参数从没离开过浏览器（2026-10-21）
+
+`api.get(url, opts)` 的第二个参数是 **fetch init**（内部只有 `opts.headers` 会被读），
+不是查询参数。`Notifications.vue` 两处都按后者写：
+`api.get('/api/notifications/list', { limit: PAGE_SIZE, offset })` ⇒ 参数被静默丢掉，
+后端按自己的 `limit=100` 返回，前端 `PAGE_SIZE=20` 形同虚设；"加载更多"把
+`offset` 加到 20 再请求一次，拿到的还是同一批 100 条并 append ——
+**点一次"加载更多"，整个列表重复一遍**，然后 `length > total` 让按钮自己消失。
+
+同一次全仓扫描（`api.get(含对象第二参数`）只找出 3 个点：这两处 + AlertRules
+的历史抽屉（`{ rule_id }` 从未发出，抽屉把所有规则的历史当成一条的），后者已在
+#131 里一并修掉。其余 6 处 `api.put(url, {...})` 的第二参数是请求体，用法正确。
+
+- 参数改进 URL：`?limit=${PAGE_SIZE}&offset=0` / `&offset=${next}`。
+- 新增 2 条测试：首屏必须带 `limit=20&offset=0`；"加载更多"必须带 `offset=20`
+  且合并后不出现重复行（每行同时渲染 title 与 message，所以按"含 n1 的行数"判定，
+  不是按出现次数 —— 后者一行就命中两次，会把断言写成假绿）。
+- 变异回验：把两处还原成 fetch-init 形状后新用例转红。
+
+验证：Notifications 14 passed（原 12 + 新 2）、AlertRules 7 passed。
+
 ### Agent 计费：额度卡片恒为 0、记录筛选静默失效（2026-10-21）
 
 - `GET /api/quota/{agent}` 返回 `{quota: {...}}`，页面直接读顶层桶 ⇒ 额度卡片
@@ -170,6 +216,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `items/history/records` ⇒ 告警历史的抽屉永远为空。
 - 两处均补上真实键名并保留旧键兜底；新增 `AlertRules` vitest 2 条，
   已做变异验证（去掉对应键后测试转红）。
+
+### Alertmanager 入站告警落库（有界）+ 读回端点（2026-10-21）
+
+`POST /api/alerts/webhook` 的模块 docstring 写着 **"deliberately does NOT persist
+alerts"** —— 这条链"接通了"，但每条告警只变成一行日志：重启即失忆、无法查询、
+个人版还没有任何告警历史可读（`/api/audit/alert/*` 由企业版 `FeatureFlag.AUDIT_LOG`
+门禁，个人版 404）。要不要落库先算清代价：用与实现同构的表建一份临时 SQLite，
+插入 100/1 000/10 000 行后 VACUUM，取整库字节数除以行数（一次性实测脚本，不在仓库内）：
+
+| 行形状 | 每行 | 10 000 行 |
+|---|---|---|
+| 标签与注解各存一份 JSON + 再存整包 raw | 2 123 B | 21.2 MB |
+| 同上，但不存 raw | 892 B | 8.9 MB |
+| **采用**：常用标签提升为列、文本裁剪、不存 raw | **461 B** | **4.6 MB** |
+
+参照物：本机 `data/maop.db` 当前 208 KB。所以"要不要落库"真正的问法是"上界是多少"：
+
+- **行数由去重键决定，而不是通知次数**。键为 `(fingerprint, status, starts_at)`，
+  `alertmanager.yml` 的 `repeat_interval: 4h` 反复推同一事件时 `INSERT OR IGNORE`
+  直接收敛 ⇒ 行数正比于**事件数**。`test_repeat_notification_reports_duplicate` 钉住
+  这条（received=1 / stored=0 / duplicate=1）。
+- **重复通知仍然要刷新 `received_at`**，否则一条持续 firing 的告警会在 30 天后被
+  保留期裁掉，而它其实还活着（`test_repeat_notification_collapses_and_refreshes`）。
+- **硬上界两条**：30 天 + 10 000 行，谁先到以谁为准；裁的是"最旧的整行"，
+  绝不按 fingerprint 裁（那样会把同一事件的 firing/resolved 一起删掉，删除行数
+  ≠ 超出量，上界就不再可证 —— 两条测试分别钉住）。
+- **内存上界**：`WebhookPayload.alerts` 加 `max_length=1000`。AM 侧
+  `max_alerts: 0` 不截断，所以这一刀只能接收端来（越界 422，且 422 不落库）。
+- **批次状态不是摆设**：单条没带 `status` 时退回 `payload.status`（日志侧一直是
+  `alert.status or payload.status`，落库若写死 `firing` 就会与日志互相矛盾）。
+  这条是自查静默丢弃字段扫出来的，`test_batch_status_flows_into_rows_without_their_own`
+  与另 3 条把它钉住（把 router 的透传删掉后转红）。
+- 落库失败**仍回 200** 并报 `stored=0`：回 4xx/5xx 会让 Alertmanager 无限重试。
+
+企业版那套 `AuditAlertEngine` 不能直接接手：`_record_alert` 按 `rule_id` 做 60 s
+去重（MAOS `audit_enhanced.py:45`、`:479`），一批 200 条不同告警会被压成"每条规则
+一行"；它的历史是 `deque(maxlen=10000)`（`:222`），`list_alerts()` 只读内存、
+PG 写了不回读（`:332`），进程重启即空。所以个人版另起一张有界 SQLite 表是必要的，
+不是重复造轮子。
+
+**消费端也补上了**：`AlertRules.vue` 增加「Alertmanager 入站告警」区块（两条数据源
+分开的空态：读不到 ≠ 没有），并且修掉个人版下这一页的死路 —— 原先
+`onMounted` 见个人版直接 return（"不发请求，后端必然 404"），于是有入站告警也不显示。
+
+顺带发现并修掉一处静默丢弃：历史抽屉 `api.get('/api/audit/alert/history', { rule_id })`
+—— `api.get` 的第二参数是 fetch init（只有 `.headers` 会被读），`rule_id` 从来没发出去
+过，抽屉把所有规则的历史当成这一条的显示。参数改进 URL，`test_scopes_the_history_drawer…`
+钉住（把修复回退后该测试转红）。
+
+验证：`test_alert_ingest.py` 20 条 + `test_alerts_endpoint_persistence.py` 14 条 +
+`test_alertmanager_e2e.py` 52 条全过（e2e 的 `webhook_client` 补了 tmp_path 隔离，
+否则每条用例都在往开发者本地 `data/maop.db` 写真行）；四处变异回验（去重关闭 /
+不刷新 received_at / stored 计数对重复失明 / router 不透传批次状态）全部转红；
+前端 518 passed、build exit 0、
+eslint 0 error、对比度 164 对全过；`check_silent_exceptions` / `check_file_size` /
+`check_docs_consistency --gate` / ruff / mypy 全绿（README 的 `core/` 计数 8→9 随新模块更新）。
 
 ### Webhooks 投递配置真正生效 + 最近触发时间（2026-10-21）
 
@@ -219,6 +321,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 验证：`test_mcp_route_crud.py` **12 passed**（新增 5 条）、`test_mcp_hub.py`
   **46 passed**（新增真实 SQLite 往返）、相关 MCP 套件 **176 passed**；
   McpManager vitest **10 passed**；ruff/mypy 通过。
+
+### MCP：enabled / auto_connect 从假字段变成真能力（2026-10-21）
+
+`ServerCreate` 早就声明了 `enabled` / `auto_connect`，但 `MCPServerConfig` 里没有
+这两个属性、也没有任何消费者 ⇒ 用户勾了等于没勾。本次把它变成真语义：
+
+- `MCPServerConfig.enabled`（默认 True）+ `auto_connect`（默认 False）落进配置
+  JSON；`MCPHub.connect()` 开头就拒绝停用配置（抛 `ValueError`），手动连接与
+  启动期自动连接走同一道闸门。
+- 路由：连接被拒回 **409**（"先启用再连接"），与"连接失败"区分开；PUT 不带
+  `enabled` 视为**不改**（复用同一模型时缺省不得把已停用的服务悄悄恢复）。
+- 停用立即生效：`enabled=false` 更新后真的断开该服务器的活动连接，不留"显示停用
+  但还在跑"的状态。
+- 启动播种后新增 `plugin_service.auto_connect_servers()`，只挑
+  `enabled && auto_connect && 当前 disconnected` 的服务器；作为后台任务跑，
+  不可达的 MCP 服务不拖慢也不阻断仪表板启动，关停时取消任务。
+- **关停排空顺带收口**：lifespan 的 `finally` 原先要为每个待取消任务写一处
+  `with suppress(asyncio.CancelledError)`，第一版把它加在 WS 排空旁边，直接把
+  `check_silent_exceptions` 的 suppress 棘轮顶到 48 > 47 而 CI 判红。现在两个任务
+  走同一个 `drain_cancelled()`（带 `# silent-ok: interrupt` 理由标记），
+  `SUPPRESS_BASELINE` 顺势收到 **46**；这条关停路径此前没有任何测试覆盖，
+  现在由 `test_server_core.py` 三条异步用例钉住（取消要真的落地、必须 await 完成、
+  None 与已结束任务跳过）。
+- `GET /api/mcp/servers` 现在回报 `enabled` / `auto_connect`，列表页据此显示
+  「已停用」徽标（此前"断开"与"停用"混在一起）。
+- **YAML 侧同样修**：`config/mcp_servers.yaml` 里早已写着 `enabled: true` 与
+  `timeout: 30`，但加载器不透传 ⇒ 写了不生效。`MCPDiscovery` 现在接
+  `enabled` / `auto_connect` / `timeout(_s)`（保留 `timeout` 旧拼写）。
+- 验证：`test_mcp_route_crud.py` 新增 7 条（持久化 / 409 / PUT 不缺省翻回 /
+  停用即断开 / 自动连接筛选）、`test_mcp_hub.py` 真实 hub 闸门 1 条 + 往返断言、
+  `test_mcp_discovery.py` YAML 透传 1 条、`test_server_core.py` 关停排空 3 条；
+  `pytest -k "server or lifespan or shutdown or mcp"` 606 passed / 6 skipped
+  （首轮跑出 1 条真失败：另一份 `SimpleNamespace` 替身缺 `enabled`，已按真实模型补齐）；
+  `check_silent_exceptions` / `check_docs_consistency --gate` / `check_file_size` 全过，
+  ruff + mypy 干净；新增前端 3 条，全量 516 passed、build exit 0、
+  eslint 0 error、对比度 164 对全通过；对"连接闸门"与"add 透传"做变异回验
+  （去掉后 5 条测试转红）。
 
 ### Agent 目录写路径与聊天 Markdown 纠偏（2026-10-21）
 
