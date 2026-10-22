@@ -89,6 +89,7 @@ export const nav = [
   { section: 'nav.group.system' },
   { to: '/settings', label: 'nav.settings', icon: 'gear', subtitle: 'nav.settings.subtitle' },
   { to: '/notifications', label: 'nav.notifications', icon: 'message-square', subtitle: 'nav.notifications.subtitle' },
+  { to: '/notifications/config', label: 'nav.notificationConfig', icon: 'gear', subtitle: 'nav.notificationConfig.subtitle' },
   { to: '/docs', label: 'nav.docs', icon: 'book-open', subtitle: 'nav.docs.subtitle' },
 ];
 

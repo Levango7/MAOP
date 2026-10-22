@@ -73,6 +73,7 @@ const routes = [
   // ── 设置 ──
   { path: '/settings', name: 'settings', component: () => import('../views/Settings.vue') },
   { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue') },
+  { path: '/notifications/config', name: 'notification-config', component: () => import('../views/NotificationConfig.vue') },
   { path: '/docs', name: 'docs', component: () => import('../views/Docs.vue') },
 
   // ═══ 旧路径 301 重定向（书签/深链/外部链接兼容，零断链）═══
