@@ -160,6 +160,46 @@ test_routing_audit / test_mcp_observability / test_router_mcp_evolve_memory_cove
 MAOS 的读键同时失效；正确做法是一份 ADR + 按区域灰度（同 PR 内改消费端 + 契约测试），
 而不是批量替换。已量化的漂移清单保留在本条，供 ADR 引用。
 
+### 内存与浏览器缓存兜底：作业注册表会遗忘，登出会清干净（2026-10-22）
+
+先收回上一轮审计里的两条误报，都是我自己造出来的：
+
+- `core/visual_builder.py:297` 的"无 maxlen deque"**不是泄漏**——那是 Kahn 拓扑排序的
+  工作队列，长度由 DAG 节点数天然界定。
+- "JWT 存在 localStorage（XSS 暴露面）"**是错的**：`stores/api.js` 的 M6 修复早已把
+  token 移到后端 `Set-Cookie ... HttpOnly`，前端只存非敏感的 `maop_user`；
+  `App.vue` 里那句 `removeItem('maop_token')` 是旧版遗留清理。
+
+真找到的两条，都修了：
+
+**1）`state.active_jobs` 只增不减（进程内存）。** 全仓对这个字典只有写入与迭代，
+**没有任何 pop/clear**：`system_service.py` 5 处、`system/workflow.py` 1 处插入，条目带着
+`stdout`/`stderr` 与子进程句柄。7×24 的看板于是按每次运行累积"已完成作业的输出一坨"，
+而它名叫 active jobs。新增 `state.register_job()` / `prune_active_jobs()`（上限
+`JOB_RETENTION_MAX = 200`，按 `start` 从旧到新只淘汰**终态**条目，`running` 永不驱逐——
+宁可超上限也不扔活的作业），6 个写入点全部改走 `register_job`（顺带修掉一个隐患：
+`active_jobs_lock` 是不可重入锁，若在 `with lock:` 里调用它会自锁，所以外层 `with`
+一并撤掉）。`test_active_jobs_registry.py` 钉住驱逐顺序、终态限定、计数返回值，并有
+一条**状态词汇表守卫**：AST 扫所有 `register_job(...)` 里的 `"status"` 字面量，任何不在
+`TERMINAL_JOB_STATUSES ∪ {running, pending}` 的值直接判红——写错一个终态字符串的后果是
+"这条永远不驱逐"，而不是报错。
+
+**2）登出后残留身份派生缓存（浏览器侧）。** `clearAuthToken()` 与 401 分支过去只删
+`maop_user`，而 `maop_roles` / `maop_edition` / `maop_auth_enabled` 留在 localStorage：
+下一个会话（可能是另一个用户，或 license 降级后重登）在异步 hydrate 落地之前，会按
+**上一个身份的角色**渲染权限可见性——这是权限窗口，不只是显示脏。改为
+`clearAuthKeys()` 一次清 `AUTH_SCOPED_KEYS` 五个键，三条登出/失效路径
+（`clearAuthToken`、`handleUnauthorized`、`App.vue` 的 cookie 已死分支）共用同一口径，
+不再有第二处真相源；`maop_theme` / `maop_locale` 这类设备级偏好**不清**，测试把这条边界
+也钉住。`AuthKeyLifecycle.test.js` 4 passed。
+
+顺带澄清：`_instance_cache`（agents/_deps.py）与 `state.cache` 的键空间都是有界的
+（前者是固定几个单例槽位，后者在 dashboard 内没有写入点），不在这批处理范围内。
+
+验证：`test_active_jobs_registry` + `test_router_control` + `test_server_core` 78 passed；
+前端 `npm run lint` 净、`vitest run` 62 files / **529 passed**；ruff/mypy 净；
+`check_silent_exceptions` 仍 46＝基线。
+
 
 ### Chat：`stream` 从被丢掉的字段变成真的开关（2026-10-21）
 

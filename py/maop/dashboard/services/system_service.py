@@ -245,8 +245,7 @@ async def start_control_run(task: str) -> str:
         "start": time.strftime("%Y-%m-%dT%H:%M:%S"), "task": task,
         "process": proc, "stdout": "", "stderr": "", "trace_id": "",
     }
-    with state.active_jobs_lock:
-        state.active_jobs[job_id] = job
+    state.register_job(job_id, job)
     _append_history(_job_snapshot(job_id, job))
 
     async def _drain() -> None:
@@ -360,21 +359,19 @@ def validate_config_job() -> tuple[str, dict[str, Any]]:
         from maop.deploy import validate_config
         result = validate_config(state.MAOP_ROOT)
         result_dict = result.model_dump()
-        with state.active_jobs_lock:
-            state.active_jobs[job_id] = {
-                "action": "validate", "status": "completed",
-                "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "task": "config validation", "result": result_dict,
-            }
+        state.register_job(job_id, {
+            "action": "validate", "status": "completed",
+            "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "task": "config validation", "result": result_dict,
+        })
         return job_id, result_dict
     except Exception:
         logger.exception("Validate failed")
-        with state.active_jobs_lock:
-            state.active_jobs[job_id] = {
-                "action": "validate", "status": "failed",
-                "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "task": "config validation", "error": "Validate failed",
-            }
+        state.register_job(job_id, {
+            "action": "validate", "status": "failed",
+            "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "task": "config validation", "error": "Validate failed",
+        })
         raise
 
 
@@ -389,21 +386,19 @@ def run_doctor_job() -> tuple[str, list[dict[str, Any]]]:
         from maop.deploy import health_check
         results = health_check(state.MAOP_ROOT)
         findings = [r.model_dump() for r in results]
-        with state.active_jobs_lock:
-            state.active_jobs[job_id] = {
-                "action": "doctor", "status": "completed",
-                "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "task": "system diagnostics", "result": findings,
-            }
+        state.register_job(job_id, {
+            "action": "doctor", "status": "completed",
+            "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "task": "system diagnostics", "result": findings,
+        })
         return job_id, findings
     except Exception:
         logger.exception("Doctor check failed")
-        with state.active_jobs_lock:
-            state.active_jobs[job_id] = {
-                "action": "doctor", "status": "failed",
-                "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "task": "system diagnostics", "error": "Doctor check failed",
-            }
+        state.register_job(job_id, {
+            "action": "doctor", "status": "failed",
+            "start": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "task": "system diagnostics", "error": "Doctor check failed",
+        })
         raise
 
 
