@@ -300,7 +300,6 @@ async def api_system_diagnostics(request: Request) -> dict[str, Any]:
 
     # ── Database: 尝试 SELECT 1 ──
     try:
-        import sqlite3
         db_path = _deps.get_db_path()
         if not db_path.exists():
             data_dir = _deps.MAOP_ROOT / "data"
@@ -308,13 +307,13 @@ async def api_system_diagnostics(request: Request) -> dict[str, Any]:
             if db_files:
                 db_path = db_files[0]
         if db_path.exists():
-            conn = sqlite3.connect(str(db_path), timeout=2)
-            try:
+            from maop.core.backends.db_utils import sqlite_connect
+            # 连通性探针：2s 是有意的短超时，但关闭与 busy_timeout 口径仍归中心助手。
+            with sqlite_connect(str(db_path), timeout=2, wal=False,
+                                foreign_keys=False, row_factory=None) as conn:
                 cur = conn.execute("SELECT 1")
                 cur.fetchone()
                 result["database"] = {"ok": True, "result": f"OK ({db_path.name})"}
-            finally:
-                conn.close()
         else:
             result["database"] = {"ok": True, "result": "OK (no db file yet)"}
     except Exception as exc:

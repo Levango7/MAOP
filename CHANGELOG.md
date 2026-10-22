@@ -87,7 +87,51 @@ upsert（`budget_config`、`heal_rules`…），真正有问题的是**有写入
 `test_bandit_security_fixes.py` 72 passed；`check_silent_exceptions`（suppress 46＝基线）、
 `check_file_size`、`check_docs_consistency --gate` 均绿（README `core/` 计数 9→10）。
 
+### SQLite 连接卫生：`with sqlite3.connect(...)` 不关连接，5 处句柄泄漏清零（2026-10-22）
+
+审计口径纠偏：上一轮我用"行匹配 + 附近有无 PRAGMA"报了"16 处裸连接"，其中 **1 处是
+docstring 里的文字**（`knowledge_graph_reasoning.py:214` 只是注释里提到
+`sqlite3.connect`），不是调用点。真正的缺陷不是"没设 PRAGMA"，而是 **连接不关**：
+
+`with sqlite3.connect(...)` 是**事务**上下文管理器——提交/回滚，但**从不 close**。
+命中 5 处：`deploy.py` 的两个健康探针（按周期反复跑）、`ab_test_framework.py` 的
+promote 写路径、`memory_migration.py` 的迁移源库、`subagent_db.py` 的建库函数。
+每跑一次就在库文件上多留一个活句柄；`db_utils` 里早就写着这条后果——Windows 上
+句柄未关会让"删除损坏库重建"撞 `WinError 32`，于是那条恢复路径永远走不通。
+
+改动：
+
+- `db_utils` 把连接初始化拆出 `open_connection(...)`（含损坏库重建、PRAGMA 失败即
+  关闭的原有行为），`sqlite_connect` 变成它的 commit/rollback/close 包装；新增
+  `check_same_thread` 参数——这是 `relay_platform` 当年留在裸 connect 的**唯一**真实
+  原因，现在它可以要跨线程而不再丢掉 WAL/busy_timeout。
+- 5 处泄漏全部改走 `sqlite_connect`（探针用 `wal=False`，只读统计不去改别人的
+  journal 模式）；另纳管 9 处：`relay_platform` 6 处、`provider` 2 处、
+  `system/overview` 1 处。
+- 留任 6 处裸连接，逐个写明理由并进门禁白名单：`db_utils` 自身 2 处、
+  `backends.py`/`prompt_manager.py` 各 1 处（自带 contextmanager，PRAGMA 齐全且
+  在 finally 里 close，属重复口径而非不安全）、`config_history.py` 1 处（实例长期
+  持有、autocommit、跨线程）、`long_running_task.py` 1 处（`:memory:` 没有文件可言）。
+
+门禁 `py/tests/test_sqlite_connection_hygiene.py`（9 passed）：
+
+- `with sqlite3.connect(` 在**代码**里零容忍。检测用 AST 而不是行匹配——第一版
+  行匹配把描述这个 bug 的 docstring 自己算成了违规，测试直接假红；`concurrency.py`
+  带 UTF-8 BOM 还会让 `ast.parse` 抛错，故按 `utf-8-sig` 读。
+- 白名单是"文件→次数"的相等断言，不是子集：多一处红，**少一处也红**（防止条目过期
+  变成谎言），另有白名单文件必须存在的反向校验。
+- 行为回证：`sqlite_connect` 确实设上 WAL 与 busy_timeout、异常回滚、退出后文件可
+  被 unlink（Windows 上句柄未关就会失败）；`wal=False` 时确实不改 journal 模式；
+  `RelayPlatformManager(db_path=...)` 建出来的库现在是 WAL。
+
+验证：`test_sqlite_connection_hygiene` 9 passed；受影响调用方
+`test_relay_platform / test_provider* / test_db_utils / test_deploy* / test_migration /
+test_subagent*` 共 265 passed；ruff 净（顺带清掉 4 处因改造而不再使用的
+`import sqlite3`）；mypy 5 文件无错；`check_silent_exceptions` 仍 46＝基线。
+
 ### Chat：`stream` 从被丢掉的字段变成真的开关（2026-10-21）
+
+
 
 `ChatRequestBody.stream` 早就声明了，但两个处理器都把值写死 —— `/api/chat`
 恒 `stream=False`、`/api/chat/stream` 恒 `stream=True`。后果不是"少个功能"而是

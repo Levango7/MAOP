@@ -86,32 +86,29 @@ def _recoverable_corruption(exc: sqlite3.DatabaseError, db_path: str | Path) -> 
     return any(marker in msg for marker in _RECOVERABLE_CORRUPTION)
 
 
-@contextmanager
-def sqlite_connect(
+def open_connection(
     db_path: str | Path,
     *,
     timeout: float = 10.0,
     wal: bool = True,
     foreign_keys: bool = True,
     row_factory: type | None = sqlite3.Row,
-) -> Generator[sqlite3.Connection, None, None]:
-    """Context manager for SQLite connections with WAL mode and proper cleanup.
+    check_same_thread: bool = True,
+) -> sqlite3.Connection:
+    """Open a SQLite connection with the project's PRAGMAs applied.
 
-    Parameters
-    ----------
-    db_path : str | Path
-        Path to the SQLite database file.
-    timeout : float
-        Connection timeout in seconds.
-    wal : bool
-        Enable WAL journal mode.
-    foreign_keys : bool
-        Enable foreign key constraints.
-    row_factory : type | None
-        Row factory class (default: sqlite3.Row).
+    Split out of :func:`sqlite_connect` for callers that cannot use a context
+    manager because they hand the connection across calls or threads (e.g. the
+    relay-platform registry, which keeps ``try/finally: conn.close()``). Those
+    callers used to drop down to bare ``sqlite3.connect`` and silently lost
+    WAL + busy_timeout with it; this keeps one source of truth for the PRAGMAs
+    without forcing an ownership model on them.
+
+    Caller owns the connection and must close it.
     """
     def _open_and_init() -> sqlite3.Connection:
-        conn = sqlite3.connect(str(db_path), timeout=timeout)
+        conn = sqlite3.connect(str(db_path), timeout=timeout,
+                               check_same_thread=check_same_thread)
         try:
             if row_factory:
                 conn.row_factory = row_factory
@@ -166,6 +163,47 @@ def sqlite_connect(
             except OSError as rm_err:
                 logger.warning("Failed to remove %s: %s", cand, rm_err)
         conn = _open_and_init()
+    return conn
+
+
+@contextmanager
+def sqlite_connect(
+    db_path: str | Path,
+    *,
+    timeout: float = 10.0,
+    wal: bool = True,
+    foreign_keys: bool = True,
+    row_factory: type | None = sqlite3.Row,
+    check_same_thread: bool = True,
+) -> Generator[sqlite3.Connection, None, None]:
+    """Context manager for SQLite connections with WAL mode and proper cleanup.
+
+    Parameters
+    ----------
+    db_path : str | Path
+        Path to the SQLite database file.
+    timeout : float
+        Connection timeout in seconds.
+    wal : bool
+        Enable WAL journal mode.
+    foreign_keys : bool
+        Enable foreign key constraints.
+    row_factory : type | None
+        Row factory class (default: sqlite3.Row).
+    check_same_thread : bool
+        Keep the SQLite threading assertion (default). Set ``False`` only for a
+        connection that is deliberately handed across threads — it was the one
+        reason ``relay_platform`` stayed on bare ``sqlite3.connect`` and thus
+        outside the WAL/busy-timeout/cleanup path of every other module.
+    """
+    conn = open_connection(
+        db_path,
+        timeout=timeout,
+        wal=wal,
+        foreign_keys=foreign_keys,
+        row_factory=row_factory,
+        check_same_thread=check_same_thread,
+    )
 
     try:
         yield conn

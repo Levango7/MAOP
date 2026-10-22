@@ -40,7 +40,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from maop.core.backends.db_utils import get_db_path
+from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
 # 统一 DB 模块名。
 # - unified 模式（默认）：映射到 maop.db
@@ -368,14 +368,15 @@ def migrate_legacy_subagent_db() -> None:
       保留旧数据。
     - 索引和 ``agent_messages`` / ``subagent_transcripts`` 附属表幂等创建。
 
-    使用裸 ``sqlite3.connect`` 而非 ``sqlite_connect``，因为此函数在
-    ``__init__`` 阶段执行一次，无需 WAL；后续业务访问通过 ``sqlite_connect``
-    会自动启用 WAL 模式。
+    使用 ``sqlite_connect`` 而非裸 ``sqlite3.connect``：此函数在 ``__init__``
+    阶段执行一次，**不需要** WAL（``wal=False`` 保持与原实现一致的外建表语义），
+    但必须保证连接被关闭 —— 原先的 ``with sqlite3.connect(...)`` 只提交事务、
+    不关闭连接，句柄会一直捏着 subagent 库文件。后续业务访问通过
+    ``sqlite_connect`` 会自动启用 WAL 模式。
     """
     db_path = get_subagent_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(db_path) as conn:
-        conn.row_factory = sqlite3.Row
+    with sqlite_connect(db_path, wal=False, foreign_keys=False) as conn:
         # 检查 subagents 表是否存在
         table_exists = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='subagents'"

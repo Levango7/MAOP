@@ -167,9 +167,10 @@ class RelayPlatformManager:
 
     def _init_db(self) -> None:
         """创建 SQLite 表结构（幂等）。"""
-        import sqlite3
 
-        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        from maop.core.backends.db_utils import open_connection
+
+        conn = open_connection(self._db_path, check_same_thread=False)
         try:
             conn.execute(
                 """
@@ -211,7 +212,9 @@ class RelayPlatformManager:
         """从 SQLite 加载已持久化的平台到内存。"""
         import sqlite3
 
-        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        from maop.core.backends.db_utils import open_connection
+
+        conn = open_connection(self._db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         try:
             rows = conn.execute("SELECT * FROM relay_platforms").fetchall()
@@ -234,9 +237,10 @@ class RelayPlatformManager:
 
     def _persist_platform(self, platform: RelayPlatform) -> None:
         """将单个平台写入 SQLite（upsert）。"""
-        import sqlite3
 
-        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        from maop.core.backends.db_utils import open_connection
+
+        conn = open_connection(self._db_path, check_same_thread=False)
         try:
             conn.execute(
                 """
@@ -266,9 +270,10 @@ class RelayPlatformManager:
 
     def _delete_platform_from_db(self, name: str) -> None:
         """从 SQLite 删除平台记录。"""
-        import sqlite3
 
-        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        from maop.core.backends.db_utils import open_connection
+
+        conn = open_connection(self._db_path, check_same_thread=False)
         try:
             conn.execute("DELETE FROM relay_platforms WHERE name = ?", (name,))
             conn.execute("DELETE FROM relay_models WHERE platform_name = ?", (name,))
@@ -278,9 +283,10 @@ class RelayPlatformManager:
 
     def _persist_model(self, model: RelayModelInfo) -> None:
         """将发现的模型写入 SQLite 缓存（upsert）。"""
-        import sqlite3
 
-        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        from maop.core.backends.db_utils import open_connection
+
+        conn = open_connection(self._db_path, check_same_thread=False)
         try:
             conn.execute(
                 """
@@ -310,7 +316,9 @@ class RelayPlatformManager:
         """从 SQLite 加载指定平台的已缓存模型列表。"""
         import sqlite3
 
-        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        from maop.core.backends.db_utils import open_connection
+
+        conn = open_connection(self._db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         try:
             rows = conn.execute(
