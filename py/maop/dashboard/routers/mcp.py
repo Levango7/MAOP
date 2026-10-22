@@ -11,7 +11,7 @@ import asyncio
 import logging
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
@@ -197,7 +197,10 @@ async def mcp_topology(request: Request) -> dict[str, Any]:
 
 @router.get("/stats")
 @handle_api_errors
-async def mcp_stats(request: Request, hours: int = 24) -> dict[str, Any]:
+async def mcp_stats(
+    request: Request,
+    hours: int = Query(24, ge=1, le=87_600),
+) -> dict[str, Any]:
     """MCP 调用统计（按小时分桶 + 按工具聚合）。
 
     2026-09-23 新增：McpManager 的统计面板调用本端点，此前后端无实现 ——

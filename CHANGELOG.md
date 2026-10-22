@@ -129,6 +129,38 @@ promote 写路径、`memory_migration.py` 的迁移源库、`subagent_db.py` 的
 test_subagent*` 共 265 passed；ruff 净（顺带清掉 4 处因改造而不再使用的
 `import sqlite3`）；mypy 5 文件无错；`check_silent_exceptions` 仍 46＝基线。
 
+### 查询参数边界：路由上的 int 一律带 ge/le（2026-10-22）
+
+上一轮我报"186 处 `Query()` 只有 80 处带边界"，这个口径本身需要先纠偏：那 186 处里
+大量是 str/bool/list 参数，**真正的分页/时间窗 int 参数**用 AST 精算后只有 **20 处**
+没有边界（`limit`/`offset`/`hours`/`version`/`memory_id`）。FastAPI 里
+`limit: int = 100` 就是个查询参数，所以 `?limit=1000000000` 会原样进
+`SELECT ... LIMIT ?` —— 这是自己递给调用方一个 DoS 旋钮。
+
+- 补齐：`audit.py` 7 处（`/events`、`/summary`、`/filter`、`/alert/history`、
+  `/alert/evaluate`）、`debate.py` 的 history `limit`、`mcp.py` 的 stats `hours`、
+  `agents/memory.py` 的 `memory_id`（`ge=0`，0=全部 的语义保留）、`react.py` 的
+  `version`（`ge=1`）。
+- 上限取值是**荒谬值闸门，不是产品限额**：`le=2_000` 行、`le=87_600` 小时（十年）。
+  拒绝这么大的数不会挡住任何真实查询，不拒绝则会撑爆内存。
+- 路径参数（无默认值的 `provider_id: str` / `version: int`）不在此列：它们的量级不是
+  调用方随意选的，处理函数按身份查表。门禁按这条口径实现并写明理由。
+- 新门禁 `py/tests/test_query_param_bounds.py`（2 passed）：AST 扫 `maop/dashboard`
+  里所有 `@router.get/post/put/delete/patch` 处理函数，int 型且**带默认值**的参数必须
+  在 `Query(...)` 里给出 `ge/le/gt/lt`，零容忍；`test_gate_is_not_blind` 要求扫到的
+  有界参数 ≥ 20，防止扫描器本身失明后"全绿"。
+
+验证：`test_audit_enhanced / test_debate / test_mcp_route_crud /
+test_mcp_stats_tool_limit / test_observability / test_react_loop /
+test_routing_audit / test_mcp_observability / test_router_mcp_evolve_memory_coverage`
+374 passed（没有一条现存调用踩到新边界）；ruff 净。
+
+**列表信封统一没有在这一批里做**，是决定而非遗漏：`count` 33 个文件 / `total` 8 /
+`data` 15 / `results` 4 / `items` 2 是**对外契约**，改名会让前端、CLI 与私有仓库
+MAOS 的读键同时失效；正确做法是一份 ADR + 按区域灰度（同 PR 内改消费端 + 契约测试），
+而不是批量替换。已量化的漂移清单保留在本条，供 ADR 引用。
+
+
 ### Chat：`stream` 从被丢掉的字段变成真的开关（2026-10-21）
 
 

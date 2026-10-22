@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
@@ -152,7 +152,10 @@ async def api_debate_start(
     "Debate history",
     error_value={"status": "error", "verdicts": [], "error": "Query failed"},
 )
-async def api_debate_history(request: Request, limit: int = 20) -> dict[str, Any]:
+async def api_debate_history(
+    request: Request,
+    limit: int = Query(20, ge=1, le=500),
+) -> dict[str, Any]:
     """Return recent debate history (read-only)."""
     require_admin(request)
     dispatcher = _get_debate_dispatcher()

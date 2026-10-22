@@ -77,9 +77,9 @@ async def list_events(
     tenant_id: str = "",
     action: str = "",
     severity: str = "",
-    hours: int = 24,
-    limit: int = 100,
-    offset: int = 0,
+    hours: int = Query(24, ge=1, le=87_600),
+    limit: int = Query(100, ge=1, le=2_000),
+    offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """List audit events with optional filters (unified for both editions)."""
     require_admin(request)
@@ -94,7 +94,7 @@ async def list_events(
 async def get_summary(
     request: Request,
     tenant_id: str = "",
-    hours: int = 24,
+    hours: int = Query(24, ge=1, le=87_600),
 ) -> dict[str, Any]:
     """Get audit event summary (unified for both editions)."""
     require_admin(request)
@@ -108,7 +108,7 @@ async def filter_events(
     action: str = "",
     actor: str = "",
     target: str = "",
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=2_000),
 ) -> dict[str, Any]:
     """Filter audit events by action/actor/target (unified for both editions)."""
     require_admin(request)
@@ -266,7 +266,7 @@ async def list_alert_history(
     tenant_id: str = "",
     acknowledged: bool | None = None,
     since: float = 0.0,
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=2_000),
 ) -> dict[str, Any]:
     """List triggered-alert history."""
     require_admin(request)
@@ -292,7 +292,7 @@ async def acknowledge_alert(request: Request, alert_id: str) -> dict[str, Any]:
 @handle_api_errors
 async def evaluate_alerts(
     request: Request,
-    hours: int = 1,
+    hours: int = Query(1, ge=1, le=87_600),
     tenant_id: str = "",
 ) -> dict[str, Any]:
     """Manually evaluate recent audit events against all enabled rules."""
