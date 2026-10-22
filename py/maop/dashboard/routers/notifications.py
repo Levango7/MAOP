@@ -105,111 +105,32 @@ class PublishEventRequest(BaseModel):
 # ── 请求模型：直接复用 enterprise.notification.models 中的 Create/Update ──
 # 让 FastAPI 自动校验请求体，避免手动 ``dict → Pydantic`` 转换。
 from maop.core.tenant.context import tenant_id_from_request
+from maop.dashboard.routers.notification_schemas import (
+    ChannelEnvelope,
+    ChannelListEnvelope,
+    DeadLetterListEnvelope,
+    DeleteEnvelope,
+    MarkAllReadEnvelope,
+    MarkReadEnvelope,
+    NotificationEnvelope,
+    NotificationListEnvelope,
+    PreferenceEnvelope,
+    PublishEventEnvelope,
+    RuleEnvelope,
+    RuleListEnvelope,
+    StatsEnvelope,
+    TemplateEnvelope,
+    TemplateListEnvelope,
+    UnreadCountEnvelope,
+)
 from maop.enterprise.notification.models import (
     ChannelCreate,
-    ChannelResponse,
     ChannelUpdate,
-    NotificationResponse,
-    PreferenceResponse,
     PreferenceUpdate,
     RuleCreate,
-    RuleResponse,
     RuleUpdate,
     TemplateCreate,
-    TemplateResponse,
 )
-
-# ── Response envelopes ────────────────────────────────────────────
-# Declared on every route so the OpenAPI schema (and therefore the
-# dashboard) has a typed contract instead of ``dict[str, Any]``.
-
-
-class ChannelListEnvelope(BaseModel):
-    status: str = "ok"
-    channels: list[ChannelResponse]
-    count: int
-
-
-class ChannelEnvelope(BaseModel):
-    status: str = "ok"
-    channel: ChannelResponse
-
-
-class RuleListEnvelope(BaseModel):
-    status: str = "ok"
-    rules: list[RuleResponse]
-    count: int
-
-
-class RuleEnvelope(BaseModel):
-    status: str = "ok"
-    rule: RuleResponse
-
-
-class TemplateListEnvelope(BaseModel):
-    status: str = "ok"
-    templates: list[TemplateResponse]
-    count: int
-
-
-class TemplateEnvelope(BaseModel):
-    status: str = "ok"
-    template: TemplateResponse
-
-
-class DeleteEnvelope(BaseModel):
-    status: str = "ok"
-    deleted: bool
-
-
-class NotificationEnvelope(BaseModel):
-    status: str = "ok"
-    notification: NotificationResponse
-
-
-class NotificationListEnvelope(BaseModel):
-    status: str = "ok"
-    notifications: list[NotificationResponse]
-    count: int
-    total: int
-
-
-class MarkAllReadEnvelope(BaseModel):
-    status: str = "ok"
-    marked_read: int
-
-
-class MarkReadEnvelope(BaseModel):
-    status: str = "ok"
-    read: bool
-
-
-class UnreadCountEnvelope(BaseModel):
-    status: str = "ok"
-    unread_count: int
-
-
-class PreferenceEnvelope(BaseModel):
-    status: str = "ok"
-    preference: PreferenceResponse | None
-
-
-class DeadLetterListEnvelope(BaseModel):
-    status: str = "ok"
-    dead_letters: list[NotificationResponse]
-    count: int
-
-
-class StatsEnvelope(BaseModel):
-    status: str = "ok"
-    stats: dict[str, Any]
-
-
-class PublishEventEnvelope(BaseModel):
-    status: str = "ok"
-    # EventBus.publish returns the number of handlers invoked, not a list of
-    # target IDs — the service docstring said otherwise until P1-b.
-    delivered_to: int
 
 # ── Identity / auth helpers (router-layer concerns) ───────────────
 

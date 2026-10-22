@@ -22,6 +22,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 from maop.dashboard.server import app
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -118,6 +120,9 @@ def test_path_normalization_handles_templates_and_queries():
 
 
 def test_notification_router_is_fully_typed():
+    # The router imports its models from maop-enterprise and is not mounted
+    # in a personal-only install (CI); the generic ratchet still applies there.
+    pytest.importorskip("maop.enterprise", reason="notifications router needs maop-enterprise")
     routes = route_schema()
     notification_routes = [key for key in routes if key[1].startswith("/api/notifications")]
     assert len(notification_routes) == 26, len(notification_routes)
