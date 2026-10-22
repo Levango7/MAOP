@@ -323,6 +323,44 @@ agent 相关旗标，主运行链路（MaopLoop）也不构造带 `preferred_age
   `tests/test_frozen_lock.py` + `test_requirements_lock_sync.py` + `test_ci_path_scope.py`
   **42 passed**；`scripts/check_docs_consistency.py --gate` 通过。
 
+### 通知列表读错字段；通知路由全量建模 + 前端端点 response_model 棘轮（2026-10-22）
+
+P1-b 先量化：前端实际调用 252 个端点（去掉查询串、模板参数归一后），匹配到
+个人版路由 220 个，其中 **211 个的 2xx 响应是 `dict[str, Any]`**（OpenAPI 里只有
+`additionalProperties: true`）。这不是"文档不漂亮"：通知列表页就把
+`NotificationResponse` 的 `notification_id/body/read_at` 读成了
+`id/message/read`——
+
+- 正文恒为空（读 `message`，后端叫 `body`）；所有通知恒显示未读；
+- 点"标记已读"/删除会请求 `/api/notifications/undefined/read` ⇒ 404；
+- 分类筛选建立在后端没有的 `category` 字段上 ⇒ 除"系统"外永远空。
+  测试一直用旧形状的 mock，把这条 bug 固化成了绿色。
+
+**修法**
+
+- 通知路由 26 个操作全部声明 `response_model`（channels/rules/templates 各
+  列表 + 单项信封、notification list/send、preferences、stats、dead-letters、
+  delete/read/read-all/unread-count）。顺手修掉一个谎报类型：
+  `events/publish` 的 `delivered_to` 实际是"被调用的 handler 数"（int），
+  服务 docstring 一直写成 "list of delivered target IDs"。
+- 前端按真实字段归一：`notification_id/body/read_at/event_payload` 生效，
+  旧 `id/message/read` 仅作兜底；`event_type` 映射回既有分类徽章
+  （`quota_*→quota`、`license_*→tenant`、`audit_*→security`、`task_/dag_/agent_→agent`）；
+  补 `critical` 级别（后端枚举一直有，前端此前落到 info）。
+- 门禁 `test_frontend_response_models.py`：从 `.vue/.js` 抽取 `api.*` 调用，
+  与 `app.openapi()` 的真实路由求交，把"缺模型"的 194 条写进
+  `fixtures/frontend_response_model_allowlist.txt`，**双向断言**：新增缺口报红，
+  已修复却未删清单条目也报红；上限 194 只许降不许升。判据读 OpenAPI
+  组件引用而非 AST/行匹配，避免"注释里提过"这类假阳性。
+- 变异回验：删掉清单里的 `GET /api/agents` ⇒ 报"not allowlisted"；塞一条
+  `GET /api/__stale_probe__` ⇒ 报"no longer missing"；恢复后 sha256 与改前一致。
+
+**验证**：通知后端 111 passed（原 107 + 4 条契约测试）；新增门禁 4 passed；
+Notifications vitest 16 passed（样例改成真实 `NotificationResponse` 形状）；
+真浏览器 + 真后端：发一条 `task_failed` 站内通知 → 正文正常显示、分类为 Agent、
+点已读后 `/list` 回读 `read_at > 0`，控制台无报错。剩余 194 条按模块
+（agents 16、evolution 15、mcp/plugins 各 10 …）继续烧。
+
 ### 通知偏好：读错键、存错结构（2026-10-21）
 
 - `GET /api/notifications/preferences` 返回 `{preference: {channel_enabled, event_level_min}}`，
