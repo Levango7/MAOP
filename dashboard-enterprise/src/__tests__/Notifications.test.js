@@ -349,4 +349,66 @@ describe('Notifications.vue', () => {
     expect(badgesInRow.length).toBeGreaterThanOrEqual(2);
     wrapper.unmount();
   });
+
+  // ── 分页参数必须走查询串 ──
+  // api.get 的第二个参数是 fetch init（只有 .headers 会被读），以前写成
+  // api.get(url, { limit, offset }) ⇒ 参数从没发出，后端按 limit=100 返回，
+  // "加载更多"再取一次同一页并 append，整批条目重复。
+  function mockPagedFetch() {
+    const urls = [];
+    const page = (ids, total, hasMore) => ({
+      notifications: ids.map((id) => ({
+        id, level: 'info', category: 'system', title: id, message: id,
+        read: false, created_at: Date.now(), metadata: {},
+      })),
+      total,
+      has_more: hasMore,
+    });
+    global.fetch = vi.fn((url) => {
+      const full = String(url);
+      urls.push(full);
+      const u = full.split('?')[0];
+      const qs = new URLSearchParams(full.split('?')[1] || '');
+      const offset = Number(qs.get('offset') || 0);
+      let body = {};
+      if (u === '/api/notifications/list') {
+        body = offset === 0 ? page(['n1', 'n2'], 3, true) : page(['n3'], 3, false);
+      }
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: () => Promise.resolve(body),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      });
+    });
+    urls.self = urls;
+    return urls;
+  }
+
+  it('sends limit/offset as query parameters on the first page', async () => {
+    const urls = mockPagedFetch();
+    const wrapper = await mountNotifications();
+    expect(urls).toContain('/api/notifications/list?limit=20&offset=0');
+    wrapper.unmount();
+  });
+
+  it('advances the offset on load more and never duplicates rows', async () => {
+    const urls = mockPagedFetch();
+    const wrapper = await mountNotifications();
+    expect(wrapper.findAll('.notif-row')).toHaveLength(2);
+
+    const btn = wrapper.findAll('button').find((b) => b.text().includes('Load more'));
+    expect(btn).toBeTruthy();
+    await btn.trigger('click');
+    await flushPromises();
+    await flushPromises();
+
+    expect(urls).toContain('/api/notifications/list?limit=20&offset=20');
+    const rows = wrapper.findAll('.notif-row');
+    expect(rows).toHaveLength(3);
+    // 每行同时渲染 title 与 message（都是同一个串），所以按"含 n1 的行数"判定，
+    // 而不是按出现次数 —— 后者一行就命中两次。offset 若没发出去，这里会是 2 行 n1。
+    expect(rows.filter((r) => r.text().includes('n1'))).toHaveLength(1);
+    expect(rows.filter((r) => r.text().includes('n3'))).toHaveLength(1);
+    wrapper.unmount();
+  });
 });

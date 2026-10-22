@@ -404,10 +404,10 @@ async function loadAll() {
   error.value = '';
   offset.value = 0;
   try {
-    const d = await api.get('/api/notifications/list', {
-      limit: PAGE_SIZE,
-      offset: 0,
-    });
+    // 分页参数必须进 URL：api.get 的第二个参数是 fetch init（只有 .headers 会被读），
+    // 传 { limit, offset } 等于没传 —— 后端按 limit=100 返回整页，"加载更多"
+    // 再取一次同样的 100 条并 append，列表就整批重复。
+    const d = await api.get(`/api/notifications/list?limit=${PAGE_SIZE}&offset=0`);
     notifications.value = normalizeList(d);
     hasMore.value = !!(d.has_more || (d.total && d.total > notifications.value.length));
   } catch (e) {
@@ -423,10 +423,7 @@ async function loadMore() {
   loadingMore.value = true;
   try {
     const next = offset.value + PAGE_SIZE;
-    const d = await api.get('/api/notifications/list', {
-      limit: PAGE_SIZE,
-      offset: next,
-    });
+    const d = await api.get(`/api/notifications/list?limit=${PAGE_SIZE}&offset=${next}`);
     const items = normalizeList(d);
     notifications.value.push(...items);
     offset.value = next;
