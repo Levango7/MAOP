@@ -94,6 +94,26 @@ engines 是 `^22.22.2 || ^24.15.0 || >=26.0.0`，node 20 不在区间内。
 本地验证方式（已实测通过，node v24.21.0，`✓ built in 29.62s`）：
 `docker build -f py/Dockerfile --target frontend-builder --build-arg NODE_IMAGE=node:24-alpine -t maop-fe-smoke .`
 
+### 4.1 合并后必须盯的那几条腿（2026-10-21 实证）
+
+“PR 上看不到”还有后半句：**合并后要主动盯，别等 nightly**。同日实证两次：
+
+- master `d816405`（#130：Dockerfile 换依赖源）合并后 `Docker build` = **failure**，
+  日志只有一行 `-i option requires 1 argument`。根因是 Docker 的 ARG 作用域 ——
+  文件顶部（第一个 FROM 之前）声明的 `ARG` 只对 FROM 插值可见，stage 内的 RUN 用不到，
+  `${PIP_INDEX_URL}` 被 shell 展开成空串。连带 `Container Scan (trivy)` 被跳过，
+  **#130 想修的那条腿一次都没跑到**。
+- 修它的 #136 也只能在合并后才拿到成功证据（`Docker build` + `trivy` 双双 success）。
+
+⇒ 纪律：改 `py/Dockerfile` / `.dockerignore` / `docker-compose*.yml` 的 PR，**合并后立刻**
+查 master 上这三条腿的结论，不要等下一次 nightly：
+
+    Docker build · Container Scan (trivy) · Compose Smoke
+
+注意它们**不在** `CI merge gate` 的 `needs` 里，所以 gate 绿不等于它们绿 —— 这是有意识的
+设计（push-only 作业在 PR 上恒为 `skipped`，而 gate 是白名单式判定，只有 `success` 算通过），
+代价就是这三条腿只能人盯。
+
 ## 5. 前端覆盖率门禁
 
 `Frontend Build` 里有显式一步 `Frontend coverage gate`（`npm run test:coverage`）。
