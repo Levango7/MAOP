@@ -39,6 +39,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 中央保留期：14 张"只增不减"的表接上兜底（2026-10-22）
+
+盘点口径：`py/maop` 里 `CREATE TABLE` 共涉及 **131 张表**，其中 **60 张**在仓库任意
+位置出现 `DELETE FROM <该表>`；**71 张一次删除语句都没有**。71 里多数是配置/单行
+upsert（`budget_config`、`heal_rules`…），真正有问题的是**有写入者、按事件追加**的那批：
+逐个确认写入点后挑出 14 张 —— `error_log`、`hook_logs`、`usage_calls`、`cost_entries`、
+`breaker_events`、`change_log`、`config_snapshots`、`health_log`、`routing_audit_logs`、
+`memory_traces`、`consolidation_log`、`subagent_transcripts`、`protocol_messages`、
+`agent_performance`。它们此前会随安装寿命一直长，7×24 部署没有上界。
+
+新增 [py/maop/core/retention.py](py/maop/core/retention.py)：一张策略表 + 一个删除点，
+接进已有的 `maintain_prune`（与 `run_events` / `alertmanager_alerts` / `quota_usage_samples`
+同一入口），响应新增 `retention_tables_checked` / `retention_rows_pruned` /
+`retention_by_table` 三个键，`test_prune_reports_every_ledger_it_owns` 一并把它们钉住
+（少一个键＝那张表悄悄不再被裁）。
+
+三条设计决定，都是过程中踩出来的：
+
+- **DB 路径复用写入者自己的解析函数**。这些表分属 6 种解析方式
+  （`unified_db_path`、`get_db_path("<mod>")`、`get_memory_db_path`、
+  `get_subagent_db_path`、两处私有 `_default_db_path`）。若统一按 `get_db_path` 猜，
+  `config_snapshots`（`data/config_history.db`）与 `error_log`
+  （`find_project_root()/data/maop.db`，data_dir 自定义时与 unified 不同）就会**裁到另一个文件**，
+  报"已清理"而原表照长——正是本项目已经记过一次"熔断器写库与看板读库不是一个文件"的同型坑。
+- **时间界 + 行数双约束**。每策略除 `days` 外还带 `max_rows`（rowid 保留最新 N 行，
+  这些表都不是 `WITHOUT ROWID`）：时钟坏了或一分钟写进百万行时，行数上界仍然兜住。
+  `config_snapshots` 只设 `days=0` 走纯上限（100 版），因为它是回滚的事实源，不该按日历老化。
+- **`typeof()` 守卫**（测试驱动出来的，不是预先设计）：写第一版测试时把 epoch 列配成 ISO
+  策略，期望删 1 行、实际**删光 3 行**——SQLite 里"数字 < 文本"恒真。于是删除条件加了
+  `typeof(col) = 'text'` / `IN ('real','integer')`：将来 kind 配错的结果从"清库"
+  降级成"这次什么都不删"。`test_kind_mismatch_cannot_wipe_the_table` 钉住这条。
+  同理 `<> ''` 让历史空时间戳行不被当成"无限旧"，`NULL` 也被跳过。
+
+窗口取值：计费与用量相关 90 天（`cost_entries`、`usage_calls`）、探针日志 14 天
+（`health_log`）、其余 30 天；上界 1 万～20 万行按写入频度分档。
+
+安全口径：表名/列名只取 `POLICIES` 常量，导入时再过一次 `validate_identifier`
+（`_validate_policies` 同时拒未知 db key、未知 kind、负窗口、无上限的纯上限策略），
+筛选值一律参数绑定；4 处 f-string 拼 SQL 各带 `# nosec B608`，登记进
+`NOSEC_INVENTORY` 的 `maop/core/retention.py:B608:4`。
+
+验证：`tests/test_retention.py` 22 passed（ISO/epoch/纯上限/上限叠加/缺表缺文件/
+重复策略/注入标识符/跨类型守卫）；结构守卫 `test_every_policy_table_is_created_and_written_in_the_tree`
+要求策略里的每张表都同时能在源码中找到 `CREATE TABLE`（且含该时间列）与 `INSERT INTO`，
+防止策略指向一张已经不存在的表还报成功。`test_router_control.py` +
+`test_bandit_security_fixes.py` 72 passed；`check_silent_exceptions`（suppress 46＝基线）、
+`check_file_size`、`check_docs_consistency --gate` 均绿（README `core/` 计数 9→10）。
+
 ### Chat：`stream` 从被丢掉的字段变成真的开关（2026-10-21）
 
 `ChatRequestBody.stream` 早就声明了，但两个处理器都把值写死 —— `/api/chat`

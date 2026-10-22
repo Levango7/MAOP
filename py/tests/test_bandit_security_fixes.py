@@ -41,6 +41,9 @@ NOSEC_INVENTORY: frozenset[str] = frozenset({
     # "alertname = ?" / "received_at >= ?" 四段字面量拼成，筛选值一律走 params
     # 绑定 ⇒ 无注入路径，登记而非改写。
     "maop/core/alert_ingest.py:B608:1",
+    # 2026-10-22 retention：表名/列名只取 POLICIES 常量，导入时过
+    # validate_identifier；cutoff 与 max_rows 一律走 params 绑定 ⇒ 无注入路径。
+    "maop/core/retention.py:B608:4",
     "maop/core/backends/data.py:B608:6",
     "maop/core/backends/image_store.py:B608:2",
     "maop/core/backends/kv_store.py:B608:1",

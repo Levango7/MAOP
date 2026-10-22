@@ -458,6 +458,12 @@ async def maintain_prune() -> dict[str, Any]:
         run_events_pruned = prune_run_events(older_than_days=DEFAULT_RETENTION_DAYS)
         from maop.core import alert_ingest
         alert_rows_pruned = alert_ingest.prune_alerts()
+        # Central retention: the append-only tables that used to have no delete
+        # path at all (error_log, hook_logs, breaker_events, …). Runs before the
+        # memory-store prune so a locked/missing table cannot hide it either —
+        # prune_all never raises, it reports per-table skips.
+        from maop.core import retention
+        retention_results = retention.prune_all()
         from maop.memory.store import MemoryStore
         store = MemoryStore(root_dir=str(state.MAOP_ROOT))
         stats_before = store.stats()
@@ -488,6 +494,7 @@ async def maintain_prune() -> dict[str, Any]:
                 "pruned_ids": list(pruned_ids)[:20],
                 "run_events_pruned": run_events_pruned,
                 "alert_rows_pruned": alert_rows_pruned,
+                **retention.summarize(retention_results),
                 "quota_audit_pruned": quota_audit.prune_audit()}
     except Exception:
         logger.exception("Prune failed")
