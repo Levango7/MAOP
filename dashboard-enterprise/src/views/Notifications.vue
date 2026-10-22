@@ -280,6 +280,7 @@ const filterSchema = computed(() => [
       { value: 'info', label: t('view.notifications.levelInfo') },
       { value: 'warning', label: t('view.notifications.levelWarning') },
       { value: 'error', label: t('view.notifications.levelError') },
+      { value: 'critical', label: t('view.notifications.levelCritical') },
       { value: 'success', label: t('view.notifications.levelSuccess') },
     ],
   },
@@ -341,19 +342,20 @@ function toMs(ts) {
 
 // ── Level / category helpers ──
 function levelIcon(lv) {
-  if (lv === 'error') return 'alert-triangle';
+  if (lv === 'error' || lv === 'critical') return 'alert-triangle';
   if (lv === 'warning') return 'alert-triangle';
   if (lv === 'success') return 'check-circle';
   return 'info';
 }
 function levelTone(lv) {
-  if (lv === 'error') return 'fail';
+  if (lv === 'error' || lv === 'critical') return 'fail';
   if (lv === 'warning') return 'warn';
   if (lv === 'success') return 'success';
   return 'info';
 }
 function levelLabelKey(lv) {
   if (lv === 'error') return 'view.notifications.levelError';
+  if (lv === 'critical') return 'view.notifications.levelCritical';
   if (lv === 'warning') return 'view.notifications.levelWarning';
   if (lv === 'success') return 'view.notifications.levelSuccess';
   return 'view.notifications.levelInfo';
@@ -437,16 +439,31 @@ async function loadMore() {
 
 function normalizeList(d) {
   const items = d.notifications || d.items || d.data || [];
+  // The API returns NotificationResponse: notification_id / body / read_at /
+  // event_type. The legacy id/message/read/category keys are kept as fallbacks
+  // so an older backend still renders, but the real fields must win.
   return items.map((n) => ({
-    id: n.id,
+    id: n.notification_id || n.id,
     level: n.level || 'info',
-    category: n.category || 'system',
+    category: n.category || categoryFromEvent(n.event_type),
     title: n.title || '',
-    message: n.message || '',
-    read: !!n.read,
+    message: n.body ?? n.message ?? '',
+    read: n.read_at ? true : !!n.read,
     created_at: n.created_at || n.created_at_ms || 0,
-    metadata: n.metadata || {},
+    metadata: n.event_payload || n.metadata || {},
   }));
+}
+
+function categoryFromEvent(eventType) {
+  if (!eventType) return 'system';
+  if (eventType.startsWith('quota_')) return 'quota';
+  if (eventType.startsWith('license_')) return 'tenant';
+  if (eventType.startsWith('audit_')) return 'security';
+  if (eventType.startsWith('cost_')) return 'cost';
+  if (eventType.startsWith('task_') || eventType.startsWith('dag_') || eventType.startsWith('agent_')) {
+    return 'agent';
+  }
+  return 'system';
 }
 
 // ── Actions ──
