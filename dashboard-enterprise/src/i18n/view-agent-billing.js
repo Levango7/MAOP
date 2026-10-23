@@ -43,8 +43,10 @@ export const messages = {
     'view.agentBilling.quota.consumeSuccess': 'Quota consumed',
     'view.agentBilling.quota.refundSuccess': 'Quota refunded',
     'view.agentBilling.quota.failed': 'Quota operation failed',
+    'view.agentBilling.quota.insufficient': 'Insufficient quota',
     'view.agentBilling.quota.validateAgent': 'Agent is required',
     'view.agentBilling.quota.validateAmount': 'Amount must be a non-negative number',
+    'view.agentBilling.quota.validatePositive': 'Amount must be greater than zero',
     'view.agentBilling.quota.unlimited': '∞',
 
     // ── Records ───────────────────────────────────────────────────
@@ -136,8 +138,10 @@ export const messages = {
     'view.agentBilling.quota.consumeSuccess': '额度已消耗',
     'view.agentBilling.quota.refundSuccess': '额度已退还',
     'view.agentBilling.quota.failed': '额度操作失败',
+    'view.agentBilling.quota.insufficient': '额度不足',
     'view.agentBilling.quota.validateAgent': '智能体为必填项',
     'view.agentBilling.quota.validateAmount': '数量必须为非负数',
+    'view.agentBilling.quota.validatePositive': '数量必须大于 0',
     'view.agentBilling.quota.unlimited': '∞',
 
     // ── 记录 ──────────────────────────────────────────────────────

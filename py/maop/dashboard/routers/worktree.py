@@ -18,6 +18,16 @@ from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import execution_service
 
 from .state import MAOP_ROOT
+from .worktree_schemas import (
+    AbandonEnvelope,
+    BranchEnvelope,
+    CheckpointEnvelope,
+    CreateRootEnvelope,
+    GetEnvelope,
+    ListEnvelope,
+    MergeEnvelope,
+    RollbackEnvelope,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +77,7 @@ def _get_worktree_mgr() -> Any:
     return execution_service._get_worktree_mgr(maop_root=MAOP_ROOT)
 
 
-@router.post("/api/worktree/create-root")
+@router.post("/api/worktree/create-root", response_model=CreateRootEnvelope)
 @handle_api_errors("Worktree create-root", error_value={"status": "error", "error": "Create failed"})
 async def api_worktree_create_root(body: WorktreeCreateRootRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -80,7 +90,7 @@ async def api_worktree_create_root(body: WorktreeCreateRootRequest, request: Req
     return {"status": "ok", "node_id": node_id}
 
 
-@router.post("/api/worktree/branch")
+@router.post("/api/worktree/branch", response_model=BranchEnvelope)
 @handle_api_errors("Worktree branch", error_value={"status": "error", "error": "Branch failed"})
 async def api_worktree_branch(body: WorktreeBranchRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -102,7 +112,7 @@ async def api_worktree_branch(body: WorktreeBranchRequest, request: Request) -> 
         raise HTTPException(400, "Worktree branch failed") from exc
 
 
-@router.post("/api/worktree/abandon")
+@router.post("/api/worktree/abandon", response_model=AbandonEnvelope)
 @handle_api_errors("Worktree abandon", error_value={"status": "error", "error": "Abandon failed"})
 async def api_worktree_abandon(body: WorktreeAbandonRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -116,7 +126,7 @@ async def api_worktree_abandon(body: WorktreeAbandonRequest, request: Request) -
     return {"status": "ok", "id": node_id}
 
 
-@router.get("/api/worktree/get")
+@router.get("/api/worktree/get", response_model=GetEnvelope)
 @handle_api_errors("Worktree get", error_value={"status": "error", "error": "Get failed"})
 async def api_worktree_get(request: Request, node_id: str = "") -> dict[str, Any]:
     require_admin(request)
@@ -129,7 +139,7 @@ async def api_worktree_get(request: Request, node_id: str = "") -> dict[str, Any
     return {"status": "ok", "branch": info.model_dump()}
 
 
-@router.get("/api/worktree/list")
+@router.get("/api/worktree/list", response_model=ListEnvelope)
 @handle_api_errors("Worktree list", error_value={"branches": [], "count": 0, "error": "List failed"})
 async def api_worktree_list(request: Request, root_id: str = "", active_only: bool = False) -> dict[str, Any]:
     require_admin(request)
@@ -138,7 +148,7 @@ async def api_worktree_list(request: Request, root_id: str = "", active_only: bo
     return {"status": "ok", "branches": [b.model_dump() for b in branches], "count": len(branches)}
 
 
-@router.post("/api/worktree/merge")
+@router.post("/api/worktree/merge", response_model=MergeEnvelope)
 @handle_api_errors("Worktree merge", error_value={"status": "error", "error": "Merge failed"})
 async def api_worktree_merge(body: WorktreeMergeRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -148,10 +158,14 @@ async def api_worktree_merge(body: WorktreeMergeRequest, request: Request) -> di
         raise HTTPException(400, "missing source_branch")
     mgr = _get_worktree_mgr()
     result = execution_service.worktree_merge(mgr, source_branch=source, target_branch=target)
+    if not result.success:
+        # A merge that found no branch changed nothing. Answering "ok" here
+        # told the dashboard the merge had worked while no row was touched.
+        raise HTTPException(404, "; ".join(result.conflicts) or "Merge failed")
     return {"status": "ok", "merge": result.model_dump()}
 
 
-@router.post("/api/worktree/checkpoint")
+@router.post("/api/worktree/checkpoint", response_model=CheckpointEnvelope)
 @handle_api_errors("Worktree checkpoint", error_value={"status": "error", "error": "Checkpoint failed"})
 async def api_worktree_checkpoint(body: WorktreeCheckpointRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -169,7 +183,7 @@ async def api_worktree_checkpoint(body: WorktreeCheckpointRequest, request: Requ
         raise HTTPException(400, "Worktree checkpoint failed") from exc
 
 
-@router.post("/api/worktree/rollback")
+@router.post("/api/worktree/rollback", response_model=RollbackEnvelope)
 @handle_api_errors("Worktree rollback", error_value={"status": "error", "error": "Rollback failed"})
 async def api_worktree_rollback(body: WorktreeRollbackRequest, request: Request) -> dict[str, Any]:
     require_admin(request)

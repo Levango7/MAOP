@@ -1,7 +1,13 @@
 """Tests for maop.dashboard.routers.quota — Agent 额度分桶管理 API 端点.
 
 覆盖 6 个端点的正常路径 + 错误路径，使用隔离的 tmp_path DB 避免污染主库。
-每个测试通过自定义中间件注入 admin 角色，绕过+ require_admin 鉴权。
+每个测试通过自定义中间件注入 admin 角色，绕过 require_admin 鉴权。
+
+额度契约（2026-10-23）：
+- GET 返回三桶视图 ``quota.free.total`` / ``.used`` / ``.remaining``。
+- PUT 请求体是 ``{bucket, total}``——设某个桶的额度上限；旧的 QuotaEntry
+  形态不再接受（多余字段会被拒绝，而不是静默丢弃成默认值）。
+- consume 的 ``bucket`` 生效：指定桶只从该桶扣减。
 """
 
 from __future__ import annotations
@@ -60,46 +66,58 @@ class TestQuotaGet:
         data = resp.json()
         assert data["status"] == "ok"
         assert data["agent_name"] == "nonexistent"
-        assert data["quota"]["free_quota"] == 0
-        assert data["quota"]["prepaid_quota"] == 0
+        assert data["quota"]["free"] == {"total": 0, "used": 0, "remaining": 0}
 
     def test_get_after_set_returns_config(self, client: TestClient):
         """set 后 get 应返回设置的配置。"""
-        client.put("/api/quota/agent1", json={
-            "free_quota": 100,
-            "prepaid_quota": 200,
-            "postpaid_quota": 50,
-            "reset_period": "monthly",
-        })
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
+        client.put("/api/quota/agent1", json={"bucket": "prepaid", "total": 200})
         resp = client.get("/api/quota/agent1")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["quota"]["free_quota"] == 100
-        assert data["quota"]["prepaid_quota"] == 200
+        assert data["quota"]["free"]["total"] == 100
+        assert data["quota"]["prepaid"]["total"] == 200
+
+    def test_get_reports_remaining(self, client: TestClient):
+        """剩余 = 上限 - 已用。"""
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
+        client.post("/api/quota/agent1/consume", json={"amount": 30, "bucket": "free"})
+        quota = client.get("/api/quota/agent1").json()["quota"]
+        assert quota["free"] == {"total": 100, "used": 30, "remaining": 70}
 
 
-# ── 2. PUT /Aapi/quota/{agent_name} ───────────────────────────────
+# ── 2. PUT /api/quota/{agent_name} ───────────────────────────────
 
 
 class TestQuotaSet:
     def test_set_basic_quota(self, client: TestClient):
-        """设置基本额度配置。"""
-        resp = client.put("/api/quota/agent1", json={
-            "free_quota": 100,
-            "prepaid_quota": 200,
-            "postpaid_quota": 50,
-            "reset_period": "daily",
-        })
+        """设置某个桶的额度上限。"""
+        resp = client.put("/api/quota/agent1", json={"bucket": "prepaid", "total": 200})
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ok"
         assert data["agent_name"] == "agent1"
+        assert data["quota"]["prepaid"]["total"] == 200
 
-    def test_set_quota_with_defaults(self, client: TestClient):
-        """使用默认值设置额度。"""
-        resp = client.put("/api/quota/agent2", json={})
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
+    def test_set_keeps_other_buckets_and_used(self, client: TestClient):
+        """设置一个桶不动其它桶，也不抹掉已用量。"""
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
+        client.post("/api/quota/agent1/consume", json={"amount": 30, "bucket": "free"})
+        client.put("/api/quota/agent1", json={"bucket": "prepaid", "total": 500})
+        quota = client.get("/api/quota/agent1").json()["quota"]
+        assert quota["free"]["total"] == 100
+        assert quota["free"]["used"] == 30
+        assert quota["prepaid"]["total"] == 500
+
+    def test_set_invalid_bucket(self, client: TestClient):
+        """无效桶名返回 400。"""
+        resp = client.put("/api/quota/agent1", json={"bucket": "nope", "total": 10})
+        assert resp.status_code == 400
+
+    def test_set_rejects_unknown_field(self, client: TestClient):
+        """旧契约（QuotaEntry 形态）被拒绝，而不是静默写成默认值。"""
+        resp = client.put("/api/quota/agent1", json={"free_quota": 100})
+        assert resp.status_code == 422
 
 
 # ── 3. POST /api/quota/{agent_name}/consume ──────────────────────
@@ -108,7 +126,7 @@ class TestQuotaSet:
 class TestQuotaConsume:
     def test_consume_success(self, client: TestClient):
         """有足够额度时消耗成功。"""
-        client.put("/api/quota/agent1", json={"free_quota": 100})
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
         resp = client.post("/api/quota/agent1/consume", json={"amount": 30})
         assert resp.status_code == 200
         data = resp.json()
@@ -116,9 +134,35 @@ class TestQuotaConsume:
         assert data["result"]["success"] is True
         assert data["result"]["consumed"] == 30
 
+    def test_consume_only_from_named_bucket(self, client: TestClient):
+        """指定桶时只从该桶扣减。"""
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
+        client.put("/api/quota/agent1", json={"bucket": "prepaid", "total": 500})
+        resp = client.post(
+            "/api/quota/agent1/consume", json={"amount": 30, "bucket": "prepaid"},
+        )
+        result = resp.json()["result"]
+        assert result["from_prepaid"] == 30
+        assert result["from_free"] == 0
+        quota = client.get("/api/quota/agent1").json()["quota"]
+        assert quota["free"]["used"] == 0
+        assert quota["prepaid"]["used"] == 30
+
+    def test_consume_insufficient_in_named_bucket(self, client: TestClient):
+        """指定桶余额不足时失败，且不跨桶借用。"""
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
+        resp = client.post(
+            "/api/quota/agent1/consume", json={"amount": 30, "bucket": "prepaid"},
+        )
+        data = resp.json()
+        assert data["result"]["success"] is False
+        assert "prepaid" in data["result"]["reason"]
+        quota = client.get("/api/quota/agent1").json()["quota"]
+        assert quota["free"]["used"] == 0
+
     def test_consume_insufficient_quota(self, client: TestClient):
         """额度不足时消耗失败。"""
-        client.put("/api/quota/agent1", json={"free_quota": 10})
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 10})
         resp = client.post("/api/quota/agent1/consume", json={"amount": 50})
         assert resp.status_code == 200
         data = resp.json()
@@ -127,10 +171,17 @@ class TestQuotaConsume:
 
     def test_consume_zero_amount(self, client: TestClient):
         """消耗 0 额度应成功。"""
-        client.put("/api/quota/agent1", json={"free_quota": 100})
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
         resp = client.post("/api/quota/agent1/consume", json={"amount": 0})
         assert resp.status_code == 200
         assert resp.json()["result"]["success"] is True
+
+    def test_consume_invalid_bucket(self, client: TestClient):
+        """无效桶名返回 400。"""
+        resp = client.post(
+            "/api/quota/agent1/consume", json={"amount": 10, "bucket": "nope"},
+        )
+        assert resp.status_code == 400
 
 
 # ── 4. POST /api/quota/{agent_name}/refund ───────────────────────
@@ -139,18 +190,19 @@ class TestQuotaConsume:
 class TestQuotaRefund:
     def test_refund_to_specific_bucket(self, client: TestClient):
         """退还到指定桶。"""
-        client.put("/api/quota/agent1", json={
-            "free_quota": 100, "free_used": 50,
-        })
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
+        client.post("/api/quota/agent1/consume", json={"amount": 50, "bucket": "free"})
         resp = client.post("/api/quota/agent1/refund", json={
             "amount": 20, "bucket": "free",
         })
         assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
+        quota = client.get("/api/quota/agent1").json()["quota"]
+        assert quota["free"]["used"] == 30
 
     def test_refund_invalid_bucket(self, client: TestClient):
         """无效桶名返回 400。"""
-        client.put("/api/quota/agent1", json={"free_quota": 100})
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
         resp = client.post("/api/quota/agent1/refund", json={
             "amount": 10, "bucket": "invalid_bucket",
         })
@@ -158,9 +210,8 @@ class TestQuotaRefund:
 
     def test_refund_auto_bucket(self, client: TestClient):
         """auto 桶自动选择退还目标。"""
-        client.put("/api/quota/agent1", json={
-            "free_quota": 100, "free_used": 30,
-        })
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
+        client.post("/api/quota/agent1/consume", json={"amount": 30, "bucket": "free"})
         resp = client.post("/api/quota/agent1/refund", json={
             "amount": 10, "bucket": "auto",
         })
@@ -181,7 +232,7 @@ class TestQuotaRemaining:
 
     def test_remaining_after_consume(self, client: TestClient):
         """消耗后剩余应减少。"""
-        client.put("/api/quota/agent1", json={"free_quota": 100})
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
         client.post("/api/quota/agent1/consume", json={"amount": 30})
         resp = client.get("/api/quota/agent1/remaining")
         assert resp.status_code == 200
@@ -196,7 +247,7 @@ class TestQuotaRemaining:
 class TestQuotaReset:
     def test_reset_all_buckets(self, client: TestClient):
         """重置所有桶。"""
-        client.put("/api/quota/agent1", json={"free_quota": 100})
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
         client.post("/api/quota/agent1/consume", json={"amount": 30})
         resp = client.post("/api/quota/agent1/reset", json={"bucket": "all"})
         assert resp.status_code == 200
@@ -206,7 +257,7 @@ class TestQuotaReset:
 
     def test_reset_invalid_bucket(self, client: TestClient):
         """无效桶名返回 400。"""
-        client.put("/api/quota/agent1", json={"free_quota": 100})
+        client.put("/api/quota/agent1", json={"bucket": "free", "total": 100})
         resp = client.post("/api/quota/agent1/reset", json={"bucket": "invalid"})
         assert resp.status_code == 400
 

@@ -39,6 +39,207 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### quota 批次：8 条端点建模，额度页的四个按钮其实一直是禁用的（2026-10-24）
+
+P1-b 第十二批：`/api/quota/*` 前端在用的 5 条端点 + 同页的 `/api/billing/summary`
+与 `/api/billing/records` 全部声明 `response_model`，新增
+`routers/quota_schemas.py`、`routers/billing_schemas.py`。响应模型复用领域模型
+`ConsumeResult`（`core/agent/billing/quota_bucket.py`）——只有它知道一次消耗
+实际从哪个桶扣了多少。
+
+**额度卡片从来不是"0"，是恒为"无限"**：`GET /api/quota/{agent}` 回的是扁平的
+`QuotaEntry`（`free_quota`/`free_used`），视图读的是嵌套的
+`quota.free.total/.used/.remaining` ⇒ 三个桶全部落到兜底值"无限/0"，数据库里
+有额度也显示不出来。
+
+**"设置额度"把额度清零还弹成功**：`PUT` 的请求体是 `QuotaEntry`，视图发的是
+`{bucket, total}`。Pydantic v2 默认丢弃未声明字段 ⇒ 两个键都被丢掉、模型取默认
+值 ⇒ 该 Agent 的额度被写成全 0，前端却弹"设置成功"。请求体现在一律
+`extra="forbid"`：多发一个键是 422，不是静默改数据。`QuotaBucket` 新增
+`set_bucket_quota()`，只改指名的那个桶，其它桶与已用量原样保留。
+
+**桶下拉框是个装饰**：`consume` 完全忽略请求里的 `bucket`。现在
+`consume(agent, amount, bucket)` 按名扣减（指定桶时**不跨桶借用**，不足即失败并
+给出原因），`auto` 才按 免费 → 预付 → 后付 顺序扣。
+
+**消耗失败被报成成功**：额度不足时端点回 HTTP 200 + `success=false`，视图不看
+`success` 直接弹"消耗成功"。现在按 `success` 分支，失败弹 `reason`。
+
+**空数量被当成 0**：`Number('')` 是 0 不是 NaN ⇒ 空输入"消耗 0"成功、"设置额度
+0"静默清零。新增 `parseAmount()`：空/非数/负数一律拦下并提示，"设额度"才允许 0。
+
+**同页另外两个页签也读错了键**：摘要读 `s.total_cost`（生产者发
+`total_cost_usd`）⇒ 成本恒 `$0.0000`；摘要的桶进度条读 `s.buckets`（从没发过）
+⇒ 恒"无限"。记录表读 `r.tokens`/`r.calls`/`r.cost`/`r.source`，生产者发的是
+`tokens_consumed`/`calls_made`/`cost_usd`/`quota_source` ⇒ 整片表格体渲染成
+"—"；`model` 列则是因为 `billing_records.model` 列一直有写、`_row_to_record`
+却没读回 `BillingRecord`，字段直接丢了。`quota_source` 的真形态是
+`"free:1000,prepaid:234"`（无消耗为 `"none"`），不是裸桶名——视图改为解析后取
+占比最大的那个桶。
+
+**四个操作按钮在真机上点不动**（新测试逮到的）：`:disabled="quotaBusy"` 里
+`quotaBusy` 是字符串，Vue 对布尔属性把 `''` 当"有值"（`includeBooleanAttr('')`
+为真）⇒ 消耗/退还/设置/重置四个按钮**恒为 disabled**。改成 `!!quotaBusy`。
+
+**棘轮**：清单 96 → 90。（`/api/billing/records` 不在清单里：视图用字符串拼接
+URL，抽取器只认字面量 URL——已记入"扩展抽取器"的待办。）
+
+**验证**：`test_quota_route.py` 21 条重写 + 新契约
+`test_quota_router_contracts.py` 23 条——都跑**真** `QuotaBucket`/`BillingEngine`
+（临时 SQLite），不是手写 mock：断言 GET 的嵌套三桶与生产者同值、视图读的桶键
+与记录键都 ⊆ 生产者所发、摘要的 `total_cost_usd` 与桶视图、`/remaining` 与三桶
+视图互不矛盾、旧 PUT 体 422 且额度未被改动、consume 按指名桶扣减、四条改端点
+在 OpenAPI 里的请求体字段与视图实发的一模一样且 `additionalProperties: false`、
+8 条路由都有 `response_model`、每个信封的 `status` 默认 `"error"`、兜底分支回
+`status="error"` 而不是被静默丢弃。前端 `AgentBilling.test.js` 9 条（mock 按真
+生产者形状重写；旧 mock 发明的额度形状让坏卡片一直是绿的）。三处变异逐个转红：
+后端 `get_agent_quota` 改回扁平 `QuotaEntry`（3 条红）、视图改回
+`r.tokens_consumed`→`r.tokens`（2 条红）、视图改回 `b.limit`（1 条红）、去掉
+consume 的失败分支（前端 1 条红）。另：把按钮的 `disabled` 手动置 false 后点击
+立即生效，是"按钮恒禁用"的直接证据。
+
+### subagent 批次：5 条端点建模，三个行内按钮其实全是坏的（2026-10-23）
+
+P1-b 第十一批：`/api/subagent/*` 前端在用的 5 条端点全部声明 `response_model`，
+新增 `routers/subagent_schemas.py`。信封**复用**领域模型 `AgentResult`/
+`TranscriptEntry`（`core/agent/delegation/subagent_lifecycle.py` 里那两个）——
+只有 manager 知道一条转录条目有几个键。
+
+**"等待 / 转录 / 取消"三个按钮全是坏的**：视图读 `a.agent_id`，而
+`SubAgentManager.list_agents()` 吐的是数据库列 `id`（名字列是 `name`，视图读
+`a.agent`）⇒ 每行的 id 列空白，三个行内操作都发 `agent_id: undefined` ⇒
+请求体里的 `agent_id` 取默认值 `""` ⇒ 后端 `raise HTTPException(400,
+"missing agent_id")` ⇒ 这三个功能在界面上从来没成功过。现在路由把这两列改名成
+API 其余部分已经在用的词（`spawn`/`cancel` 回的都是 `agent_id`，spawn 请求体
+把名字叫 `agent`），其余列原样保留。
+
+**旧测试的替身和生产者对不上**：既有覆盖测试把 `list_agents` 替成
+`{"id": ..., "agent": ...}`（manager 从没产出过这个形状）、把转录替成
+`["line1", "line2"]`（真转录是 `TranscriptEntry` 列表）⇒ 两边各自跟视图自洽，
+谁都不像错的。现在替身按真形状写。
+
+**"信封不许丢生产者的键"在这里差点失效**：改名前后信封的字段名都在，值却是空的
+（pydantic 拿默认值补齐）⇒ 所以断言比对的是**值**，不只比对键名。
+
+**视图里两处多余的兜底**：`a.agent || a.agent_name || '—'` 里的 `agent_name`
+生产者从来没发过；转录那段 `typeof tr === 'string'` / `typeof tr === 'object'`
+两个分支同理——信封声明了 `list[TranscriptEntry]`，转录只可能是数组。
+
+**棘轮**：清单 101 → 96。
+
+**验证**：新契约 `test_subagent_router_contracts.py` 11 条——用**真**
+`SubAgentManager`（临时 SQLite；行通过 manager 自己的连接写入，因为
+`spawn()` 会去调真 LLM）而不是 mock：断言列表行的键名与**值**都来自生产者
+（`agent_id`/`agent` 是 `id`/`name` 改名，其余列原样）、列表里的 id 能被行内
+操作接受（真 manager 报"没在跑"⇒ 404，而不是 400 "missing agent_id"）、转录
+条目是 `TranscriptEntry` 的字段、wait 回的是 `AgentResult` 的字段、5 条路由在
+OpenAPI 里都带 `response_model`、每个信封的 `status` 默认 `"error"`、
+`/api/subagent/list` 的兜底（本来连 `status` 都没有）被标成 error 而不是 ok。
+棘轮 + 本批契约 + 既有覆盖共 75 passed；前端 `Subagents.test.js` 11/11；
+ruff / mypy(2 文件) / 尺寸 / 静默异常 / API 契约 / 接线门禁绿。两处变异逐个
+转红：去掉生产者的改名（后端 4 条转红）、视图改读 `a.id`/`a.name`（前端 3 条
+转红）。
+
+### analysis 批次：6 条端点建模，"最贵 agent"那张表其实一直空着（2026-10-23）
+
+P1-b 第十批：`/api/analysis/*` 前端在用的 6 条端点全部声明 `response_model`，
+新增 `routers/analysis_schemas.py`。这批路由用的是**裸** `@handle_api_errors`
+（没有 `error_value`）⇒ 失败走 `error_response()` 的 `JSONResponse`，**不进
+信封校验**，所以错误响应不会被 `status` 字段改写；`status` 仍默认给
+`"error"`——万一有个不带 `status` 的 dict 溜进来，会被标成失败而不是成功。
+
+**"最贵 agent"那张表一直空着**：生产者吐的键是 `slowest_agents`（按**延迟**
+排的），视图读的是 `expensive_agents` ⇒ 键根本对不上，那张表永远没有数据；
+而且就算对上了，它排的也是延迟不是成本——标题写着"Most Expensive Agents"、
+列也是成本。现在生产者改用 `tracker.summary().by_agent` 按**成本**排，键改名
+`expensive_agents`，视图同步。
+
+**summary 成功率永远是"—"**：视图读 `summaryData.success_rate`，生产者写的是
+`success_rate_pct` ⇒ 字段名对不上。
+
+**百分数靠量级猜**：旧的 `formatPct` 在值 ≤1 时乘 100（赌"这是分数"）⇒ 真的
+1% 成功率会被显示成 100%。新增 `formatPct100` 专供 0–100 的百分数，成功率的
+红黄绿阈值同步改成 95/80。
+
+**两个百分数量纲不同**：`success_rate_pct` 是 0–100，`cache.hit_rate` 是 0–1
+的分数 ⇒ 视图各按各的量纲格式化。
+
+**资源卡片全是 0 和"—"**：视图读平铺的 `cpu_pct`/`memory_mb`/`db_in_use`/
+`db_max_size`/`cache_hit_rate`，生产者写的是嵌套的 `live.cpu_percent`/
+`live.memory_used_mb`/`db_pool.in_use`/`db_pool.max_size`/`cache.hit_rate`。
+
+**成本表和饼图是空的**：视图读 `items[].dimension`/`items[].value`/`total`，
+生产者写 `breakdown[].key`/`breakdown[].cost_usd`/`total_cost_usd` ⇒ 列全是
+"—"、金额 $0、饼图整块不渲染。
+
+**慢端点表全是"—"和 0**：视图读 `e.name`/`e.latency_ms`，生产者写
+`e.metric`/`e.avg_seconds`（单位是**秒**）⇒ 名字空、延迟 0。
+
+**资源图表没有可画的数据**：生产者存了 `history`，但从没给图序列 ⇒ 图表恒空。
+新增 `series`（`_cpu_series()` 把 `system.cpu.percent` 摊成
+`{timestamp, cpu_percent}`）。
+
+**summary 少一个 token 指标**：生产者补 `total_tokens`。
+
+**棘轮**：清单 107 → 101。
+
+**验证**：新契约 `test_analysis_router_contracts.py` 15 条——生产者换成假后端
+（"chatty" 慢而便宜、"pricey" 快而贵 ⇒ 延迟榜冒充成本榜会被当场抓住）而不是
+mock 掉被测的那一层；断言 6 条路由在 OpenAPI 里都带 `response_model`、每个信封
+`status` 默认 `"error"`、信封不丢生产者任何一个键、视图契约逐条双向绑定
+（生产者键 ↔ 视图取值表达式）；棘轮 + analysis 共 47 passed；前端
+`Analysis.test.js` 14/14、全量 64 文件 563 用例绿；ruff / mypy(4 文件) /
+尺寸 / 静默异常 / API 契约 / 接线门禁绿。五处变异逐个转红：去掉 `response_model`、
+把成本榜塞回旧键、视图改读 `success_rate`、视图改读平铺 `cpu_pct`、生产者把
+`total_tokens` 清零。
+
+### worktree 批次：8 条端点建模，挖出三个"合并其实没发生"（2026-10-23）
+
+P1-b 第九批：`/api/worktree/*` 全部 8 条端点声明 `response_model`，新增
+`routers/worktree_schemas.py`。信封**复用**领域模型 `BranchInfo`/
+`MergeResult`（`core/agent/memory_ctx/worktree.py` 里那两个），不另抄一份
+字段表——只有 manager 知道 `BranchInfo` 有几个键，抄一份就会漂。
+`status` 默认给 `"error"`：这批路由的 `@handle_api_errors(error_value=...)`
+兜底是**普通 dict**，普通 dict 会真的进信封校验，给 `"ok"` 兜底等于把失败
+响应标成成功（`/api/worktree/list` 的兜底干脆连 `status` 都没有）。
+
+**"弃用"永远成功**：`WorktreeManager.abandon()` 无条件 `return True`，
+不管 `UPDATE` 命中几行 ⇒ 路由里那条 `if not ok: raise 404` 永远不成立
+⇒ 弃用一个根本不存在的分支也报"成功"。现在按 `rowcount` 说实话。
+
+**界面发名字、接口只认 id**：`merge()` 原来只按 `id` 查分支，而
+`Worktrees.vue` 送的是分支**名** ⇒ 每次从界面发起的合并都落在
+`Source branch not found` 上，合并功能等于没有。新增 `_resolve_ref()`：
+先按 id 查，查不到再按名字查；同名分支取**最近创建**的那条（schema 里
+`name` 不唯一）。前端改成发 id、显示名，两边不再互相猜。
+
+**合并失败却回 200 "ok"**：路由不判 `result.success` 就
+`return {"status": "ok"}` ⇒ 合并没发生，仪表盘却说成功。现在失败抛 404
+（`conflicts` 进 detail），状态码与返回体一致。
+
+**冲突被前端丢在地上**：`submitMerge()` 拿到响应就扔了，`merge.conflicts`
+没人读；AUTO 策略发现两边 `result` 不同会转成 manual 并取源结果，这种
+"合上了但有冲突"和"干净合并"在界面上长得一模一样。现在读
+`merge.conflicts` 并在页头渲染一条提示（`view.worktrees.merge.conflicts`
+中英双份）。
+
+**扫描器的盲区（如实记一笔）**：`GET /api/worktree/list` 的 URL 是拼出来的
+（`` `/api/worktree/list${qs}` ``），棘轮只认字面量 `api.get('/api/...')`
+⇒ 这条端点从来不在清单里，棘轮也就从来没管过它。本批连它和
+`GET /api/worktree/get` 一起建模（所以是 8 条端点，清单只少 6 行）。
+让扫描器解析拼接 URL 是后续项。
+
+**棘轮**：清单 113 → 107。
+
+**验证**：新契约 `test_worktree_router_contracts.py` 14 条——真
+`WorktreeManager`（tmp 目录）建分支、按名字合并、按 id 合并、合并不存在
+的分支回 404、弃用不存在的分支回 404、manual 策略的冲突上报、信封字段与
+生产者逐字段对齐、8 条路由在 OpenAPI 里都带 `response_model`、每个信封的
+`status` 默认值是 `"error"`；棘轮 + worktree 共 46 passed；前端
+`Worktrees.test.js` 12/12；ruff / mypy(2 文件) / 尺寸 / 静默异常门禁绿。
+五处变异逐个转红且恢复字节一致：`abandon()` 回到恒真、`merge()` 回到只认
+id、路由回到失败也说 ok、视图回到发名字、视图回到吞掉冲突。
+
 ### audit 批次：8 条路由建模 + 两个版本统一到一套词表（2026-10-23）
 
 P1-b 第八批：`/api/audit/*` 前端在用 7 条端点（外加无人调用但同属本路由器的

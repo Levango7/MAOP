@@ -49,7 +49,7 @@
                   <span class="sa-table__id mono">{{ a.agent_id }}</span>
                 </div>
                 <div class="sa-table__td" role="cell">
-                  <span class="sa-table__agent">{{ a.agent || a.agent_name || '—' }}</span>
+                  <span class="sa-table__agent">{{ a.agent || '—' }}</span>
                 </div>
                 <div class="sa-table__td" role="cell">
                   <span class="sa-table__task">{{ a.task || '—' }}</span>
@@ -387,7 +387,7 @@ async function doWait() {
       agent_id: waitTarget.value.agent_id,
       timeout: Math.max(1, Math.min(3600, Number(waitTimeout.value) || 120)),
     });
-    waitResult.value = data.result ?? data;
+    waitResult.value = data.result;
     toast.success(t('view.subagents.wait.success'));
     await loadList();
   } catch (err) {
@@ -418,16 +418,10 @@ async function openTranscript(a) {
   transcriptLoading.value = true;
   try {
     const data = await api.get(`/api/subagent/transcript?agent_id=${encodeURIComponent(a.agent_id)}`);
-    const tr = data.transcript;
-    if (typeof tr === 'string') {
-      transcriptText.value = tr;
-    } else if (Array.isArray(tr)) {
-      transcriptText.value = tr.map((line) => (typeof line === 'string' ? line : JSON.stringify(line))).join('\n');
-    } else if (tr && typeof tr === 'object') {
-      try { transcriptText.value = JSON.stringify(tr, null, 2); } catch { transcriptText.value = String(tr); }
-    } else {
-      transcriptText.value = '';
-    }
+    const entries = data.transcript || [];
+    transcriptText.value = entries
+      .map((entry) => (typeof entry === 'string' ? entry : JSON.stringify(entry)))
+      .join('\n');
   } catch (err) {
     transcriptError.value = (err && err.message) || t('view.subagents.transcript.failedLoad');
   } finally {

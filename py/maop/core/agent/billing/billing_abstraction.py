@@ -31,6 +31,7 @@ from maop.core.agent.billing.quota_bucket import (  # noqa: F401
     ConsumeResult,
     QuotaBucket,
     QuotaEntry,
+    quota_bucket_views,
 )
 from maop.core.agent.registry.agent_catalog import (
     AgentCatalog,
@@ -59,6 +60,7 @@ class BillingRecord(BaseModel):
     cost_usd: float = Field(default=0.0, ge=0.0, description="成本（美元）")
     quota_consumed: int = Field(default=0, ge=0, description="消耗的额度单位")
     quota_source: str = Field(default="", description="free/prepaid/postpaid 或组合")
+    model: str = Field(default="", description="模型名称")
     timestamp: str = Field(default="", description="ISO 时间戳")
 
 
@@ -209,6 +211,7 @@ class BillingEngine:
                 cost_usd=round(cost_usd, 6),
                 quota_consumed=quota_units,
                 quota_source=quota_source,
+                model=model,
                 timestamp=now_iso,
             )
             self._persist_record(record, session_id=session_id, model=model)
@@ -240,8 +243,9 @@ class BillingEngine:
         Returns
         -------
         dict[str, Any]
-            包含 total_calls / total_tokens / total_cost / total_quota_consumed /
-            quota_remaining / billing_model 等字段。
+            包含 total_calls / total_tokens / total_cost_usd /
+            total_quota_consumed / quota_remaining / quota（三桶视图）/
+            billing_model 等字段。
         """
         descriptor = self._catalog.get(agent_name)
         billing_model = descriptor.billing_model.value if descriptor else "unknown"
@@ -272,6 +276,7 @@ class BillingEngine:
             "total_cost_usd": round(total_cost, 6),
             "total_quota_consumed": total_quota,
             "quota_remaining": quota_remaining,
+            "quota": quota_bucket_views(self._quota.get_quota(agent_name)),
         }
 
     def get_billing_records(
@@ -412,5 +417,6 @@ class BillingEngine:
             cost_usd=row["cost_usd"],
             quota_consumed=row["quota_consumed"],
             quota_source=row["quota_source"],
+            model=row["model"],
             timestamp=row["timestamp"],
         )

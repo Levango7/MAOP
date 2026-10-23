@@ -111,11 +111,13 @@
                     />
                   </label>
                 </div>
+                <!-- quotaBusy 是字符串：Vue 对布尔属性把 '' 当"有值"（includeBooleanAttr），
+                     直接绑会让四个按钮恒为 disabled。 -->
                 <div class="quota-actions__buttons">
                   <button
                     class="btn-primary"
                     type="button"
-                    :disabled="quotaBusy"
+                    :disabled="!!quotaBusy"
                     @click="doConsume"
                   >
                     <AppIcon name="zap" :size="14" />
@@ -124,7 +126,7 @@
                   <button
                     class="btn-ghost"
                     type="button"
-                    :disabled="quotaBusy"
+                    :disabled="!!quotaBusy"
                     @click="doRefund"
                   >
                     <AppIcon name="rotate-ccw" :size="14" />
@@ -133,7 +135,7 @@
                   <button
                     class="btn-ghost"
                     type="button"
-                    :disabled="quotaBusy"
+                    :disabled="!!quotaBusy"
                     @click="doSetQuota"
                   >
                     <AppIcon name="gauge" :size="14" />
@@ -142,7 +144,7 @@
                   <button
                     class="btn-ghost btn-ghost--danger"
                     type="button"
-                    :disabled="quotaBusy"
+                    :disabled="!!quotaBusy"
                     @click="doReset"
                   >
                     <AppIcon name="refresh" :size="14" />
@@ -233,24 +235,24 @@
               </div>
               <div v-for="r in pagedRecords" :key="r.timestamp + '-' + r.agent_name + '-' + r.model" class="records-table__row" role="row">
                 <div class="records-table__td" role="cell">
-                  <span class="mono">{{ formatTime(r.timestamp || r.time) }}</span>
+                  <span class="mono">{{ formatTime(r.timestamp) }}</span>
                 </div>
-                <div class="records-table__td" role="cell">{{ r.agent_name || r.agent || '—' }}</div>
+                <div class="records-table__td" role="cell">{{ r.agent_name || '—' }}</div>
                 <div class="records-table__td" role="cell">{{ r.model || '—' }}</div>
                 <div class="records-table__td" role="cell">
                   <Badge :tone="billingModelTone(r.billing_model)">{{ billingModelLabel(r.billing_model) }}</Badge>
                 </div>
                 <div class="records-table__td records-table__td--num" role="cell">
-                  <span class="mono">{{ formatNum(r.tokens) }}</span>
+                  <span class="mono">{{ formatNum(r.tokens_consumed) }}</span>
                 </div>
                 <div class="records-table__td records-table__td--num" role="cell">
-                  <span class="mono">{{ formatNum(r.calls) }}</span>
+                  <span class="mono">{{ formatNum(r.calls_made) }}</span>
                 </div>
                 <div class="records-table__td records-table__td--num" role="cell">
-                  <span class="mono">{{ formatCost(r.cost) }}</span>
+                  <span class="mono">{{ formatCost(r.cost_usd) }}</span>
                 </div>
                 <div class="records-table__td" role="cell">
-                  <Badge :tone="sourceTone(r.source)">{{ sourceLabel(r.source) }}</Badge>
+                  <Badge :tone="sourceTone(r.quota_source)">{{ sourceLabel(r.quota_source) }}</Badge>
                 </div>
               </div>
             </div>
@@ -326,11 +328,11 @@
                 <div class="summary-agent-list">
                   <div
                     v-for="s in summaryList"
-                    :key="s.agent_name || s.agent"
+                    :key="s.agent_name"
                     class="summary-agent-card"
                   >
                     <div class="summary-agent-card__head">
-                      <span class="summary-agent-card__name">{{ s.agent_name || s.agent || '—' }}</span>
+                      <span class="summary-agent-card__name">{{ s.agent_name || '—' }}</span>
                     </div>
                     <div class="summary-agent-card__stats">
                       <div class="summary-agent-stat">
@@ -339,7 +341,7 @@
                       </div>
                       <div class="summary-agent-stat">
                         <span class="summary-agent-stat__label">{{ t('view.agentBilling.summary.cost') }}</span>
-                        <span class="summary-agent-stat__value mono">{{ formatCost(s.total_cost) }}</span>
+                        <span class="summary-agent-stat__value mono">{{ formatCost(s.total_cost_usd) }}</span>
                       </div>
                       <div class="summary-agent-stat">
                         <span class="summary-agent-stat__label">{{ t('view.agentBilling.summary.calls') }}</span>
@@ -497,8 +499,28 @@ function billingModelTone(m) {
   return 'neutral';
 }
 
+// quota_source 的生产格式是 "free:100,prepaid:50"（无消耗时是 "none"），
+// 不是裸桶名：拿整串当桶名比对会全部落到"未知"。
+function parseQuotaSource(raw) {
+  const text = String(raw || '').trim();
+  if (!text || text === 'none') return [];
+  return text
+    .split(',')
+    .map((part) => {
+      const [bucket, amount] = part.split(':');
+      return { bucket: (bucket || '').trim(), amount: Number(amount) || 0 };
+    })
+    .filter((x) => x.bucket);
+}
+
+function primarySourceBucket(raw) {
+  const parts = parseQuotaSource(raw);
+  if (!parts.length) return '';
+  return parts.reduce((best, cur) => (cur.amount > best.amount ? cur : best)).bucket;
+}
+
 function sourceLabel(s) {
-  const key = String(s || '').toLowerCase();
+  const key = primarySourceBucket(s);
   const map = {
     free: 'view.agentBilling.source.free',
     prepaid: 'view.agentBilling.source.prepaid',
@@ -508,7 +530,7 @@ function sourceLabel(s) {
 }
 
 function sourceTone(s) {
-  const key = String(s || '').toLowerCase();
+  const key = primarySourceBucket(s);
   if (key === 'free') return 'success';
   if (key === 'prepaid') return 'brand';
   if (key === 'postpaid') return 'info';
@@ -556,8 +578,8 @@ const quotaBuckets = computed(() => {
   ];
   return defs.map((d) => {
     const b = (q[d.key] && typeof q[d.key] === 'object') ? q[d.key] : {};
-    const total = b.total ?? b.limit ?? UNLIMITED;
-    const used = b.used ?? b.consumed ?? 0;
+    const total = b.total ?? UNLIMITED;
+    const used = b.used ?? 0;
     const remaining = b.remaining ?? (isUnlimited(total) ? UNLIMITED : Math.max(0, total - used));
     const pct = bucketPercent(total, used);
     return {
@@ -591,7 +613,7 @@ const summaryTotals = computed(() => {
   return summaryList.value.reduce(
     (acc, s) => {
       acc.total_tokens += Number(s.total_tokens || 0);
-      acc.total_cost += Number(s.total_cost || 0);
+      acc.total_cost += Number(s.total_cost_usd || 0);
       acc.total_calls += Number(s.total_calls || 0);
       return acc;
     },
@@ -605,11 +627,11 @@ function agentBucketBars(s) {
     { key: 'prepaid', label: t('view.agentBilling.quota.prepaid') },
     { key: 'postpaid', label: t('view.agentBilling.quota.postpaid') },
   ];
-  const buckets = (s && s.buckets) || (s && s.quota) || {};
+  const buckets = (s && s.quota) || {};
   return defs.map((d) => {
     const b = (buckets[d.key] && typeof buckets[d.key] === 'object') ? buckets[d.key] : {};
-    const total = b.total ?? b.limit ?? UNLIMITED;
-    const used = b.used ?? b.consumed ?? 0;
+    const total = b.total ?? UNLIMITED;
+    const used = b.used ?? 0;
     const pct = bucketPercent(total, used);
     return {
       key: d.key,
@@ -658,13 +680,24 @@ function onAgentChange() {
   loadQuota();
 }
 
+// 表单里的数量是字符串：空串会被 Number('') 变成 0（不是 NaN），
+// 那会让"消耗 0"静默成功、"设置额度 0"静默清零。
+function parseAmount(allowZero = false) {
+  const raw = quotaForm.amount;
+  if (raw === '' || raw === null || raw === undefined) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  if (!allowZero && n === 0) return null;
+  return n;
+}
+
 async function doSetQuota() {
   if (!selectedAgent.value) {
     toast.warn(t('view.agentBilling.quota.validateAgent'));
     return;
   }
-  const amount = Number(quotaForm.amount);
-  if (isNaN(amount) || amount < 0) {
+  const amount = parseAmount(true);
+  if (amount === null) {
     toast.warn(t('view.agentBilling.quota.validateAmount'));
     return;
   }
@@ -688,18 +721,25 @@ async function doConsume() {
     toast.warn(t('view.agentBilling.quota.validateAgent'));
     return;
   }
-  const amount = Number(quotaForm.amount);
-  if (isNaN(amount) || amount < 0) {
-    toast.warn(t('view.agentBilling.quota.validateAmount'));
+  const amount = parseAmount();
+  if (amount === null) {
+    toast.warn(t('view.agentBilling.quota.validatePositive'));
     return;
   }
   quotaBusy.value = 'consume';
   try {
-    await api.post(`/api/quota/${encodeURIComponent(selectedAgent.value)}/consume`, {
+    const data = await api.post(`/api/quota/${encodeURIComponent(selectedAgent.value)}/consume`, {
       bucket: quotaForm.bucket,
       amount,
     });
-    toast.success(t('view.agentBilling.quota.consumeSuccess'));
+    // 额度不足时后端仍返回 200 + success=false，前端必须自己判，否则"消耗失败"
+    // 会弹成功提示。
+    const result = (data && data.result) || {};
+    if (result.success === false) {
+      toast.error(result.reason || t('view.agentBilling.quota.insufficient'));
+    } else {
+      toast.success(t('view.agentBilling.quota.consumeSuccess'));
+    }
     await loadQuota();
   } catch (err) {
     toast.error((err && err.message) || t('view.agentBilling.quota.failed'));
@@ -713,9 +753,9 @@ async function doRefund() {
     toast.warn(t('view.agentBilling.quota.validateAgent'));
     return;
   }
-  const amount = Number(quotaForm.amount);
-  if (isNaN(amount) || amount < 0) {
-    toast.warn(t('view.agentBilling.quota.validateAmount'));
+  const amount = parseAmount();
+  if (amount === null) {
+    toast.warn(t('view.agentBilling.quota.validatePositive'));
     return;
   }
   quotaBusy.value = 'refund';

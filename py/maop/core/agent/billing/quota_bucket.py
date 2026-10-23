@@ -66,6 +66,27 @@ class ConsumeResult(BaseModel):
     reason: str = Field(default="", description="失败原因")
 
 
+# ── 桶名与视图 ────────────────────────────────────────────────────
+BUCKET_NAMES = ("free", "prepaid", "postpaid")
+
+
+def quota_bucket_views(entry: QuotaEntry) -> dict[str, dict[str, int]]:
+    """把 ``QuotaEntry`` 摊成三桶视图。
+
+    每个桶给出 ``total``（额度上限）/ ``used``（本周期已用）/ ``remaining``
+    （剩余）。前端额度卡片直接读这三个键。
+    """
+    return {
+        "free": _bucket_view(entry.free_quota, entry.free_used),
+        "prepaid": _bucket_view(entry.prepaid_quota, entry.prepaid_used),
+        "postpaid": _bucket_view(entry.postpaid_quota, entry.postpaid_used),
+    }
+
+
+def _bucket_view(total: int, used: int) -> dict[str, int]:
+    return {"total": total, "used": used, "remaining": max(0, total - used)}
+
+
 # ── QuotaBucket ─────────────────────────────────────────────────
 class QuotaBucket:
     """额度分桶管理器.
@@ -159,12 +180,43 @@ class QuotaBucket:
             agent_name, quota.free_quota, quota.prepaid_quota, quota.postpaid_quota,
         )
 
+    def set_bucket_quota(self, agent_name: str, bucket: str, total: int) -> QuotaEntry:
+        """设置单个桶的额度上限。
+
+        保留其它桶的额度上限与全部 ``*_used`` 已用量（已用量只能由消耗/退还
+        改动，不能被"设置额度"顺手抹掉）。
+
+        Parameters
+        ----------
+        agent_name : str
+            Agent 名称。
+        bucket : str
+            目标桶：``free`` / ``prepaid`` / ``postpaid``。
+        total : int
+            新的额度上限（``>= 0``）。
+
+        Returns
+        -------
+        QuotaEntry
+            设置后的额度配置。
+        """
+        if bucket not in BUCKET_NAMES:
+            raise ValueError(
+                f"invalid bucket {bucket!r}; expected one of {list(BUCKET_NAMES)}",
+            )
+        if total < 0:
+            raise ValueError(f"invalid total {total!r}; expected >= 0")
+        entry = self.get_quota(agent_name)
+        updated = entry.model_copy(update={f"{bucket}_quota": total})
+        self.set_quota(agent_name, updated)
+        return updated
+
     # ── 消耗 ────────────────────────────────────────────────────
-    def consume(self, agent_name: str, amount: int) -> ConsumeResult:
+    def consume(self, agent_name: str, amount: int, bucket: str = "auto") -> ConsumeResult:
         """消耗额度.
 
-        按免费 → 预付 → 后付顺序扣减。若三桶总剩余 < amount，返回失败
-        （不部分扣减，保证原子性）。
+        ``bucket="auto"`` 时按免费 → 预付 → 后付顺序扣减；指定具体桶时**只从
+        该桶扣减**，该桶余额不足即失败（不跨桶借用）。
 
         使用 ``BEGIN IMMEDIATE`` 事务包裹读-检-写，防止多进程并发超额。
         （来源：2026-09-12-python-sqlite-toctou-race-begin-immediate-atomic-fix）
@@ -175,12 +227,18 @@ class QuotaBucket:
             Agent 名称。
         amount : int
             请求消耗量。``amount <= 0`` 时返回成功但 consumed=0。
+        bucket : str
+            ``auto``（顺序扣减）/ ``free`` / ``prepaid`` / ``postpaid``。
 
         Returns
         -------
         ConsumeResult
             消耗结果。
         """
+        if bucket not in ("auto", *BUCKET_NAMES):
+            raise ValueError(
+                f"invalid bucket {bucket!r}; expected one of {['auto', *BUCKET_NAMES]}",
+            )
         if amount < 0:
             return ConsumeResult(success=False, reason=f"negative amount: {amount}")
         if amount == 0:
@@ -212,29 +270,51 @@ class QuotaBucket:
                 prepaid_remaining = max(0, quota.prepaid_quota - quota.prepaid_used)
                 postpaid_remaining = max(0, quota.postpaid_quota - quota.postpaid_used)
                 total_remaining = free_remaining + prepaid_remaining + postpaid_remaining
+                remaining_by_bucket = {
+                    "free": free_remaining,
+                    "prepaid": prepaid_remaining,
+                    "postpaid": postpaid_remaining,
+                }
 
-                if total_remaining < amount:
-                    # 额度不足，回滚事务（未做任何修改，回滚安全）
-                    conn.rollback()
-                    return ConsumeResult(
-                        success=False,
-                        consumed=0,
-                        remaining_total=total_remaining,
-                        reason=(
-                            f"insufficient quota: need {amount}, available {total_remaining}"
-                        ),
-                    )
-
-                # 按免费 → 预付 → 后付顺序扣减
-                free_deduct = min(amount, free_remaining)
-                remaining_after_free = amount - free_deduct
-                prepaid_deduct = min(remaining_after_free, prepaid_remaining)
-                postpaid_deduct = remaining_after_free - prepaid_deduct
+                if bucket == "auto":
+                    if total_remaining < amount:
+                        # 额度不足，回滚事务（未做任何修改，回滚安全）
+                        conn.rollback()
+                        return ConsumeResult(
+                            success=False,
+                            consumed=0,
+                            remaining_total=total_remaining,
+                            reason=(
+                                f"insufficient quota: need {amount}, available {total_remaining}"
+                            ),
+                        )
+                    # 按免费 → 预付 → 后付顺序扣减
+                    deduct: dict[str, int] = {}
+                    rest = amount
+                    for name in BUCKET_NAMES:
+                        take = min(rest, remaining_by_bucket[name])
+                        deduct[name] = take
+                        rest -= take
+                else:
+                    if remaining_by_bucket[bucket] < amount:
+                        conn.rollback()
+                        return ConsumeResult(
+                            success=False,
+                            consumed=0,
+                            remaining_total=total_remaining,
+                            reason=(
+                                f"insufficient quota in {bucket}: need {amount}, "
+                                f"available {remaining_by_bucket[bucket]}"
+                            ),
+                        )
+                    deduct = {
+                        name: (amount if name == bucket else 0) for name in BUCKET_NAMES
+                    }
 
                 # 更新 used 值
-                new_free_used = quota.free_used + free_deduct
-                new_prepaid_used = quota.prepaid_used + prepaid_deduct
-                new_postpaid_used = quota.postpaid_used + postpaid_deduct
+                new_free_used = quota.free_used + deduct["free"]
+                new_prepaid_used = quota.prepaid_used + deduct["prepaid"]
+                new_postpaid_used = quota.postpaid_used + deduct["postpaid"]
 
                 conn.execute(
                     """UPDATE quota_bucket SET
@@ -246,15 +326,15 @@ class QuotaBucket:
 
             new_total_remaining = total_remaining - amount
             logger.debug(
-                "[quota_bucket] consume %s: amount=%d free=%d prepaid=%d postpaid=%d",
-                agent_name, amount, free_deduct, prepaid_deduct, postpaid_deduct,
+                "[quota_bucket] consume %s: amount=%d bucket=%s free=%d prepaid=%d postpaid=%d",
+                agent_name, amount, bucket, deduct["free"], deduct["prepaid"], deduct["postpaid"],
             )
             return ConsumeResult(
                 success=True,
                 consumed=amount,
-                from_free=free_deduct,
-                from_prepaid=prepaid_deduct,
-                from_postpaid=postpaid_deduct,
+                from_free=deduct["free"],
+                from_prepaid=deduct["prepaid"],
+                from_postpaid=deduct["postpaid"],
                 remaining_total=new_total_remaining,
             )
 

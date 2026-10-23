@@ -18,6 +18,12 @@ from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import agent_service
 
 from .state import MAOP_ROOT
+from .subagent_schemas import (
+    SubAgentIdEnvelope,
+    SubAgentListEnvelope,
+    SubAgentTranscriptEnvelope,
+    SubAgentWaitEnvelope,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +59,27 @@ def _set_subagent_mgr(mgr: Any) -> None:
     agent_service._set_subagent_mgr(mgr)
 
 
-@router.post("/api/subagent/spawn")
+def _agent_item(row: dict[str, Any]) -> dict[str, Any]:
+    """Rename a raw ``subagents`` row to the vocabulary this API uses.
+
+    ``SubAgentManager.list_agents()`` selects the DB columns ``id`` and
+    ``name``, but ``spawn``/``cancel`` answer with ``agent_id`` and the spawn
+    request calls the name ``agent`` — the dashboard view reads those words
+    for every subagent it shows. Emitting the DB column names here left the
+    view reading ``undefined`` for the id and the agent name.
+    """
+    return {
+        "agent_id": str(row.get("id") or ""),
+        "agent": str(row.get("name") or ""),
+        "role": str(row.get("role") or ""),
+        "model": str(row.get("model") or ""),
+        "task": str(row.get("task") or ""),
+        "status": str(row.get("status") or ""),
+        "created_at": str(row.get("created_at") or ""),
+    }
+
+
+@router.post("/api/subagent/spawn", response_model=SubAgentIdEnvelope)
 @handle_api_errors("SubAgent spawn", error_value={"status": "error", "error": "Spawn failed"})
 async def api_subagent_spawn(body: SubAgentSpawnRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -69,7 +95,7 @@ async def api_subagent_spawn(body: SubAgentSpawnRequest, request: Request) -> di
     return {"status": "ok", "agent_id": agent_id}
 
 
-@router.post("/api/subagent/wait")
+@router.post("/api/subagent/wait", response_model=SubAgentWaitEnvelope)
 @handle_api_errors("SubAgent wait", error_value={"status": "error", "error": "Wait failed"})
 async def api_subagent_wait(body: SubAgentWaitRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -84,7 +110,7 @@ async def api_subagent_wait(body: SubAgentWaitRequest, request: Request) -> dict
     return {"status": "ok", "result": result.model_dump() if hasattr(result, "model_dump") else str(result)}
 
 
-@router.post("/api/subagent/cancel")
+@router.post("/api/subagent/cancel", response_model=SubAgentIdEnvelope)
 @handle_api_errors("SubAgent cancel", error_value={"status": "error", "error": "Cancel failed"})
 async def api_subagent_cancel(body: SubAgentCancelRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -104,16 +130,17 @@ async def api_subagent_cancel(body: SubAgentCancelRequest, request: Request) -> 
     return {"status": "ok", "agent_id": agent_id}
 
 
-@router.get("/api/subagent/list")
+@router.get("/api/subagent/list", response_model=SubAgentListEnvelope)
 @handle_api_errors("SubAgent list", error_value={"agents": [], "count": 0, "error": "List failed"})
 async def api_subagent_list(request: Request) -> dict[str, Any]:
     require_admin(request)
     mgr = _get_subagent_mgr()
     result = agent_service.subagent_list(mgr)
-    return {"status": "ok", **result}
+    agents = [_agent_item(row) for row in result.get("agents", [])]
+    return {"status": "ok", "agents": agents, "count": len(agents)}
 
 
-@router.get("/api/subagent/transcript")
+@router.get("/api/subagent/transcript", response_model=SubAgentTranscriptEnvelope)
 @handle_api_errors("SubAgent transcript", error_value={"status": "error", "error": "Transcript failed"})
 async def api_subagent_transcript(request: Request, agent_id: str = "") -> dict[str, Any]:
     require_admin(request)

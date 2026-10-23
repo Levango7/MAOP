@@ -11,6 +11,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from maop.core.agent.delegation.subagent_lifecycle import TranscriptEntry
 from maop.core.agent.plugins_hooks.plugin_manager import PluginInfo, PluginState
 
 
@@ -146,8 +147,17 @@ def subagent_client(tmp_path, monkeypatch):
         model_dump=lambda: {"status": "completed"}
     ))
     mock_mgr.cancel = MagicMock(return_value=True)
-    mock_mgr.list_agents = MagicMock(return_value=[{"id": "a1", "agent": "claude"}])
-    mock_mgr.get_live_transcript = MagicMock(return_value=["line1", "line2"])
+    # The row and the transcript must look like what SubAgentManager really
+    # produces: DB columns for the row, TranscriptEntry models for the
+    # transcript. A mock that answers "line1"/"line2" would let the route
+    # contract drift away from the producer unnoticed.
+    mock_mgr.list_agents = MagicMock(return_value=[{
+        "id": "a1", "name": "claude", "role": "leaf", "model": "claude-3",
+        "task": "test", "status": "running", "created_at": "1700000000.0",
+    }])
+    mock_mgr.get_live_transcript = MagicMock(return_value=[
+        TranscriptEntry(agent_id="a1", event="started", data={"task": "test"}),
+    ])
     monkeypatch.setattr("maop.dashboard.routers.subagent._get_subagent_mgr", lambda: mock_mgr)
 
     from maop.dashboard.routers.subagent import router

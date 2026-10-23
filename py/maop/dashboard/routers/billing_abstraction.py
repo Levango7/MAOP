@@ -18,6 +18,10 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.billing_schemas import (
+    BillingRecordsEnvelope,
+    BillingSummaryEnvelope,
+)
 from maop.dashboard.services import billing_service
 
 logger = logging.getLogger(__name__)
@@ -85,7 +89,7 @@ async def api_billing_estimate(
     }
 
 
-@router.get("/api/billing/summary/{agent_name}")
+@router.get("/api/billing/summary/{agent_name}", response_model=BillingSummaryEnvelope)
 @handle_api_errors("Billing summary", error_value={"status": "error", "error": "Summary failed"})
 async def api_billing_summary(agent_name: str, request: Request) -> dict[str, Any]:
     """获取 Agent 计费摘要。"""
@@ -94,7 +98,7 @@ async def api_billing_summary(agent_name: str, request: Request) -> dict[str, An
     return {"status": "ok", "summary": summary}
 
 
-@router.get("/api/billing/records")
+@router.get("/api/billing/records", response_model=BillingRecordsEnvelope)
 @handle_api_errors("Billing records", error_value={"status": "error", "error": "Records failed"})
 async def api_billing_records(
     request: Request,

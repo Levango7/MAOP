@@ -44,6 +44,9 @@ export const messages = {
     'view.worktrees.modal.targetBranch': 'Target Branch',
     'view.worktrees.modal.targetBranchHint': 'Leave empty to merge into root',
 
+    // ── Merge notice ─────────────────────────────────────────────
+    'view.worktrees.merge.conflicts': 'Merge completed with conflicts: {detail}',
+
     // ── Checkpoint modal ─────────────────────────────────────────
     'view.worktrees.modal.checkpointTitle': 'Create Checkpoint',
     'view.worktrees.modal.checkpointLabel': 'Label',
@@ -109,6 +112,9 @@ export const messages = {
     'view.worktrees.modal.sourceBranch': '源分支',
     'view.worktrees.modal.targetBranch': '目标分支',
     'view.worktrees.modal.targetBranchHint': '留空则合并到根',
+
+    // ── 合并提示 ─────────────────────────────────────────────────
+    'view.worktrees.merge.conflicts': '合并完成，但存在冲突：{detail}',
 
     // ── 检查点模态框 ──────────────────────────────────────────────
     'view.worktrees.modal.checkpointTitle': '创建检查点',

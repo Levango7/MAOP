@@ -25,6 +25,14 @@ from fastapi import APIRouter, Query, Request
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.analysis_schemas import (
+    AgentEfficiencyEnvelope,
+    BottlenecksEnvelope,
+    CostBreakdownEnvelope,
+    ResourceUtilizationEnvelope,
+    SummaryEnvelope,
+    TaskTrendsEnvelope,
+)
 from maop.dashboard.services import data_service
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
@@ -33,7 +41,7 @@ router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 # ── 1. Agent efficiency ────────────────────────────────────────────
 
 
-@router.get("/agent-efficiency")
+@router.get("/agent-efficiency", response_model=AgentEfficiencyEnvelope)
 @handle_api_errors("analysis agent-efficiency")
 async def agent_efficiency(
     request: Request,
@@ -55,7 +63,7 @@ async def agent_efficiency(
 # ── 2. Task trends ─────────────────────────────────────────────────
 
 
-@router.get("/task-trends")
+@router.get("/task-trends", response_model=TaskTrendsEnvelope)
 @handle_api_errors("analysis task-trends")
 async def task_trends(
     request: Request,
@@ -75,7 +83,7 @@ async def task_trends(
 # ── 3. Resource utilization ────────────────────────────────────────
 
 
-@router.get("/resource-utilization")
+@router.get("/resource-utilization", response_model=ResourceUtilizationEnvelope)
 @handle_api_errors("analysis resource-utilization")
 async def resource_utilization(
     request: Request,
@@ -92,7 +100,7 @@ async def resource_utilization(
 # ── 4. Cost breakdown ──────────────────────────────────────────────
 
 
-@router.get("/cost-breakdown")
+@router.get("/cost-breakdown", response_model=CostBreakdownEnvelope)
 @handle_api_errors("analysis cost-breakdown")
 async def cost_breakdown(
     request: Request,
@@ -112,7 +120,7 @@ async def cost_breakdown(
 # ── 5. Performance bottlenecks ─────────────────────────────────────
 
 
-@router.get("/performance-bottlenecks")
+@router.get("/performance-bottlenecks", response_model=BottlenecksEnvelope)
 @handle_api_errors("analysis performance-bottlenecks")
 async def performance_bottlenecks(
     request: Request,
@@ -130,7 +138,7 @@ async def performance_bottlenecks(
 # ── 6. Summary ─────────────────────────────────────────────────────
 
 
-@router.get("/summary")
+@router.get("/summary", response_model=SummaryEnvelope)
 @handle_api_errors("analysis summary")
 async def summary(
     request: Request,

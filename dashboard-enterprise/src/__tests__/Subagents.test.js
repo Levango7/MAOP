@@ -1,9 +1,15 @@
-// Smoke tests for Subagents.vue — subagent management page.
+// Tests for Subagents.vue — subagent management page.
 //
-// Subagents.onMounted calls loadList() which hits /api/subagent/list.
-// We mock global.fetch, stub PageHeader (via ListPageLayout), then
-// assert the root renders, tabs switch, subagent list displays,
-// spawn form works, and transcript drawer opens.
+// The payloads below mirror what the endpoint really answers. The list
+// response is the envelope of /api/subagent/list and every row is a
+// subagents table row renamed to the API's vocabulary (agent_id / agent);
+// the producer keeps the status values of AgentStatus (running / completed /
+// failed / cancelled / pending).
+//
+// The mock used to answer {agent_id, agent, ...} while the endpoint sent
+// the raw DB columns {id, name, ...}. Both sides agreed with each other and
+// nobody noticed that the view read an id the API never sent — every row
+// action went out with agent_id: undefined.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
@@ -17,6 +23,19 @@ const mountOptions = {
     },
   },
 };
+
+function producerRow(overrides = {}) {
+  return {
+    agent_id: 'sa-1',
+    agent: 'coder',
+    role: 'leaf',
+    model: 'claude-3',
+    task: 'refactor module',
+    status: 'running',
+    created_at: '1700000000.0',
+    ...overrides,
+  };
+}
 
 describe('Subagents.vue', () => {
   let originalFetch;
@@ -35,8 +54,14 @@ describe('Subagents.vue', () => {
   });
 
   function mockFetch(routes) {
-    global.fetch = vi.fn((url) => {
+    const calls = [];
+    global.fetch = vi.fn((url, init) => {
       const u = String(url);
+      calls.push({
+        url: u,
+        method: (init && init.method) || 'GET',
+        body: init && init.body ? JSON.parse(init.body) : null,
+      });
       const body = routes[u] ?? {};
       return Promise.resolve({
         ok: true, status: 200,
@@ -44,11 +69,12 @@ describe('Subagents.vue', () => {
         text: () => Promise.resolve(JSON.stringify(body)),
       });
     });
+    return calls;
   }
 
   function defaultRoutes(overrides = {}) {
     return {
-      '/api/subagent/list': { agents: [], count: 0 },
+      '/api/subagent/list': { status: 'ok', agents: [], count: 0 },
       ...overrides,
     };
   }
@@ -79,9 +105,10 @@ describe('Subagents.vue', () => {
   it('renders subagent rows when /api/subagent/list returns data', async () => {
     mockFetch(defaultRoutes({
       '/api/subagent/list': {
+        status: 'ok',
         agents: [
-          { agent_id: 'sa-1', agent: 'coder', task: 'refactor module', model: 'gpt-4', status: 'running' },
-          { agent_id: 'sa-2', agent: 'reviewer', task: 'review PR', model: '', status: 'done' },
+          producerRow(),
+          producerRow({ agent_id: 'sa-2', agent: 'reviewer', task: 'review PR', status: 'completed' }),
         ],
         count: 2,
       },
@@ -94,14 +121,26 @@ describe('Subagents.vue', () => {
     wrapper.unmount();
   });
 
+  it('shows the id and the name the producer sent', async () => {
+    mockFetch(defaultRoutes({
+      '/api/subagent/list': { status: 'ok', agents: [producerRow()], count: 1 },
+    }));
+    const wrapper = await mountSubagents();
+    expect(wrapper.find('.sa-table__id').text()).toBe('sa-1');
+    expect(wrapper.find('.sa-table__agent').text()).toBe('coder');
+    wrapper.unmount();
+  });
+
   it('displays correct status badges for subagents', async () => {
     mockFetch(defaultRoutes({
       '/api/subagent/list': {
+        status: 'ok',
         agents: [
-          { agent_id: 'sa-1', agent: 'a1', status: 'running' },
-          { agent_id: 'sa-2', agent: 'a2', status: 'done' },
-          { agent_id: 'sa-3', agent: 'a3', status: 'error' },
+          producerRow({ agent_id: 'sa-1', agent: 'a1', status: 'running' }),
+          producerRow({ agent_id: 'sa-2', agent: 'a2', status: 'completed' }),
+          producerRow({ agent_id: 'sa-3', agent: 'a3', status: 'failed' }),
         ],
+        count: 3,
       },
     }));
     const wrapper = await mountSubagents();
@@ -139,11 +178,7 @@ describe('Subagents.vue', () => {
 
   it('opens wait modal when wait button clicked', async () => {
     mockFetch(defaultRoutes({
-      '/api/subagent/list': {
-        agents: [
-          { agent_id: 'sa-1', agent: 'coder', task: 'do work', status: 'running' },
-        ],
-      },
+      '/api/subagent/list': { status: 'ok', agents: [producerRow()], count: 1 },
     }));
     const wrapper = await mountSubagents();
     const waitBtn = wrapper.find('button[aria-label="Wait"]');
@@ -152,6 +187,28 @@ describe('Subagents.vue', () => {
     await flushPromises();
     const modal = document.querySelector('.modal-overlay');
     expect(modal).toBeTruthy();
+    wrapper.unmount();
+  });
+
+  it('carries the row id into the wait modal and the transcript request', async () => {
+    const calls = mockFetch(defaultRoutes({
+      '/api/subagent/list': { status: 'ok', agents: [producerRow()], count: 1 },
+      '/api/subagent/transcript?agent_id=sa-1': {
+        status: 'ok',
+        transcript: [{ agent_id: 'sa-1', timestamp: 1700000000, event: 'started', data: { task: 'refactor module' } }],
+      },
+    }));
+    const wrapper = await mountSubagents();
+
+    await wrapper.find('button[aria-label="Wait"]').trigger('click');
+    await flushPromises();
+    const modal = document.querySelector('.modal-overlay');
+    expect(modal.textContent).toContain('sa-1');
+
+    await wrapper.find('button[aria-label="Transcript"]').trigger('click');
+    await flushPromises();
+    const transcriptCall = calls.find((c) => c.url.includes('/api/subagent/transcript'));
+    expect(transcriptCall.url).toContain('agent_id=sa-1');
     wrapper.unmount();
   });
 
@@ -170,10 +227,12 @@ describe('Subagents.vue', () => {
   it('shows transcript button for each subagent', async () => {
     mockFetch(defaultRoutes({
       '/api/subagent/list': {
+        status: 'ok',
         agents: [
-          { agent_id: 'sa-1', agent: 'a1', status: 'running' },
-          { agent_id: 'sa-2', agent: 'a2', status: 'done' },
+          producerRow({ agent_id: 'sa-1', agent: 'a1', status: 'running' }),
+          producerRow({ agent_id: 'sa-2', agent: 'a2', status: 'completed' }),
         ],
+        count: 2,
       },
     }));
     const wrapper = await mountSubagents();
