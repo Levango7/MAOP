@@ -217,4 +217,131 @@ describe('Feedback.vue', () => {
     expect(wrapper.text()).toContain('No feedback yet');
     wrapper.unmount();
   });
+
+  // ── Request shapes (the modal's two bodies) ─────────────────────
+  // These pin what the backend actually accepts: create takes the five
+  // declared fields; update must NOT carry target_type/target_id (the
+  // request model forbids extras), and the list filters are query params.
+
+  function mockFetchCapturing(routes) {
+    const fn = vi.fn((url) => {
+      const u = String(url);
+      const base = u.split('?')[0];
+      const body = routes[u] ?? routes[base] ?? {};
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: () => Promise.resolve(body),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      });
+    });
+    global.fetch = fn;
+    return fn;
+  }
+
+  function oneRowRoutes() {
+    return defaultRoutes({
+      '/api/feedback': {
+        status: 'ok',
+        data: [
+          { feedback_id: 'fb_1', target_type: 'agent', target_id: 'coder', rating: 5, comment: 'Great work', tags: ['fast'], user_id: 'u1', created_at: 1700000000, updated_at: 1700000000 },
+        ],
+        total: 1,
+        page: 1,
+        page_size: 20,
+      },
+    });
+  }
+
+  it('creates feedback with the five declared fields', async () => {
+    const fetchMock = mockFetchCapturing(defaultRoutes());
+    const wrapper = await mountFeedback();
+    await wrapper.findAll('button').find((b) => b.text().includes('Submit Feedback')).trigger('click');
+    await flushPromises();
+
+    // The modal is teleported to <body>, so it lives outside the wrapper.
+    const modalInputs = document.querySelectorAll('.modal__body input');
+    modalInputs[0].value = 'coder';                 // target_id
+    modalInputs[0].dispatchEvent(new Event('input'));
+    modalInputs[1].value = 'fast, accurate';        // tags
+    modalInputs[1].dispatchEvent(new Event('input'));
+    await flushPromises();
+
+    const save = document.querySelector('.modal__foot .btn-primary');
+    expect(save, 'save button').toBeTruthy();
+    expect(save.disabled).toBe(false);
+    save.click();
+    await flushPromises();
+
+    const call = fetchMock.mock.calls.find(
+      ([u, init]) => String(u) === '/api/feedback' && init && init.method === 'POST',
+    );
+    expect(call).toBeTruthy();
+    expect(JSON.parse(call[1].body)).toEqual({
+      target_type: 'agent',
+      target_id: 'coder',
+      rating: 5,
+      comment: '',
+      tags: ['fast', 'accurate'],
+    });
+    wrapper.unmount();
+  });
+
+  it('updates feedback without the target fields', async () => {
+    const fetchMock = mockFetchCapturing(oneRowRoutes());
+    const wrapper = await mountFeedback();
+
+    await wrapper.find('.fb-table__row .icon-btn').trigger('click');
+    await flushPromises();
+    const save = document.querySelector('.modal__foot .btn-primary');
+    expect(save, 'save button').toBeTruthy();
+    save.click();
+    await flushPromises();
+
+    const call = fetchMock.mock.calls.find(
+      ([u, init]) => String(u).includes('/api/feedback/fb_1') && init && init.method === 'PUT',
+    );
+    expect(call).toBeTruthy();
+    const body = JSON.parse(call[1].body);
+    expect(Object.keys(body).sort()).toEqual(['comment', 'rating', 'tags']);
+    expect(body.target_type).toBeUndefined();
+    expect(body.target_id).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('sends the filters as query params the API declares', async () => {
+    const fetchMock = mockFetchCapturing(defaultRoutes());
+    const wrapper = await mountFeedback();
+
+    await wrapper.find('.filterbar__select').setValue('agent');
+    await wrapper.findAll('button').find((b) => b.text().includes('Refresh')).trigger('click');
+    await flushPromises();
+
+    const listCall = fetchMock.mock.calls
+      .map(([u]) => String(u))
+      .filter((u) => u.startsWith('/api/feedback?'))
+      .pop();
+    expect(listCall).toContain('target_type=agent');
+    expect(listCall).toContain('page=1');
+    expect(listCall).toContain('page_size=20');
+    wrapper.unmount();
+  });
+
+  it('deletes the row it confirmed', async () => {
+    const fetchMock = mockFetchCapturing(oneRowRoutes());
+    const wrapper = await mountFeedback();
+
+    await wrapper.find('.fb-table__row .icon-btn--danger').trigger('click');
+    await flushPromises();
+    const confirm = Array.from(document.querySelectorAll('.modal__foot .btn-danger'))
+      .find((b) => b.textContent.includes('Delete'));
+    expect(confirm).toBeTruthy();
+    confirm.click();
+    await flushPromises();
+
+    const call = fetchMock.mock.calls.find(
+      ([u, init]) => String(u) === '/api/feedback/fb_1' && init && init.method === 'DELETE',
+    );
+    expect(call).toBeTruthy();
+    wrapper.unmount();
+  });
 });

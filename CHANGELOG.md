@@ -39,6 +39,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### feedback 批次：5 条端点建模，编辑请求体不再能静默换目标（2026-10-24）
+
+P1-b 第十三批：`/api/feedback/*` 前端在用的 5 条端点（列表/摘要/创建/更新/
+删除）全部声明 `response_model`，新增 `routers/feedback_schemas.py`。行字段
+逐字来自服务层 `FEEDBACK_COLUMNS` + `row_to_dict()`（`tags` 在服务层已从
+JSON 串解析成数组），不另造别名。
+
+**这页的键名本来就和生产者一致**——批次的价值在于把它钉住：契约测试把
+视图的 `f.*` / `summaryData.*` 静态读取与实发响应双向对齐，任何一侧改名都会
+转红。
+
+**编辑请求体可以带上 target 字段却不生效**：`FeedbackUpdate` 没有
+`target_type` / `target_id`（改评分不该顺手换目标），而 Pydantic v2 默认
+**静默丢弃**未声明字段 ⇒ 客户端多发这两个键会"看着保存成功、目标没变"。
+两个请求模型都加 `extra="forbid"`：多发键一律 422。前端本来就只发
+`{rating, comment, tags}`，无需改动。
+
+**错误分支不进信封**：这 5 条用的是**裸** `@handle_api_errors`（没有
+`error_value`）⇒ 异常走 `error_response()` 的 JSONResponse，不经过
+response_model；HTTP 状态码保留（404/401/400 都照原样到前端），信封的
+`status` 仍默认 `"error"` 兜底。
+
+**棘轮**：清单 90 → 85。
+
+**验证**：新契约 `test_feedback_router_contracts.py` 14 条——真服务 + 每测试
+隔离的 `MAOP_DATA_DIR`（conftest 已提供）而不是手写 mock：断言列表行的键集
+**等于**服务层 `row_to_dict()` 的输出（不是等于我写的清单）、视图静态读取
+⊆ 生产者所发、摘要的 `average_rating`/`rating_distribution`/`tag_frequency`
+与聚合结果同值、编辑带 target 字段回 422 且行未被改动、删除回
+`deleted: true`、五条路由都有 `response_model`、每个信封 `status` 默认
+`"error"`、两个请求模型在 OpenAPI 里 `additionalProperties: false` 且字段集
+分别等于模态框的两条分支、视图发出的查询参数都在 OpenAPI 声明里。前端
+`Feedback.test.js` 新增 4 条（创建体五字段、编辑体不含 target、筛选参数、
+删除 URL）。变异转红：去掉 `extra="forbid"`（2 红）、生产者
+`data`→`items` 与 `average_rating`→`avg_rating`（4 红）、编辑体加上 target
+字段（前端 1 红）。既有 `test_feedback.py` 41 条仍绿。
+
 ### quota 批次：8 条端点建模，额度页的四个按钮其实一直是禁用的（2026-10-24）
 
 P1-b 第十二批：`/api/quota/*` 前端在用的 5 条端点 + 同页的 `/api/billing/summary`

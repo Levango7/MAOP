@@ -45,11 +45,6 @@ GET /api/debate/{}
 POST /api/evolve/analyze
 GET /api/evolve/metrics
 GET /api/evolve/status
-GET /api/feedback
-POST /api/feedback
-GET /api/feedback/summary
-DELETE /api/feedback/{}
-PUT /api/feedback/{}
 GET /api/graph/edges
 GET /api/graph/neighbors
 GET /api/graph/nodes
