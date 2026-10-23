@@ -27,11 +27,18 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import PlainTextResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from maop.core.security.middleware import require_admin
 from maop.core.tenant.context import tenant_id_from_request
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.feedback_schemas import (
+    FeedbackCreateEnvelope,
+    FeedbackDeleteEnvelope,
+    FeedbackListEnvelope,
+    FeedbackSummaryEnvelope,
+    FeedbackUpdateEnvelope,
+)
 from maop.dashboard.services import chat_service
 
 logger = logging.getLogger(__name__)
@@ -49,7 +56,13 @@ _FEEDBACK_COLUMNS = chat_service.FEEDBACK_COLUMNS
 
 
 class FeedbackCreate(BaseModel):
-    """提交反馈请求体."""
+    """提交反馈请求体.
+
+    ``extra="forbid"``：Pydantic v2 默认静默丢弃未声明字段，前端多发一个键
+    会"看着提交成功但值没进去"——这里让它 422。
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     target_type: str = Field(..., description="目标类型: agent|task|result")
     target_id: str = Field(..., min_length=1, max_length=255, description="目标 ID")
@@ -59,7 +72,13 @@ class FeedbackCreate(BaseModel):
 
 
 class FeedbackUpdate(BaseModel):
-    """更新反馈请求体 — 所有字段可选."""
+    """更新反馈请求体 — 所有字段可选.
+
+    没有 ``target_type`` / ``target_id``：改评分不能顺手把目标换掉。多发的
+    字段一律 422，而不是静默丢弃。
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     rating: int | None = Field(None, ge=1, le=5, description="评分 1-5")
     comment: str | None = Field(None, max_length=4000, description="评论")
@@ -128,7 +147,7 @@ def _ensure_schema() -> None:
 # ── Endpoints: 提交反馈 ──────────────────────────────────────────
 
 
-@router.post("")
+@router.post("", response_model=FeedbackCreateEnvelope)
 @handle_api_errors
 async def create_feedback(body: FeedbackCreate, request: Request) -> dict[str, Any]:
     """提交反馈 — 任何已认证用户均可调用."""
@@ -151,7 +170,7 @@ async def create_feedback(body: FeedbackCreate, request: Request) -> dict[str, A
 # ── Endpoints: 查询反馈列表 ──────────────────────────────────────
 
 
-@router.get("")
+@router.get("", response_model=FeedbackListEnvelope)
 @handle_api_errors
 async def list_feedback(
     request: Request,
@@ -185,7 +204,7 @@ async def list_feedback(
 # ── Endpoints: 反馈摘要 ──────────────────────────────────────────
 
 
-@router.get("/summary")
+@router.get("/summary", response_model=FeedbackSummaryEnvelope)
 @handle_api_errors
 async def get_summary(
     request: Request,
@@ -259,7 +278,7 @@ async def export_feedback(
 # 否则 FastAPI 会把 "summary" / "export" 当作 feedback_id 匹配.
 
 
-@router.put("/{feedback_id}")
+@router.put("/{feedback_id}", response_model=FeedbackUpdateEnvelope)
 @handle_api_errors
 async def update_feedback(
     feedback_id: str,
@@ -285,7 +304,7 @@ async def update_feedback(
     return {"status": "ok", "feedback": item}
 
 
-@router.delete("/{feedback_id}")
+@router.delete("/{feedback_id}", response_model=FeedbackDeleteEnvelope)
 @handle_api_errors
 async def delete_feedback(feedback_id: str, request: Request) -> dict[str, Any]:
     """删除反馈 — 本人或 admin 可删除."""
