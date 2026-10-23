@@ -152,29 +152,32 @@ def _get_db_pool_stats() -> dict[str, Any]:
     return {}
 
 
-def _percentile(values: list[int], pct: int) -> float:
-    """Compute the pct-th percentile of a list of integers (linear interpolation)."""
-    if not values:
-        return 0.0
-    s = sorted(values)
-    k = (len(s) - 1) * (pct / 100.0)
-    f = int(k)
-    c = f + 1 if f + 1 < len(s) else f
-    if f == c:
-        return float(s[f])
-    return round(s[f] + (s[c] - s[f]) * (k - f), 1)
+def _cpu_series(history: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Turn the raw per-metric history into a chart-ready CPU series.
+
+    ``TimeSeriesStore`` keeps one row per metric, so the dashboard has to
+    pick the CPU metric out of the dict before it can draw a line. Doing it
+    here keeps the metric name on the producer side — the view should not
+    have to know that CPU lives under ``system.cpu.percent``.
+    """
+    points = history.get("system.cpu.percent", [])
+    return [
+        {"timestamp": p.get("timestamp"), "cpu_percent": p.get("value")}
+        for p in points
+        if p.get("timestamp") is not None
+    ]
 
 
 __all__ = [
     "_PROJECT_ROOT",
     "_bucket_index",
     "_bucket_seconds",
+    "_cpu_series",
     "_get_audit_events",
     "_get_cache_stats",
     "_get_cost_tracker",
     "_get_db_pool_stats",
     "_iso_to_sqlite_str",
     "_parse_date_range",
-    "_percentile",
     "_safe_psutil",
 ]

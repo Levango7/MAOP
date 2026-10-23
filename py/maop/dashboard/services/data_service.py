@@ -42,13 +42,13 @@ from maop.dashboard.routers import state
 from maop.dashboard.routers.analysis_helpers import (
     _bucket_index,
     _bucket_seconds,  # noqa: F401
+    _cpu_series,
     _get_audit_events,
     _get_cache_stats,
     _get_cost_tracker,
     _get_db_pool_stats,
     _iso_to_sqlite_str,
     _parse_date_range,
-    _percentile,
     _safe_psutil,
 )
 
@@ -894,6 +894,9 @@ async def analysis_resource_utilization(
             "memory_total_mb": mem_total_mb,
         },
         "history": history,
+        # Chart-ready CPU line. The view draws one line; without this key the
+        # resource chart stays empty no matter how much history is stored.
+        "series": _cpu_series(history),
         "db_pool": db_pool,
         "cache": cache_stats,
     }
@@ -1030,33 +1033,31 @@ async def analysis_performance_bottlenecks(
         logger.debug("[analysis] metrics histograms failed: %s", exc)
         note = "metrics histograms unavailable"
 
-    # 2) Slowest agents from CostTracker latency_ms
-    slowest_agents: list[dict[str, Any]] = []
+    # 2) Most expensive agents — ranked by cost, not by latency.
+    #    The dashboard section is titled "Most Expensive Agents" and renders a
+    #    cost column, so a latency ranking under a different key left that
+    #    table permanently empty.
+    expensive_agents: list[dict[str, Any]] = []
     try:
         tracker = _get_cost_tracker()
-        entries = tracker.get_entries(
+        cost_summary = tracker.summary(
             start_date=_iso_to_sqlite_str(iso_from),
             end_date=_iso_to_sqlite_str(iso_to),
-            limit=10000,
-        )
-        per_agent: dict[str, list[int]] = defaultdict(list)
-        for e in entries:
-            per_agent[e.agent].append(e.latency_ms)
-        for name, lats in per_agent.items():
-            if not lats:
-                continue
-            slowest_agents.append({
+        ).model_dump()
+        rows = [
+            {
                 "agent": name,
-                "calls": len(lats),
-                "avg_latency_ms": round(sum(lats) / len(lats), 1),
-                "max_latency_ms": max(lats),
-                "p95_latency_ms": _percentile(lats, 95),
-            })
-        slowest_agents.sort(key=lambda x: x["avg_latency_ms"], reverse=True)
-        slowest_agents = slowest_agents[:top_n]
+                "calls": int(stats.get("calls", 0)),
+                "cost_usd": round(float(stats.get("cost", 0.0)), 4),
+                "tokens": int(stats.get("tokens", 0)),
+            }
+            for name, stats in cost_summary.get("by_agent", {}).items()
+        ]
+        rows.sort(key=lambda r: r["cost_usd"], reverse=True)
+        expensive_agents = rows[:top_n]
     except Exception as exc:
-        logger.debug("[analysis] agent latency failed: %s", exc)
-        note = (note + "; " if note else "") + "agent latency unavailable"
+        logger.debug("[analysis] agent cost ranking failed: %s", exc)
+        note = (note + "; " if note else "") + "agent cost ranking unavailable"
 
     # 3) Top memory consumers via psutil
     top_memory: list[dict[str, Any]] = []
@@ -1084,7 +1085,7 @@ async def analysis_performance_bottlenecks(
 
     data = {
         "slowest_endpoints": slowest_endpoints,
-        "slowest_agents": slowest_agents,
+        "expensive_agents": expensive_agents,
         "top_memory_consumers": top_memory,
     }
     return {
@@ -1111,6 +1112,7 @@ async def analysis_summary(date_range: Literal["7d", "30d", "90d"]) -> dict[str,
     # 1) Cost totals
     total_cost = 0.0
     total_calls = 0
+    total_tokens = 0
     avg_latency_ms = 0.0
     try:
         tracker = _get_cost_tracker()
@@ -1120,6 +1122,7 @@ async def analysis_summary(date_range: Literal["7d", "30d", "90d"]) -> dict[str,
         ).model_dump()
         total_cost = csum.get("total_cost_usd", 0.0)
         total_calls = csum.get("total_calls", 0)
+        total_tokens = csum.get("total_tokens", 0)
         avg_latency_ms = csum.get("avg_latency_ms", 0.0)
     except Exception as exc:
         logger.debug("[analysis] summary cost failed: %s", exc)
@@ -1171,6 +1174,7 @@ async def analysis_summary(date_range: Literal["7d", "30d", "90d"]) -> dict[str,
         "avg_latency_ms": avg_latency_ms,
         "total_cost_usd": round(total_cost, 4),
         "total_calls": total_calls,
+        "total_tokens": total_tokens,
         "active_agents": active_agents,
         "sparkline": sparkline,
         "observability": obs_snapshot,

@@ -39,6 +39,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### analysis 批次：6 条端点建模，"最贵 agent"那张表其实一直空着（2026-10-23）
+
+P1-b 第十批：`/api/analysis/*` 前端在用的 6 条端点全部声明 `response_model`，
+新增 `routers/analysis_schemas.py`。这批路由用的是**裸** `@handle_api_errors`
+（没有 `error_value`）⇒ 失败走 `error_response()` 的 `JSONResponse`，**不进
+信封校验**，所以错误响应不会被 `status` 字段改写；`status` 仍默认给
+`"error"`——万一有个不带 `status` 的 dict 溜进来，会被标成失败而不是成功。
+
+**"最贵 agent"那张表一直空着**：生产者吐的键是 `slowest_agents`（按**延迟**
+排的），视图读的是 `expensive_agents` ⇒ 键根本对不上，那张表永远没有数据；
+而且就算对上了，它排的也是延迟不是成本——标题写着"Most Expensive Agents"、
+列也是成本。现在生产者改用 `tracker.summary().by_agent` 按**成本**排，键改名
+`expensive_agents`，视图同步。
+
+**summary 成功率永远是"—"**：视图读 `summaryData.success_rate`，生产者写的是
+`success_rate_pct` ⇒ 字段名对不上。
+
+**百分数靠量级猜**：旧的 `formatPct` 在值 ≤1 时乘 100（赌"这是分数"）⇒ 真的
+1% 成功率会被显示成 100%。新增 `formatPct100` 专供 0–100 的百分数，成功率的
+红黄绿阈值同步改成 95/80。
+
+**两个百分数量纲不同**：`success_rate_pct` 是 0–100，`cache.hit_rate` 是 0–1
+的分数 ⇒ 视图各按各的量纲格式化。
+
+**资源卡片全是 0 和"—"**：视图读平铺的 `cpu_pct`/`memory_mb`/`db_in_use`/
+`db_max_size`/`cache_hit_rate`，生产者写的是嵌套的 `live.cpu_percent`/
+`live.memory_used_mb`/`db_pool.in_use`/`db_pool.max_size`/`cache.hit_rate`。
+
+**成本表和饼图是空的**：视图读 `items[].dimension`/`items[].value`/`total`，
+生产者写 `breakdown[].key`/`breakdown[].cost_usd`/`total_cost_usd` ⇒ 列全是
+"—"、金额 $0、饼图整块不渲染。
+
+**慢端点表全是"—"和 0**：视图读 `e.name`/`e.latency_ms`，生产者写
+`e.metric`/`e.avg_seconds`（单位是**秒**）⇒ 名字空、延迟 0。
+
+**资源图表没有可画的数据**：生产者存了 `history`，但从没给图序列 ⇒ 图表恒空。
+新增 `series`（`_cpu_series()` 把 `system.cpu.percent` 摊成
+`{timestamp, cpu_percent}`）。
+
+**summary 少一个 token 指标**：生产者补 `total_tokens`。
+
+**棘轮**：清单 107 → 101。
+
+**验证**：新契约 `test_analysis_router_contracts.py` 15 条——生产者换成假后端
+（"chatty" 慢而便宜、"pricey" 快而贵 ⇒ 延迟榜冒充成本榜会被当场抓住）而不是
+mock 掉被测的那一层；断言 6 条路由在 OpenAPI 里都带 `response_model`、每个信封
+`status` 默认 `"error"`、信封不丢生产者任何一个键、视图契约逐条双向绑定
+（生产者键 ↔ 视图取值表达式）；棘轮 + analysis 共 47 passed；前端
+`Analysis.test.js` 14/14、全量 64 文件 563 用例绿；ruff / mypy(4 文件) /
+尺寸 / 静默异常 / API 契约 / 接线门禁绿。五处变异逐个转红：去掉 `response_model`、
+把成本榜塞回旧键、视图改读 `success_rate`、视图改读平铺 `cpu_pct`、生产者把
+`total_tokens` 清零。
+
 ### worktree 批次：8 条端点建模，挖出三个"合并其实没发生"（2026-10-23）
 
 P1-b 第九批：`/api/worktree/*` 全部 8 条端点声明 `response_model`，新增

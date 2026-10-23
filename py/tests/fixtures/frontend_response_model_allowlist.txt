@@ -12,12 +12,6 @@ GET /api/agent-catalog/stats
 GET /api/agent/upgrade
 POST /api/agent/upgrade
 GET /api/alerts
-GET /api/analysis/agent-efficiency
-GET /api/analysis/cost-breakdown
-GET /api/analysis/performance-bottlenecks
-GET /api/analysis/resource-utilization
-GET /api/analysis/summary
-GET /api/analysis/task-trends
 POST /api/api-keys/{}/revoke
 POST /api/auth/register
 GET /api/auth/status

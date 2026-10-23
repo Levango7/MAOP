@@ -47,7 +47,7 @@
               </div>
               <div class="an-kpi">
                 <span class="an-kpi__label">{{ t('view.analysis.summary.successRate') }}</span>
-                <span class="an-kpi__value" :class="successRateTone">{{ formatPct(summaryData.success_rate) }}</span>
+                <span class="an-kpi__value" :class="successRateTone">{{ formatPct100(summaryData.success_rate_pct) }}</span>
               </div>
               <div class="an-kpi">
                 <span class="an-kpi__label">{{ t('view.analysis.summary.totalCost') }}</span>
@@ -180,19 +180,19 @@
               <div class="an-resource-grid">
                 <div class="an-resource-card">
                   <span class="an-resource-card__label">{{ t('view.analysis.resources.cpu') }}</span>
-                  <span class="an-resource-card__value">{{ formatNum(resourceData.cpu_pct) }}%</span>
+                  <span class="an-resource-card__value">{{ formatNum(resourceData.live?.cpu_percent) }}%</span>
                 </div>
                 <div class="an-resource-card">
                   <span class="an-resource-card__label">{{ t('view.analysis.resources.memory') }}</span>
-                  <span class="an-resource-card__value">{{ formatNum(resourceData.memory_mb) }}</span>
+                  <span class="an-resource-card__value">{{ formatNum(resourceData.live?.memory_used_mb) }}</span>
                 </div>
                 <div class="an-resource-card">
                   <span class="an-resource-card__label">{{ t('view.analysis.resources.dbPool') }}</span>
-                  <span class="an-resource-card__value">{{ resourceData.db_in_use ?? 0 }} / {{ resourceData.db_max_size ?? 0 }}</span>
+                  <span class="an-resource-card__value">{{ resourceData.db_pool?.in_use ?? 0 }} / {{ resourceData.db_pool?.max_size ?? 0 }}</span>
                 </div>
                 <div class="an-resource-card">
                   <span class="an-resource-card__label">{{ t('view.analysis.resources.cacheHit') }}</span>
-                  <span class="an-resource-card__value">{{ formatPct(resourceData.cache_hit_rate) }}</span>
+                  <span class="an-resource-card__value">{{ formatPct(resourceData.cache?.hit_rate) }}</span>
                 </div>
               </div>
               <div v-if="resourceSeries.length" class="an-chart">
@@ -380,8 +380,8 @@ const agentData = ref({ agents: [], total_cost_usd: 0, total_calls: 0 });
 const trendsData = ref({ series: [], granularity: 'day' });
 const resourceData = ref({});
 const resourceSeries = ref([]);
-const costData = ref({ items: [], total: 0 });
-const bottleneckData = ref({ slow_endpoints: [], expensive_agents: [], memory_consumers: [] });
+const costData = ref({ breakdown: [], total_cost_usd: 0 });
+const bottleneckData = ref({ slowest_endpoints: [], expensive_agents: [], top_memory_consumers: [] });
 
 const trendsGranularity = ref('day');
 const granularityOptions = [
@@ -410,10 +410,10 @@ function dateRangeParams() {
 const hasSummaryData = computed(() => Object.keys(summaryData.value).length > 0);
 
 const successRateTone = computed(() => {
-  const v = Number(summaryData.value.success_rate);
+  const v = Number(summaryData.value.success_rate_pct);
   if (isNaN(v)) return '';
-  if (v >= 0.95) return 'is-ok';
-  if (v >= 0.8) return 'is-warn';
+  if (v >= 95) return 'is-ok';
+  if (v >= 80) return 'is-warn';
   return 'is-fail';
 });
 
@@ -516,9 +516,17 @@ const trendGridLines = computed(() => {
 });
 
 // ── Resources ───────────────────────────────────────────────────
-const hasResourceData = computed(() => Object.keys(resourceData.value).length > 0 || resourceSeries.value.length > 0);
+const hasResourceData = computed(() => {
+  const d = resourceData.value || {};
+  const live = d.live || {};
+  const pool = d.db_pool || {};
+  return resourceSeries.value.length > 0
+    || live.cpu_percent != null
+    || live.memory_used_mb != null
+    || (pool.max_size || 0) > 0;
+});
 
-const resourceLineValues = computed(() => resourceSeries.value.map((r) => r.cpu_pct ?? 0));
+const resourceLineValues = computed(() => resourceSeries.value.map((r) => r.cpu_percent ?? 0));
 const resourceLinePath = computed(() => buildLinePath(resourceLineValues.value));
 const resourceAreaPath = computed(() => buildAreaPath(resourceLineValues.value));
 const resourceGridLines = computed(() => {
@@ -534,25 +542,25 @@ const resourceGridLines = computed(() => {
 
 // ── Cost breakdown ──────────────────────────────────────────────
 const costRows = computed(() => {
-  const items = costData.value.items || [];
+  const items = costData.value.breakdown || [];
   return items.map((it) => ({
-    dimension: it.dimension || it.name || '—',
-    value: `$${formatNum(it.value || it.cost || 0)}`,
-    tokens: formatNum(it.tokens || 0),
-    calls: it.calls || 0,
+    dimension: it.key || '—',
+    value: `$${formatNum(it.cost_usd ?? 0)}`,
+    tokens: formatNum(it.tokens ?? 0),
+    calls: it.calls ?? 0,
   }));
 });
 
-const costTotal = computed(() => costData.value.total || 0);
+const costTotal = computed(() => costData.value.total_cost_usd || 0);
 
 const PIE_R = 80;
 const costPieSlices = computed(() => {
-  const items = (costData.value.items || []).slice(0, 8);
-  const total = items.reduce((sum, it) => sum + (it.value || it.cost || 0), 0);
+  const items = (costData.value.breakdown || []).slice(0, 8);
+  const total = items.reduce((sum, it) => sum + (it.cost_usd || 0), 0);
   if (total <= 0) return [];
   let acc = 0;
   return items.map((it) => {
-    const value = it.value || it.cost || 0;
+    const value = it.cost_usd || 0;
     const start = (acc / total) * 2 * Math.PI;
     acc += value;
     const end = (acc / total) * 2 * Math.PI;
@@ -562,7 +570,7 @@ const costPieSlices = computed(() => {
     const y2 = PIE_R - PIE_R * Math.cos(end);
     const largeArc = end - start > Math.PI ? 1 : 0;
     return {
-      label: it.dimension || it.name || '—',
+      label: it.key || '—',
       value,
       d: `M${PIE_R},${PIE_R} L${x1.toFixed(1)},${y1.toFixed(1)} A${PIE_R},${PIE_R} 0 ${largeArc} 1 ${x2.toFixed(1)},${y2.toFixed(1)} Z`,
     };
@@ -579,9 +587,9 @@ const costCols = computed(() => [
 // ── Bottlenecks ─────────────────────────────────────────────────
 const hasBottleneckData = computed(() => {
   const b = bottleneckData.value;
-  return (b.slow_endpoints && b.slow_endpoints.length > 0) ||
+  return (b.slowest_endpoints && b.slowest_endpoints.length > 0) ||
     (b.expensive_agents && b.expensive_agents.length > 0) ||
-    (b.memory_consumers && b.memory_consumers.length > 0);
+    (b.top_memory_consumers && b.top_memory_consumers.length > 0);
 });
 
 const slowEndpointCols = computed(() => [
@@ -589,9 +597,9 @@ const slowEndpointCols = computed(() => [
   { key: 'latency_ms', label: t('view.analysis.bottlenecks.col.latency'), type: 'num', align: 'right', width: '40%' },
 ]);
 const slowEndpointRows = computed(() =>
-  (bottleneckData.value.slow_endpoints || []).map((e) => ({
-    name: e.name || e.endpoint || '—',
-    latency_ms: e.latency_ms || e.latency || 0,
+  (bottleneckData.value.slowest_endpoints || []).map((e) => ({
+    name: e.metric || '—',
+    latency_ms: Math.round((e.avg_seconds ?? 0) * 1000),
   })),
 );
 
@@ -601,8 +609,8 @@ const expensiveAgentCols = computed(() => [
 ]);
 const expensiveAgentRows = computed(() =>
   (bottleneckData.value.expensive_agents || []).map((e) => ({
-    name: e.name || e.agent || '—',
-    cost_usd: `$${formatNum(e.cost_usd || e.cost || 0)}`,
+    name: e.agent || '—',
+    cost_usd: `$${formatNum(e.cost_usd ?? 0)}`,
   })),
 );
 
@@ -611,9 +619,9 @@ const memoryConsumerCols = computed(() => [
   { key: 'memory_mb', label: t('view.analysis.bottlenecks.col.memory'), type: 'num', align: 'right', width: '40%' },
 ]);
 const memoryConsumerRows = computed(() =>
-  (bottleneckData.value.memory_consumers || []).map((e) => ({
-    name: e.name || e.process || '—',
-    memory_mb: e.memory_mb || e.memory || 0,
+  (bottleneckData.value.top_memory_consumers || []).map((e) => ({
+    name: e.name || '—',
+    memory_mb: e.memory_mb ?? 0,
   })),
 );
 
@@ -635,13 +643,21 @@ function formatPct(v) {
   const pct = n <= 1 ? n * 100 : n;
   return pct.toFixed(1) + '%';
 }
+// Percentage fields the API already sends as 0-100 (success rates).
+// formatPct would guess from the magnitude and turn 1% into 100%.
+function formatPct100(v) {
+  if (v == null) return '—';
+  const n = Number(v);
+  if (isNaN(n)) return '—';
+  return n.toFixed(1) + '%';
+}
 
 // ── Data loading ────────────────────────────────────────────────
 async function loadSummary() {
   try {
     const params = new URLSearchParams(dateRangeParams());
     const data = await api.get(`/api/analysis/summary?${params.toString()}`);
-    summaryData.value = data.data || data.summary || {};
+    summaryData.value = data.data || {};
     errors.value = { ...errors.value, summary: null };
   } catch (err) {
     summaryData.value = {};
@@ -680,7 +696,7 @@ async function loadResources() {
     const data = await api.get(`/api/analysis/resource-utilization?${params.toString()}`);
     const d = data.data || {};
     resourceData.value = d;
-    resourceSeries.value = d.series || d.timeseries || [];
+    resourceSeries.value = d.series || [];
     errors.value = { ...errors.value, resources: null };
   } catch (err) {
     resourceData.value = {};
@@ -695,12 +711,12 @@ async function loadCost() {
     const data = await api.get(`/api/analysis/cost-breakdown?${params.toString()}`);
     const d = data.data || {};
     costData.value = {
-      items: d.items || d.by_agent || d.breakdown || [],
-      total: d.total || d.total_cost_usd || 0,
+      breakdown: d.breakdown || [],
+      total_cost_usd: d.total_cost_usd || 0,
     };
     errors.value = { ...errors.value, cost: null };
   } catch (err) {
-    costData.value = { items: [], total: 0 };
+    costData.value = { breakdown: [], total_cost_usd: 0 };
     errors.value = { ...errors.value, cost: (err && err.message) || t('view.analysis.cost.failedLoad') };
   }
 }
@@ -711,13 +727,13 @@ async function loadBottlenecks() {
     const data = await api.get(`/api/analysis/performance-bottlenecks?${params.toString()}`);
     const d = data.data || {};
     bottleneckData.value = {
-      slow_endpoints: d.slow_endpoints || d.slowest_endpoints || [],
-      expensive_agents: d.expensive_agents || d.most_expensive_agents || [],
-      memory_consumers: d.memory_consumers || d.top_memory_consumers || [],
+      slowest_endpoints: d.slowest_endpoints || [],
+      expensive_agents: d.expensive_agents || [],
+      top_memory_consumers: d.top_memory_consumers || [],
     };
     errors.value = { ...errors.value, bottlenecks: null };
   } catch (err) {
-    bottleneckData.value = { slow_endpoints: [], expensive_agents: [], memory_consumers: [] };
+    bottleneckData.value = { slowest_endpoints: [], expensive_agents: [], top_memory_consumers: [] };
     errors.value = { ...errors.value, bottlenecks: (err && err.message) || t('view.analysis.bottlenecks.failedLoad') };
   }
 }

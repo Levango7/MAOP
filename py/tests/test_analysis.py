@@ -231,7 +231,7 @@ class TestPerformanceBottlenecks:
         assert resp.status_code == 200
         _assert_ok_shape(
             resp.json(),
-            ["slowest_endpoints", "slowest_agents", "top_memory_consumers"],
+            ["slowest_endpoints", "expensive_agents", "top_memory_consumers"],
         )
 
     async def test_top_n_limit(self, admin_client):
@@ -242,7 +242,7 @@ class TestPerformanceBottlenecks:
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert len(data["slowest_endpoints"]) <= 5
-        assert len(data["slowest_agents"]) <= 5
+        assert len(data["expensive_agents"]) <= 5
         assert len(data["top_memory_consumers"]) <= 5
 
     async def test_top_n_bounds(self, admin_client):
