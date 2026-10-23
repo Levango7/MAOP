@@ -39,6 +39,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### evolution 批次：15 个端点建模，顺带挖出 A/B 面板从未有过数据（2026-10-23）
+
+P1-b 第二批：`/api/evolution` 下前端调用的 15 个端点声明 `response_model`，
+新建 `routers/evolution_schemas.py`。生产者已有的 Pydantic 模型一律复用
+（`EvolutionCycleReport` / `LoopReport` / `SkillMeta` / `DeploymentRecord` /
+`PromoteResult` / `SPSRTExperimentResult` / `VariantStats` / `SPRTState`），
+手写 dict（approvals 条目、loop 状态、ab 结果、narrative）按服务的字面键复述。
+`/api/evolution/skills` 从来没有 `status` 键，信封也没给它编一个。
+
+建模时撞出两个真 bug：
+
+**1）路由遮蔽：A/B 实验列表恒为空。**
+`GET /api/evolution/ab/list` 被 `GET /api/evolution/ab/{cycle_id}` 吃掉——
+`_register_routes.py` 里 `evolve_insights` 在 :162 注册、
+`evolution_experiment` 在 :273 才注册，而 Starlette 取第一个全匹配。
+实测（真实 app、绕开鉴权）：`/api/evolution/ab/list` 返回
+`{"status":"ok","cycle_id":"list","ab_result":null}`，即命中了 cycle 处理器；
+`EvolutionHistory.vue:925` 的 `res.experiments || []` 因此恒为 `[]`，
+整个 A/B 面板（含逐实验的 SPRT 判定）一件产品都没有。
+OpenAPI 表达不了这件事：两条路径都在文档里、各自也有形状，但 schema 里没有
+"谁先匹配"这一层信息——只有拿真实 URL 去解析才暴露。
+修法是把 `evolution_experiment` 的注册提到 `evolve_insights` 之前；
+修后同一路径返回 `{"status":"ok","experiments":["evo-real-list"]}`。
+全量扫描 517 条叶子路由，遮蔽的静态路径**只有这一条**。
+新增门禁 `test_no_static_route_is_shadowed_by_an_earlier_param_route`
+（先把 `include_router` 包装摊平成叶子路由再按真实匹配顺序判定；
+FastAPI 0.141 的 `app.routes` 里每条 include 是一个无 `.path` 的
+`_IncludedRouter`，只数 `app.routes` 会漏掉 500+ 条——旧用例正是这么数成 13 条的）。
+
+**2）读了一个从不上线的字段：速率列渲染成 NaN。**
+`SPRTState.success_rate` 是 Python `@property`，`model_dump()` 不带它；
+视图读 `sprt.success_rate` ⇒ undefined，而行映射写的是
+`e.success_rate !== null ? (e.success_rate * 100).toFixed(1) : '—'`
+（undefined ≠ null）⇒ 每行都是 `NaN`。改由已序列化的 `successes / samples`
+推算，无样本时为 `null`；守卫也改成 `== null` 同时兜住 undefined。
+
+**入口覆盖**：`evolution_experiment` 那 9 个端点此前**没有任何 HTTP 级测试**
+（`test_evolution_loop_ac07.py` 直接调处理函数，绕过 FastAPI 的响应序列化；
+其余用 `MagicMock` 行对象，缺字段也会自动长出来）。新增
+`tests/test_evolution_router_contracts.py` 24 条走 ASGI 的用例，逐端点把响应
+与生产者载荷比对——建模若丢字段就红。另断言 `handle_api_errors` 的
+`error_value` 兜底 dict 也能通过校验（那条路径返回普通 dict、会被
+response_model 校验；`HTTPException` 走 JSONResponse 则绕过），以及
+`cycle_id` 缺失时 narrative 仍是 404。
+
+**棘轮**：清单 178 → 163，上限同步下调。
+
+**验证**：定向 81 passed（contracts 24 + server_core 7 + 棘轮 6 + ac07 + agents 覆盖）。
+三处变异回验，恢复后文件字节与改前一致：
+
+- 从 `LoopStats` 删掉 `improvement_rate` ⇒ contracts 用例报
+  `dropped by response_model: improvement_rate`；
+- 把两个 router 的 `include_router` 顺序还原 ⇒ 遮蔽门禁报
+  `GET /api/evolution/ab/list served by /api/evolution/ab/{cycle_id}`；
+- 把前端加载映射还原成 `sprt.success_rate` ⇒ A/B 用例失败（NaN / 无 65.0）。
+
+遮蔽修复实测（真实 app）：`/api/evolution/ab/list` 由
+`{"cycle_id":"list","ab_result":null}` 变成 `{"experiments":["evo-real-list"]}`；
+517 条叶子路由的遮蔽计数 1 → 0。前端 62 files / 532 tests passed、eslint 干净；
+后端 ruff 与 mypy（4 个改动文件）干净。
+
+
 ### agents 批次：16 个前端在用端点建模，顺带把假形状的用例桩改成真形状（2026-10-23）
 
 P1-b 第一批从最大的模块开：`/api/agents` 下前端实际调用的 16 个端点
