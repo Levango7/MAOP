@@ -30,7 +30,6 @@
             <div class="users-cell users-cell--name" role="columnheader">{{ t('users.username') }}</div>
             <div class="users-cell users-cell--roles" role="columnheader">{{ t('users.roles') }}</div>
             <div class="users-cell users-cell--created" role="columnheader">{{ t('users.created') }}</div>
-            <div class="users-cell users-cell--login" role="columnheader">{{ t('users.lastLogin') }}</div>
             <div class="users-cell users-cell--actions" role="columnheader">{{ t('common.actions') }}</div>
           </div>
           <div v-for="u in users" :key="u.username" class="users-row" role="row">
@@ -45,7 +44,6 @@
               <span v-for="r in (u.roles || [])" :key="r" class="users-role" :class="'users-role--' + r">{{ r }}</span>
             </div>
             <div class="users-cell users-cell--created" role="cell">{{ formatDate(u.created_at) }}</div>
-            <div class="users-cell users-cell--login" role="cell">{{ u.last_login ? formatDate(u.last_login) : '—' }}</div>
             <div class="users-cell users-cell--actions" role="cell">
               <button class="btn-icon" :title="t('common.edit')" :aria-label="t('common.edit')" @click="openEdit(u)">
                 <AppIcon name="gear" :size="14" aria-hidden="true" />
@@ -146,9 +144,15 @@ function getInitial(n) {
   return n.charAt(0).toUpperCase();
 }
 
+// created_at 是 epoch **秒**（auth_service 用 time.time() 写入）：
+// 直接 new Date(秒) 会按毫秒解释 → 每个用户都显示成 1970 年。
 function formatDate(s) {
   if (!s) return '—';
-  try { return new Date(s).toLocaleString(); } catch { return s; }
+  const n = Number(s);
+  if (Number.isFinite(n)) {
+    try { return new Date(n * 1000).toLocaleString(); } catch { return String(s); }
+  }
+  try { return new Date(s).toLocaleString(); } catch { return String(s); }
 }
 
 async function fetchUsers() {
@@ -193,22 +197,18 @@ async function submitForm() {
         submitting.value = false;
         return;
       }
-      const d = await api.post('/api/auth/register', {
+      await api.post('/api/auth/register', {
         username: form.value.username,
         password: form.value.password,
         roles: form.value.roles,
       });
-      if (d.status !== 'ok') formError.value = d.error || t('view.users.failed');
     } else {
       const body = { roles: form.value.roles };
       if (form.value.password) body.password = form.value.password;
-      const d = await api.put(`/api/auth/users/${encodeURIComponent(form.value.username)}`, body);
-      if (d.status !== 'ok') formError.value = d.error || t('view.users.failed');
+      await api.put(`/api/auth/users/${encodeURIComponent(form.value.username)}`, body);
     }
-    if (!formError.value) {
-      closeDialog();
-      await fetchUsers();
-    }
+    closeDialog();
+    await fetchUsers();
   } catch (e) {
     formError.value = e.message || t('view.users.networkError');
   } finally {
@@ -274,7 +274,7 @@ onMounted(fetchUsers);
 }
 .users-row {
   display: grid;
-  grid-template-columns: 50px 1.5fr 1.5fr 1fr 1fr 90px;
+  grid-template-columns: 50px 1.5fr 1.5fr 1fr 90px;
   align-items: center;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
@@ -357,6 +357,6 @@ onMounted(fetchUsers);
 
 @media (max-width: 640px) {
   .users-row { grid-template-columns: 40px 1fr 1fr 60px; }
-  .users-cell--created, .users-cell--login { display: none; }
+  .users-cell--created { display: none; }
 }
 </style>
