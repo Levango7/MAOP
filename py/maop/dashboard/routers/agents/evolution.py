@@ -25,6 +25,7 @@ from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import upgrade_service
 
 from . import _deps
+from .schemas import EvolveEnvelope, UpgradeCheckEnvelope, UpgradeRunEnvelope
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -136,7 +137,7 @@ async def get_upgrade_status(request: Request) -> dict[str, Any]:
 # ── 单 agent 升级检查 / 执行（业务逻辑在 upgrade_service） ─────────
 
 
-@router.get("/{name}/upgrade/check")
+@router.get("/{name}/upgrade/check", response_model=UpgradeCheckEnvelope)
 @handle_api_errors
 async def check_upgrade(name: str, request: Request) -> dict[str, Any]:
     """检查 agent 的当前版本和最新版本（升级前调用，不执行实际升级）。
@@ -160,7 +161,7 @@ async def check_upgrade(name: str, request: Request) -> dict[str, Any]:
     return await upgrade_service.check_agent_upgrade(name, agent_cfg)
 
 
-@router.post("/{name}/upgrade")
+@router.post("/{name}/upgrade", response_model=UpgradeRunEnvelope)
 @handle_api_errors
 async def upgrade_agent(name: str, request: Request) -> dict[str, Any]:
     """升级 agent CLI（自动检测安装方式：pip/npm/二进制）。"""
@@ -179,7 +180,7 @@ async def upgrade_agent(name: str, request: Request) -> dict[str, Any]:
 # ── Agent 自进化 ──────────────────────────────────────────────────
 
 
-@router.post("/{name}/evolve")
+@router.post("/{name}/evolve", response_model=EvolveEnvelope)
 @handle_api_errors
 async def evolve_agent(name: str, request: Request) -> dict[str, Any]:
     """触发 agent 自进化分析。"""

@@ -19,6 +19,16 @@ from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 from . import _deps
+from .schemas import (
+    AgentDeleteEnvelope,
+    AgentListEnvelope,
+    DiagnosisEnvelope,
+    HealthCheckEnvelope,
+    PresetsEnvelope,
+    RegisterEnvelope,
+    RepairEnvelope,
+    ScanEnvelope,
+)
 
 # P2-16: logger 定义移至所有 import 之后
 logger = logging.getLogger(__name__)
@@ -106,7 +116,7 @@ def _remove_agent_from_yaml(name: str) -> None:
 # ── Endpoints ──────────────────────────────────────────────────────
 
 
-@router.get("")
+@router.get("", response_model=AgentListEnvelope)
 @handle_api_errors
 async def list_agents(
     request: Request,
@@ -177,7 +187,7 @@ PRESET_AGENTS: list[dict[str, Any]] = [
 ]
 
 
-@router.get("/presets")
+@router.get("/presets", response_model=PresetsEnvelope)
 @handle_api_errors
 async def list_presets(request: Request):
     """返回预置示例 Agent 模板，供前端一键创建。"""
@@ -218,7 +228,7 @@ async def get_agent(name: str, request: Request) -> Response:
     return JSONResponse(status_code=200, content={"status": "ok", "agent": agent.model_dump()})
 
 
-@router.post("/scan")
+@router.post("/scan", response_model=ScanEnvelope)
 @handle_api_errors
 async def scan_agents(request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -229,7 +239,7 @@ async def scan_agents(request: Request) -> dict[str, Any]:
     return {"status": "ok", "scanned": len(found), "synced": synced, "agents": [a.model_dump() for a in found]}
 
 
-@router.post("/{name}/health-check")
+@router.post("/{name}/health-check", response_model=HealthCheckEnvelope)
 @handle_api_errors
 async def check_agent_health(name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -265,7 +275,7 @@ async def disable_agent(name: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "disabled": ok}
 
 
-@router.post("/register")
+@router.post("/register", response_model=RegisterEnvelope)
 @handle_api_errors
 async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[str, Any]:
     """注册新 agent——同时写入 registry 数据库和 config/agents.yaml。
@@ -303,7 +313,7 @@ async def register_agent(body: RegisterAgentRequest, request: Request) -> dict[s
     return {"status": "ok", "agent": agent.model_dump(), "synced_to_yaml": synced_to_yaml}
 
 
-@router.delete("/{name}")
+@router.delete("/{name}", response_model=AgentDeleteEnvelope)
 @handle_api_errors
 async def unregister_agent(name: str, request: Request) -> dict[str, Any]:
     """从注册表、扫描表和 agents.yaml 中移除 agent。
@@ -366,7 +376,7 @@ async def get_health_log(name: str, request: Request, limit: int = Query(50, ge=
 # ── 诊断与修复 ────────────────────────────────────────────────────
 
 
-@router.get("/{name}/diagnose")
+@router.get("/{name}/diagnose", response_model=DiagnosisEnvelope)
 @handle_api_errors
 async def diagnose_agent(name: str, request: Request) -> dict[str, Any]:
     """诊断 agent CLI 的状态（CLI 存在性、依赖、配置）。"""
@@ -377,7 +387,7 @@ async def diagnose_agent(name: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "diagnosis": result.model_dump()}
 
 
-@router.post("/{name}/repair")
+@router.post("/{name}/repair", response_model=RepairEnvelope)
 @handle_api_errors
 async def repair_agent(name: str, request: Request) -> dict[str, Any]:
     """修复 agent CLI（安装缺失依赖、修复权限、重装 CLI）。"""

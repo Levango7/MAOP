@@ -15,8 +15,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from maop.core.agent.evolution.agent_evolution import EvolutionResult, EvolutionSuggestion
 from maop.core.agent.lifecycle.agent_registry import HealthCheckResult, RegisteredAgent
 from maop.core.agent.lifecycle.agent_repair import DiagnosisResult, RepairResult
+from maop.core.agent.lifecycle.agent_scanner import AgentStatus, ScannedAgent
 
 # ── Fakes ───────────────────────────────────────────────────────────
 
@@ -75,7 +77,16 @@ def agents_env(tmp_path, monkeypatch):
     registry.get_health_log = MagicMock(return_value=[{"ts": "2026-01-01", "healthy": True}])
 
     scanner = MagicMock()
-    scanner.scan = MagicMock(return_value=[_agent("claude")])
+    # scan() really returns ScannedAgent, not RegisteredAgent — the stub has to
+    # match, or the response_model silently defaults fields the UI reads.
+    scanner.scan = MagicMock(return_value=[ScannedAgent(
+        name="claude",
+        cli_path="/usr/bin/claude",
+        version="1.0",
+        status=AgentStatus.AVAILABLE,
+        capabilities=["code"],
+        provider="anthropic",
+    )])
     scanner.sync_from_scanner = MagicMock(return_value=1)
     scanner.unregister = MagicMock()
 
@@ -84,15 +95,38 @@ def agents_env(tmp_path, monkeypatch):
     repair.repair = AsyncMock(return_value=RepairResult(agent_name="claude", success=True, actions_taken=["install"]))
 
     memory = MagicMock()
-    memory.retrieve = MagicMock(return_value=[{"id": 1, "type": "interaction", "content": {}}])
+    # Shapes copied from AgentMemory._row_to_dict / .summarize.
+    memory.retrieve = MagicMock(return_value=[{
+        "id": 1,
+        "agent_name": "claude",
+        "memory_type": "interaction",
+        "content": {"k": "v"},
+        "metadata": {"source": "test"},
+        "importance": 0.5,
+        "created_at": "2026-01-01T00:00:00+00:00",
+    }])
     memory.store = MagicMock(return_value=1)
     memory.forget = MagicMock(return_value=1)
-    memory.summarize = MagicMock(return_value={"total": 1, "by_type": {"interaction": 1}})
+    memory.summarize = MagicMock(return_value={
+        "agent_name": "claude",
+        "total_memories": 1,
+        "by_type": {"interaction": 1},
+        "last_activity": "2026-01-01T00:00:00+00:00",
+        "avg_importance": 0.5,
+        "top_error_patterns": [{"pattern": {"k": "v"}, "frequency": 1}],
+        "evolution_count": 0,
+    })
 
     evolution = MagicMock()
-    evolution.evolve = AsyncMock(return_value=SimpleNamespace(
-        summary="no change", auto_applied=[],
-        model_dump=lambda: {"summary": "no change", "auto_applied": []},
+    evolution.evolve = AsyncMock(return_value=EvolutionResult(
+        agent_name="claude",
+        suggestions=[EvolutionSuggestion(
+            category="performance", priority="medium", description="raise timeout",
+            action="manual_required", changes={"timeout_s": 300}, confidence=0.6,
+        )],
+        auto_applied=[{"category": "preference", "changes": {}}],
+        errors=[],
+        summary="1 suggestion",
     ))
     evolution.get_status = MagicMock(return_value={"last_run": "2026-01-01", "applied": 0})
 
@@ -233,6 +267,23 @@ class TestScan:
         data = resp.json()
         assert data["scanned"] == 1
         assert "synced" in data
+        # Agents.vue renders name/status/version/cli_path from each scanned agent.
+        assert set(data["agents"][0]) >= {"name", "status", "version", "cli_path"}
+        assert data["agents"][0]["status"] == "available"
+
+
+class TestPresets:
+    def test_presets_carry_the_register_payload(self, client):
+        resp = client.get("/api/agents/presets")
+        assert resp.status_code == 200
+        presets = resp.json()["presets"]
+        assert presets, "presets must not be empty — loadPresets() no-ops otherwise"
+        # Agents.vue forwards exactly these keys to POST /api/agents/register.
+        for preset in presets:
+            assert set(preset) >= {
+                "name", "cli", "capabilities", "description",
+                "model", "driver", "cli_args", "timeout_s",
+            }
 
 
 class TestHealthCheck:
@@ -317,14 +368,19 @@ class TestDiagnose:
     def test_diagnose(self, client):
         resp = client.get("/api/agents/claude/diagnose")
         assert resp.status_code == 200
-        assert "diagnosis" in resp.json()
+        # repairAgent() short-circuits on diagnosis.overall_status.
+        assert resp.json()["diagnosis"]["overall_status"] == "healthy"
 
 
 class TestRepair:
     def test_repair(self, client):
         resp = client.post("/api/agents/claude/repair")
         assert resp.status_code == 200
-        assert "result" in resp.json()
+        result = resp.json()["result"]
+        # repairAgent() reads success / actions_taken / errors.
+        assert result["success"] is True
+        assert result["actions_taken"] == ["install"]
+        assert result["errors"] == []
 
 
 # ── Upgrade status / check / run ────────────────────────────────────
@@ -384,6 +440,9 @@ class TestUpgradeCheck:
         body = resp.json()
         assert body["status"] == "ok"
         assert body["install_method"] == "pip"
+        # Upgrade panel reads these five; the error branch leaves them defaulted.
+        for key in ("current_version", "latest_version", "update_available", "release_notes", "agent"):
+            assert key in body, key
 
 
 class TestUpgradeRun:
@@ -416,8 +475,18 @@ class TestAgentMemory:
         resp = client.get("/api/agents/claude/memory")
         assert resp.status_code == 200
         data = resp.json()
-        assert "memories" in data
         assert data["count"] == 1
+        # The memory list renders these per record; a model that silently
+        # defaults them would show blank rows instead of failing loudly.
+        assert data["memories"][0] == {
+            "id": 1,
+            "agent_name": "claude",
+            "memory_type": "interaction",
+            "content": {"k": "v"},
+            "metadata": {"source": "test"},
+            "importance": 0.5,
+            "created_at": "2026-01-01T00:00:00+00:00",
+        }
 
     def test_store_memory(self, client):
         resp = client.post("/api/agents/claude/memory", json={
@@ -439,7 +508,11 @@ class TestAgentMemory:
     def test_summary(self, client):
         resp = client.get("/api/agents/claude/memory/summary")
         assert resp.status_code == 200
-        assert "summary" in resp.json()
+        summary = resp.json()["summary"]
+        # Memory panel iterates by_type and shows total_memories/evolution_count.
+        assert summary["by_type"] == {"interaction": 1}
+        assert summary["total_memories"] == 1
+        assert summary["evolution_count"] == 0
 
     def test_store_invalid_importance(self, client):
         # importance must be 0..1 → 2 violates → 422.
@@ -455,7 +528,13 @@ class TestEvolution:
     def test_evolve(self, client):
         resp = client.post("/api/agents/claude/evolve")
         assert resp.status_code == 200
-        assert "result" in resp.json()
+        result = resp.json()["result"]
+        # Evolution panel: summary text, suggestions list, auto_applied count.
+        assert result["summary"] == "1 suggestion"
+        assert result["suggestions"][0]["description"] == "raise timeout"
+        assert len(result["auto_applied"]) == 1
+        assert result["errors"] == []
+        assert result["agent_name"] == "claude"
 
     def test_status(self, client):
         resp = client.get("/api/agents/claude/evolution-status")

@@ -130,6 +130,17 @@ def test_notification_router_is_fully_typed():
     assert untyped == []
 
 
+def test_agents_router_endpoints_in_use_are_typed():
+    routes = route_schema()
+    agents_calls = {key for key in frontend_calls() if key[1].startswith("/api/agents")}
+    assert len(agents_calls) == 16, sorted(agents_calls)
+    untyped = sorted(
+        key for key in agents_calls
+        if key in routes and not has_typed_response(routes[key])
+    )
+    assert untyped == []
+
+
 def test_only_allowlisted_frontend_endpoints_lack_models():
     missing, calls, matched = coverage()
     allowlist = load_allowlist()
@@ -151,4 +162,4 @@ def test_only_allowlisted_frontend_endpoints_lack_models():
     )
     # Burn-down ratchet: the allowlist may only shrink. Raising this number is
     # an explicit decision, not something a feature PR should do silently.
-    assert len(allowlist) <= 194, len(allowlist)
+    assert len(allowlist) <= 178, len(allowlist)

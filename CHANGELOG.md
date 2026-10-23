@@ -39,6 +39,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### agents 批次：16 个前端在用端点建模，顺带把假形状的用例桩改成真形状（2026-10-23）
+
+P1-b 第一批从最大的模块开：`/api/agents` 下前端实际调用的 16 个端点
+（list / presets / register / scan / delete / diagnose / repair / health-check /
+memory 四件 / upgrade / upgrade-check / evolve / routes）此前全部返回
+`dict[str, Any]`。
+
+**建模**：新增 `py/maop/dashboard/routers/agents/schemas.py`。能复用真模型的不新造——
+`RegisteredAgent`、`ScannedAgent`、`HealthCheckResult` 直接来自 core；
+`DiagnosisResult` / `RepairResult` / `EvolutionResult` 是 dataclass（只有
+`model_dump()`），按它的键在 schemas 里逐字段复述。`upgrade/check` 的错误分支
+只带 `status`/`error`，其余字段一律有默认值，避免错误响应被建模打成 500。
+
+**改桩（这条才是重点）**：`tests/test_router_agents_coverage.py` 的用例桩形状
+和生产不一致，而 `response_model` 对"缺字段"是静默补默认值，不是报错——
+留着这些桩，建模就自证不了任何事：
+
+- `scanner.scan` 桩返回 `RegisteredAgent`，真实返回 `ScannedAgent`
+  （UI 读的 `status/version/cli_path` 在旧桩下会走默认值）；
+- 记忆条目桩用 `type`，真实列名是 `memory_type`，且缺
+  `agent_name/metadata/importance/created_at`；
+- `summarize` 桩用 `total`，真实键是 `total_memories`（UI 的合计卡片读后者）；
+- `evolve` 桩只给 `summary/auto_applied`，真实结果还有
+  `agent_name/suggestions/errors`。
+
+桩改成真实形状后，断言也跟着收紧：presets 必须带 UI 转发给 `/register` 的
+8 个键、memory 列表整条相等、summary 三项、evolve 四件、diagnose 的
+`overall_status`、upgrade-check 的 5 个版本字段。
+
+**棘轮**：清单 194 → 178（agents 16 条删除），上限同步降到 178；
+新增 `test_agents_router_endpoints_in_use_are_typed` 断言这 16 条路由的
+2xx 都指向组件模型。
+
+**通知批次补刀（PR CI 红因）**：`notifications.py` 加完信封到 860 行，
+撞 800 行文件门禁（CI 里 file-size gate 挂在 Docs job，pytest 侧也各红一条），
+把 16 个信封拆到 `routers/notification_schemas.py`；`test_notification_router_is_fully_typed`
+在纯净 CI（未装 maop-enterprise，通知路由根本不挂载）改成 `importorskip` 跳过，
+而不是硬断言 26 条。
+
+**验证**：`test_router_agents_coverage.py + test_frontend_response_models.py`
+42 passed；变异回验——从 `DiagnosisOut` 删掉 `overall_status` 后
+`TestDiagnose` 立刻 KeyError 报红（rc=1），恢复后文件字节与改前一致；
+模拟无企业包环境跑棘轮 = 4 passed / 1 skipped。
+
+
 ### 中央保留期：14 张"只增不减"的表接上兜底（2026-10-22）
 
 盘点口径：`py/maop` 里 `CREATE TABLE` 共涉及 **131 张表**，其中 **60 张**在仓库任意
