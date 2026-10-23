@@ -11,6 +11,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from maop.core.mcp.mcp_hub_types import MCPTool, ServerInfo, ServerStatus, TransportType
+
 
 def _make_app(*routers) -> TestClient:
     app = FastAPI()
@@ -46,11 +48,17 @@ def mcp_env(tmp_path, monkeypatch):
     mock_hub.connect = AsyncMock(return_value="server-1")
     mock_hub.find_server_id_by_name = MagicMock(return_value="server-1")
     mock_hub.disconnect = AsyncMock(return_value=None)
-    mock_hub.list_servers = MagicMock(return_value=[{"name": "s1", "connected": True}])
+    mock_hub.list_servers = MagicMock(return_value=[ServerInfo(
+        id="server-1", name="s1", transport=TransportType.STDIO,
+        status=ServerStatus.CONNECTED, tools_count=2, resources_count=1,
+        url="", enabled=True, auto_connect=True,
+    )])
     mock_hub.add_server = MagicMock(return_value=None)
-    mock_hub.all_tools = MagicMock(return_value=[
-        SimpleNamespace(model_dump=lambda: {"name": "tool1"})
-    ])
+    mock_hub.all_tools = MagicMock(return_value=[MCPTool(
+        name="tool1", description="d", server_name="s1",
+        input_schema={"type": "object", "properties": {"q": {"type": "string"}}},
+    )])
+    mock_hub.list_tool_concurrency_limits = MagicMock(return_value={"s1:tool1": 3})
     mock_hub.call_tool_by_name = AsyncMock(return_value=SimpleNamespace(
         model_dump=lambda: {"result": "ok"}
     ))

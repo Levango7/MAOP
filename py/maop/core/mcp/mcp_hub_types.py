@@ -146,3 +146,7 @@ class ServerInfo(BaseModel):
     # 启动播种后自动连接。列表页要靠这两个字段才能区分"断开"与"被停用"。
     enabled: bool = True
     auto_connect: bool = False
+    # Endpoint URL for http/sse transports (from the stored config JSON).
+    # The servers table renders this column; it used to read a field the
+    # API never sent, so every row showed an em dash.
+    url: str = ""

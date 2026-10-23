@@ -85,16 +85,6 @@ GET /api/info/config
 GET /api/live
 GET /api/logs
 GET /api/logs/analysis
-GET /api/mcp
-GET /api/mcp/marketplace/tools
-GET /api/mcp/servers
-POST /api/mcp/servers
-GET /api/mcp/servers/{}
-PUT /api/mcp/servers/{}
-GET /api/mcp/stats
-GET /api/mcp/tools
-PUT /api/mcp/tools/{}
-GET /api/mcp/topology
 GET /api/memory/search
 GET /api/memory/stats
 POST /api/memory/store

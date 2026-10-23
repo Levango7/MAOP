@@ -39,6 +39,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### mcp 批次：10 端点建模，并把 5 个"UI 在读、API 从不发"的字段做成真值（2026-10-23）
+
+P1-b 第三批。`/api/mcp` 系（含 `data.py` 的组合端点）10 条路由声明
+`response_model`，新增 `routers/mcp_schemas.py`：`ServerInfo`、`MCPTool`
+直接复用核心模型，手写 dict（server detail / stats / topology / marketplace）
+按服务层的字面键复述。`TopologyTool` **故意不带** `concurrency_limit`——
+拓扑构造器从不设这个键，写进模型就等于往线上编一个 `0`。
+
+建模逼出来的 5 个字段错配（`McpManager.vue` 在读，线上从来没有）：
+
+| UI 读的 | 实际生产者 | 处置 |
+|---|---|---|
+| `servers[].tool_count` | `ServerInfo.tools_count` | 改名，数量列此前恒 0 |
+| `servers[].url` | 存储的 config JSON 里有 `url` | `ServerInfo` 新增 `url`，hub 在唯一构造点 `mcp_hub_ops.py:273` 填上 |
+| `servers[].latency_ms` | 没有该字段；`per_tool` 有 `avg_ms`/`calls` | UI 侧按调用数加权 join 出每服务器延迟 |
+| `tools[].parameters` / `call_count` | `input_schema` / 无 | 参数面板改读 `input_schema`；调用数从 `per_tool` 按 `server:tool` id join |
+| `stats.series[].calls` / `success_rate` / `avg_latency_ms` | `{ts,count,errors}`，延迟根本没输出 | 累加器每桶已存 `total_ms`：序列行补出 `avg_ms`（小时均延迟），成功率由 `(count-errors)/count` 现算，不再虚构字段 |
+
+顺带修一条凭据泄漏：组合端点的数据源是 bridge 原样吐出的
+`config/mcp_servers.yaml`，`headers.Authorization` 可能是真的 Bearer token——
+而 `GET /api/mcp/servers/{id}` 一直只回 `auth_type`/`has_auth`。
+现按通知渠道同一约定处理：**键保留、值打码 `"***"`**（`env` 里只打码名字含
+key/token/secret/password/auth/credential 的项，`LOG_LEVEL` 这类照原样），
+`name`/`transport`/`url` 仍可见，卡片不受影响。
+
+**测试两侧的形状谎言一起改**：vitest 的 `McpManager.test.js` 桩恰好把 UI 读的
+字段名原样编了一遍（`tool_count`/`latency_ms`/`parameters`/`success_rate`/
+`avg_latency_ms`，`ts` 还写成 ISO 串——线上是 Unix 秒），于是视图和测试互相自洽、
+一起与 API 不一致；后端侧 `list_servers` 桩返回 `{"name":"s1","connected":true}`
+（`connected` 不是字段）、`all_tools` 只给 `{"name": ...}`。全部换成生产形状，
+断言也从"渲染出 2 行"升级到具体数值（URL 文本、3 个工具、加权后 120 ms、
+调用数 42、95.0% 成功率、schema 里出现 `query`）。
+
+**棘轮**：清单 163 → 153，上限同步下调。
+
+**验证**：后端定向 127 passed（新契约 14 条 + crud/data/coverage/stats 既有 113 条）；
+每桶均延迟用真实累加器 `MCPCallStats` 直接证（100ms 成功 + 300ms 失败 ⇒ `avg_ms=200`）；
+前端 `McpManager.test.js` 13 passed；ruff、mypy（7 个改动文件）、尺寸/静默异常/docs
+门禁通过。三处变异各自转红、恢复后字节一致：改回 `s.tool_count`、改回
+`tool.parameters`、删掉 `_mask_mcp_row` 那一行 ⇒ 打码用例报红。
+
+
 ### evolution 批次：15 个端点建模，顺带挖出 A/B 面板从未有过数据（2026-10-23）
 
 P1-b 第二批：`/api/evolution` 下前端调用的 15 个端点声明 `response_model`，

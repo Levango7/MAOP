@@ -153,10 +153,11 @@ class MCPCallStats:
             if bucket_ts < cutoff:
                 continue
             row = series.setdefault(
-                bucket_ts, {"ts": bucket_ts, "count": 0, "errors": 0}
+                bucket_ts, {"ts": bucket_ts, "count": 0, "errors": 0, "total_ms": 0.0}
             )
             row["count"] += bucket.calls
             row["errors"] += bucket.errors
+            row["total_ms"] += bucket.total_ms
 
             agg = per_tool.setdefault(
                 (server_name, tool_name),
@@ -190,7 +191,15 @@ class MCPCallStats:
         total_ms = sum(a["total_ms"] for a in per_tool.values())
 
         return {
-            "series": [series[k] for k in sorted(series)],
+            "series": [
+                {
+                    "ts": row["ts"],
+                    "count": row["count"],
+                    "errors": row["errors"],
+                    "avg_ms": round(row["total_ms"] / row["count"], 2) if row["count"] else 0.0,
+                }
+                for row in (series[k] for k in sorted(series))
+            ],
             "per_tool": tools,
             "total": {
                 "calls": total_calls,

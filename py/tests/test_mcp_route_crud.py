@@ -59,6 +59,9 @@ class _FakeHub:
                 tools_count=d["tools_count"],
                 enabled=d["config"].enabled,
                 auto_connect=d["config"].auto_connect,
+                resources_count=d.get("resources_count", 0),
+                error=d.get("error", ""),
+                url=getattr(d["config"], "url", ""),
             )
             for sid, d in self._servers.items()
         ]
@@ -140,6 +143,7 @@ class _FakeHub:
                 name=t["name"],
                 description=t.get("description", ""),
                 server_name=t["server_name"],
+                input_schema=t.get("input_schema", {"type": "object", "properties": {}}),
             )
             for t in self._tools
         ]

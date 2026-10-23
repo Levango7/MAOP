@@ -421,11 +421,45 @@ async def get_mcp_tools() -> Any:
     return await state.get_bridge().mcp_tools()
 
 
+#: Keys whose *values* are credentials wherever they appear in a server row.
+_SECRET_ROW_KEYS = frozenset({"token", "api_key", "password", "secret", "auth_token"})
+#: ``env`` entries are only masked when the variable name looks like a secret.
+_SECRET_ENV_HINTS = ("key", "token", "secret", "password", "auth", "credential")
+
+
+def _mask_mcp_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Redact credentials from one raw ``mcp_servers.yaml`` entry.
+
+    The bridge hands back user-authored YAML, so ``headers`` / ``env`` may carry
+    live bearer tokens. ``GET /api/mcp/servers/{id}`` already refuses to return
+    header values (only ``auth_type`` / ``has_auth``); the combined endpoint has
+    no reason to be the exception. Keys are kept so the UI can still show that
+    something is configured — same convention as notification channel configs.
+    """
+    if not isinstance(row, dict):
+        return row
+    out = dict(row)
+    headers = out.get("headers")
+    if isinstance(headers, dict):
+        out["headers"] = {name: "***" for name in headers}
+    env = out.get("env")
+    if isinstance(env, dict):
+        out["env"] = {
+            name: ("***" if any(h in name.lower() for h in _SECRET_ENV_HINTS) else value)
+            for name, value in env.items()
+        }
+    for name in list(out):
+        if isinstance(name, str) and name.lower() in _SECRET_ROW_KEYS:
+            out[name] = "***"
+    return out
+
+
 async def get_mcp_combined() -> dict[str, Any]:
-    """Fetch combined MCP servers + tools."""
+    """Fetch combined MCP servers + tools (credentials redacted)."""
     servers = await state.get_bridge().mcp_servers()
     tools = await state.get_bridge().mcp_tools()
-    return {"servers": servers, "tools": tools, "server_count": len(servers), "tool_count": len(tools)}
+    masked = [_mask_mcp_row(s) for s in servers]
+    return {"servers": masked, "tools": tools, "server_count": len(masked), "tool_count": len(tools)}
 
 
 # ════════════════════════════════════════════════════════════════════════════
