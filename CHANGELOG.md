@@ -39,6 +39,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### plugins 批次：11 条路由建模，插件状态词表与生产者对齐（2026-10-23）
+
+`/api/plugins` 系 10 条前端在用端点（外加 `GET /{plugin_id}` 一并建模）声明
+`response_model`，新增 `routers/plugin_schemas.py`。服务层每个载荷都是
+`PluginInfo.model_dump()`，所以三个信封直接复用 `PluginInfo`——手抄字段等于
+再造一份会漂移的副本。
+
+**状态词表对不上**：生产者只有 `discovered|loaded|started|stopped|errored`
+五个值（`plugin_hooks.py:21-26`），而 `Plugins.vue` 的分支里写着
+`running`/`unloaded`/`error`/`failed` 这四个**从不上线**的名字，
+真正会出现的 `errored` 反倒没人接 ⇒ 崩溃插件的徽章显示成"未知"，
+且因为 `canReload` 不含 errored，**行上连一个可用操作都不剩**。
+按生产者词表重写字段映射，并把 `error-plug` 的 vitest 桩从 `state:'error'`
+改成 `state:'errored'`——旧桩恰好写了 UI 那套编造的名字，所以视图与测试
+一起自洽地错着。
+
+**按钮可见性写进断言**：`PluginManager.start()` 在非 LOADED 时直接抛
+（`plugin_manager.py:273-274`），而 `canStart` 之前对 `stopped` 也放行 ⇒
+点一下就是 500。现按真实守卫收敛（started 只能 Stop；stopped/errored 走
+Reload），并断言三行的 aria-label 集合，防止以后又把 Start 放回去。
+
+**用例桩一起改**：`test_router_misc_coverage` 的插件替身返回
+`{"id": "p1"}`（`name` 在 `PluginInfo` 里是必填）与 `"state": "reloaded"`
+（枚举没有这个值），`load_all/start_all/stop_all` 一律返回空列表；
+`test_list_with_state` 甚至写成 `status_code in (200, 500)`，
+`test_not_found` 注释里承认"没法按用例注入替身"于是断 200。
+全部换成真 `PluginInfo`（reload 走 stop→load→start，返回态是 **started**
+不是 reloaded）、按 id 分流的 `get_plugin` side_effect、两个含糊断言收紧成
+`== 200` 与 `== 404`。
+
+**棘轮**：清单 153 → 143。
+
+**验证**：新契约 13 passed（逐字段等值 + "枚举只有这五个值" + 真
+`PluginInfo` 往返）；`test_router_misc_coverage` 59 passed；定向合跑 77
+passed；`Plugins.test.js` 9 passed；ruff/mypy(3 文件)/尺寸/静默异常/docs 门禁
+通过。两处变异转红且恢复字节一致：摘掉 `GET ""` 的 `response_model` ⇒
+契约测试报 `UNtyped GET /api/plugins`；把 `canReload` 的 errored 去掉 ⇒
+vitest 的 Reload 断言失败。
+
+
 ### mcp 批次：10 端点建模，并把 5 个"UI 在读、API 从不发"的字段做成真值（2026-10-23）
 
 P1-b 第三批。`/api/mcp` 系（含 `data.py` 的组合端点）10 条路由声明

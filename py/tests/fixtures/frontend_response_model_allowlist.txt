@@ -109,16 +109,6 @@ GET /api/observability/health
 GET /api/observability/status
 GET /api/observability/traces
 GET /api/overview
-GET /api/plugins
-POST /api/plugins/discover
-POST /api/plugins/load-all
-POST /api/plugins/start-all
-POST /api/plugins/stop-all
-PUT /api/plugins/{}/config
-POST /api/plugins/{}/load
-POST /api/plugins/{}/reload
-POST /api/plugins/{}/start
-POST /api/plugins/{}/stop
 GET /api/prompts
 GET /api/protocol/list
 GET /api/protocol/messages

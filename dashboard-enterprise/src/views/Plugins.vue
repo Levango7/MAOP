@@ -289,6 +289,11 @@ const resultsLabel = computed(() => {
 });
 
 // ── State helpers ───────────────────────────────────────────────
+// The producer's vocabulary is exactly PluginState: discovered | loaded |
+// started | stopped | errored. The old branches for 'running' / 'unloaded' /
+// 'error' / 'failed' matched nothing the API emits, while 'errored' itself fell
+// through to "unknown" — a crashed plugin looked unrecognised and offered no
+// way out.
 function normalizeState(s) {
   return String(s || '').toLowerCase();
 }
@@ -296,41 +301,39 @@ function normalizeState(s) {
 function stateLabel(s) {
   const n = normalizeState(s);
   if (n === 'loaded') return t('view.plugins.state.loaded');
-  if (n === 'started' || n === 'running') return t('view.plugins.state.started');
+  if (n === 'started') return t('view.plugins.state.started');
   if (n === 'stopped') return t('view.plugins.state.stopped');
-  if (n === 'unloaded' || n === 'discovered') return t('view.plugins.state.unloaded');
-  if (n === 'error' || n === 'failed') return t('view.plugins.state.error');
+  if (n === 'discovered') return t('view.plugins.state.unloaded');
+  if (n === 'errored') return t('view.plugins.state.error');
   return t('view.plugins.state.unknown');
 }
 
 function stateTone(s) {
   const n = normalizeState(s);
-  if (n === 'started' || n === 'running') return 'success';
+  if (n === 'started') return 'success';
   if (n === 'loaded') return 'info';
-  if (n === 'stopped') return 'neutral';
-  if (n === 'error' || n === 'failed') return 'fail';
+  if (n === 'errored') return 'fail';
   return 'neutral';
 }
 
 function canLoad(p) {
-  const n = normalizeState(p.state);
-  return n === 'unloaded' || n === 'discovered' || n === '';
+  // load() is only meaningful before a plugin has been imported.
+  return normalizeState(p.state) === 'discovered';
 }
 function canStart(p) {
-  const n = normalizeState(p.state);
-  return n === 'loaded' || n === 'stopped';
+  // PluginManager.start() raises unless state is LOADED, so a stopped plugin
+  // must go through reload — offering Start here produced a 500.
+  return normalizeState(p.state) === 'loaded';
 }
 function canStop(p) {
-  const n = normalizeState(p.state);
-  return n === 'started' || n === 'running';
+  return normalizeState(p.state) === 'started';
 }
 function canReload(p) {
   const n = normalizeState(p.state);
-  return n === 'loaded' || n === 'started' || n === 'running' || n === 'stopped';
+  return n === 'loaded' || n === 'started' || n === 'stopped' || n === 'errored';
 }
 function canConfig(p) {
-  const n = normalizeState(p.state);
-  return n !== 'unloaded' && n !== 'discovered' && n !== '';
+  return normalizeState(p.state) !== 'discovered';
 }
 
 // ── Single-plugin actions ───────────────────────────────────────
