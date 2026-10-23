@@ -96,14 +96,6 @@ DELETE /api/model-gateway/permissions/{}
 PUT /api/model-gateway/permissions/{}
 DELETE /api/model-gateway/usage
 GET /api/model-gateway/usage
-GET /api/model/agents
-GET /api/model/budget
-GET /api/model/list
-GET /api/model/policies
-GET /api/model/providers
-GET /api/model/quota
-GET /api/model/registry
-POST /api/model/switch
 GET /api/observability/config
 GET /api/observability/health
 GET /api/observability/status

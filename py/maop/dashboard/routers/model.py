@@ -15,6 +15,18 @@ from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.model_schemas import (
+    BudgetEnvelope,
+    ModelAgentsEnvelope,
+    ModelListEnvelope,
+    ModelQuotaEnvelope,
+    ModelSelectEnvelope,
+    PolicyListEnvelope,
+    ProviderListEnvelope,
+    QuotaStatusEnvelope,
+    RegistryEnvelope,
+    SwitchEnvelope,
+)
 from maop.dashboard.services import model_service
 from maop.model.schema import ModelDef, ProviderDef  # 批次3A: 模块级导入以支持 Pydantic 模型继承
 
@@ -68,19 +80,19 @@ class ModelAddRequest(ModelDef):
     """
     name: str = ""
 
-@router.get("/api/model/agents")
+@router.get("/api/model/agents", response_model=ModelAgentsEnvelope)
 @handle_api_errors("Model agents", error_value={"agents": [], "count": 0, "error": "Model agents failed"})
 async def api_model_agents(request: Request) -> dict[str, Any]:
     require_admin(request)
     return {"status": "ok", **model_service.list_model_agents()}
 
-@router.get("/api/model/quota")
+@router.get("/api/model/quota", response_model=ModelQuotaEnvelope)
 @handle_api_errors("Model quota", error_value={"agents": [], "count": 0, "error": "Model quota failed"})
 async def api_model_quota(request: Request) -> dict[str, Any]:
     require_admin(request)
     return {"status": "ok", **model_service.get_model_quota()}
 
-@router.post("/api/model/switch")
+@router.post("/api/model/switch", response_model=SwitchEnvelope)
 @handle_api_errors("Model switch", error_value={"status": "error", "error": "Model switch failed"})
 async def api_model_switch(body: ModelSwitchRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -101,43 +113,43 @@ async def api_model_switch(body: ModelSwitchRequest, request: Request) -> dict[s
 
 # ── Model Management v2 (ModelRegistry-backed) ────────────────────
 
-@router.get("/api/model/registry")
+@router.get("/api/model/registry", response_model=RegistryEnvelope)
 @handle_api_errors("Model registry", error_value={"status": "error", "error": "Model registry failed"})
 async def api_model_registry(request: Request) -> dict[str, Any]:
     require_admin(request)
     return {"status": "ok", **model_service.get_model_registry_stats()}
 
-@router.get("/api/model/list")
+@router.get("/api/model/list", response_model=ModelListEnvelope)
 @handle_api_errors("Model list", error_value={"models": [], "count": 0, "error": "Model list failed"})
 async def api_model_list(request: Request) -> dict[str, Any]:
     require_admin(request)
     return {"status": "ok", **model_service.list_models()}
 
-@router.get("/api/model/providers")
+@router.get("/api/model/providers", response_model=ProviderListEnvelope)
 @handle_api_errors("Model providers", error_value={"providers": [], "error": "Model providers failed"})
 async def api_model_providers(request: Request) -> dict[str, Any]:
     require_admin(request)
     return {"status": "ok", **model_service.list_model_providers()}
 
-@router.get("/api/model/select")
+@router.get("/api/model/select", response_model=ModelSelectEnvelope)
 @handle_api_errors("Model select", error_value={"status": "error", "error": "Model select failed"})
 async def api_model_select(request: Request, capability: str = "", agent_model: str = "", policy: str = "default") -> dict[str, Any]:
     require_admin(request)
     return {"status": "ok", **model_service.select_model(capability, agent_model, policy)}
 
-@router.get("/api/model/budget")
+@router.get("/api/model/budget", response_model=BudgetEnvelope)
 @handle_api_errors("Model budget", error_value={"status": "error", "error": "Model budget failed"})
 async def api_model_budget(request: Request) -> dict[str, Any]:
     require_admin(request)
     return {"status": "ok", **model_service.get_model_budget()}
 
-@router.get("/api/model/quota/status")
+@router.get("/api/model/quota/status", response_model=QuotaStatusEnvelope)
 @handle_api_errors("Model quota", error_value={"status": "error", "error": "Model quota failed"})
 async def api_model_quota_status(request: Request) -> dict[str, Any]:
     require_admin(request)
     return {"status": "ok", **model_service.get_model_quota_status()}
 
-@router.get("/api/model/policies")
+@router.get("/api/model/policies", response_model=PolicyListEnvelope)
 @handle_api_errors("Model policies", error_value={"policies": [], "count": 0, "error": "Model policies failed"})
 async def api_model_policies(request: Request) -> dict[str, Any]:
     require_admin(request)

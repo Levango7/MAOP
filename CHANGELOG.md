@@ -39,6 +39,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### model 批次：10 条路由建模，顺带堵住 `/api/model/select` 外发明文 API key（2026-10-23）
+
+P1-b 第五批：`/api/model/*` 前端在用 8 条 + 顺手做齐 `select` 与 `quota/status`
+（同一路由器里只建模一半会留下更难看的洞）。新增 `routers/model_schemas.py`。
+
+**漏 key**：`GET /api/model/select` 直接 dump `EffectiveModel`，而它带着
+`api_key`（schema.py:253，从 env 或内联解析出的真 key，本来是给 dispatcher
+用的）⇒ 浏览器/日志/截屏都能看见明文密钥。响应模型改为不声明该字段，并用
+`model_validator(mode="before")` 把"有没有 key"换成 `has_api_key` 上报——
+只是删字段会让 `has_api_key` 恒 false，那换的是一种错为另一种错。
+（同一路由器里 `list_providers` 一直只回 `has_api_key`，这次是补齐先例。）
+
+**`status` 默认 `"error"` 而不是 `"ok"`**：成功路径一律显式写
+`{"status":"ok", ...}`，但 `list/agents/quota/providers/policies/list` 等多处
+`@handle_api_errors(error_value=...)` 的兜底 dict **不带 status**，而兜底 dict
+是会被 response_model 校验的——默认 `"ok"` 就等于把失败应答标成成功。
+
+**同义反复的契约测试**：`tests/contract/test_model_api_contract.py` 有 7 个
+`expected_keys = {...}; assert expected_keys == {...}`——左右两边是同一份字面量，
+永远不可能失败，其中还把 `quota/status` 的 `quotas` 写成 dict（实为 list）。
+改成读 `app.openapi()` 的真实信封与条目属性集（含 "`api_key` 不在
+effective_model 里" 这条安全不变量），断言终于有了牙齿。
+
+**桩与枚举值改真**：`FakeModelRegistry.stats()` 交回真实 `ModelRegistry.stats`
+逻辑跑在假 `_config` 上（旧桩的 `providers`/`policies` 两个键生产者从不发，
+而 UI 读的 `total_providers`/`thinking_capable` 它没有）；`FakeProviders`
+补齐 7 个键（此前缺 `has_api_key`/`base_url`，正是面板要显示的列）；
+budget 桩的 `used` 改成真名 `daily_spend`。vitest 里 `quality_tier:'high'`、
+`latency_tier:'low'`、`protocol:'rest'`、`strategy:'cost'` 都是不存在的枚举值，
+换成 excellent/medium/openai_completions/cheapest。另一处习惯性错误：mock 靠
+"省掉键"来触发视图的 `—` 兜底，而有了信封之后键不会消失、只会是 `""`/`0`——
+于是第二个 mock 行改成空值全键，两处断言随之改成真实渲染值
+（`context_window` 是 0、`max_cost_per_task` 是 `$0.000`，不再是 `—`）。
+
+**棘轮**：清单 143 → 135。
+
+**验证**：定向 125 passed（新契约 12 条 + `test_router_model` + `tests/contract` 全套）；
+`Models.test.js` 6 passed；eslint/ruff/mypy(2 文件)/尺寸/静默异常/docs 门禁绿。
+三处变异转红且恢复字节一致：摘掉 `/api/model/list` 的 `response_model` ⇒
+契约报 `UNtyped`；把 `api_key` 加回 `EffectiveModelPublic` ⇒ 报
+"credential leaked through the response model"；从 `ProviderRow` 删
+`has_api_key` ⇒ 契约套件里 provider 形状断言失败。
+
+
 ### plugins 批次：11 条路由建模，插件状态词表与生产者对齐（2026-10-23）
 
 `/api/plugins` 系 10 条前端在用端点（外加 `GET /{plugin_id}` 一并建模）声明

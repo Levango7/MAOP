@@ -86,8 +86,17 @@ class FakeProviders:
     """Fake provider registry."""
 
     def list_providers(self):
-        return [{"name": "anthropic", "enabled": True},
-                {"name": "google", "enabled": True}]
+        # Same 7 keys ProviderRegistry.list_providers() emits (registry.py:74) —
+        # a partial stub lets a response_model pass while has_api_key/base_url
+        # silently default, which is the column the dashboard shows.
+        return [
+            {"name": "anthropic", "type": "api", "enabled": True,
+             "protocol": "claude_code", "healthy": True, "has_api_key": True,
+             "base_url": "https://api.anthropic.com"},
+            {"name": "google", "type": "api", "enabled": True,
+             "protocol": "openai_completions", "healthy": False, "has_api_key": False,
+             "base_url": "https://generativelanguage.googleapis.com"},
+        ]
 
     def is_healthy(self, provider: str) -> bool:
         return provider in ("anthropic", "google")
@@ -98,7 +107,7 @@ class FakeModelRegistry:
 
     def __init__(self):
         self.providers = FakeProviders()
-        self.config = ModelRegistryConfig(
+        self._config = ModelRegistryConfig(
             providers={},
             models={"claude-3": _make_model()},
             policies={
@@ -108,10 +117,21 @@ class FakeModelRegistry:
             },
             budget=BudgetConfig(daily_limit=5.0, monthly_limit=100.0),
         )
+        # ``model_service.list_model_policies`` reads ``reg.config`` while the
+        # real ``ModelRegistry.stats`` reads ``self._config`` — both names must
+        # resolve to the same object for the fake.
+        self.config = self._config
 
     def stats(self) -> dict:
-        return {"total_models": 1, "enabled_models": 1,
-                "providers": 2, "policies": 2}
+        """Run the real producer logic over this fake's ``_config``.
+
+        The old hand-written dict used ``providers``/``policies`` keys that
+        ``ModelRegistry.stats()`` never emits, and omitted the ``by_*`` /
+        ``total_providers`` / ``thinking_capable`` keys the dashboard reads.
+        """
+        from maop.model.registry import ModelRegistry
+
+        return ModelRegistry.stats(self)
 
     def list_models(self, enabled_only=False):
         models = [_make_model()]
@@ -270,6 +290,9 @@ class TestModelRegistry:
     def test_stats_has_model_count(self, client):
         data = client.get("/api/model/registry").json()
         assert data["stats"]["total_models"] == 1
+        # The two keys Models.vue reads that the old stub never produced.
+        assert data["stats"]["total_providers"] == 0
+        assert "thinking_capable" in data["stats"]
 
 
 # ── /api/model/list ─────────────────────────────────────────────────
@@ -344,12 +367,19 @@ class TestModelBudget:
     def test_returns_budget_stats(self, client, monkeypatch):
         mock_guard = MagicMock()
         mock_guard.stats = MagicMock(
-            return_value={"daily_limit": 5.0, "used": 1.0})
+            return_value={
+                "daily_spend": 1.0, "daily_limit": 5.0,
+                "monthly_spend": 12.0, "monthly_limit": 100.0,
+                "alert_threshold": 0.8, "hard_stop": False,
+                "daily_remaining": 4.0, "daily_utilization": 0.2, "alerted": False,
+            })
         monkeypatch.setattr("maop.model.budget.BudgetGuard",
                             lambda **kw: mock_guard)
         data = client.get("/api/model/budget").json()
         assert data["status"] == "ok"
-        assert "budget" in data
+        # ``used`` was an invented key; the producer says daily_spend.
+        assert data["budget"]["daily_spend"] == 1.0
+        assert data["budget"]["daily_utilization"] == 0.2
 
     def test_budget_error(self, client, monkeypatch):
         monkeypatch.setattr("maop.model.budget.BudgetGuard",
