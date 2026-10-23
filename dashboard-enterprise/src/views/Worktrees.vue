@@ -19,6 +19,10 @@
               <span>{{ t('view.worktrees.branches.activeOnly') }}</span>
             </label>
           </template>
+          <div v-if="mergeNotice" class="wt-notice" role="status">
+            <AppIcon name="alert-triangle" :size="14" />
+            <span>{{ t('view.worktrees.merge.conflicts', { detail: mergeNotice }) }}</span>
+          </div>
           <div v-if="loading" class="blk">
             <Skeleton block height="44px" />
             <Skeleton block height="44px" />
@@ -187,7 +191,7 @@
           <div class="modal__body">
             <label class="field">
               <span class="field__label">{{ t('view.worktrees.modal.sourceBranch') }}</span>
-              <input class="field__input" :value="mergeForm.source_branch" disabled />
+              <input class="field__input" :value="mergeForm.source_label" disabled />
             </label>
             <label class="field">
               <span class="field__label">{{ t('view.worktrees.modal.targetBranch') }}</span>
@@ -402,11 +406,16 @@ async function submitBranch() {
 // ── Merge modal ─────────────────────────────────────────────────
 const showMergeModal = ref(false);
 const mergeSaving = ref(false);
-const mergeForm = reactive({ source_branch: '', target_branch: '' });
+const mergeForm = reactive({ source_branch: '', target_branch: '', source_label: '' });
+const mergeNotice = ref('');
 
 function openMergeModal(branch) {
-  mergeForm.source_branch = branch.name || branch.id || '';
+  // The API resolves a branch by id or by name; send the id so two branches
+  // sharing a name cannot be confused, and keep the name for the display.
+  mergeForm.source_branch = branch.id || branch.name || '';
+  mergeForm.source_label = branch.name || branch.id || '';
   mergeForm.target_branch = '';
+  mergeNotice.value = '';
   showMergeModal.value = true;
 }
 function closeMergeModal() {
@@ -416,10 +425,18 @@ async function submitMerge() {
   if (!mergeForm.source_branch) return;
   mergeSaving.value = true;
   try {
-    await api.post('/api/worktree/merge', {
+    const data = await api.post('/api/worktree/merge', {
       source_branch: mergeForm.source_branch,
       target_branch: mergeForm.target_branch.trim(),
     });
+    const merge = (data && data.merge) || null;
+    // A merge can succeed while reporting conflicts — the target kept the
+    // source result under a manual strategy. Saying nothing would report a
+    // manual merge as a clean one.
+    mergeNotice.value =
+      merge && Array.isArray(merge.conflicts) && merge.conflicts.length
+        ? merge.conflicts.join('; ')
+        : '';
     showMergeModal.value = false;
     await loadBranches();
   } catch (err) {
@@ -581,6 +598,18 @@ onMounted(() => {
 .wt-toggle input { cursor: pointer; }
 
 /* ── Branches table ────────────────────────────────────────────── */
+.wt-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-2);
+  padding: var(--sp-2);
+  border: 1px solid var(--warn);
+  border-radius: var(--r-md);
+  background: var(--warn-soft);
+  color: var(--warn-strong);
+  font-size: var(--fs-sm);
+}
 .wt-table {
   width: 100%;
   border: 1px solid var(--border-subtle);

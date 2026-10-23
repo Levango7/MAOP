@@ -111,9 +111,3 @@ GET /api/system/resources
 GET /api/vector/list
 GET /api/vector/search
 GET /api/vector/stats
-POST /api/worktree/abandon
-POST /api/worktree/branch
-POST /api/worktree/checkpoint
-POST /api/worktree/create-root
-POST /api/worktree/merge
-POST /api/worktree/rollback

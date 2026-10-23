@@ -6,7 +6,6 @@ mocked WorktreeManager.
 """
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -19,23 +18,28 @@ def worktree_env(tmp_path, monkeypatch):
     """Isolate MAOP_ROOT and mock WorktreeManager."""
     monkeypatch.setattr("maop.dashboard.routers.worktree.MAOP_ROOT", tmp_path)
 
-    # Reset worktree manager singleton
-    import maop.dashboard.routers.worktree as wt_mod
-    wt_mod._worktree_mgr = None
+    # Reset the worktree manager singleton. It lives in the service module —
+    # resetting an attribute on the router module would create a new, unread
+    # attribute there and leave the real singleton in place.
+    from maop.dashboard.services import execution_service
 
-    # Mock WorktreeManager
+    execution_service._worktree_mgr = None
+
+    # Mock WorktreeManager. The returns are the real domain models, not
+    # hand-written dicts: a stub with an invented key (the old merge stub
+    # carried a ``merged`` field that ``MergeResult`` never had) would let a
+    # renamed field pass unnoticed.
+    from maop.core.agent.memory_ctx.worktree import BranchInfo, MergeResult, MergeStrategy
+
     mock_mgr = MagicMock()
     mock_mgr.create_root = MagicMock(return_value="root-1")
     mock_mgr.branch = MagicMock(return_value="branch-1")
     mock_mgr.abandon = MagicMock(return_value=True)
-    mock_mgr.get_branch = MagicMock(return_value=SimpleNamespace(
-        model_dump=lambda: {"id": "branch-1", "name": "test"}
-    ))
-    mock_mgr.list_branches = MagicMock(return_value=[
-        SimpleNamespace(model_dump=lambda: {"id": "b1", "name": "branch1"})
-    ])
-    mock_mgr.merge = MagicMock(return_value=SimpleNamespace(
-        model_dump=lambda: {"merged": True, "conflicts": []}
+    mock_mgr.get_branch = MagicMock(return_value=BranchInfo(id="branch-1", name="test"))
+    mock_mgr.list_branches = MagicMock(return_value=[BranchInfo(id="b1", name="branch1")])
+    mock_mgr.merge = MagicMock(return_value=MergeResult(
+        success=True, source_branch="branch-1", target_branch="main",
+        strategy=MergeStrategy.AUTO, conflicts=[], merged_result="",
     ))
     mock_mgr.checkpoint = MagicMock(return_value="cp-1")
     mock_mgr.rollback = MagicMock(return_value=True)
@@ -174,6 +178,18 @@ class TestMerge:
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
+        assert resp.json()["merge"]["success"] is True
+
+    def test_failed_merge_is_404(self, worktree_env, client):
+        """A merge that touched no row must not answer "ok"."""
+        from maop.core.agent.memory_ctx.worktree import MergeResult
+
+        worktree_env.merge.return_value = MergeResult(
+            success=False, source_branch="nope",
+            conflicts=["Source branch not found"],
+        )
+        resp = client.post("/api/worktree/merge", json={"source_branch": "nope"})
+        assert resp.status_code == 404
 
 
 class TestCheckpoint:

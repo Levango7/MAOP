@@ -231,6 +231,28 @@ class WorktreeManager:
             )
         return True
 
+    def _resolve_ref(self, conn: Any, ref: str) -> str:
+        """Resolve a branch reference to a node id.
+
+        Accepts a node id first, then a branch name. The dashboard shows names
+        to the user and the API previously looked up ids only, so a merge
+        driven from the UI could never find its branch. When several branches
+        share a name the most recently created one wins — names are not
+        unique in the schema.
+        """
+        if not ref:
+            return ""
+        row = conn.execute(
+            "SELECT id FROM worktree_nodes WHERE id = ?", (ref,),
+        ).fetchone()
+        if row:
+            return str(row[0])
+        row = conn.execute(
+            "SELECT id FROM worktree_nodes WHERE name = ? ORDER BY created_at DESC LIMIT 1",
+            (ref,),
+        ).fetchone()
+        return str(row[0]) if row else ""
+
     def merge(
         self,
         source_branch: str,
@@ -239,24 +261,26 @@ class WorktreeManager:
     ) -> MergeResult:
         """Merge a source branch into target (or root if target not specified)."""
         with self._connect() as conn:
-            src_row = conn.execute(
-                "SELECT * FROM worktree_nodes WHERE id = ?", (source_branch,),
-            ).fetchone()
-            if not src_row:
+            src_id = self._resolve_ref(conn, source_branch)
+            if not src_id:
                 return MergeResult(success=False, source_branch=source_branch,
                                    strategy=strategy, conflicts=["Source branch not found"])
 
             cols = [d[0] for d in conn.execute("SELECT * FROM worktree_nodes LIMIT 0").description]
+            src_row = conn.execute(
+                "SELECT * FROM worktree_nodes WHERE id = ?", (src_id,),
+            ).fetchone()
             src = dict(zip(cols, src_row))
 
-            tgt_id = target_branch or src["root_id"]
+            tgt_ref = target_branch or src["root_id"]
+            tgt_id = self._resolve_ref(conn, tgt_ref)
+            if not tgt_id:
+                return MergeResult(success=False, source_branch=src_id,
+                                   target_branch=tgt_ref, strategy=strategy,
+                                   conflicts=["Target branch not found"])
             tgt_row = conn.execute(
                 "SELECT * FROM worktree_nodes WHERE id = ?", (tgt_id,),
             ).fetchone()
-            if not tgt_row:
-                return MergeResult(success=False, source_branch=source_branch,
-                                   target_branch=tgt_id, strategy=strategy,
-                                   conflicts=["Target branch not found"])
             tgt = dict(zip(cols, tgt_row))
 
             conflicts: list[str] = []
@@ -277,12 +301,12 @@ class WorktreeManager:
             )
             conn.execute(
                 "UPDATE worktree_nodes SET status = ?, updated_at = ? WHERE id = ?",
-                (BranchStatus.MERGED.value, now, source_branch),
+                (BranchStatus.MERGED.value, now, src_id),
             )
 
         return MergeResult(
             success=True,
-            source_branch=source_branch,
+            source_branch=src_id,
             target_branch=tgt_id,
             strategy=used_strategy,
             conflicts=conflicts,
@@ -402,14 +426,20 @@ class WorktreeManager:
         return True
 
     def abandon(self, node_id: str) -> bool:
-        """Mark a branch as abandoned."""
+        """Mark a branch as abandoned.
+
+        Returns ``False`` when the node does not exist — the ``UPDATE`` matching
+        zero rows is the only truthful signal, and reporting success for a
+        branch that was never there hides the miss from the caller.
+        """
         now = time.time()
         with self._connect() as conn:
-            conn.execute(
+            cur = conn.execute(
                 "UPDATE worktree_nodes SET status = ?, updated_at = ? WHERE id = ?",
                 (BranchStatus.ABANDONED.value, now, node_id),
             )
-        return True
+            updated = int(cur.rowcount or 0)
+        return updated > 0
 
     def list_branches(self, root_id: str = "", active_only: bool = False) -> list[BranchInfo]:
         """List all branches, optionally filtered by root or active status."""

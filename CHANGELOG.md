@@ -39,6 +39,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### worktree 批次：8 条端点建模，挖出三个"合并其实没发生"（2026-10-23）
+
+P1-b 第九批：`/api/worktree/*` 全部 8 条端点声明 `response_model`，新增
+`routers/worktree_schemas.py`。信封**复用**领域模型 `BranchInfo`/
+`MergeResult`（`core/agent/memory_ctx/worktree.py` 里那两个），不另抄一份
+字段表——只有 manager 知道 `BranchInfo` 有几个键，抄一份就会漂。
+`status` 默认给 `"error"`：这批路由的 `@handle_api_errors(error_value=...)`
+兜底是**普通 dict**，普通 dict 会真的进信封校验，给 `"ok"` 兜底等于把失败
+响应标成成功（`/api/worktree/list` 的兜底干脆连 `status` 都没有）。
+
+**"弃用"永远成功**：`WorktreeManager.abandon()` 无条件 `return True`，
+不管 `UPDATE` 命中几行 ⇒ 路由里那条 `if not ok: raise 404` 永远不成立
+⇒ 弃用一个根本不存在的分支也报"成功"。现在按 `rowcount` 说实话。
+
+**界面发名字、接口只认 id**：`merge()` 原来只按 `id` 查分支，而
+`Worktrees.vue` 送的是分支**名** ⇒ 每次从界面发起的合并都落在
+`Source branch not found` 上，合并功能等于没有。新增 `_resolve_ref()`：
+先按 id 查，查不到再按名字查；同名分支取**最近创建**的那条（schema 里
+`name` 不唯一）。前端改成发 id、显示名，两边不再互相猜。
+
+**合并失败却回 200 "ok"**：路由不判 `result.success` 就
+`return {"status": "ok"}` ⇒ 合并没发生，仪表盘却说成功。现在失败抛 404
+（`conflicts` 进 detail），状态码与返回体一致。
+
+**冲突被前端丢在地上**：`submitMerge()` 拿到响应就扔了，`merge.conflicts`
+没人读；AUTO 策略发现两边 `result` 不同会转成 manual 并取源结果，这种
+"合上了但有冲突"和"干净合并"在界面上长得一模一样。现在读
+`merge.conflicts` 并在页头渲染一条提示（`view.worktrees.merge.conflicts`
+中英双份）。
+
+**扫描器的盲区（如实记一笔）**：`GET /api/worktree/list` 的 URL 是拼出来的
+（`` `/api/worktree/list${qs}` ``），棘轮只认字面量 `api.get('/api/...')`
+⇒ 这条端点从来不在清单里，棘轮也就从来没管过它。本批连它和
+`GET /api/worktree/get` 一起建模（所以是 8 条端点，清单只少 6 行）。
+让扫描器解析拼接 URL 是后续项。
+
+**棘轮**：清单 113 → 107。
+
+**验证**：新契约 `test_worktree_router_contracts.py` 14 条——真
+`WorktreeManager`（tmp 目录）建分支、按名字合并、按 id 合并、合并不存在
+的分支回 404、弃用不存在的分支回 404、manual 策略的冲突上报、信封字段与
+生产者逐字段对齐、8 条路由在 OpenAPI 里都带 `response_model`、每个信封的
+`status` 默认值是 `"error"`；棘轮 + worktree 共 46 passed；前端
+`Worktrees.test.js` 12/12；ruff / mypy(2 文件) / 尺寸 / 静默异常门禁绿。
+五处变异逐个转红且恢复字节一致：`abandon()` 回到恒真、`merge()` 回到只认
+id、路由回到失败也说 ok、视图回到发名字、视图回到吞掉冲突。
+
 ### audit 批次：8 条路由建模 + 两个版本统一到一套词表（2026-10-23）
 
 P1-b 第八批：`/api/audit/*` 前端在用 7 条端点（外加无人调用但同属本路由器的
