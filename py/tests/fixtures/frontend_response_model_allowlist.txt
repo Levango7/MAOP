@@ -32,13 +32,6 @@ GET /api/auth/users
 DELETE /api/auth/users/{}
 PUT /api/auth/users/{}
 GET /api/billing/summary/{}
-POST /api/blackboard/clear/{}
-GET /api/blackboard/domains
-GET /api/blackboard/domains/{}
-GET /api/blackboard/history
-GET /api/blackboard/snapshot
-GET /api/blackboard/stats
-POST /api/blackboard/write
 GET /api/bridge/adapters
 POST /api/bridge/call
 GET /api/bridge/health

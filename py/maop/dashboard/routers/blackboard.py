@@ -10,6 +10,9 @@ Endpoints:
   GET  /api/blackboard/stats           — 黑板统计信息
 
 读操作开放访问；写操作（write/clear）需 admin 鉴权。
+
+响应模型集中在 ``maop.dashboard.routers.blackboard_schemas``，字段与
+``BlackboardEntry.to_dict()`` / ``_record_history()`` 的产出一致。
 """
 
 from __future__ import annotations
@@ -23,6 +26,15 @@ from pydantic import BaseModel, Field
 from maop.core.reliability.blackboard import InvalidDomainError
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.blackboard_schemas import (
+    ClearDomainEnvelope,
+    DomainEntriesEnvelope,
+    DomainsEnvelope,
+    HistoryEnvelope,
+    SnapshotEnvelope,
+    StatsEnvelope,
+    WriteEntryEnvelope,
+)
 from maop.dashboard.services import blackboard_service
 
 logger = logging.getLogger(__name__)
@@ -48,7 +60,7 @@ class WriteEntryRequest(BaseModel):
 # ── Endpoints ────────────────────────────────────────────────────
 
 
-@router.get("/snapshot")
+@router.get("/snapshot", response_model=SnapshotEnvelope)
 @handle_api_errors("blackboard snapshot")
 async def get_snapshot() -> dict[str, Any]:
     """获取黑板完整快照。
@@ -58,14 +70,14 @@ async def get_snapshot() -> dict[str, Any]:
     return {"status": "ok", "data": blackboard_service.get_snapshot()}
 
 
-@router.get("/domains")
+@router.get("/domains", response_model=DomainsEnvelope)
 @handle_api_errors("blackboard domains")
 async def list_domains() -> dict[str, Any]:
     """列出所有允许的域（白名单）与当前非空域。"""
     return {"status": "ok", "data": blackboard_service.list_domains()}
 
 
-@router.get("/domains/{domain}")
+@router.get("/domains/{domain}", response_model=DomainEntriesEnvelope)
 @handle_api_errors("blackboard read domain")
 async def read_domain(domain: str) -> dict[str, Any]:
     """读取指定域内所有条目。"""
@@ -82,7 +94,7 @@ async def read_domain(domain: str) -> dict[str, Any]:
     }
 
 
-@router.post("/write")
+@router.post("/write", response_model=WriteEntryEnvelope)
 @handle_api_errors("blackboard write")
 async def write_entry(
     body: WriteEntryRequest, request: Request
@@ -108,7 +120,7 @@ async def write_entry(
     return {"status": "ok", "data": entry}
 
 
-@router.post("/clear/{domain}")
+@router.post("/clear/{domain}", response_model=ClearDomainEnvelope)
 @handle_api_errors("blackboard clear")
 async def clear_domain(domain: str, request: Request) -> dict[str, Any]:
     """清除指定域（admin 鉴权）。返回被清除的条目数。"""
@@ -122,14 +134,14 @@ async def clear_domain(domain: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "domain": domain, "cleared": cleared}
 
 
-@router.get("/history")
+@router.get("/history", response_model=HistoryEnvelope)
 @handle_api_errors("blackboard history")
 async def get_history(limit: int = Query(100, ge=1, le=1000)) -> dict[str, Any]:
     """获取操作历史（最近 ``limit`` 条）。"""
     return {"status": "ok", "data": blackboard_service.get_history(limit=limit)}
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=StatsEnvelope)
 @handle_api_errors("blackboard stats")
 async def blackboard_stats() -> dict[str, Any]:
     """黑板统计信息。"""

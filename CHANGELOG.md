@@ -39,6 +39,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### blackboard 批次：7 条端点建模，把"视图读错词表 + 测试跟着错"拆掉（2026-10-23）
+
+P1-b 第七批：`/api/blackboard/*` 前端在用 7 条端点声明 `response_model`，
+新增 `routers/blackboard_schemas.py`。这批的信封只声明成功形状且
+`status` **无默认值**：`blackboard.py` 不给 `@handle_api_errors` 传
+`error_value`，失败走 `error_response()` 的 `JSONResponse`（直接绕过
+序列化）⇒ 兜底 dict 根本不会进信封，给 `status` 兜个 `"error"` 只是自我安慰。
+
+**视图读的是另一套词表**：`BlackboardEntry.to_dict()` 发 `entry_id`
+（`core/reliability/blackboard.py:106-116`），而模板用 `:key="e.id || i"` ⇒ 永远走下标兜底，
+列表变化时 Vue 按下标复用行。历史行同理：`_record_history()` 只写
+`action/domain/entry_id/contributor/timestamp`（`+extra`），模板却按
+`h.op || h.operation || h.action`、`h.actor || h.contributor`、
+`h.domain || h.target`、`e.timestamp || e.ts || e.created_at` 一路兜底，
+`h.id`/`h.target` 是从不存在的键。
+
+**测试替身把错误固化了**：`Blackboard.test.js` 的 mock 写的正是
+`{id, op, actor}` 和域 `tasks/results/metrics` —— 真实的
+`BlackboardDomain`（R-8 白名单）是
+`problem/partial_solution/hypothesis/evidence/decision/constraint/agent_contribution`，
+七个里一个都没出现在 mock 里。视图的兜底链 + 替身的错词表 = 两边自洽地错着，
+`9 tests` 全绿。mock 换成生产者真实形状（条目 7 键齐全、历史行 5 键齐全 +
+clear 行带 `cleared_count`），并补一条**自相矛盾的反向探针**：同一行同时给
+`action:'write'`（真）和 `op:'clear'`（假），断言徽章文字是 write **且**
+tone 是 `badge--success`；另一行只带死词表键，断言它一个字都渲染不出来。
+
+**`extra="allow"` 是有原因的**：`_record_history(extra=...)` 是开放口子
+（clear 行带 `cleared_count`），响应模型默认会**过滤掉未声明的键** ⇒
+声明式信封在这里会把生产者数据抹掉。契约测试同时钉住
+`cleared_count` 透传与"`cleared_count` 不在 `HistoryRowOut.model_fields` 里"，
+以后有人想把它改成显式字段也不会漏。
+
+**没被测试覆盖的一处**：`:key` 从 `e.id` 改成 `e.entry_id` 在文本断言里
+观察不到（内容/贡献者本来就是直接绑定，下标键只在复用行时才出错），所以这一条
+只靠代码事实，不假称有回归网。
+
+**棘轮**：清单 127 → 120。
+
+**验证**：新契约 11 条（真 `Blackboard` + `reset_blackboard()` 隔离，不用替身）、
+`test_blackboard.py` 74 条、`Blackboard.test.js` 10 条、定向合跑 90 passed；
+前端全量 63 files / 547 tests passed；eslint / ruff / mypy(2 文件) /
+尺寸 / 静默异常 / docs 门禁绿。**变异九处**（摘 `GET /history` 的信封、
+`extra=allow` 去掉、条目信封改叫 `id`、模板五处兜底链逐个复原）全部转红
+且恢复字节一致——其中 `historyTone` 与时间兜底两处**第一轮跑漏了**：
+原探针只给"真+假都发"的行，而 `h.timestamp || h.ts` 在第一键存在时根本走不到
+分支；改成"一行自相矛盾 + 一行只发死键"才真正有牙齿。
+
+
 ### model-gateway 批次：8 条端点建模 + 两个静默数据缺陷（2026-10-23）
 
 P1-b 第六批：`/api/model-gateway/*` 前端在用 8 条端点声明 `response_model`，
