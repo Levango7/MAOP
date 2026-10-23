@@ -95,11 +95,6 @@ GET /api/security/config
 GET /api/sessions
 POST /api/sessions/{}/rerun
 GET /api/skills
-POST /api/subagent/cancel
-GET /api/subagent/list
-POST /api/subagent/spawn
-GET /api/subagent/transcript
-POST /api/subagent/wait
 GET /api/system/diagnostics
 GET /api/system/resources
 GET /api/vector/list

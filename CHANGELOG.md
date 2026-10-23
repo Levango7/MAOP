@@ -39,6 +39,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### subagent 批次：5 条端点建模，三个行内按钮其实全是坏的（2026-10-23）
+
+P1-b 第十一批：`/api/subagent/*` 前端在用的 5 条端点全部声明 `response_model`，
+新增 `routers/subagent_schemas.py`。信封**复用**领域模型 `AgentResult`/
+`TranscriptEntry`（`core/agent/delegation/subagent_lifecycle.py` 里那两个）——
+只有 manager 知道一条转录条目有几个键。
+
+**"等待 / 转录 / 取消"三个按钮全是坏的**：视图读 `a.agent_id`，而
+`SubAgentManager.list_agents()` 吐的是数据库列 `id`（名字列是 `name`，视图读
+`a.agent`）⇒ 每行的 id 列空白，三个行内操作都发 `agent_id: undefined` ⇒
+请求体里的 `agent_id` 取默认值 `""` ⇒ 后端 `raise HTTPException(400,
+"missing agent_id")` ⇒ 这三个功能在界面上从来没成功过。现在路由把这两列改名成
+API 其余部分已经在用的词（`spawn`/`cancel` 回的都是 `agent_id`，spawn 请求体
+把名字叫 `agent`），其余列原样保留。
+
+**旧测试的替身和生产者对不上**：既有覆盖测试把 `list_agents` 替成
+`{"id": ..., "agent": ...}`（manager 从没产出过这个形状）、把转录替成
+`["line1", "line2"]`（真转录是 `TranscriptEntry` 列表）⇒ 两边各自跟视图自洽，
+谁都不像错的。现在替身按真形状写。
+
+**"信封不许丢生产者的键"在这里差点失效**：改名前后信封的字段名都在，值却是空的
+（pydantic 拿默认值补齐）⇒ 所以断言比对的是**值**，不只比对键名。
+
+**视图里两处多余的兜底**：`a.agent || a.agent_name || '—'` 里的 `agent_name`
+生产者从来没发过；转录那段 `typeof tr === 'string'` / `typeof tr === 'object'`
+两个分支同理——信封声明了 `list[TranscriptEntry]`，转录只可能是数组。
+
+**棘轮**：清单 101 → 96。
+
+**验证**：新契约 `test_subagent_router_contracts.py` 11 条——用**真**
+`SubAgentManager`（临时 SQLite；行通过 manager 自己的连接写入，因为
+`spawn()` 会去调真 LLM）而不是 mock：断言列表行的键名与**值**都来自生产者
+（`agent_id`/`agent` 是 `id`/`name` 改名，其余列原样）、列表里的 id 能被行内
+操作接受（真 manager 报"没在跑"⇒ 404，而不是 400 "missing agent_id"）、转录
+条目是 `TranscriptEntry` 的字段、wait 回的是 `AgentResult` 的字段、5 条路由在
+OpenAPI 里都带 `response_model`、每个信封的 `status` 默认 `"error"`、
+`/api/subagent/list` 的兜底（本来连 `status` 都没有）被标成 error 而不是 ok。
+棘轮 + 本批契约 + 既有覆盖共 75 passed；前端 `Subagents.test.js` 11/11；
+ruff / mypy(2 文件) / 尺寸 / 静默异常 / API 契约 / 接线门禁绿。两处变异逐个
+转红：去掉生产者的改名（后端 4 条转红）、视图改读 `a.id`/`a.name`（前端 3 条
+转红）。
+
 ### analysis 批次：6 条端点建模，"最贵 agent"那张表其实一直空着（2026-10-23）
 
 P1-b 第十批：`/api/analysis/*` 前端在用的 6 条端点全部声明 `response_model`，
