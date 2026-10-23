@@ -67,6 +67,7 @@ export const coreMessages = {
     'nav.quotas': 'Quotas',
     'nav.apikeys': 'API Keys',
     'nav.notifications': 'Notifications',
+    'nav.notificationConfig': 'Channels & rules',
     'nav.settings': 'Settings',
     // ── Page subtitles (one-line description under each page title) ──
     'nav.overview.subtitle': 'Platform-wide metrics and health at a glance',
@@ -93,6 +94,7 @@ export const coreMessages = {
     'nav.quotas.subtitle': 'Resource quotas and usage limits',
     'nav.apikeys.subtitle': 'API key creation, rotation and access scoping',
     'nav.notifications.subtitle': 'Platform alerts and notification center',
+    'nav.notificationConfig.subtitle': 'Delivery channels, routing rules and message templates',
     'nav.settings.subtitle': 'Appearance, edition and backend configuration',
     'nav.docs': 'Documentation',
     'nav.docs.subtitle': 'Guides, API reference and architecture decisions',
@@ -390,6 +392,7 @@ export const coreMessages = {
     'nav.quotas': '配额',
     'nav.apikeys': 'API 密钥',
     'nav.notifications': '通知',
+    'nav.notificationConfig': '渠道与规则',
     'nav.settings': '设置',
     // ── 页面副标题 ──
     'nav.overview.subtitle': '平台全局指标与健康状态一览',
@@ -415,6 +418,7 @@ export const coreMessages = {
     'nav.quotas.subtitle': '资源配额与使用限制',
     'nav.apikeys.subtitle': 'API 密钥创建、轮换和访问范围',
     'nav.notifications.subtitle': '平台告警与通知中心',
+    'nav.notificationConfig.subtitle': '投递渠道、路由规则与消息模板',
     'nav.settings.subtitle': '外观、版本和后端配置',
     'nav.docs': '文档',
     'nav.docs.subtitle': '指南、API 参考和架构决策',

@@ -354,6 +354,38 @@ agent 相关旗标，主运行链路（MaopLoop）也不构造带 `preferred_age
 
 验证：Notifications 14 passed（原 12 + 新 2）、AlertRules 7 passed。
 
+### 通知渠道 / 规则 / 模板：后端 14 个端点此前没有任何配置界面（2026-10-22）
+
+`notifications.py` 已提供 channels / rules / templates 的完整 CRUD（5 + 5 + 4 = 14
+个端点），但前端只有"通知列表 + 偏好开关"：没有渠道就发不出邮件/Webhook，没有
+规则就没有事件路由，模板只能靠 curl 建。同一套后端能力在 UI 上等于不存在。
+
+新增 `/notifications/config`（侧边栏 "Channels & rules"），三个 tab：
+
+- **Channels**：按类型生成结构化表单 —— email 对应 `EmailChannel` 的
+  host / port / username / password / from_addr / to_addrs / use_tls / use_ssl；
+  webhook 对应 `WebhookChannel` 的 url / method / secret / headers / timeout_s /
+  ssl_verify；inapp 对应 `user_id`。表单不认识的配置键原样保留。
+- **Rules**：事件类型（9 个内置事件作候选，仍允许自定义）、多选渠道、级别、
+  模板、payload 过滤 JSON。
+- **Templates**：创建 / 删除（后端没有 PUT，界面不造一个假的保存按钮）。
+
+隐藏的契约坑与处理：
+
+- 读接口把密钥掩码成 `"***"`，而 `PUT /channels/{id}` 的 `config` 是**整体替换**。
+  把 GET 结果原样回传会把密钥写成字面量 `"***"`。⇒ 编辑时配置区默认折叠，只改
+  名称/描述/启用状态时 **根本不发 `config`**；展开配置会明确提示"保存将整体替换，
+  需要保留的密钥请重新填写"，空密钥即删除。测试断言 PUT 体里既不出现 `"***"`，
+  也不出现未触碰的 `config` 键。
+- 规则没有渠道等于永不投递（manager 只遍历 `channel_ids`），前端把"至少一个渠道"
+  作为保存前置条件。
+
+验证：新增 8 条 vitest（加载三列表、创建 email 渠道的结构化 config、改名不发
+config、配置区不回传掩码、规则必须选渠道、模板创建/删除、空态、错误态）；全量
+前端 533 passed、`vite build` 通过。另起真实后端（个人版 owner 模式 + 独立
+`MAOP_DATA_DIR`）用真浏览器跑通：建渠道 → 建规则 → 建模板 → 刷新后仍在 → 改名
+→ 从 `/api/notifications/*` 回读的 `channel_ids` 与输入一致，控制台无报错。
+
 ### Agent 计费：额度卡片恒为 0、记录筛选静默失效（2026-10-21）
 
 - `GET /api/quota/{agent}` 返回 `{quota: {...}}`，页面直接读顶层桶 ⇒ 额度卡片
