@@ -13,11 +13,6 @@ GET /api/agent/upgrade
 POST /api/agent/upgrade
 GET /api/alerts
 POST /api/api-keys/{}/revoke
-POST /api/auth/register
-GET /api/auth/status
-GET /api/auth/users
-DELETE /api/auth/users/{}
-PUT /api/auth/users/{}
 GET /api/bridge/adapters
 POST /api/bridge/call
 GET /api/bridge/health

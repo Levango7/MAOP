@@ -39,6 +39,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### auth 批次：5 条端点建模，用户列表的"最后登录"列从未有数据（2026-10-24）
+
+P1-b 第十四批：`/api/auth/*` 前端在用的 5 条端点（注册、状态、用户列表、
+更新、删除）全部声明 `response_model`，新增 `routers/auth_schemas.py`。
+字段名逐字来自 `auth_service` 的生产者（`db_list_users()` 的 item、
+`db_register_user()`/`db_update_user()`/`db_delete_user()` 的返回）。
+
+**"最后登录"整列永远是 `—`**：`Users.vue` 的登录时间列读
+`u.last_login`，但 `users` 表没有该列（SQLite/PG 建表语句都没有），
+`db_list_users()` 也从不返回它——这一列从上线起就没有数据源。删除表头、
+单元格、i18n 键与窄屏折叠规则（不做跨库 schema 迁移：这个能力本就不存在）。
+
+**每个用户的创建时间都显示成 1970 年**：`created_at` 是 `REAL` 列，写入用
+`time.time()`（epoch **秒**），视图却 `new Date(秒)` 按毫秒解释 ⇒ 1970-01。
+`formatDate()` 改为数值一律 ×1000；字符串解析保留为兼容分支。
+
+**`GET /api/auth/status` 没有 `status` 键**：它直接返回
+`{auth_enabled, has_token}`，App/Agents/Chat/Settings 四个视图也只读这两项。
+模型照实建（`AuthStatusPayload` 无 `status`/`error`），不为了信封整齐而
+补一个真实响应里不存在的键。
+
+**两个请求模型会静默吞掉拼错的字段**：`RegisterRequest` 收到
+`{"role": [...]}`（少个 s）时丢弃该键、按默认 `["read"]` 建档并回报成功；
+`UpdateUserRequest` 收到 `{"role": [...]}` 时丢弃、回报 `status: ok` 而实际
+什么都没改——操作者会以为角色已授予。两者都加 `extra="forbid"`：多发键
+一律 422。视图的注册体本来就只发 `username/password/roles`，编辑体只发
+`roles` + 可选的 `password`。
+
+**两处死代码**：注册/更新的成功分支读 `d.error`，但 2xx 信封里没有这个键，
+非 2xx 由 api store 直接抛错——该分支永远走不到，一并删除。
+
+**棘轮**：清单 85 → 80。
+
+**验证**：新契约 `test_auth_router_contracts.py` 16 条——真路由 + 每测试
+隔离的 `MAOP_DATA_DIR` + 真 PBKDF2 用户库：断言列表行的键集**等于**
+`db_list_users()` 的输出、视图静态读取 ⊆ 生产者所发、`last_login` 在生产与
+视图两侧都不存在、`created_at` 落在注册前后的真实墙钟窗口内且视图确实
+×1000、注册响应的键集等于 `db_register_user()` 的输出、`/api/auth/status`
+的实发键集与 OpenAPI 属性都恰好是两项、更新能往返 `enabled`、删除回
+`status/message`、拼错字段（注册/更新）422 且数据未变、注册仍拒绝
+`admin` 角色、404/403 保留状态码、三个信封 `status` 默认 `"error"`、两个
+请求模型在 OpenAPI 里 `additionalProperties: false` 且字段集与视图实发
+一致。前端 `Users.test.js` 新增 4 条（秒→日期、无 last_login 列、注册体
+三字段、编辑体只发 roles）。变异转红：`AuthStatusPayload` 补 `status`
+（1 红）、去掉 `UpdateUserRequest` 的 `extra="forbid"`（1 红）、去掉
+`GET /api/auth/users` 的 `response_model`（契约 1 红）、视图改回
+`new Date(n)`（前端 1 红）。
+
 ### feedback 批次：5 条端点建模，编辑请求体不再能静默换目标（2026-10-24）
 
 P1-b 第十三批：`/api/feedback/*` 前端在用的 5 条端点（列表/摘要/创建/更新/

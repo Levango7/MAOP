@@ -274,7 +274,6 @@ export const coreMessages = {
     'users.password': 'Password',
     'users.roles': 'Roles',
     'users.created': 'Created',
-    'users.lastLogin': 'Last Login',
     'users.confirmDelete': 'Confirm deregistration of this user?',
     'users.noUsers': 'No users',
 
@@ -610,7 +609,6 @@ export const coreMessages = {
     'users.password': '密码',
     'users.roles': '角色',
     'users.created': '创建时间',
-    'users.lastLogin': '最后登录',
     'users.confirmDelete': '确认注销该用户？',
     'users.noUsers': '暂无用户',
 
