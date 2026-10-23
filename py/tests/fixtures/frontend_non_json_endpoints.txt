@@ -1,0 +1,12 @@
+# Endpoints the dashboard calls WITHOUT a JSON envelope.
+#
+# A response_model would be a lie for these: the handler returns an SSE
+# stream or an attachment body, so OpenAPI cannot describe the payload.
+# The ratchet skips them — but every entry is checked to name a mounted
+# route that still has NO model, so a rename, a deletion, or a handler that
+# later starts returning JSON all fail the gate instead of hiding here.
+# Format: METHOD PATH # reason
+
+GET /api/feedback/export # file download (CSV, or a raw JSON attachment body)
+GET /api/stream/agent/{} # SSE: StreamingResponse media_type=text/event-stream
+GET /api/stream/dag/{} # SSE: StreamingResponse media_type=text/event-stream
