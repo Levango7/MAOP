@@ -19,13 +19,6 @@ GET /api/analysis/resource-utilization
 GET /api/analysis/summary
 GET /api/analysis/task-trends
 POST /api/api-keys/{}/revoke
-GET /api/audit/alert/history
-GET /api/audit/alert/rules
-POST /api/audit/alert/rules
-DELETE /api/audit/alert/rules/{}
-PUT /api/audit/alert/rules/{}
-GET /api/audit/events
-GET /api/audit/summary
 POST /api/auth/register
 GET /api/auth/status
 GET /api/auth/users

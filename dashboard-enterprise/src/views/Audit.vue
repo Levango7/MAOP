@@ -164,7 +164,7 @@
           <div v-for="r in rules" :key="r.id" class="rule-row">
             <div class="rule-row__main">
               <span class="rule-row__name">{{ r.name }}</span>
-              <span class="rule-row__cond">{{ r.condition }}</span>
+              <span class="rule-row__cond">{{ r.condition_text }}</span>
             </div>
             <Badge :tone="levelTone(r.severity)">{{ r.severity }}</Badge>
             <span class="rule-row__state" :class="r.enabled ? 'is-on' : 'is-off'">
@@ -606,12 +606,30 @@ const ruleEditor = reactive({ open: false, rule: { id: '', name: '', condition: 
 // 修复: 添加 ruleSaving 状态防止保存规则按钮重复提交
 const ruleSaving = ref(false);
 
+function ruleConditionText(rule) {
+  const c = rule.condition || {};
+  if (rule.condition_type === 'threshold') {
+    const parts = [c.op, c.value].filter((v) => v !== undefined && v !== null && v !== '');
+    if (c.window_s) parts.push(`/${c.window_s}s`);
+    return parts.join(' ');
+  }
+  return rule.condition_type || '';
+}
+
 async function loadRules() {
   rulesLoading.value = true;
   rulesError.value = '';
   try {
     const d = await api.get('/api/audit/alert/rules');
-    rules.value = d.rules || [];
+    // AuditAlertRule: rule_id / name / condition_type / condition{op,value,
+    // window_s,filter} / action / severity / enabled. `condition` is a dict, so
+    // rendering it directly printed "[object Object]"; id comes from rule_id,
+    // otherwise every row keyed on undefined.
+    rules.value = (d.rules || []).map((r) => ({
+      ...r,
+      id: r.rule_id,
+      condition_text: ruleConditionText(r),
+    }));
   } catch (e) {
     rulesError.value = e.message || t('view.audit.rulesUnavailable');
   } finally {
@@ -687,7 +705,18 @@ async function loadHistory() {
     // 实际端点是 /api/audit/alert/history，返回 {status, alerts, count}
     // —— 与下方 `d.alerts` 的读取方式一致。
     const d = await api.get('/api/audit/alert/history');
-    history.value = d.alerts || d.history || [];
+    // AuditAlert: alert_id / rule_id / triggered_at / event_id / severity /
+    // message / acknowledged / metadata. The display name of the rule and the
+    // actor of the triggering event live inside metadata, and only for
+    // engine-built alerts -- rule_id is always there, so fall back to it.
+    history.value = (d.alerts || []).map((a) => ({
+      ...a,
+      id: a.alert_id,
+      time: a.triggered_at,
+      rule_name: (a.metadata && a.metadata.rule_name) || a.rule_id,
+      event: a.message,
+      actor: (a.metadata && a.metadata.event_actor) || '',
+    }));
   } catch (e) {
     historyError.value = e.message || t('view.audit.historyUnavailable');
   } finally {
@@ -699,10 +728,11 @@ async function loadHistory() {
 async function loadSummary() {
   try {
     const d = await api.get('/api/audit/summary');
-    const s = d.summary || d;
+    const s = d.summary;
     summary.data = {
-      total: s.total || s.total_events || 0,
-      by_action: s.by_action || {},
+      total: s.total_events,
+      by_action: s.by_action,
+      // by_actor is enterprise-absent (null), not a spelling variant.
       by_actor: s.by_actor || {},
     };
     summary.error = '';
@@ -713,11 +743,14 @@ async function loadSummary() {
 async function loadEvents() {
   try {
     const d = await api.get('/api/audit/events');
+    // One wire vocabulary since 2026-10-23: the service answers both editions
+    // with severity/resource (personal used to spell them level/target), so the
+    // view model maps once instead of chaining `e.level || e.severity`.
     events.value = (d.events || []).map((e) => ({
       ...e,
-      time: e.time || e.timestamp,
-      level: e.level || e.severity || 'info',
-      target: e.target || e.resource || '',
+      time: e.timestamp,
+      level: e.severity,
+      target: e.resource,
     }));
     events.error = '';
   } catch (e) {

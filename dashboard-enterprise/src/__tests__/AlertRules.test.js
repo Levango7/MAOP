@@ -28,17 +28,24 @@ describe('AlertRules.vue', () => {
       let body = {};
       if (u === '/api/audit/alert/rules') {
         body = {
+          // AuditAlertRule: keyed by rule_id, operator/value live in `condition`.
           rules: [{
-            id: 'r1', name: 'cpu-hot', metric: 'cpu_usage', condition: '>',
-            threshold: 90, channel: 'email', enabled: true,
+            rule_id: 'r1', name: 'cpu-hot', description: '', enabled: true,
+            condition_type: 'threshold', condition: { op: '>', value: 90, window_s: 300 },
+            action: 'email', action_config: { email: 'ops@example.com' },
+            severity: 'warning', tenant_id: '', created_at: 1763000000,
+            updated_at: 1763000000, created_by: 'alice',
           }],
           count: 1,
         };
       } else if (u.startsWith('/api/audit/alert/history')) {
         body = {
+          // AuditAlert: no per-alert metric value or delivery channel.
           alerts: [{
-            id: 'a1', triggered_at: '2026-10-20T10:00:00Z',
-            rule_name: 'cpu-hot', value: 7.5, channel: 'email', status: 'fired',
+            alert_id: 'a1', rule_id: 'r1', triggered_at: 1763000000, event_id: 'ev1',
+            severity: 'warning', message: 'cpu-hot fired', acknowledged: false,
+            acknowledged_by: '', acknowledged_at: null, tenant_id: '',
+            metadata: { rule_name: 'cpu-hot', event_actor: 'system' },
           }],
           count: 1,
         };
@@ -93,7 +100,9 @@ describe('AlertRules.vue', () => {
 
     const drawerText = document.body.textContent;
     expect(drawerText).toContain('cpu-hot');
-    expect(drawerText).toContain('7.5');
+    // The wire carries a message and a severity, not a metric value.
+    expect(drawerText).toContain('cpu-hot fired');
+    expect(drawerText).toContain('warning');
     wrapper.unmount();
   });
 
@@ -107,7 +116,12 @@ describe('AlertRules.vue', () => {
       let ok = true;
       let status = 200;
       if (u === '/api/audit/alert/rules') {
-        body = { rules: [{ id: 'r1', name: 'cpu-hot', metric: 'cpu_usage', condition: '>', threshold: 90, channel: 'email', enabled: true }], count: 1 };
+        body = { rules: [{
+          rule_id: 'r1', name: 'cpu-hot', description: '', enabled: true,
+          condition_type: 'threshold', condition: { op: '>', value: 90, window_s: 300 },
+          action: 'email', action_config: { email: 'ops@example.com' }, severity: 'warning',
+          tenant_id: '', created_at: 1763000000, updated_at: 1763000000, created_by: 'alice',
+        }], count: 1 };
         if (rules === 'missing') { ok = false; status = 404; body = { error: 'requires enterprise edition' }; }
       } else if (u.startsWith('/api/audit/alert/history')) {
         body = { alerts: [], count: 0 };

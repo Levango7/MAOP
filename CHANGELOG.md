@@ -39,6 +39,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### audit 批次：8 条路由建模 + 两个版本统一到一套词表（2026-10-23）
+
+P1-b 第八批：`/api/audit/*` 前端在用 7 条端点（外加无人调用但同属本路由器的
+`GET /alert/rules/{rule_id}` 一并做齐）声明 `response_model`，新增
+`routers/audit_schemas.py`。`audit.py` 全用裸 `@handle_api_errors`，失败走
+`error_response()` 的 `JSONResponse` ⇒ 兜底不进信封，`status` 因此不给默认值。
+
+**⚠ 线上字段更名（个人版分支）**：`observability_service` 按
+`has_feature(FeatureFlag.AUDIT_LOG)` 分叉，两条产线以前**拼写不同**——
+个人版 `AuditEvent` 用 `level`/`target`、summary 用 `total`，企业版用
+`severity`/`resource`/`total_events`。`Audit.vue` 于是靠
+`e.level || e.severity` 这类兜底链缝起来，而它的 vitest 替身写的恰恰是
+视图内部的 `time/level/target` 名字 ⇒ 两边自洽，谁都不像错的。现在个人版分支
+直接产出企业版词表（`warn` → `warning`；`error` 保留，不夸大成 `critical`），
+`level`/`target`/`total` 不再上线。全仓（含 e2e）只有 `Audit.vue` 读这两个端点，
+已同步改掉。个人版记不到的属性置 `None` 而非 `""`，"没记"与"记成空"是两回事。
+
+**三个过滤器此前什么都不做**：个人版分支只把 `action`/`limit` 传下去，
+`severity`、`hours`、`offset` 全被丢掉 ⇒ 按级别筛选返回全部、时间窗不过滤、
+翻页永远返回同一页。现在三个都生效（`/filter` 的个人版行也跟着并成一套词表）。
+
+**每条审计记录都显示成"两万多天前"**：`timestamp` 两个版本都是 **epoch 秒**，
+而 `DataTable.formatRel` 直接把数字交给 `new Date()`（那是毫秒）。视图里早就有
+`toMs()` 处理这个单位差，只有渲染单元漏了 ⇒ 现在 `< 1e12` 按秒处理。
+`Audit.vue` 的聚合走 `toMs`，所以统计卡片一直是对的，坏的是表格里那一格。
+
+**规则行渲染成 `[object Object]`**：`AuditAlertRule.condition` 是 dict
+（`{op,value,window_s,filter}`），模板直接 `{{ r.condition }}`；`:key="r.id"` 也
+取不到（生产者是 `rule_id`）⇒ 所有行共用一个 `undefined` 键。改成
+`rule_id` + `condition_text`（阈值规则显示 `>= 5 /300s`，其余显示条件类型）。
+`AlertRules.vue` 同样问题：`normalizeRules` 读 `r.id` ⇒
+**编辑/删除/历史抽屉全部打到 `/api/audit/alert/rules/undefined`**，
+抽屉的 URL 也变成 `rule_id=undefined`；抽屉列表现改 `alert_id/triggered_at/
+severity/message/acknowledged`，原来的"值/渠道"两列在链路上根本没有对应字段
+（i18n 里 `historyColValue/Channel` 换成 `Severity/Message`）。
+
+**没修、需要产品决策的一处**：两个页面的规则**表单**本身对不上后端。
+后端条件里没有"metric"这个维度（只有 `filter` 的事件字段匹配），
+`action_config`（email/webhook/cooldown）在 MAOS 侧**只写不读**
+（`grep action_config maop/enterprise/audit_enhanced.py` 只命中模型定义与
+create/update 落库，引擎从不消费）⇒ 通知渠道是"存了但不会发生"。
+而且表单把 `condition` 当字符串发，`AuditAlertRuleCreate.condition: dict`
+⇒ POST/PUT 现在仍 422，**保存规则依旧是坏的**；本批只把"选中哪条规则"
+（id）与展示改对，没有替这个缺失概念编一个映射。
+
+**棘轮**：清单 120 → 113。
+
+**验证**：新契约 `test_audit_router_contracts.py` 12 条——个人版走真实
+`AuditLog`（tmp `MAOP_ROOT`）+ 词表/过滤/分页/时间窗断言，企业版三条用
+`importorskip` 分别拿真 `AuditEvent`/`AuditAlertRule`/`AuditAlert` 的
+`model_dump()` 过信封（本机 MAOS 可导入，三条实跑通过；CI 无 overlay 时跳过，
+前 9 条仍跑）；`-k "audit or observ or frontend_response"` 471 passed /
+7 skipped；前端全量 63 files / 547 tests passed；eslint / ruff / mypy(2 文件) /
+尺寸 / 静默异常 / docs 门禁绿。十一处变异逐个转红且恢复字节一致：服务层退回
+`target` 拼写、`warn` 不再归一、去掉 severity 过滤、去掉 offset、去掉 hours
+窗口、summary 仍发 `total`、摘掉 `GET /events` 信封、`Audit.vue` 恢复
+`e.level || e.severity`、规则行直发 condition 原值、`AlertRules.vue` 恢复
+`r.id`、`DataTable` 不再把秒当秒。
+
+
 ### blackboard 批次：7 条端点建模，把"视图读错词表 + 测试跟着错"拆掉（2026-10-23）
 
 P1-b 第七批：`/api/blackboard/*` 前端在用 7 条端点声明 `response_model`，

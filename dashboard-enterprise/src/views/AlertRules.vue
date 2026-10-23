@@ -331,9 +331,9 @@ function defaultForm() {
 const historyCols = computed(() => [
   { key: 'time', label: t('view.alerts.historyColTime'), type: 'time' },
   { key: 'rule', label: t('view.alerts.historyColRule') },
-  { key: 'value', label: t('view.alerts.historyColValue'), type: 'num' },
-  { key: 'channel', label: t('view.alerts.historyColChannel') },
-  { key: 'status', label: t('view.alerts.historyColStatus'), type: 'badge' },
+  { key: 'severity', label: t('view.alerts.historyColSeverity'), type: 'badge' },
+  { key: 'message', label: t('view.alerts.historyColMessage') },
+  { key: 'status', label: t('view.alerts.historyColStatus') },
 ]);
 
 // ── 统计 ──
@@ -383,15 +383,6 @@ function channelLabel(ch) {
     inline: t('view.alerts.channelInline'),
   };
   return map[ch] || ch;
-}
-
-function alertStatusLabel(s) {
-  const map = {
-    fired: t('view.alerts.alertFired'),
-    resolved: t('view.alerts.alertResolved'),
-    acknowledged: t('view.alerts.alertAcknowledged'),
-  };
-  return map[s] || s;
 }
 
 // ── 数据加载 ──
@@ -483,12 +474,16 @@ function formatTs(ts) {
 function normalizeRules(d) {
   const items = Array.isArray(d) ? d : (d.items || d.rules || d.data || []);
   return items.map((r) => ({
-    id: r.id,
+    // AuditAlertRule keys by rule_id; reading `id` left every edit/delete
+    // pointing at /api/audit/alert/rules/undefined.
+    id: r.rule_id,
     name: r.name || '',
     description: r.description || '',
     metric: r.metric || '',
-    condition: r.condition || '>',
-    threshold: r.threshold,
+    // The engine keeps the operator and the value inside `condition`
+    // ({op, value, window_s, filter}), not as flat columns.
+    condition: (r.condition && r.condition.op) || '>=',
+    threshold: r.condition ? r.condition.value : undefined,
     channel: r.channel || 'email',
     email: r.email || '',
     webhook_id: r.webhook_id || '',
@@ -611,14 +606,19 @@ async function openHistory(r) {
     const d = await api.get(
       `/api/audit/alert/history?rule_id=${encodeURIComponent(r.id)}`,
     );
-    const items = Array.isArray(d) ? d : (d.alerts || d.items || d.history || d.records || []);
+    const items = d.alerts || [];
+    // AuditAlert: alert_id / rule_id / triggered_at / severity / message /
+    // acknowledged / metadata. There is no per-alert metric value or delivery
+    // channel on the wire, so the drawer shows what the alert actually says.
     historyRecords.value = items.map((h) => ({
-      id: h.id || h.ts || Math.random(),
-      time: h.time || h.triggered_at || h.ts,
-      rule: h.rule_name || h.rule || r.name,
-      value: h.value ?? h.metric_value ?? 0,
-      channel: channelLabel(h.channel || r.channel),
-      status: alertStatusLabel(h.status || 'fired'),
+      id: h.alert_id,
+      time: h.triggered_at,
+      rule: (h.metadata && h.metadata.rule_name) || r.name,
+      severity: h.severity,
+      message: h.message,
+      status: h.acknowledged
+        ? t('view.alerts.alertAcknowledged')
+        : t('view.alerts.alertFired'),
     }));
   } catch (e) {
     toast.error(e.message || t('view.alerts.historyError'));
