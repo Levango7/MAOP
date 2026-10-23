@@ -86,7 +86,7 @@
                 <div class="bb-table__th bb-table__th--num" role="columnheader">{{ t('view.blackboard.col.confidence') }}</div>
                 <div class="bb-table__th" role="columnheader">{{ t('view.blackboard.col.timestamp') }}</div>
               </div>
-              <div v-for="(e, i) in domainEntries" :key="e.id || i" class="bb-table__row" role="row">
+              <div v-for="(e, i) in domainEntries" :key="e.entry_id || i" class="bb-table__row" role="row">
                 <div class="bb-table__td" role="cell">
                   <pre class="bb-table__content mono">{{ formatContent(e.content) }}</pre>
                 </div>
@@ -95,7 +95,7 @@
                   <Badge :tone="confidenceTone(e.confidence)">{{ formatConfidence(e.confidence) }}</Badge>
                 </div>
                 <div class="bb-table__td" role="cell">
-                  <span class="bb-table__time">{{ formatRel(e.timestamp || e.ts || e.created_at) }}</span>
+                  <span class="bb-table__time">{{ formatRel(e.timestamp) }}</span>
                 </div>
               </div>
             </div>
@@ -128,15 +128,15 @@
               :title="t('view.blackboard.history.empty')"
             />
             <div v-else class="hist-list">
-              <div v-for="(h, i) in history" :key="(h.id != null ? h.id : (h.timestamp || h.ts || h.time) + '-' + (h.actor || h.contributor || '') + '-' + i)" class="hist-item">
+              <div v-for="(h, i) in history" :key="h.timestamp + '-' + h.entry_id + '-' + i" class="hist-item">
                 <div class="hist-item__head">
-                  <Badge :tone="historyTone(h)">{{ h.op || h.operation || h.action || '—' }}</Badge>
-                  <span class="hist-item__actor muted">{{ h.actor || h.contributor || '—' }}</span>
-                  <span class="hist-item__time">{{ formatRel(h.timestamp || h.ts || h.time) }}</span>
+                  <Badge :tone="historyTone(h)">{{ h.action || '—' }}</Badge>
+                  <span class="hist-item__actor muted">{{ h.contributor || '—' }}</span>
+                  <span class="hist-item__time">{{ formatRel(h.timestamp) }}</span>
                 </div>
-                <div v-if="h.domain || h.target" class="hist-item__target">
+                <div v-if="h.domain" class="hist-item__target">
                   <span class="muted">{{ t('view.blackboard.col.domain') }}:</span>
-                  <code class="mono">{{ h.domain || h.target || '—' }}</code>
+                  <code class="mono">{{ h.domain }}</code>
                 </div>
               </div>
             </div>
@@ -447,7 +447,7 @@ function confidenceTone(v) {
 }
 
 function historyTone(h) {
-  const op = String(h.op || h.operation || h.action || '').toLowerCase();
+  const op = String(h.action || '').toLowerCase();
   if (/(write|create|add|set)/.test(op)) return 'success';
   if (/(clear|delete|remove|reset)/.test(op)) return 'fail';
   if (/(update|modify|edit)/.test(op)) return 'warn';

@@ -11,6 +11,12 @@ from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 from . import _deps
+from .schemas import (
+    MemoryClearEnvelope,
+    MemoryListEnvelope,
+    MemoryStoreEnvelope,
+    MemorySummaryEnvelope,
+)
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -22,7 +28,7 @@ class MemoryStoreRequest(BaseModel):
     importance: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
-@router.get("/{name}/memory")
+@router.get("/{name}/memory", response_model=MemoryListEnvelope)
 @handle_api_errors
 async def get_agent_memory(
     name: str,
@@ -38,7 +44,7 @@ async def get_agent_memory(
     return {"memories": records, "count": len(records)}
 
 
-@router.post("/{name}/memory")
+@router.post("/{name}/memory", response_model=MemoryStoreEnvelope)
 @handle_api_errors
 async def store_agent_memory(name: str, body: MemoryStoreRequest, request: Request) -> dict[str, Any]:
     """存储一条 agent 记忆。"""
@@ -54,7 +60,7 @@ async def store_agent_memory(name: str, body: MemoryStoreRequest, request: Reque
     return {"id": record_id, "status": "stored"}
 
 
-@router.delete("/{name}/memory")
+@router.delete("/{name}/memory", response_model=MemoryClearEnvelope)
 @handle_api_errors
 async def clear_agent_memory(
     name: str,
@@ -71,7 +77,7 @@ async def clear_agent_memory(
     return {"deleted": deleted}
 
 
-@router.get("/{name}/memory/summary")
+@router.get("/{name}/memory/summary", response_model=MemorySummaryEnvelope)
 @handle_api_errors
 async def get_memory_summary(name: str, request: Request) -> dict[str, Any]:
     """获取 agent 记忆的统计摘要。"""

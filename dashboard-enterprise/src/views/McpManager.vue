@@ -59,8 +59,8 @@
                     {{ isConnected(s) ? t('view.mcp.status.connected') : t('view.mcp.status.disconnected') }}
                   </Badge>
                 </div>
-                <div class="srv-table__td srv-table__td--num" role="cell">{{ s.tool_count ?? 0 }}</div>
-                <div class="srv-table__td srv-table__td--num" role="cell">{{ formatLatency(s.latency_ms) }}</div>
+                <div class="srv-table__td srv-table__td--num" role="cell">{{ s.tools_count ?? 0 }}</div>
+                <div class="srv-table__td srv-table__td--num" role="cell">{{ formatLatency(serverLatencyMs(s)) }}</div>
                 <div class="srv-table__td srv-table__td--act" role="cell">
                   <button class="icon-btn" type="button" :aria-label="t('common.edit')" @click="openEditServer(s)">
                     <AppIcon name="gear" :size="14" />
@@ -108,7 +108,7 @@
                     <Badge v-if="tool.server_name" tone="info">{{ tool.server_name }}</Badge>
                   </div>
                   <div class="tool-item__meta">
-                    <span class="tool-item__calls">{{ t('view.mcp.tools.callCount') }}: <b>{{ tool.call_count ?? 0 }}</b></span>
+                    <span class="tool-item__calls">{{ t('view.mcp.tools.callCount') }}: <b>{{ toolCallCount(tool) }}</b></span>
                     <AppIcon name="chevrondown" :size="14" class="tool-item__chevron" />
                   </div>
                 </summary>
@@ -117,7 +117,7 @@
                   <p v-else class="tool-item__desc muted">{{ t('view.tools.noDescription') }}</p>
                   <div class="tool-item__params">
                     <div class="tool-item__params-label">{{ t('view.mcp.tools.params') }}</div>
-                    <pre v-if="hasParams(tool)" class="tool-item__schema mono">{{ formatSchema(tool.parameters) }}</pre>
+                    <pre v-if="hasParams(tool)" class="tool-item__schema mono">{{ formatSchema(tool.input_schema) }}</pre>
                     <span v-else class="muted">{{ t('view.mcp.tools.noParams') }}</span>
                   </div>
                 </div>
@@ -592,7 +592,7 @@ const toolResultsLabel = computed(() => {
 });
 
 function hasParams(tool) {
-  const p = tool.parameters;
+  const p = tool.input_schema;
   if (!p) return false;
   if (typeof p === 'object') return Object.keys(p).length > 0;
   try { return Object.keys(JSON.parse(p)).length > 0; } catch { return false; }
@@ -606,6 +606,48 @@ function formatSchema(params) {
 }
 
 // ── Stats ───────────────────────────────────────────────────────
+const perToolStats = computed(() => stats.value.per_tool || []);
+
+// A bucket is {ts, count, errors, avg_ms}; success rate is not sent, so derive
+// it here rather than inventing a field the API never had.
+function bucketSuccessRate(bucket) {
+  const count = bucket.count || 0;
+  if (!count) return 0;
+  return (count - (bucket.errors || 0)) / count;
+}
+
+// Per-server latency = call-weighted mean of that server's per-tool averages.
+const serverLatencyByName = computed(() => {
+  const agg = {};
+  for (const row of perToolStats.value) {
+    const name = row.server_name;
+    if (!name) continue;
+    const acc = agg[name] || (agg[name] = { calls: 0, ms: 0 });
+    acc.calls += row.calls || 0;
+    acc.ms += (row.avg_ms || 0) * (row.calls || 0);
+  }
+  const out = {};
+  for (const [name, acc] of Object.entries(agg)) out[name] = acc.calls ? acc.ms / acc.calls : null;
+  return out;
+});
+
+function serverLatencyMs(server) {
+  return serverLatencyByName.value[server.name] ?? null;
+}
+
+// Tool rows are keyed by the synthetic id ``server:name`` — same key stats use.
+const callsByToolId = computed(() => {
+  const out = {};
+  for (const row of perToolStats.value) {
+    out[`${row.server_name}:${row.tool}`] = row.calls || 0;
+  }
+  return out;
+});
+
+function toolCallCount(tool) {
+  return callsByToolId.value[tool.id] ?? 0;
+}
+
 const statsMetric = ref('calls');
 const statsMetricOptions = [
   { value: 'calls', label: t('view.mcp.stats.calls') },
@@ -623,11 +665,12 @@ const statsOverview = computed(() => {
   if (!series.length) {
     return { totalCalls: 0, successRate: '—', avgLatency: '—' };
   }
-  const totalCalls = series.reduce((sum, p) => sum + (p.calls ?? 0), 0);
+  const totalCalls = series.reduce((sum, p) => sum + (p.count ?? 0), 0);
   const last = series[series.length - 1];
-  const avgLatency = last && last.avg_latency_ms != null ? Math.round(last.avg_latency_ms) : '—';
-  const successRate = last && last.success_rate != null ? (last.success_rate * 100).toFixed(1) : '—';
-  return { totalCalls, successRate, avgLatency };
+  const avgLatency = last && last.avg_ms != null ? Math.round(last.avg_ms) : '—';
+  const successRate = last && last.count ? bucketSuccessRate(last) * 100 : null;
+  const successRateText = successRate === null ? '—' : successRate.toFixed(1);
+  return { totalCalls, successRate: successRateText, avgLatency };
 });
 
 const successRateTone = computed(() => {
@@ -648,9 +691,9 @@ const chartValues = computed(() => {
   const series = statsSeries.value;
   if (!series.length) return [];
   return series.map((p) => {
-    if (statsMetric.value === 'calls') return p.calls ?? 0;
-    if (statsMetric.value === 'success_rate') return (p.success_rate ?? 0) * 100;
-    return p.avg_latency_ms ?? 0;
+    if (statsMetric.value === 'calls') return p.count ?? 0;
+    if (statsMetric.value === 'success_rate') return bucketSuccessRate(p) * 100;
+    return p.avg_ms ?? 0;
   });
 });
 

@@ -20,6 +20,7 @@ export const messages = {
     'view.notifications.levelInfo': 'Info',
     'view.notifications.levelWarning': 'Warning',
     'view.notifications.levelError': 'Error',
+    'view.notifications.levelCritical': 'Critical',
     'view.notifications.levelSuccess': 'Success',
 
     // ── Categories ──
@@ -102,6 +103,7 @@ export const messages = {
     'view.notifications.levelInfo': '信息',
     'view.notifications.levelWarning': '警告',
     'view.notifications.levelError': '错误',
+    'view.notifications.levelCritical': '严重',
     'view.notifications.levelSuccess': '成功',
 
     // ── 类别 ──

@@ -199,47 +199,122 @@ def run_observability_setup(force: bool = False) -> dict[str, Any]:
 # Audit endpoints (audit.py) — Personal edition helpers
 # ════════════════════════════════════════════════════════════════════════════
 
+def _personal_severity(level_value: str) -> str:
+    """Personal ``AuditLevel`` → the severity spelling the dashboard speaks.
+
+    ``maop/control/audit.py`` uses ``warn`` where
+    ``maop.enterprise.audit.AuditSeverity`` uses ``warning``; ``error`` has no
+    enterprise counterpart and is passed through rather than inflated into
+    ``critical``.
+    """
+    return "warning" if level_value == "warn" else level_value
+
+
+def _personal_event_row(event: Any) -> dict[str, Any]:
+    """One wire vocabulary for both editions.
+
+    The personal event spells severity ``level`` and resource ``target``
+    (``AuditEvent.model_dump()``), while the enterprise row spells them
+    ``severity`` / ``resource``. Two spellings on one endpoint is what forced
+    ``Audit.vue`` into ``e.level || e.severity`` chains, and those chains are
+    how a wrong-vocabulary test mock stayed green. Attributes the personal
+    log never records are ``None`` — not ``""`` — so a consumer can tell
+    "not recorded" from "recorded as empty".
+    """
+    severity = _personal_severity(event.level.value)
+    return {
+        "event_id": event.event_id,
+        "timestamp": event.timestamp,
+        "action": event.action,
+        "severity": severity,
+        "actor": event.actor,
+        "resource": event.target,
+        "detail": event.detail,
+        "trace_id": event.trace_id,
+        "tenant_id": None,
+        "result": None,
+        "ip_address": None,
+        "user_agent": None,
+        "metadata": None,
+        "risk_level": None,
+        "category": None,
+        "tags": None,
+    }
+
+
+def _read_personal_events(*, hours: int, limit: int) -> list[Any]:
+    """Recent personal audit events within ``hours`` (raw ``AuditEvent`` objects)."""
+    from maop.control.audit import AuditLog
+
+    events = AuditLog(state.MAOP_ROOT / "logs" / "audit.jsonl").read_recent(limit=limit * 5)
+    cutoff = _time.time() - hours * 3600
+    return [e for e in events if e.timestamp >= cutoff]
+
+
 def _get_personal_events(
     *,
     action: str = "",
     actor: str = "",
     target: str = "",
+    severity: str = "",
+    hours: int = 24,
     limit: int = 100,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
-    """Read audit events from personal edition AuditLog (logs/audit.jsonl)."""
+    """Read audit events from personal edition AuditLog (logs/audit.jsonl).
+
+    ``severity``/``hours``/``offset`` are wired through here since 2026-10-23:
+    the personal branch used to drop them on the floor, so the dashboard's
+    severity filter returned everything and paging never advanced.
+    """
     try:
-        from maop.control.audit import AuditLog
-        events = AuditLog(state.MAOP_ROOT / "logs" / "audit.jsonl").read_recent(limit=limit * 5)
         result = []
-        for e in events:
+        for e in _read_personal_events(hours=hours, limit=limit):
             if action and e.action != action:
                 continue
             if actor and e.actor != actor:
                 continue
             if target and e.target != target:
                 continue
-            result.append(e.model_dump())
-        return result[:limit]
+            if severity and _personal_severity(e.level.value) != severity:
+                continue
+            result.append(_personal_event_row(e))
+        return result[offset:offset + limit]
     except Exception as exc:
         logger.error("Personal audit events failed: %s", exc)
         return []
 
 
-def _get_personal_summary() -> dict[str, Any]:
-    """Get audit summary from personal edition AuditLog."""
+def _get_personal_summary(hours: int = 24) -> dict[str, Any]:
+    """Get audit summary from personal edition AuditLog.
+
+    ``by_risk_level`` / ``by_category`` are ``None``: the personal log has
+    neither concept, and an empty dict would read as "computed, nothing found".
+    """
+    empty = {
+        "total_events": 0, "by_action": {}, "by_actor": {},
+        "critical_count": 0, "hours": hours,
+        "by_risk_level": None, "by_category": None,
+    }
     try:
-        from maop.control.audit import AuditLog
-        log = AuditLog(state.MAOP_ROOT / "logs" / "audit.jsonl")
-        events = log.read_recent(limit=500)
+        events = _read_personal_events(hours=hours, limit=500)
         by_action: dict[str, int] = {}
         by_actor: dict[str, int] = {}
         for e in events:
             by_action[e.action] = by_action.get(e.action, 0) + 1
             by_actor[e.actor] = by_actor.get(e.actor, 0) + 1
-        return {"total": len(events), "by_action": by_action, "by_actor": by_actor}
+        return {
+            "total_events": len(events),
+            "by_action": by_action,
+            "by_actor": by_actor,
+            "critical_count": sum(1 for e in events if _personal_severity(e.level.value) == "critical"),
+            "hours": hours,
+            "by_risk_level": None,
+            "by_category": None,
+        }
     except Exception as exc:
         logger.error("Personal audit summary failed: %s", exc)
-        return {"total": 0, "by_action": {}, "by_actor": {}}
+        return empty
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -409,7 +484,9 @@ async def list_audit_events(
             "offset": offset,
         }
     else:
-        events = _get_personal_events(action=action, limit=limit)
+        events = _get_personal_events(
+            action=action, severity=severity, hours=hours, limit=limit, offset=offset,
+        )
         return {
             "status": "ok",
             "events": events,
@@ -427,7 +504,7 @@ async def get_audit_summary(tenant_id: str = "", hours: int = 24) -> dict[str, A
         summary = mgr.summary(tenant_id=tenant_id, hours=hours)
         return {"status": "ok", "summary": summary}
     else:
-        return {"status": "ok", "summary": _get_personal_summary()}
+        return {"status": "ok", "summary": _get_personal_summary(hours)}
 
 
 async def filter_audit_events(

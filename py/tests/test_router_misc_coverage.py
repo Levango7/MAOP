@@ -11,6 +11,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from maop.core.agent.plugins_hooks.plugin_manager import PluginInfo, PluginState
+
 
 def _make_app(*routers) -> TestClient:
     app = FastAPI()
@@ -229,33 +231,34 @@ class TestSubagentTranscript:
 @pytest.fixture
 def plugin_client(tmp_path, monkeypatch):
     mock_mgr = MagicMock()
-    mock_mgr.list_plugins = MagicMock(return_value=[
-        SimpleNamespace(model_dump=lambda: {"id": "p1", "name": "test"})
-    ])
-    mock_mgr.get_plugin = MagicMock(return_value=SimpleNamespace(
-        model_dump=lambda: {"id": "p1", "name": "test"}
-    ))
-    mock_mgr.discover = MagicMock(return_value=[
-        SimpleNamespace(model_dump=lambda: {"id": "p1"})
-    ])
-    mock_mgr.load = MagicMock(return_value=SimpleNamespace(
-        model_dump=lambda: {"id": "p1", "state": "loaded"}
-    ))
-    mock_mgr.start = MagicMock(return_value=SimpleNamespace(
-        model_dump=lambda: {"id": "p1", "state": "started"}
-    ))
-    mock_mgr.stop = MagicMock(return_value=SimpleNamespace(
-        model_dump=lambda: {"id": "p1", "state": "stopped"}
-    ))
-    mock_mgr.reload = MagicMock(return_value=SimpleNamespace(
-        model_dump=lambda: {"id": "p1", "state": "reloaded"}
-    ))
-    mock_mgr.update_config = MagicMock(return_value=SimpleNamespace(
-        model_dump=lambda: {"id": "p1"}
-    ))
-    mock_mgr.load_all = MagicMock(return_value=[])
-    mock_mgr.start_all = MagicMock(return_value=[])
-    mock_mgr.stop_all = MagicMock(return_value=[])
+
+    def _info(**kw):
+        """Real PluginInfo, not a partial SimpleNamespace.
+
+        ``PluginInfo.name`` is required and ``state`` is a 5-value enum with no
+        ``reloaded`` member, so the old stubs matched nothing the manager emits
+        and a strict response_model would 500 on them.
+        """
+        base = {
+            "id": "p1", "name": "test", "version": "0.1.0", "description": "",
+            "author": "", "state": PluginState.DISCOVERED, "path": str(tmp_path),
+            "error": "", "loaded_at": "", "started_at": "", "config": {},
+        }
+        base.update(kw)
+        return PluginInfo(**base)
+
+    mock_mgr.list_plugins = MagicMock(return_value=[_info()])
+    mock_mgr.get_plugin = MagicMock(side_effect=lambda pid: _info() if pid == "p1" else None)
+    mock_mgr.discover = MagicMock(return_value=[_info()])
+    mock_mgr.load = MagicMock(return_value=_info(state=PluginState.LOADED, loaded_at="2026-10-23T00:00:00+00:00"))
+    mock_mgr.start = MagicMock(return_value=_info(state=PluginState.STARTED, started_at="2026-10-23T00:00:01+00:00"))
+    mock_mgr.stop = MagicMock(return_value=_info(state=PluginState.STOPPED))
+    # reload() is stop -> load -> start, so it returns the STARTED snapshot.
+    mock_mgr.reload = MagicMock(return_value=_info(state=PluginState.STARTED))
+    mock_mgr.update_config = MagicMock(return_value=_info(config={"key": "value"}))
+    mock_mgr.load_all = MagicMock(return_value=[_info(state=PluginState.LOADED)])
+    mock_mgr.start_all = MagicMock(return_value=[_info(state=PluginState.STARTED)])
+    mock_mgr.stop_all = MagicMock(return_value=[_info(state=PluginState.STOPPED)])
     monkeypatch.setattr("maop.dashboard.services.plugin_service._get_plugin_manager", lambda: mock_mgr)
 
     from maop.dashboard.routers.plugin import router
@@ -269,7 +272,7 @@ class TestPluginList:
 
     def test_list_with_state(self, plugin_client):
         resp = plugin_client.get("/api/plugins?state=loaded")
-        assert resp.status_code in (200, 500)
+        assert resp.status_code == 200
 
 
 class TestPluginGet:
@@ -277,11 +280,10 @@ class TestPluginGet:
         resp = plugin_client.get("/api/plugins/p1")
         assert resp.status_code == 200
 
-    def test_not_found(self, plugin_client, monkeypatch):
-        # Can't easily mock _get_plugin_manager per-test; just call nonexistent
+    def test_not_found(self, plugin_client):
+        """Unknown ids must 404, not answer 200 with an envelope."""
         resp = plugin_client.get("/api/plugins/nonexistent")
-        # Returns {"error": "Plugin not found"} with 200
-        assert resp.status_code == 200
+        assert resp.status_code == 404
 
 
 class TestPluginDiscover:

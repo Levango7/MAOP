@@ -280,6 +280,7 @@ class MCPHubOpsMixin:
                 error=r.get("error", ""),
                 enabled=bool(cfg.get("enabled", True)),
                 auto_connect=bool(cfg.get("auto_connect", False)),
+                url=str(cfg.get("url", "") or ""),
             ))
         return infos
 

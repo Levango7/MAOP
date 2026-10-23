@@ -14,6 +14,11 @@ from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.plugin_schemas import (
+    PluginDiscoverEnvelope,
+    PluginEnvelope,
+    PluginListEnvelope,
+)
 from maop.dashboard.services import plugin_service
 
 from .state import MAOP_ROOT  # noqa: F401
@@ -42,7 +47,7 @@ def _set_plugin_manager(mgr: Any) -> None:
     plugin_service._set_plugin_manager(mgr)
 
 
-@router.get("")
+@router.get("", response_model=PluginListEnvelope)
 @handle_api_errors
 async def list_plugins(request: Request, state: str = Query("", description="Filter by state")) -> dict[str, Any]:
     require_admin(request)
@@ -50,7 +55,7 @@ async def list_plugins(request: Request, state: str = Query("", description="Fil
     return {"status": "ok", **result}
 
 
-@router.get("/{plugin_id}")
+@router.get("/{plugin_id}", response_model=PluginEnvelope)
 @handle_api_errors
 async def get_plugin(request: Request, plugin_id: str) -> dict[str, Any]:
     require_admin(request)
@@ -60,7 +65,7 @@ async def get_plugin(request: Request, plugin_id: str) -> dict[str, Any]:
     return {"status": "ok", "plugin": info}
 
 
-@router.post("/discover")
+@router.post("/discover", response_model=PluginDiscoverEnvelope)
 @handle_api_errors
 async def discover_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -68,7 +73,7 @@ async def discover_plugins(request: Request) -> dict[str, Any]:
     return {"status": "ok", **result}
 
 
-@router.post("/{plugin_id}/load")
+@router.post("/{plugin_id}/load", response_model=PluginEnvelope)
 @handle_api_errors
 async def load_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -76,7 +81,7 @@ async def load_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "plugin": info}
 
 
-@router.post("/{plugin_id}/start")
+@router.post("/{plugin_id}/start", response_model=PluginEnvelope)
 @handle_api_errors
 async def start_plugin(plugin_id: str, request: Request, body: PluginStartRequest | None = None) -> dict[str, Any]:
     require_admin(request)
@@ -85,7 +90,7 @@ async def start_plugin(plugin_id: str, request: Request, body: PluginStartReques
     return {"status": "ok", "plugin": info}
 
 
-@router.post("/{plugin_id}/stop")
+@router.post("/{plugin_id}/stop", response_model=PluginEnvelope)
 @handle_api_errors
 async def stop_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -93,7 +98,7 @@ async def stop_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "plugin": info}
 
 
-@router.post("/{plugin_id}/reload")
+@router.post("/{plugin_id}/reload", response_model=PluginEnvelope)
 @handle_api_errors
 async def reload_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -101,7 +106,7 @@ async def reload_plugin(plugin_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "plugin": info}
 
 
-@router.put("/{plugin_id}/config")
+@router.put("/{plugin_id}/config", response_model=PluginEnvelope)
 @handle_api_errors
 async def update_plugin_config(plugin_id: str, request: Request, body: PluginConfigUpdateRequest) -> dict[str, Any]:
     require_admin(request)
@@ -109,7 +114,7 @@ async def update_plugin_config(plugin_id: str, request: Request, body: PluginCon
     return {"status": "ok", "plugin": info}
 
 
-@router.post("/load-all")
+@router.post("/load-all", response_model=PluginListEnvelope)
 @handle_api_errors
 async def load_all_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -117,7 +122,7 @@ async def load_all_plugins(request: Request) -> dict[str, Any]:
     return {"status": "ok", **result}
 
 
-@router.post("/start-all")
+@router.post("/start-all", response_model=PluginListEnvelope)
 @handle_api_errors
 async def start_all_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -125,7 +130,7 @@ async def start_all_plugins(request: Request) -> dict[str, Any]:
     return {"status": "ok", **result}
 
 
-@router.post("/stop-all")
+@router.post("/stop-all", response_model=PluginListEnvelope)
 @handle_api_errors
 async def stop_all_plugins(request: Request) -> dict[str, Any]:
     require_admin(request)

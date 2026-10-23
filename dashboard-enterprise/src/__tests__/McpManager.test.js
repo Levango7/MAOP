@@ -85,9 +85,24 @@ describe('McpManager.vue', () => {
     mockFetch(defaultRoutes({
       '/api/mcp/servers': {
         servers: [
-          { id: 1, name: 'fetch-server', url: 'http://localhost:8080', status: 'connected', tool_count: 3, latency_ms: 120 },
-          { id: 2, name: 'github-server', url: 'stdio://github', status: 'disconnected', tool_count: 0, latency_ms: null },
+          { id: 'srv1', name: 'fetch-server', transport: 'streamable_http', status: 'connected',
+            tools_count: 3, resources_count: 1, error: '', enabled: true, auto_connect: false,
+            url: 'http://localhost:8080/mcp' },
+          { id: 'srv2', name: 'github-server', transport: 'stdio', status: 'disconnected',
+            tools_count: 0, resources_count: 0, error: 'boom', enabled: false, auto_connect: false,
+            url: '' },
         ],
+      },
+      // Latency is not a server field: the row joins it from per-tool call stats.
+      '/api/mcp/stats': {
+        series: [{ ts: 1700000000, count: 5, errors: 1, avg_ms: 120 }],
+        per_tool: [
+          { tool: 'search', server_name: 'fetch-server', calls: 4, errors: 1,
+            avg_ms: 100, max_ms: 250, error_rate: 0.25 },
+          { tool: 'fetch', server_name: 'fetch-server', calls: 1, errors: 0,
+            avg_ms: 200, max_ms: 200, error_rate: 0 },
+        ],
+        total: { calls: 5, errors: 1, avg_ms: 120 },
       },
     }));
     const wrapper = await mountMcp();
@@ -95,6 +110,10 @@ describe('McpManager.vue', () => {
     expect(rows.length).toBe(2);
     expect(wrapper.text()).toContain('fetch-server');
     expect(wrapper.text()).toContain('github-server');
+    // tools_count + url + joined latency (4*100 + 1*200)/5 = 120 ms
+    expect(wrapper.text()).toContain('http://localhost:8080/mcp');
+    expect(rows[0].text()).toContain('3');
+    expect(rows[0].text()).toContain('120');
     wrapper.unmount();
   });
 
@@ -102,9 +121,20 @@ describe('McpManager.vue', () => {
     mockFetch(defaultRoutes({
       '/api/mcp/tools': {
         tools: [
-          { id: 't1', name: 'search', description: 'Search the web', server_name: 'fetch-server', call_count: 42, parameters: { query: 'string' } },
-          { id: 't2', name: 'fetch', description: 'Fetch a URL', server_name: 'fetch-server', call_count: 10, parameters: null },
+          { id: 'fetch-server:search', name: 'search', description: 'Search the web',
+            server_name: 'fetch-server', concurrency_limit: 3,
+            input_schema: { type: 'object', properties: { query: { type: 'string' } } } },
+          { id: 'fetch-server:fetch', name: 'fetch', description: 'Fetch a URL',
+            server_name: 'fetch-server', concurrency_limit: 0, input_schema: {} },
         ],
+      },
+      '/api/mcp/stats': {
+        series: [],
+        per_tool: [
+          { tool: 'search', server_name: 'fetch-server', calls: 42, errors: 0,
+            avg_ms: 10, max_ms: 20, error_rate: 0 },
+        ],
+        total: { calls: 42, errors: 0, avg_ms: 10 },
       },
     }));
     const wrapper = await mountMcp();
@@ -118,6 +148,9 @@ describe('McpManager.vue', () => {
     expect(toolItems.length).toBe(2);
     expect(wrapper.text()).toContain('search');
     expect(wrapper.text()).toContain('fetch');
+    // call_count joined from stats; the schema block reads input_schema
+    expect(wrapper.text()).toContain('42');
+    expect(wrapper.find('.tool-item__schema').text()).toContain('query');
     wrapper.unmount();
   });
 
@@ -125,12 +158,14 @@ describe('McpManager.vue', () => {
     mockFetch(defaultRoutes({
       '/api/mcp/stats': {
         series: [
-          { ts: '2026-09-12T00:00:00Z', calls: 10, success_rate: 0.95, avg_latency_ms: 120 },
-          { ts: '2026-09-12T01:00:00Z', calls: 20, success_rate: 0.98, avg_latency_ms: 110 },
+          { ts: 1700000000, count: 10, errors: 0, avg_ms: 120 },
+          { ts: 1700003600, count: 20, errors: 1, avg_ms: 110 },
         ],
         per_tool: [
-          { name: 'search', calls: 30, success_rate: 0.97, avg_latency_ms: 115 },
+          { tool: 'search', server_name: 'fetch-server', calls: 30, errors: 1,
+            avg_ms: 115, max_ms: 300, error_rate: 0.0333 },
         ],
+        total: { calls: 30, errors: 1, avg_ms: 115 },
       },
     }));
     const wrapper = await mountMcp();
@@ -140,8 +175,10 @@ describe('McpManager.vue', () => {
     await flushPromises();
     expect(wrapper.find('.stats-overview').exists()).toBe(true);
     expect(wrapper.find('.stats-chart__svg').exists()).toBe(true);
-    // Total calls = 10 + 20 = 30
+    // Total calls = 10 + 20 = 30; last bucket success = (20-1)/20 = 95.0%
     expect(wrapper.text()).toContain('30');
+    expect(wrapper.text()).toContain('95.0');
+    expect(wrapper.text()).toContain('110');
     wrapper.unmount();
   });
 

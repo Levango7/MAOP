@@ -16,6 +16,17 @@ from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.mcp_schemas import (
+    AddServerEnvelope,
+    MarketplaceListEnvelope,
+    ServerDetailEnvelope,
+    ServerListEnvelope,
+    StatsEnvelope,
+    ToolLimitEnvelope,
+    ToolListEnvelope,
+    TopologyEnvelope,
+    UpdateServerEnvelope,
+)
 from maop.dashboard.routers.state import MAOP_ROOT  # noqa: F401
 from maop.dashboard.services import plugin_service
 
@@ -100,7 +111,7 @@ async def disconnect_server(server_name: str, request: Request) -> dict[str, Any
     return await plugin_service.disconnect_server(server_name)
 
 
-@router.get("/servers")
+@router.get("/servers", response_model=ServerListEnvelope)
 @handle_api_errors
 async def list_servers(request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -108,7 +119,7 @@ async def list_servers(request: Request) -> dict[str, Any]:
     return {"status": "ok", **result}
 
 
-@router.get("/servers/{server_id}")
+@router.get("/servers/{server_id}", response_model=ServerDetailEnvelope)
 @handle_api_errors
 async def get_server(server_id: str, request: Request) -> dict[str, Any]:
     """返回单个 server 的可编辑配置（不返回 token/headers 原值）。"""
@@ -119,7 +130,7 @@ async def get_server(server_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "server": detail}
 
 
-@router.post("/servers")
+@router.post("/servers", response_model=AddServerEnvelope)
 @handle_api_errors
 async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -138,7 +149,7 @@ async def add_server(body: ServerCreate, request: Request) -> dict[str, Any]:
     )
 
 
-@router.put("/servers/{server_id}")
+@router.put("/servers/{server_id}", response_model=UpdateServerEnvelope)
 @handle_api_errors
 async def update_server(server_id: str, body: ServerCreate, request: Request) -> dict[str, Any]:
     """按 id 更新 MCP server 配置。
@@ -180,7 +191,7 @@ async def remove_server(server_name: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "server": server_name}
 
 
-@router.get("/topology")
+@router.get("/topology", response_model=TopologyEnvelope)
 @handle_api_errors
 async def mcp_topology(request: Request) -> dict[str, Any]:
     """MCP 拓扑（servers ↔ tools，外加 Agent 节点）。
@@ -195,7 +206,7 @@ async def mcp_topology(request: Request) -> dict[str, Any]:
     return {"status": "ok", **plugin_service.topology()}
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=StatsEnvelope)
 @handle_api_errors
 async def mcp_stats(
     request: Request,
@@ -215,7 +226,7 @@ async def mcp_stats(
     return {"status": "ok", **plugin_service.mcp_call_stats(hours=hours)}
 
 
-@router.put("/tools/{tool_id}")
+@router.put("/tools/{tool_id}", response_model=ToolLimitEnvelope)
 @handle_api_errors
 async def update_tool(tool_id: str, body: ToolLimitUpdate, request: Request) -> dict[str, Any]:
     """设置工具的并发上限（0 = 不限）。
@@ -254,7 +265,7 @@ async def mcp_sync_config(request: Request) -> dict[str, Any]:
     return {"status": "ok", **plugin_service.sync_mcp_config()}
 
 
-@router.get("/tools")
+@router.get("/tools", response_model=ToolListEnvelope)
 @handle_api_errors
 async def list_tools(request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -294,7 +305,7 @@ async def health_check(request: Request) -> dict[str, Any]:
 # P1 闭环: 后端 marketplace 数据源已接入 ``MCPMarketplace``，以下端点
 # 对齐 SkillMarket.vue 契约（list/install），不再返回空壳或 501。
 
-@router.get("/marketplace/tools")
+@router.get("/marketplace/tools", response_model=MarketplaceListEnvelope)
 @handle_api_errors
 async def marketplace_tools(request: Request) -> dict[str, Any]:
     """列出 Marketplace 可安装工具.

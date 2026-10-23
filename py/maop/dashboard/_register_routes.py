@@ -152,13 +152,28 @@ def _register_enterprise_routers(app: FastAPI) -> None:
 
 
 def _register_core_routers(app: FastAPI) -> None:
-    """Register core dashboard routers (data / control / model / memory / system / auth)."""
-    from maop.dashboard.routers import control, data, evolve_insights, memory, model, runs, system
+    """Register core dashboard routers (data / control / model / evolution / memory / system / auth)."""
+    from maop.dashboard.routers import (
+        control,
+        data,
+        evolution_experiment,
+        evolve_insights,
+        memory,
+        model,
+        runs,
+        system,
+    )
 
     app.include_router(data.router)
     app.include_router(control.router)
     app.include_router(runs.router)
     app.include_router(model.router)
+    # F2-01 first: evolution_experiment owns the static /api/evolution/ab/list,
+    # while evolve_insights owns /api/evolution/ab/{cycle_id}. Starlette picks
+    # the first full match, so the param route must not be registered earlier —
+    # otherwise the A/B list request is served as a cycle report and the
+    # dashboard's experiments list can never be non-empty.
+    app.include_router(evolution_experiment.router)
     app.include_router(evolve_insights.router)
     app.include_router(memory.router)
     app.include_router(system.router)
@@ -268,11 +283,6 @@ def _register_data_routers(app: FastAPI) -> None:
     from maop.dashboard.routers import routing as routing_router
 
     app.include_router(routing_router.router)
-
-    # F2-01: Agent 自演化闭环 — PerformanceEvaluator / ABTest(SPRT) / AutoDeployer.
-    from maop.dashboard.routers import evolution_experiment as evolution_router
-
-    app.include_router(evolution_router.router)
 
     # F1-04: Observability stack — tracing/metrics/logging status + Prometheus JSON.
     from maop.dashboard.routers import observability as observability_router

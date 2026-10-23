@@ -99,7 +99,7 @@ describe('Plugins.vue', () => {
         plugins: [
           { id: 'p1', name: 'running-plug', state: 'started' },
           { id: 'p2', name: 'stopped-plug', state: 'stopped' },
-          { id: 'p3', name: 'error-plug', state: 'error' },
+          { id: 'p3', name: 'error-plug', state: 'errored', error: 'boom' },
         ],
       },
     }));
@@ -108,6 +108,17 @@ describe('Plugins.vue', () => {
     expect(badges[0].text()).toContain('Running');
     expect(badges[1].text()).toContain('Stopped');
     expect(badges[2].text()).toContain('Error');
+
+    // Which actions are offered is part of the contract: PluginManager.start()
+    // raises unless state is LOADED, and 'errored' used to fall through to
+    // "unknown" with no reload affordance at all.
+    const labelsOf = (row) => row.findAll('button').map((b) => b.attributes('aria-label'));
+    const rows = wrapper.findAll('.pl-table__row');
+    expect(labelsOf(rows[0])).toContain('Stop');
+    expect(labelsOf(rows[0])).not.toContain('Start');
+    expect(labelsOf(rows[1])).toContain('Reload');
+    expect(labelsOf(rows[1])).not.toContain('Start');
+    expect(labelsOf(rows[2])).toContain('Reload');
     wrapper.unmount();
   });
 

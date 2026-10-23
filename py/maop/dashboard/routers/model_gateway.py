@@ -1,11 +1,11 @@
 """MAOP Dashboard — 模型授权网关 API 端点.
 
 桥接 ``ModelGateway`` 模型授权网关到前端，提供权限规则管理/访问检查/
-使用量记录/配置更新 7 个端点。所有端点需 admin 鉴权。
+使用量记录/配置读写共 10 个端点。所有端点需 admin 鉴权。
 
 Router 层只保留：路由定义、请求解析（Pydantic）、权限检查
-（require_admin）、调用 service、响应格式化、错误处理。业务逻辑
-在 ``maop.dashboard.services.model_service`` 中，框架无关。
+（require_admin）、调用 service、响应格式化（``model_gateway_schemas``）、
+错误处理。业务逻辑在 ``maop.dashboard.services.model_service`` 中，框架无关。
 """
 
 from __future__ import annotations
@@ -14,14 +14,21 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from maop.core.agent.llm_chat.model_gateway import (
-    ModelGatewayConfig,
-    ModelPermission,
-)
+from maop.core.agent.llm_chat.model_gateway import ModelPermission
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.model_gateway_schemas import (
+    CheckEnvelope,
+    GatewayConfigEnvelope,
+    PermissionListEnvelope,
+    PermissionUpdateEnvelope,
+    PermissionWriteEnvelope,
+    UsageClearEnvelope,
+    UsageGetEnvelope,
+    UsageRecordEnvelope,
+)
 from maop.dashboard.services import model_service
 
 logger = logging.getLogger(__name__)
@@ -47,8 +54,28 @@ class ModelUsageRequest(BaseModel):
     session_id: str = Field(default="", max_length=256, description="会话 ID")
 
 
+class ModelGatewayConfigPatch(BaseModel):
+    """PUT /api/model-gateway/config 请求体（部分更新）.
+
+    每个字段都可缺省——缺省表示"保持现值"。早先这里直接复用
+    ``ModelGatewayConfig``（``permissions`` 缺省即空表），前端表单只发两个
+    字段，一次保存就把全部权限规则删光。
+    """
+
+    #: 打错的键若被 ``extra='ignore'`` 吞掉，客户端会收到 200 但什么都没改。
+    model_config = ConfigDict(extra="forbid")
+
+    default_policy: str | None = Field(default=None, description="allow | deny")
+    permissions: list[ModelPermission] | None = None
+    global_daily_token_limit: int | None = Field(default=None, ge=0, description="0 = 不限")
+    enable_quota_check: bool | None = None
+
+
 # ── API 端点：权限规则管理 ──────────────────────────────────────────
-@router.get("/api/model-gateway/permissions")
+@router.get(
+    "/api/model-gateway/permissions",
+    response_model=PermissionListEnvelope,
+)
 @handle_api_errors("Model gateway permissions list", error_value={"status": "error", "error": "List failed"})
 async def api_model_gateway_permissions_list(request: Request) -> dict[str, Any]:
     """列出所有权限规则。"""
@@ -56,7 +83,10 @@ async def api_model_gateway_permissions_list(request: Request) -> dict[str, Any]
     return {"status": "ok", **model_service.list_gateway_permissions()}
 
 
-@router.post("/api/model-gateway/permissions")
+@router.post(
+    "/api/model-gateway/permissions",
+    response_model=PermissionWriteEnvelope,
+)
 @handle_api_errors("Model gateway permissions add", error_value={"status": "error", "error": "Add failed"})
 async def api_model_gateway_permissions_add(body: ModelPermission, request: Request) -> dict[str, Any]:
     """添加权限规则。"""
@@ -66,7 +96,10 @@ async def api_model_gateway_permissions_add(body: ModelPermission, request: Requ
     return {"status": "ok", **model_service.add_gateway_permission(body)}
 
 
-@router.delete("/api/model-gateway/permissions/{model_pattern:path}")
+@router.delete(
+    "/api/model-gateway/permissions/{model_pattern:path}",
+    response_model=PermissionWriteEnvelope,
+)
 @handle_api_errors("Model gateway permissions delete", error_value={"status": "error", "error": "Delete failed"})
 async def api_model_gateway_permissions_delete(model_pattern: str, request: Request) -> dict[str, Any]:
     """删除权限规则。"""
@@ -77,7 +110,10 @@ async def api_model_gateway_permissions_delete(model_pattern: str, request: Requ
         raise HTTPException(404, str(exc)) from exc
 
 
-@router.put("/api/model-gateway/permissions/{model_pattern:path}")
+@router.put(
+    "/api/model-gateway/permissions/{model_pattern:path}",
+    response_model=PermissionUpdateEnvelope,
+)
 @handle_api_errors("Model gateway permissions update", error_value={"status": "error", "error": "Update failed"})
 async def api_model_gateway_permissions_update(
     model_pattern: str, body: ModelPermission, request: Request
@@ -89,7 +125,8 @@ async def api_model_gateway_permissions_update(
     "Unexpected token '<'"，编辑功能不可用。
 
     路径参数 ``model_pattern`` 用于定位原规则；body 中的 ``model_pattern``
-    可以与它不同（改名场景，服务层会先删旧规则）。
+    可以与它不同（改名场景，服务层会先删旧规则）。**前端必须把原 pattern
+    放进 URL**，否则改名会被当成新增，旧规则残留。
     """
     require_admin(request)
     if not body.model_pattern:
@@ -98,7 +135,10 @@ async def api_model_gateway_permissions_update(
 
 
 # ── API 端点：访问检查 ──────────────────────────────────────────────
-@router.post("/api/model-gateway/check")
+@router.post(
+    "/api/model-gateway/check",
+    response_model=CheckEnvelope,
+)
 @handle_api_errors("Model gateway check", error_value={"status": "error", "error": "Check failed"})
 async def api_model_gateway_check(body: ModelCheckRequest, request: Request) -> dict[str, Any]:
     """检查模型访问权限。"""
@@ -109,7 +149,10 @@ async def api_model_gateway_check(body: ModelCheckRequest, request: Request) -> 
 
 
 # ── API 端点：使用量 ────────────────────────────────────────────────
-@router.post("/api/model-gateway/usage")
+@router.post(
+    "/api/model-gateway/usage",
+    response_model=UsageRecordEnvelope,
+)
 @handle_api_errors("Model gateway usage record", error_value={"status": "error", "error": "Record failed"})
 async def api_model_gateway_usage_record(body: ModelUsageRequest, request: Request) -> dict[str, Any]:
     """记录模型使用量。"""
@@ -119,7 +162,10 @@ async def api_model_gateway_usage_record(body: ModelUsageRequest, request: Reque
     return {"status": "ok", **model_service.record_model_usage(body.model, body.tokens, body.agent, body.session_id)}
 
 
-@router.get("/api/model-gateway/usage")
+@router.get(
+    "/api/model-gateway/usage",
+    response_model=UsageGetEnvelope,
+)
 @handle_api_errors("Model gateway usage get", error_value={"status": "error", "error": "Get failed"})
 async def api_model_gateway_usage_get(
     request: Request,
@@ -130,7 +176,10 @@ async def api_model_gateway_usage_get(
     return {"status": "ok", **model_service.get_model_daily_usage(model)}
 
 
-@router.delete("/api/model-gateway/usage")
+@router.delete(
+    "/api/model-gateway/usage",
+    response_model=UsageClearEnvelope,
+)
 @handle_api_errors("Model gateway usage clear", error_value={"status": "error", "error": "Clear failed"})
 async def api_model_gateway_usage_clear(
     request: Request,
@@ -148,11 +197,28 @@ async def api_model_gateway_usage_clear(
     return {"status": "ok", **model_service.clear_model_daily_usage(model)}
 
 
-# ── API 端点：配置更新 ──────────────────────────────────────────────
-@router.put("/api/model-gateway/config")
-@handle_api_errors("Model gateway config update", error_value={"status": "error", "error": "Update failed"})
-async def api_model_gateway_config_update(body: ModelGatewayConfig, request: Request) -> dict[str, Any]:
-    """更新网关配置。"""
+# ── API 端点：配置读写 ──────────────────────────────────────────────
+@router.get(
+    "/api/model-gateway/config",
+    response_model=GatewayConfigEnvelope,
+)
+@handle_api_errors("Model gateway config get", error_value={"status": "error", "error": "Get failed"})
+async def api_model_gateway_config_get(request: Request) -> dict[str, Any]:
+    """读取网关配置。
+
+    2026-10-23 新增：此前只有 PUT 没有 GET，表单永远回填不了，用户看到的是
+    默认值（限额 0 / 策略 allow）而实际生效的是库里配好的值。
+    """
     require_admin(request)
-    model_service.update_gateway_config(body)
-    return {"status": "ok"}
+    return {"status": "ok", **model_service.get_gateway_config()}
+
+
+@router.put(
+    "/api/model-gateway/config",
+    response_model=GatewayConfigEnvelope,
+)
+@handle_api_errors("Model gateway config update", error_value={"status": "error", "error": "Update failed"})
+async def api_model_gateway_config_update(body: ModelGatewayConfigPatch, request: Request) -> dict[str, Any]:
+    """部分更新网关配置（未提供的字段保持现值）。"""
+    require_admin(request)
+    return {"status": "ok", **model_service.patch_gateway_config(**body.model_dump(exclude_unset=True))}

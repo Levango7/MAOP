@@ -28,6 +28,17 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.evolution_schemas import (
+    AbEvaluateEnvelope,
+    AbListEnvelope,
+    ApproveEnvelope,
+    CycleListEnvelope,
+    DeployHistoryEnvelope,
+    NarrativeEnvelope,
+    PendingListEnvelope,
+    SkillCompositeEnvelope,
+    SkillListEnvelope,
+)
 from maop.dashboard.services import evolution_service
 
 logger = logging.getLogger(__name__)
@@ -157,14 +168,14 @@ async def api_ab_record(body: EvolutionABRecordRequest, request: Request) -> dic
     )
 
 
-@router.get("/api/evolution/ab/evaluate/{experiment}")
+@router.get("/api/evolution/ab/evaluate/{experiment}", response_model=AbEvaluateEnvelope)
 @handle_api_errors("evolution ab evaluate", error_value={"status": "error"})
 async def api_ab_evaluate(request: Request, experiment: str) -> dict[str, Any]:
     require_admin(request)
     return evolution_service.evaluate_ab_experiment(experiment)
 
 
-@router.get("/api/evolution/ab/list")
+@router.get("/api/evolution/ab/list", response_model=AbListEnvelope)
 @handle_api_errors("evolution ab list", error_value={"status": "error", "experiments": []})
 async def api_ab_list(request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -188,7 +199,7 @@ async def api_deploy_rollback(body: EvolutionDeployRollbackRequest, request: Req
     return evolution_service.rollback_deployment(body.experiment, body.snapshot_id)
 
 
-@router.get("/api/evolution/deploy/history")
+@router.get("/api/evolution/deploy/history", response_model=DeployHistoryEnvelope)
 @handle_api_errors("evolution deploy history", error_value={"status": "error", "history": []})
 async def api_deploy_history(request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -222,7 +233,7 @@ async def api_evolution_run(body: EvolutionRunRequest, request: Request) -> dict
     )
 
 
-@router.get("/api/evolution/cycles")
+@router.get("/api/evolution/cycles", response_model=CycleListEnvelope)
 @handle_api_errors("evolution cycles", error_value={"status": "error", "cycles": []})
 async def api_evolution_cycles(request: Request, limit: int = Query(50, ge=1, le=1000)) -> dict[str, Any]:
     require_admin(request)
@@ -232,7 +243,7 @@ async def api_evolution_cycles(request: Request, limit: int = Query(50, ge=1, le
     return evolution_service.get_cycle_history(experiment=experiment, limit=limit)
 
 
-@router.get("/api/evolution/pending")
+@router.get("/api/evolution/pending", response_model=PendingListEnvelope)
 @handle_api_errors("evolution pending", error_value={"status": "error", "pending": []})
 async def api_evolution_pending(request: Request) -> dict[str, Any]:
     """人工 gate：返回待批准的提升列表。"""
@@ -240,7 +251,7 @@ async def api_evolution_pending(request: Request) -> dict[str, Any]:
     return evolution_service.get_pending_approvals()
 
 
-@router.post("/api/evolution/approve")
+@router.post("/api/evolution/approve", response_model=ApproveEnvelope)
 @handle_api_errors("evolution approve", error_value={"status": "error"})
 async def api_evolution_approve(body: EvolutionApproveRequest, request: Request) -> dict[str, Any]:
     """人工 gate：批准指定实验的提升。"""
@@ -253,7 +264,7 @@ async def api_evolution_approve(body: EvolutionApproveRequest, request: Request)
 # ── Skill 编辑器 ────────────────────────────────────────────────
 
 
-@router.get("/api/evolution/skills")
+@router.get("/api/evolution/skills", response_model=SkillListEnvelope)
 @handle_api_errors("evolution skills", error_value={"skills": []})
 async def api_evolution_skills(request: Request) -> dict[str, Any]:
     """列出已保存的 Skill 原子（从 SkillVersionManager 加载）。"""
@@ -261,7 +272,7 @@ async def api_evolution_skills(request: Request) -> dict[str, Any]:
     return evolution_service.list_skills()
 
 
-@router.post("/api/evolution/skills/composite")
+@router.post("/api/evolution/skills/composite", response_model=SkillCompositeEnvelope)
 @handle_api_errors("evolution skill composite", error_value={"status": "error"})
 async def api_evolution_skill_composite(body: EvolutionSkillCompositeRequest, request: Request) -> dict[str, Any]:
     """保存 composite Skill（接入 SkillVersionManager）。"""
@@ -286,7 +297,7 @@ async def api_evolution_skill_composite(body: EvolutionSkillCompositeRequest, re
 # ── 演化案例叙事 ───────────────────────────────────────────────
 
 
-@router.get("/api/evolution/narrative/{cycle_id}")
+@router.get("/api/evolution/narrative/{cycle_id}", response_model=NarrativeEnvelope)
 @handle_api_errors("evolution narrative", error_value={"status": "error"})
 async def api_evolution_narrative(cycle_id: str, request: Request) -> dict[str, Any]:
     """获取指定演化周期的人类可读叙事。

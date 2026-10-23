@@ -878,7 +878,7 @@ const abRows = computed(() =>
     decision_label: t(`view.evolutionHistory.decision.${e.decision || 'continue'}`),
     winner: e.winner || '—',
     samples: e.samples || 0,
-    success_rate: e.success_rate !== null ? (e.success_rate * 100).toFixed(1) : '—',
+    success_rate: e.success_rate == null ? '—' : (e.success_rate * 100).toFixed(1),
   })),
 );
 
@@ -933,7 +933,9 @@ async function loadAb() {
             decision: r.result?.decision || 'continue',
             winner: r.result?.winner || '',
             samples: sprt.samples || 0,
-            success_rate: sprt.success_rate,
+            // SPRTState.success_rate is a Python @property: it never crosses
+            // the wire. Derive it from the serialized samples/successes.
+            success_rate: sprt.samples ? sprt.successes / sprt.samples : null,
           };
         } catch {
           return { name, decision: 'continue', winner: '', samples: 0, success_rate: null };

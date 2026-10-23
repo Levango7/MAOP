@@ -36,6 +36,14 @@ from fastapi.responses import PlainTextResponse, Response
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.audit_schemas import (
+    AlertDeletedEnvelope,
+    AlertRuleEnvelope,
+    AlertRulesEnvelope,
+    AlertsEnvelope,
+    EventsEnvelope,
+    SummaryEnvelope,
+)
 from maop.dashboard.services import observability_service
 
 # 修复12: 提前 import Pydantic 模型用于端点参数类型注解，让 FastAPI 自动校验请求体。
@@ -70,7 +78,7 @@ router = APIRouter(prefix="/api/audit", tags=["audit"])
 # ── Endpoints (legacy) ────────────────────────────────────────────
 
 
-@router.get("/events")
+@router.get("/events", response_model=EventsEnvelope)
 @handle_api_errors
 async def list_events(
     request: Request,
@@ -89,7 +97,7 @@ async def list_events(
     )
 
 
-@router.get("/summary")
+@router.get("/summary", response_model=SummaryEnvelope)
 @handle_api_errors
 async def get_summary(
     request: Request,
@@ -201,7 +209,7 @@ async def get_heatmap(
 # ── Alert rule CRUD ───────────────────────────────────────────────
 
 
-@router.post("/alert/rules")
+@router.post("/alert/rules", response_model=AlertRuleEnvelope)
 @handle_api_errors
 async def create_alert_rule(request: Request, body: AuditAlertRuleCreate) -> dict[str, Any]:
     """Create a new alert rule."""
@@ -210,7 +218,7 @@ async def create_alert_rule(request: Request, body: AuditAlertRuleCreate) -> dic
     return await observability_service.create_alert_rule(body, actor=actor)
 
 
-@router.get("/alert/rules")
+@router.get("/alert/rules", response_model=AlertRulesEnvelope)
 @handle_api_errors
 async def list_alert_rules(
     request: Request,
@@ -222,7 +230,7 @@ async def list_alert_rules(
     return await observability_service.list_alert_rules(tenant_id=tenant_id, enabled_only=enabled_only)
 
 
-@router.get("/alert/rules/{rule_id}")
+@router.get("/alert/rules/{rule_id}", response_model=AlertRuleEnvelope)
 @handle_api_errors
 async def get_alert_rule(request: Request, rule_id: str) -> dict[str, Any]:
     """Get a single alert rule by ID."""
@@ -233,7 +241,7 @@ async def get_alert_rule(request: Request, rule_id: str) -> dict[str, Any]:
     return result
 
 
-@router.put("/alert/rules/{rule_id}")
+@router.put("/alert/rules/{rule_id}", response_model=AlertRuleEnvelope)
 @handle_api_errors
 async def update_alert_rule(request: Request, rule_id: str, body: AuditAlertRuleUpdate) -> dict[str, Any]:
     """Update an existing alert rule (partial update)."""
@@ -244,7 +252,7 @@ async def update_alert_rule(request: Request, rule_id: str, body: AuditAlertRule
     return result
 
 
-@router.delete("/alert/rules/{rule_id}")
+@router.delete("/alert/rules/{rule_id}", response_model=AlertDeletedEnvelope)
 @handle_api_errors
 async def delete_alert_rule(request: Request, rule_id: str) -> dict[str, Any]:
     """Delete an alert rule."""
@@ -258,7 +266,7 @@ async def delete_alert_rule(request: Request, rule_id: str) -> dict[str, Any]:
 # ── Alert history + acknowledgement ──────────────────────────────
 
 
-@router.get("/alert/history")
+@router.get("/alert/history", response_model=AlertsEnvelope)
 @handle_api_errors
 async def list_alert_history(
     request: Request,

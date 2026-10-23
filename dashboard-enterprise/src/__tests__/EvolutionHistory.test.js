@@ -102,6 +102,34 @@ describe('EvolutionHistory.vue', () => {
     wrapper.unmount();
   });
 
+  it('renders A/B rows from the serialized SPRT state', async () => {
+    // SPRTState.success_rate is a Python @property, so the wire only carries
+    // samples/successes. Before P1-b the view read sprt.success_rate → undefined
+    // and the rate column rendered NaN; the empty-list mock hid both this and
+    // the route-shadowing that made abExperiments always empty.
+    mockFetch(defaultRoutes({
+      '/api/evolution/ab/list': { experiments: ['evo-1'] },
+      '/api/evolution/ab/evaluate/evo-1': {
+        status: 'ok',
+        result: {
+          experiment: 'evo-1',
+          control: { name: 'control', samples: 40, successes: 20, success_rate: 0.5 },
+          treatment: { name: 'treatment', samples: 40, successes: 32, success_rate: 0.8 },
+          sprt: { samples: 80, successes: 52, llr: 2.1, decision: 'accept_h1', winner: 'treatment', stopped_at: 61 },
+          decision: 'accept_h1',
+          winner: 'treatment',
+          is_significant: true,
+        },
+      },
+    }));
+    const wrapper = await mountEvoHistory();
+    const text = wrapper.text();
+    expect(text).toContain('evo-1');
+    expect(text).not.toContain('NaN');
+    expect(text).toContain('65.0'); // 52 / 80
+    wrapper.unmount();
+  });
+
   it('does not crash when all evolution endpoints fail', async () => {
     global.fetch = vi.fn(() => Promise.resolve({
       ok: false, status: 500,

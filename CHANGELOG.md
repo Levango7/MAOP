@@ -39,6 +39,410 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### audit 批次：8 条路由建模 + 两个版本统一到一套词表（2026-10-23）
+
+P1-b 第八批：`/api/audit/*` 前端在用 7 条端点（外加无人调用但同属本路由器的
+`GET /alert/rules/{rule_id}` 一并做齐）声明 `response_model`，新增
+`routers/audit_schemas.py`。`audit.py` 全用裸 `@handle_api_errors`，失败走
+`error_response()` 的 `JSONResponse` ⇒ 兜底不进信封，`status` 因此不给默认值。
+
+**⚠ 线上字段更名（个人版分支）**：`observability_service` 按
+`has_feature(FeatureFlag.AUDIT_LOG)` 分叉，两条产线以前**拼写不同**——
+个人版 `AuditEvent` 用 `level`/`target`、summary 用 `total`，企业版用
+`severity`/`resource`/`total_events`。`Audit.vue` 于是靠
+`e.level || e.severity` 这类兜底链缝起来，而它的 vitest 替身写的恰恰是
+视图内部的 `time/level/target` 名字 ⇒ 两边自洽，谁都不像错的。现在个人版分支
+直接产出企业版词表（`warn` → `warning`；`error` 保留，不夸大成 `critical`），
+`level`/`target`/`total` 不再上线。全仓（含 e2e）只有 `Audit.vue` 读这两个端点，
+已同步改掉。个人版记不到的属性置 `None` 而非 `""`，"没记"与"记成空"是两回事。
+
+**三个过滤器此前什么都不做**：个人版分支只把 `action`/`limit` 传下去，
+`severity`、`hours`、`offset` 全被丢掉 ⇒ 按级别筛选返回全部、时间窗不过滤、
+翻页永远返回同一页。现在三个都生效（`/filter` 的个人版行也跟着并成一套词表）。
+
+**每条审计记录都显示成"两万多天前"**：`timestamp` 两个版本都是 **epoch 秒**，
+而 `DataTable.formatRel` 直接把数字交给 `new Date()`（那是毫秒）。视图里早就有
+`toMs()` 处理这个单位差，只有渲染单元漏了 ⇒ 现在 `< 1e12` 按秒处理。
+`Audit.vue` 的聚合走 `toMs`，所以统计卡片一直是对的，坏的是表格里那一格。
+
+**规则行渲染成 `[object Object]`**：`AuditAlertRule.condition` 是 dict
+（`{op,value,window_s,filter}`），模板直接 `{{ r.condition }}`；`:key="r.id"` 也
+取不到（生产者是 `rule_id`）⇒ 所有行共用一个 `undefined` 键。改成
+`rule_id` + `condition_text`（阈值规则显示 `>= 5 /300s`，其余显示条件类型）。
+`AlertRules.vue` 同样问题：`normalizeRules` 读 `r.id` ⇒
+**编辑/删除/历史抽屉全部打到 `/api/audit/alert/rules/undefined`**，
+抽屉的 URL 也变成 `rule_id=undefined`；抽屉列表现改 `alert_id/triggered_at/
+severity/message/acknowledged`，原来的"值/渠道"两列在链路上根本没有对应字段
+（i18n 里 `historyColValue/Channel` 换成 `Severity/Message`）。
+
+**没修、需要产品决策的一处**：两个页面的规则**表单**本身对不上后端。
+后端条件里没有"metric"这个维度（只有 `filter` 的事件字段匹配），
+`action_config`（email/webhook/cooldown）在 MAOS 侧**只写不读**
+（`grep action_config maop/enterprise/audit_enhanced.py` 只命中模型定义与
+create/update 落库，引擎从不消费）⇒ 通知渠道是"存了但不会发生"。
+而且表单把 `condition` 当字符串发，`AuditAlertRuleCreate.condition: dict`
+⇒ POST/PUT 现在仍 422，**保存规则依旧是坏的**；本批只把"选中哪条规则"
+（id）与展示改对，没有替这个缺失概念编一个映射。
+
+**棘轮**：清单 120 → 113。
+
+**验证**：新契约 `test_audit_router_contracts.py` 12 条——个人版走真实
+`AuditLog`（tmp `MAOP_ROOT`）+ 词表/过滤/分页/时间窗断言，企业版三条用
+`importorskip` 分别拿真 `AuditEvent`/`AuditAlertRule`/`AuditAlert` 的
+`model_dump()` 过信封（本机 MAOS 可导入，三条实跑通过；CI 无 overlay 时跳过，
+前 9 条仍跑）；`-k "audit or observ or frontend_response"` 471 passed /
+7 skipped；前端全量 63 files / 547 tests passed；eslint / ruff / mypy(2 文件) /
+尺寸 / 静默异常 / docs 门禁绿。十一处变异逐个转红且恢复字节一致：服务层退回
+`target` 拼写、`warn` 不再归一、去掉 severity 过滤、去掉 offset、去掉 hours
+窗口、summary 仍发 `total`、摘掉 `GET /events` 信封、`Audit.vue` 恢复
+`e.level || e.severity`、规则行直发 condition 原值、`AlertRules.vue` 恢复
+`r.id`、`DataTable` 不再把秒当秒。
+
+
+### blackboard 批次：7 条端点建模，把"视图读错词表 + 测试跟着错"拆掉（2026-10-23）
+
+P1-b 第七批：`/api/blackboard/*` 前端在用 7 条端点声明 `response_model`，
+新增 `routers/blackboard_schemas.py`。这批的信封只声明成功形状且
+`status` **无默认值**：`blackboard.py` 不给 `@handle_api_errors` 传
+`error_value`，失败走 `error_response()` 的 `JSONResponse`（直接绕过
+序列化）⇒ 兜底 dict 根本不会进信封，给 `status` 兜个 `"error"` 只是自我安慰。
+
+**视图读的是另一套词表**：`BlackboardEntry.to_dict()` 发 `entry_id`
+（`core/reliability/blackboard.py:106-116`），而模板用 `:key="e.id || i"` ⇒ 永远走下标兜底，
+列表变化时 Vue 按下标复用行。历史行同理：`_record_history()` 只写
+`action/domain/entry_id/contributor/timestamp`（`+extra`），模板却按
+`h.op || h.operation || h.action`、`h.actor || h.contributor`、
+`h.domain || h.target`、`e.timestamp || e.ts || e.created_at` 一路兜底，
+`h.id`/`h.target` 是从不存在的键。
+
+**测试替身把错误固化了**：`Blackboard.test.js` 的 mock 写的正是
+`{id, op, actor}` 和域 `tasks/results/metrics` —— 真实的
+`BlackboardDomain`（R-8 白名单）是
+`problem/partial_solution/hypothesis/evidence/decision/constraint/agent_contribution`，
+七个里一个都没出现在 mock 里。视图的兜底链 + 替身的错词表 = 两边自洽地错着，
+`9 tests` 全绿。mock 换成生产者真实形状（条目 7 键齐全、历史行 5 键齐全 +
+clear 行带 `cleared_count`），并补一条**自相矛盾的反向探针**：同一行同时给
+`action:'write'`（真）和 `op:'clear'`（假），断言徽章文字是 write **且**
+tone 是 `badge--success`；另一行只带死词表键，断言它一个字都渲染不出来。
+
+**`extra="allow"` 是有原因的**：`_record_history(extra=...)` 是开放口子
+（clear 行带 `cleared_count`），响应模型默认会**过滤掉未声明的键** ⇒
+声明式信封在这里会把生产者数据抹掉。契约测试同时钉住
+`cleared_count` 透传与"`cleared_count` 不在 `HistoryRowOut.model_fields` 里"，
+以后有人想把它改成显式字段也不会漏。
+
+**没被测试覆盖的一处**：`:key` 从 `e.id` 改成 `e.entry_id` 在文本断言里
+观察不到（内容/贡献者本来就是直接绑定，下标键只在复用行时才出错），所以这一条
+只靠代码事实，不假称有回归网。
+
+**棘轮**：清单 127 → 120。
+
+**验证**：新契约 11 条（真 `Blackboard` + `reset_blackboard()` 隔离，不用替身）、
+`test_blackboard.py` 74 条、`Blackboard.test.js` 10 条、定向合跑 90 passed；
+前端全量 63 files / 547 tests passed；eslint / ruff / mypy(2 文件) /
+尺寸 / 静默异常 / docs 门禁绿。**变异九处**（摘 `GET /history` 的信封、
+`extra=allow` 去掉、条目信封改叫 `id`、模板五处兜底链逐个复原）全部转红
+且恢复字节一致——其中 `historyTone` 与时间兜底两处**第一轮跑漏了**：
+原探针只给"真+假都发"的行，而 `h.timestamp || h.ts` 在第一键存在时根本走不到
+分支；改成"一行自相矛盾 + 一行只发死键"才真正有牙齿。
+
+
+### model-gateway 批次：8 条端点建模 + 两个静默数据缺陷（2026-10-23）
+
+P1-b 第六批：`/api/model-gateway/*` 前端在用 8 条端点声明 `response_model`，
+新增 `routers/model_gateway_schemas.py`。权限行/配置/决策三个载荷本来就是
+`ModelPermission`、`ModelGatewayConfig`、`ModelAccessDecision` 的
+`model_dump()`，所以信封**直接复用这三个域模型**而不是再抄一份字段——手抄
+副本迟早和生产者分家。
+
+**⚠ 行为变更：`PUT /api/model-gateway/config` 现在是合并更新**。原先它整体
+替换配置，而 `ModelGatewayConfig.permissions` 缺省就是空表，`update_config()`
+紧接着 `_sync_permissions_to_db()`（`model_gateway.py:558`，第一步就是
+`DELETE FROM model_gateway_permissions`）；仪表盘那个表单只发
+`global_daily_token_limit` + `default_policy`（`AgentGateway.vue` 的
+`updateConfig()`）⇒
+**用户每点一次"更新配置"，就把自己配好的全部权限规则删干净**，界面还报
+"配置已更新"。现在请求体换成 `ModelGatewayConfigPatch`（四字段全可缺省、
+`extra="forbid"` 免得打错的键被 `extra='ignore'` 吞成"200 但没改"），
+只有客户端真发来的键才生效；合并与写库放进
+`ModelGateway.patch_config()`，读-改-写全程持锁。要清空规则得显式发
+`permissions: []`（这条语义保留，且有测试钉住）。顺带：原先缺省被强制重置的
+`enable_quota_check` 现在保持现值；PUT 的回包从 `{"status":"ok"}` 换成生效
+配置，表单不再停留在本地草稿。
+
+**新增 `GET /api/model-gateway/config`**：此前只有 PUT 没有 GET，
+`loadUsage()` 去读 `GET /usage` 的 `data.config`（该端点从不发这个键）⇒
+配置表单永远显示默认值（限额 0、策略 allow），而库里跑的是另一套。
+`ModelGateway.config` 这个 property（返回深拷贝快照）就是为它补的读取口。
+
+**访问检查面板恒显"拒绝"**：前端写 `data.result ?? data`，决策其实在
+`data.decision` 里 ⇒ 兜到信封本体，`allowed` 是 `undefined`，每次检查都渲染
+成"拒绝"。模板另读的两个键根本不存在：`matched_rule` 实为
+`matched_permission.model_pattern`，`remaining_daily_quota` 实为
+`remaining_daily_tokens`。后者的哨兵值和 `formatLimit()` 相反（-1 = 不限、
+0 = 已用尽，而 `formatLimit(0)` 说"不限"），所以单独加 `formatRemaining()`，
+否则"额度用尽"会显示成"不限"。
+
+**用量表把映射当数组遍历**：`GET /usage` 的 `usage` 是 `{model: tokens}`，
+`usageRows.value = data.usage` 后 `v-for` 遍历的是整数 ⇒ 模型列/Token 列全空。
+Agent 列也不可能有值——内存缓存按 `date:model` 折叠，而 SQLite 主键本就是
+`(date, model, agent)`，展开数据一直在存只是没人读。新增
+`ModelGateway.get_daily_usage_rows()`，信封多带一个 `rows`。
+
+**改名规则变成加规则**：编辑弹窗把（可能已被改过的）新 pattern 放进 PUT 的
+URL，后端拿 URL 参数定位原规则 ⇒ 改名时旧规则残留、同一条限额配两遍。
+现在打开弹窗记下 `editingPattern`，PUT 用它定位（后端 `renamed_from` 语义不变）。
+
+**棘轮**：清单 135 → 127（本批 8 条全部出账；新增的 GET /config 直接带
+`response_model`，不入账）。
+
+**验证**：`AgentGateway.vue` 此前**零测试**，补 `AgentGateway.test.js` 14 条
+（权限行、改名走旧 pattern、删除走 DELETE、决策来自 `data.decision`、
+-1 渲染成"不限"、错误分支不假称有结论、用量含 Agent 列、配置表单从
+GET /config 回填、PUT 只带两个键、保存后回读生效值、配置加载失败要显形）；
+新契约 `test_model_gateway_router_contracts.py` 17 条，跑真 `ModelGateway` +
+隔离 tmp SQLite 而非替身——这几条路径正是"替身会跟着旧 bug 一起自洽"的地方。
+定向合跑 148 passed，`tests/server_core + tests/contract` 60 passed，
+前端全量 63 files / 546 tests passed，eslint / ruff / mypy(4 文件) /
+尺寸 / 静默异常 / docs 门禁绿。六处变异全部转红且恢复字节一致：
+`patch_config` 退回整体替换 ⇒ 权限保留测试红；服务层不发 `rows` ⇒ 契约红；
+摘掉 `GET /usage` 的 `response_model` ⇒ 棘轮红；前端改回读信封 / 遍历映射 /
+用新 pattern PUT ⇒ 对应 vitest 红。
+
+
+### model 批次：10 条路由建模，顺带堵住 `/api/model/select` 外发明文 API key（2026-10-23）
+
+P1-b 第五批：`/api/model/*` 前端在用 8 条 + 顺手做齐 `select` 与 `quota/status`
+（同一路由器里只建模一半会留下更难看的洞）。新增 `routers/model_schemas.py`。
+
+**漏 key**：`GET /api/model/select` 直接 dump `EffectiveModel`，而它带着
+`api_key`（schema.py:253，从 env 或内联解析出的真 key，本来是给 dispatcher
+用的）⇒ 浏览器/日志/截屏都能看见明文密钥。响应模型改为不声明该字段，并用
+`model_validator(mode="before")` 把"有没有 key"换成 `has_api_key` 上报——
+只是删字段会让 `has_api_key` 恒 false，那换的是一种错为另一种错。
+（同一路由器里 `list_providers` 一直只回 `has_api_key`，这次是补齐先例。）
+
+**`status` 默认 `"error"` 而不是 `"ok"`**：成功路径一律显式写
+`{"status":"ok", ...}`，但 `list/agents/quota/providers/policies/list` 等多处
+`@handle_api_errors(error_value=...)` 的兜底 dict **不带 status**，而兜底 dict
+是会被 response_model 校验的——默认 `"ok"` 就等于把失败应答标成成功。
+
+**同义反复的契约测试**：`tests/contract/test_model_api_contract.py` 有 7 个
+`expected_keys = {...}; assert expected_keys == {...}`——左右两边是同一份字面量，
+永远不可能失败，其中还把 `quota/status` 的 `quotas` 写成 dict（实为 list）。
+改成读 `app.openapi()` 的真实信封与条目属性集（含 "`api_key` 不在
+effective_model 里" 这条安全不变量），断言终于有了牙齿。
+
+**桩与枚举值改真**：`FakeModelRegistry.stats()` 交回真实 `ModelRegistry.stats`
+逻辑跑在假 `_config` 上（旧桩的 `providers`/`policies` 两个键生产者从不发，
+而 UI 读的 `total_providers`/`thinking_capable` 它没有）；`FakeProviders`
+补齐 7 个键（此前缺 `has_api_key`/`base_url`，正是面板要显示的列）；
+budget 桩的 `used` 改成真名 `daily_spend`。vitest 里 `quality_tier:'high'`、
+`latency_tier:'low'`、`protocol:'rest'`、`strategy:'cost'` 都是不存在的枚举值，
+换成 excellent/medium/openai_completions/cheapest。另一处习惯性错误：mock 靠
+"省掉键"来触发视图的 `—` 兜底，而有了信封之后键不会消失、只会是 `""`/`0`——
+于是第二个 mock 行改成空值全键，两处断言随之改成真实渲染值
+（`context_window` 是 0、`max_cost_per_task` 是 `$0.000`，不再是 `—`）。
+
+**棘轮**：清单 143 → 135。
+
+**验证**：定向 125 passed（新契约 12 条 + `test_router_model` + `tests/contract` 全套）；
+`Models.test.js` 6 passed；eslint/ruff/mypy(2 文件)/尺寸/静默异常/docs 门禁绿。
+三处变异转红且恢复字节一致：摘掉 `/api/model/list` 的 `response_model` ⇒
+契约报 `UNtyped`；把 `api_key` 加回 `EffectiveModelPublic` ⇒ 报
+"credential leaked through the response model"；从 `ProviderRow` 删
+`has_api_key` ⇒ 契约套件里 provider 形状断言失败。
+
+
+### plugins 批次：11 条路由建模，插件状态词表与生产者对齐（2026-10-23）
+
+`/api/plugins` 系 10 条前端在用端点（外加 `GET /{plugin_id}` 一并建模）声明
+`response_model`，新增 `routers/plugin_schemas.py`。服务层每个载荷都是
+`PluginInfo.model_dump()`，所以三个信封直接复用 `PluginInfo`——手抄字段等于
+再造一份会漂移的副本。
+
+**状态词表对不上**：生产者只有 `discovered|loaded|started|stopped|errored`
+五个值（`plugin_hooks.py:21-26`），而 `Plugins.vue` 的分支里写着
+`running`/`unloaded`/`error`/`failed` 这四个**从不上线**的名字，
+真正会出现的 `errored` 反倒没人接 ⇒ 崩溃插件的徽章显示成"未知"，
+且因为 `canReload` 不含 errored，**行上连一个可用操作都不剩**。
+按生产者词表重写字段映射，并把 `error-plug` 的 vitest 桩从 `state:'error'`
+改成 `state:'errored'`——旧桩恰好写了 UI 那套编造的名字，所以视图与测试
+一起自洽地错着。
+
+**按钮可见性写进断言**：`PluginManager.start()` 在非 LOADED 时直接抛
+（`plugin_manager.py:273-274`），而 `canStart` 之前对 `stopped` 也放行 ⇒
+点一下就是 500。现按真实守卫收敛（started 只能 Stop；stopped/errored 走
+Reload），并断言三行的 aria-label 集合，防止以后又把 Start 放回去。
+
+**用例桩一起改**：`test_router_misc_coverage` 的插件替身返回
+`{"id": "p1"}`（`name` 在 `PluginInfo` 里是必填）与 `"state": "reloaded"`
+（枚举没有这个值），`load_all/start_all/stop_all` 一律返回空列表；
+`test_list_with_state` 甚至写成 `status_code in (200, 500)`，
+`test_not_found` 注释里承认"没法按用例注入替身"于是断 200。
+全部换成真 `PluginInfo`（reload 走 stop→load→start，返回态是 **started**
+不是 reloaded）、按 id 分流的 `get_plugin` side_effect、两个含糊断言收紧成
+`== 200` 与 `== 404`。
+
+**棘轮**：清单 153 → 143。
+
+**验证**：新契约 13 passed（逐字段等值 + "枚举只有这五个值" + 真
+`PluginInfo` 往返）；`test_router_misc_coverage` 59 passed；定向合跑 77
+passed；`Plugins.test.js` 9 passed；ruff/mypy(3 文件)/尺寸/静默异常/docs 门禁
+通过。两处变异转红且恢复字节一致：摘掉 `GET ""` 的 `response_model` ⇒
+契约测试报 `UNtyped GET /api/plugins`；把 `canReload` 的 errored 去掉 ⇒
+vitest 的 Reload 断言失败。
+
+
+### mcp 批次：10 端点建模，并把 5 个"UI 在读、API 从不发"的字段做成真值（2026-10-23）
+
+P1-b 第三批。`/api/mcp` 系（含 `data.py` 的组合端点）10 条路由声明
+`response_model`，新增 `routers/mcp_schemas.py`：`ServerInfo`、`MCPTool`
+直接复用核心模型，手写 dict（server detail / stats / topology / marketplace）
+按服务层的字面键复述。`TopologyTool` **故意不带** `concurrency_limit`——
+拓扑构造器从不设这个键，写进模型就等于往线上编一个 `0`。
+
+建模逼出来的 5 个字段错配（`McpManager.vue` 在读，线上从来没有）：
+
+| UI 读的 | 实际生产者 | 处置 |
+|---|---|---|
+| `servers[].tool_count` | `ServerInfo.tools_count` | 改名，数量列此前恒 0 |
+| `servers[].url` | 存储的 config JSON 里有 `url` | `ServerInfo` 新增 `url`，hub 在唯一构造点 `mcp_hub_ops.py:273` 填上 |
+| `servers[].latency_ms` | 没有该字段；`per_tool` 有 `avg_ms`/`calls` | UI 侧按调用数加权 join 出每服务器延迟 |
+| `tools[].parameters` / `call_count` | `input_schema` / 无 | 参数面板改读 `input_schema`；调用数从 `per_tool` 按 `server:tool` id join |
+| `stats.series[].calls` / `success_rate` / `avg_latency_ms` | `{ts,count,errors}`，延迟根本没输出 | 累加器每桶已存 `total_ms`：序列行补出 `avg_ms`（小时均延迟），成功率由 `(count-errors)/count` 现算，不再虚构字段 |
+
+顺带修一条凭据泄漏：组合端点的数据源是 bridge 原样吐出的
+`config/mcp_servers.yaml`，`headers.Authorization` 可能是真的 Bearer token——
+而 `GET /api/mcp/servers/{id}` 一直只回 `auth_type`/`has_auth`。
+现按通知渠道同一约定处理：**键保留、值打码 `"***"`**（`env` 里只打码名字含
+key/token/secret/password/auth/credential 的项，`LOG_LEVEL` 这类照原样），
+`name`/`transport`/`url` 仍可见，卡片不受影响。
+
+**测试两侧的形状谎言一起改**：vitest 的 `McpManager.test.js` 桩恰好把 UI 读的
+字段名原样编了一遍（`tool_count`/`latency_ms`/`parameters`/`success_rate`/
+`avg_latency_ms`，`ts` 还写成 ISO 串——线上是 Unix 秒），于是视图和测试互相自洽、
+一起与 API 不一致；后端侧 `list_servers` 桩返回 `{"name":"s1","connected":true}`
+（`connected` 不是字段）、`all_tools` 只给 `{"name": ...}`。全部换成生产形状，
+断言也从"渲染出 2 行"升级到具体数值（URL 文本、3 个工具、加权后 120 ms、
+调用数 42、95.0% 成功率、schema 里出现 `query`）。
+
+**棘轮**：清单 163 → 153，上限同步下调。
+
+**验证**：后端定向 127 passed（新契约 14 条 + crud/data/coverage/stats 既有 113 条）；
+每桶均延迟用真实累加器 `MCPCallStats` 直接证（100ms 成功 + 300ms 失败 ⇒ `avg_ms=200`）；
+前端 `McpManager.test.js` 13 passed；ruff、mypy（7 个改动文件）、尺寸/静默异常/docs
+门禁通过。三处变异各自转红、恢复后字节一致：改回 `s.tool_count`、改回
+`tool.parameters`、删掉 `_mask_mcp_row` 那一行 ⇒ 打码用例报红。
+
+
+### evolution 批次：15 个端点建模，顺带挖出 A/B 面板从未有过数据（2026-10-23）
+
+P1-b 第二批：`/api/evolution` 下前端调用的 15 个端点声明 `response_model`，
+新建 `routers/evolution_schemas.py`。生产者已有的 Pydantic 模型一律复用
+（`EvolutionCycleReport` / `LoopReport` / `SkillMeta` / `DeploymentRecord` /
+`PromoteResult` / `SPSRTExperimentResult` / `VariantStats` / `SPRTState`），
+手写 dict（approvals 条目、loop 状态、ab 结果、narrative）按服务的字面键复述。
+`/api/evolution/skills` 从来没有 `status` 键，信封也没给它编一个。
+
+建模时撞出两个真 bug：
+
+**1）路由遮蔽：A/B 实验列表恒为空。**
+`GET /api/evolution/ab/list` 被 `GET /api/evolution/ab/{cycle_id}` 吃掉——
+`_register_routes.py` 里 `evolve_insights` 在 :162 注册、
+`evolution_experiment` 在 :273 才注册，而 Starlette 取第一个全匹配。
+实测（真实 app、绕开鉴权）：`/api/evolution/ab/list` 返回
+`{"status":"ok","cycle_id":"list","ab_result":null}`，即命中了 cycle 处理器；
+`EvolutionHistory.vue:925` 的 `res.experiments || []` 因此恒为 `[]`，
+整个 A/B 面板（含逐实验的 SPRT 判定）一件产品都没有。
+OpenAPI 表达不了这件事：两条路径都在文档里、各自也有形状，但 schema 里没有
+"谁先匹配"这一层信息——只有拿真实 URL 去解析才暴露。
+修法是把 `evolution_experiment` 的注册提到 `evolve_insights` 之前；
+修后同一路径返回 `{"status":"ok","experiments":["evo-real-list"]}`。
+全量扫描 517 条叶子路由，遮蔽的静态路径**只有这一条**。
+新增门禁 `test_no_static_route_is_shadowed_by_an_earlier_param_route`
+（先把 `include_router` 包装摊平成叶子路由再按真实匹配顺序判定；
+FastAPI 0.141 的 `app.routes` 里每条 include 是一个无 `.path` 的
+`_IncludedRouter`，只数 `app.routes` 会漏掉 500+ 条——旧用例正是这么数成 13 条的）。
+
+**2）读了一个从不上线的字段：速率列渲染成 NaN。**
+`SPRTState.success_rate` 是 Python `@property`，`model_dump()` 不带它；
+视图读 `sprt.success_rate` ⇒ undefined，而行映射写的是
+`e.success_rate !== null ? (e.success_rate * 100).toFixed(1) : '—'`
+（undefined ≠ null）⇒ 每行都是 `NaN`。改由已序列化的 `successes / samples`
+推算，无样本时为 `null`；守卫也改成 `== null` 同时兜住 undefined。
+
+**入口覆盖**：`evolution_experiment` 那 9 个端点此前**没有任何 HTTP 级测试**
+（`test_evolution_loop_ac07.py` 直接调处理函数，绕过 FastAPI 的响应序列化；
+其余用 `MagicMock` 行对象，缺字段也会自动长出来）。新增
+`tests/test_evolution_router_contracts.py` 24 条走 ASGI 的用例，逐端点把响应
+与生产者载荷比对——建模若丢字段就红。另断言 `handle_api_errors` 的
+`error_value` 兜底 dict 也能通过校验（那条路径返回普通 dict、会被
+response_model 校验；`HTTPException` 走 JSONResponse 则绕过），以及
+`cycle_id` 缺失时 narrative 仍是 404。
+
+**棘轮**：清单 178 → 163，上限同步下调。
+
+**验证**：定向 81 passed（contracts 24 + server_core 7 + 棘轮 6 + ac07 + agents 覆盖）。
+三处变异回验，恢复后文件字节与改前一致：
+
+- 从 `LoopStats` 删掉 `improvement_rate` ⇒ contracts 用例报
+  `dropped by response_model: improvement_rate`；
+- 把两个 router 的 `include_router` 顺序还原 ⇒ 遮蔽门禁报
+  `GET /api/evolution/ab/list served by /api/evolution/ab/{cycle_id}`；
+- 把前端加载映射还原成 `sprt.success_rate` ⇒ A/B 用例失败（NaN / 无 65.0）。
+
+遮蔽修复实测（真实 app）：`/api/evolution/ab/list` 由
+`{"cycle_id":"list","ab_result":null}` 变成 `{"experiments":["evo-real-list"]}`；
+517 条叶子路由的遮蔽计数 1 → 0。前端 62 files / 532 tests passed、eslint 干净；
+后端 ruff 与 mypy（4 个改动文件）干净。
+
+
+### agents 批次：16 个前端在用端点建模，顺带把假形状的用例桩改成真形状（2026-10-23）
+
+P1-b 第一批从最大的模块开：`/api/agents` 下前端实际调用的 16 个端点
+（list / presets / register / scan / delete / diagnose / repair / health-check /
+memory 四件 / upgrade / upgrade-check / evolve / routes）此前全部返回
+`dict[str, Any]`。
+
+**建模**：新增 `py/maop/dashboard/routers/agents/schemas.py`。能复用真模型的不新造——
+`RegisteredAgent`、`ScannedAgent`、`HealthCheckResult` 直接来自 core；
+`DiagnosisResult` / `RepairResult` / `EvolutionResult` 是 dataclass（只有
+`model_dump()`），按它的键在 schemas 里逐字段复述。`upgrade/check` 的错误分支
+只带 `status`/`error`，其余字段一律有默认值，避免错误响应被建模打成 500。
+
+**改桩（这条才是重点）**：`tests/test_router_agents_coverage.py` 的用例桩形状
+和生产不一致，而 `response_model` 对"缺字段"是静默补默认值，不是报错——
+留着这些桩，建模就自证不了任何事：
+
+- `scanner.scan` 桩返回 `RegisteredAgent`，真实返回 `ScannedAgent`
+  （UI 读的 `status/version/cli_path` 在旧桩下会走默认值）；
+- 记忆条目桩用 `type`，真实列名是 `memory_type`，且缺
+  `agent_name/metadata/importance/created_at`；
+- `summarize` 桩用 `total`，真实键是 `total_memories`（UI 的合计卡片读后者）；
+- `evolve` 桩只给 `summary/auto_applied`，真实结果还有
+  `agent_name/suggestions/errors`。
+
+桩改成真实形状后，断言也跟着收紧：presets 必须带 UI 转发给 `/register` 的
+8 个键、memory 列表整条相等、summary 三项、evolve 四件、diagnose 的
+`overall_status`、upgrade-check 的 5 个版本字段。
+
+**棘轮**：清单 194 → 178（agents 16 条删除），上限同步降到 178；
+新增 `test_agents_router_endpoints_in_use_are_typed` 断言这 16 条路由的
+2xx 都指向组件模型。
+
+**通知批次补刀（PR CI 红因）**：`notifications.py` 加完信封到 860 行，
+撞 800 行文件门禁（CI 里 file-size gate 挂在 Docs job，pytest 侧也各红一条），
+把 16 个信封拆到 `routers/notification_schemas.py`；`test_notification_router_is_fully_typed`
+在纯净 CI（未装 maop-enterprise，通知路由根本不挂载）改成 `importorskip` 跳过，
+而不是硬断言 26 条。
+
+**验证**：`test_router_agents_coverage.py + test_frontend_response_models.py`
+42 passed；变异回验——从 `DiagnosisOut` 删掉 `overall_status` 后
+`TestDiagnose` 立刻 KeyError 报红（rc=1），恢复后文件字节与改前一致；
+模拟无企业包环境跑棘轮 = 4 passed / 1 skipped。
+
+
 ### 中央保留期：14 张"只增不减"的表接上兜底（2026-10-22）
 
 盘点口径：`py/maop` 里 `CREATE TABLE` 共涉及 **131 张表**，其中 **60 张**在仓库任意
@@ -322,6 +726,44 @@ agent 相关旗标，主运行链路（MaopLoop）也不构造带 `preferred_age
   CI 的 `lock-drift` 偏好模式（以提交版锁为偏好集重编译后剥注释比对）**零漂移**；
   `tests/test_frozen_lock.py` + `test_requirements_lock_sync.py` + `test_ci_path_scope.py`
   **42 passed**；`scripts/check_docs_consistency.py --gate` 通过。
+
+### 通知列表读错字段；通知路由全量建模 + 前端端点 response_model 棘轮（2026-10-22）
+
+P1-b 先量化：前端实际调用 252 个端点（去掉查询串、模板参数归一后），匹配到
+个人版路由 220 个，其中 **211 个的 2xx 响应是 `dict[str, Any]`**（OpenAPI 里只有
+`additionalProperties: true`）。这不是"文档不漂亮"：通知列表页就把
+`NotificationResponse` 的 `notification_id/body/read_at` 读成了
+`id/message/read`——
+
+- 正文恒为空（读 `message`，后端叫 `body`）；所有通知恒显示未读；
+- 点"标记已读"/删除会请求 `/api/notifications/undefined/read` ⇒ 404；
+- 分类筛选建立在后端没有的 `category` 字段上 ⇒ 除"系统"外永远空。
+  测试一直用旧形状的 mock，把这条 bug 固化成了绿色。
+
+**修法**
+
+- 通知路由 26 个操作全部声明 `response_model`（channels/rules/templates 各
+  列表 + 单项信封、notification list/send、preferences、stats、dead-letters、
+  delete/read/read-all/unread-count）。顺手修掉一个谎报类型：
+  `events/publish` 的 `delivered_to` 实际是"被调用的 handler 数"（int），
+  服务 docstring 一直写成 "list of delivered target IDs"。
+- 前端按真实字段归一：`notification_id/body/read_at/event_payload` 生效，
+  旧 `id/message/read` 仅作兜底；`event_type` 映射回既有分类徽章
+  （`quota_*→quota`、`license_*→tenant`、`audit_*→security`、`task_/dag_/agent_→agent`）；
+  补 `critical` 级别（后端枚举一直有，前端此前落到 info）。
+- 门禁 `test_frontend_response_models.py`：从 `.vue/.js` 抽取 `api.*` 调用，
+  与 `app.openapi()` 的真实路由求交，把"缺模型"的 194 条写进
+  `fixtures/frontend_response_model_allowlist.txt`，**双向断言**：新增缺口报红，
+  已修复却未删清单条目也报红；上限 194 只许降不许升。判据读 OpenAPI
+  组件引用而非 AST/行匹配，避免"注释里提过"这类假阳性。
+- 变异回验：删掉清单里的 `GET /api/agents` ⇒ 报"not allowlisted"；塞一条
+  `GET /api/__stale_probe__` ⇒ 报"no longer missing"；恢复后 sha256 与改前一致。
+
+**验证**：通知后端 111 passed（原 107 + 4 条契约测试）；新增门禁 4 passed；
+Notifications vitest 16 passed（样例改成真实 `NotificationResponse` 形状）；
+真浏览器 + 真后端：发一条 `task_failed` 站内通知 → 正文正常显示、分类为 Agent、
+点已读后 `/list` 回读 `read_at > 0`，控制台无报错。剩余 194 条按模块
+（agents 16、evolution 15、mcp/plugins 各 10 …）继续烧。
 
 ### 通知偏好：读错键、存错结构（2026-10-21）
 

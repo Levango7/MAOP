@@ -72,3 +72,65 @@ async def test_drain_handles_several_tasks_at_once():
     await asyncio.sleep(0)  # 让两个任务真的开始运行，否则 done() 判定不可靠
     assert await drain_cancelled(a, b) == 2
     assert a.cancelled() and b.cancelled()
+
+
+# ── 路由遮蔽（静态路径被先注册的参数路径吃掉）───────────────────
+def _leaf_routes(routes):
+    """Flatten ``include_router`` wrappers into the leaves Starlette matches.
+
+    FastAPI 0.141 keeps each ``include_router`` as a ``_IncludedRouter`` without
+    a ``.path``, so ``app.routes`` alone hides the real matching order — which
+    is exactly what a shadowing check needs.
+    """
+    leaves = []
+    for route in routes:
+        children = getattr(route, "routes", None)
+        if children is None:
+            inner = getattr(route, "original_router", None)
+            children = getattr(inner, "routes", None) if inner is not None else None
+        if children:
+            leaves.extend(_leaf_routes(children))
+        elif getattr(route, "path", None) and getattr(route, "methods", None):
+            leaves.append(route)
+    return leaves
+
+
+def _http_methods(route) -> set[str]:
+    return set(route.methods or ()) - {"HEAD", "OPTIONS"}
+
+
+def test_no_static_route_is_shadowed_by_an_earlier_param_route():
+    """A concrete path must be served by the route that declares it.
+
+    Found by P1-b: ``GET /api/evolution/ab/list`` was served by
+    ``/api/evolution/ab/{cycle_id}`` (that router was included first), so the
+    dashboard's A/B experiment list could never be non-empty — and the OpenAPI
+    schema still described the *right* shape, because both routes exist in the
+    document. Only resolving the URL catches it.
+    """
+    from starlette.routing import Match
+
+    leaves = _leaf_routes(_app.routes)
+    assert len(leaves) > 300, f"flattening lost routes: {len(leaves)}"
+
+    shadowed: list[str] = []
+    for index, route in enumerate(leaves):
+        if "{" in route.path:
+            continue
+        for method in sorted(_http_methods(route)):
+            scope = {
+                "type": "http",
+                "path": route.path,
+                "method": method,
+                "headers": [],
+                "query_string": b"",
+                "root_path": "",
+            }
+            for earlier in leaves[:index]:
+                match, _child = earlier.matches(scope)
+                if match == Match.FULL and method in _http_methods(earlier):
+                    if earlier.path != route.path:
+                        shadowed.append(f"{method} {route.path} served by {earlier.path}")
+                    break
+
+    assert shadowed == []

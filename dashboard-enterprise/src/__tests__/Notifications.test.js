@@ -90,36 +90,40 @@ describe('Notifications.vue', () => {
 
   function sampleNotifications() {
     const now = Date.now();
+    // Real backend shape (NotificationResponse): notification_id / body /
+    // read_at / event_type. The old id/message/read/category sample hid the
+    // mismatch that made the live page render blank messages and call
+    // /api/notifications/undefined/read.
     return [
       {
-        id: 'notif_1',
+        notification_id: 'notif_1',
         level: 'info',
-        category: 'system',
+        event_type: '',
         title: 'Agent deployed',
-        message: 'Agent "data-analyst" was deployed successfully',
-        read: false,
+        body: 'Agent "data-analyst" was deployed successfully',
+        read_at: 0,
         created_at: now - 60_000,
-        metadata: { agent_id: 'agent_1', action: 'deploy' },
+        event_payload: { agent_id: 'agent_1', action: 'deploy' },
       },
       {
-        id: 'notif_2',
+        notification_id: 'notif_2',
         level: 'warning',
-        category: 'cost',
+        event_type: 'cost_daily_exceeded',
         title: 'Cost threshold reached',
-        message: 'Daily spend exceeded 80% of budget',
-        read: false,
+        body: 'Daily spend exceeded 80% of budget',
+        read_at: 0,
         created_at: now - 3_600_000,
-        metadata: { budget: 100, current: 82 },
+        event_payload: { budget: 100, current: 82 },
       },
       {
-        id: 'notif_3',
+        notification_id: 'notif_3',
         level: 'error',
-        category: 'security',
+        event_type: 'audit_alert',
         title: 'Auth failure spike',
-        message: '5 consecutive login failures from 10.0.0.1',
-        read: true,
+        body: '5 consecutive login failures from 10.0.0.1',
+        read_at: now - 3_000_000,
         created_at: now - 7_200_000, // 2h ago — within the 24h "today" window
-        metadata: { ip: '10.0.0.1' },
+        event_payload: { ip: '10.0.0.1' },
       },
     ];
   }
@@ -151,6 +155,46 @@ describe('Notifications.vue', () => {
     expect(wrapper.text()).toContain('Agent deployed');
     expect(wrapper.text()).toContain('Cost threshold reached');
     expect(wrapper.text()).toContain('Auth failure spike');
+    wrapper.unmount();
+  });
+
+  // ── Extra: real NotificationResponse field names ──
+  it('maps the backend notification_id/body/read_at/event_type contract', async () => {
+    mockFetch(defaultRoutes());
+    const wrapper = await mountNotifications();
+    const rows = wrapper.findAll('.notif-row');
+    expect(rows).toHaveLength(3);
+    // body (not message) is rendered
+    expect(rows[1].text()).toContain('Daily spend exceeded 80% of budget');
+    // read_at != 0 means read
+    expect(rows[2].classes()).not.toContain('is-unread');
+    // event_type is mapped to the existing category badges
+    expect(rows[1].text()).toContain('Cost');
+    expect(rows[2].text()).toContain('Security');
+    wrapper.unmount();
+  });
+
+  it('renders the critical level and quota category', async () => {
+    mockFetch({
+      '/api/notifications/list': {
+        notifications: [{
+          notification_id: 'notif_c',
+          level: 'critical',
+          event_type: 'quota_exceeded',
+          title: 'Quota exhausted',
+          body: 'Tenant quota is exhausted',
+          read_at: 0,
+          created_at: Date.now(),
+          event_payload: {},
+        }],
+        total: 1,
+        has_more: false,
+      },
+    });
+    const wrapper = await mountNotifications();
+    const row = wrapper.find('.notif-row');
+    expect(row.text()).toContain('Critical');
+    expect(row.text()).toContain('Quota');
     wrapper.unmount();
   });
 

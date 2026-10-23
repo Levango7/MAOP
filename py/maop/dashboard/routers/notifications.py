@@ -105,6 +105,24 @@ class PublishEventRequest(BaseModel):
 # ── 请求模型：直接复用 enterprise.notification.models 中的 Create/Update ──
 # 让 FastAPI 自动校验请求体，避免手动 ``dict → Pydantic`` 转换。
 from maop.core.tenant.context import tenant_id_from_request
+from maop.dashboard.routers.notification_schemas import (
+    ChannelEnvelope,
+    ChannelListEnvelope,
+    DeadLetterListEnvelope,
+    DeleteEnvelope,
+    MarkAllReadEnvelope,
+    MarkReadEnvelope,
+    NotificationEnvelope,
+    NotificationListEnvelope,
+    PreferenceEnvelope,
+    PublishEventEnvelope,
+    RuleEnvelope,
+    RuleListEnvelope,
+    StatsEnvelope,
+    TemplateEnvelope,
+    TemplateListEnvelope,
+    UnreadCountEnvelope,
+)
 from maop.enterprise.notification.models import (
     ChannelCreate,
     ChannelUpdate,
@@ -262,7 +280,7 @@ def wire_broadcaster() -> None:
 # ── Channel endpoints ─────────────────────────────────────────────
 
 
-@router.get("/channels")
+@router.get("/channels", response_model=ChannelListEnvelope)
 @handle_api_errors
 async def list_channels(
     request: Request,
@@ -279,7 +297,7 @@ async def list_channels(
     return {"status": "ok", "channels": items, "count": len(items)}
 
 
-@router.post("/channels")
+@router.post("/channels", response_model=ChannelEnvelope)
 @handle_api_errors
 async def create_channel(body: ChannelCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -291,7 +309,7 @@ async def create_channel(body: ChannelCreate, request: Request) -> dict[str, Any
     return {"status": "ok", "channel": _mask_config_in(channel)}
 
 
-@router.get("/channels/{channel_id}")
+@router.get("/channels/{channel_id}", response_model=ChannelEnvelope)
 @handle_api_errors
 async def get_channel(channel_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -302,7 +320,7 @@ async def get_channel(channel_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "channel": _mask_config_in(channel)}
 
 
-@router.put("/channels/{channel_id}")
+@router.put("/channels/{channel_id}", response_model=ChannelEnvelope)
 @handle_api_errors
 async def update_channel(channel_id: str, body: ChannelUpdate, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -313,7 +331,7 @@ async def update_channel(channel_id: str, body: ChannelUpdate, request: Request)
     return {"status": "ok", "channel": _mask_config_in(channel)}
 
 
-@router.delete("/channels/{channel_id}")
+@router.delete("/channels/{channel_id}", response_model=DeleteEnvelope)
 @handle_api_errors
 async def delete_channel(channel_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -327,7 +345,7 @@ async def delete_channel(channel_id: str, request: Request) -> dict[str, Any]:
 # ── Rule endpoints ────────────────────────────────────────────────
 
 
-@router.get("/rules")
+@router.get("/rules", response_model=RuleListEnvelope)
 @handle_api_errors
 async def list_rules(
     request: Request,
@@ -342,7 +360,7 @@ async def list_rules(
     return {"status": "ok", "rules": items, "count": len(items)}
 
 
-@router.post("/rules")
+@router.post("/rules", response_model=RuleEnvelope)
 @handle_api_errors
 async def create_rule(body: RuleCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -353,7 +371,7 @@ async def create_rule(body: RuleCreate, request: Request) -> dict[str, Any]:
     return {"status": "ok", "rule": rule}
 
 
-@router.get("/rules/{rule_id}")
+@router.get("/rules/{rule_id}", response_model=RuleEnvelope)
 @handle_api_errors
 async def get_rule(rule_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -364,7 +382,7 @@ async def get_rule(rule_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "rule": rule}
 
 
-@router.put("/rules/{rule_id}")
+@router.put("/rules/{rule_id}", response_model=RuleEnvelope)
 @handle_api_errors
 async def update_rule(rule_id: str, body: RuleUpdate, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -375,7 +393,7 @@ async def update_rule(rule_id: str, body: RuleUpdate, request: Request) -> dict[
     return {"status": "ok", "rule": rule}
 
 
-@router.delete("/rules/{rule_id}")
+@router.delete("/rules/{rule_id}", response_model=DeleteEnvelope)
 @handle_api_errors
 async def delete_rule(rule_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -389,7 +407,7 @@ async def delete_rule(rule_id: str, request: Request) -> dict[str, Any]:
 # ── Template endpoints ────────────────────────────────────────────
 
 
-@router.get("/templates")
+@router.get("/templates", response_model=TemplateListEnvelope)
 @handle_api_errors
 async def list_templates(
     request: Request,
@@ -401,7 +419,7 @@ async def list_templates(
     return {"status": "ok", "templates": items, "count": len(items)}
 
 
-@router.post("/templates")
+@router.post("/templates", response_model=TemplateEnvelope)
 @handle_api_errors
 async def create_template(body: TemplateCreate, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -412,7 +430,7 @@ async def create_template(body: TemplateCreate, request: Request) -> dict[str, A
     return {"status": "ok", "template": template}
 
 
-@router.get("/templates/{template_id}")
+@router.get("/templates/{template_id}", response_model=TemplateEnvelope)
 @handle_api_errors
 async def get_template(template_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -423,7 +441,7 @@ async def get_template(template_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "template": template}
 
 
-@router.delete("/templates/{template_id}")
+@router.delete("/templates/{template_id}", response_model=DeleteEnvelope)
 @handle_api_errors
 async def delete_template(template_id: str, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -437,7 +455,7 @@ async def delete_template(template_id: str, request: Request) -> dict[str, Any]:
 # ── Notification list / read / delete ────────────────────────────
 
 
-@router.get("/list")
+@router.get("/list", response_model=NotificationListEnvelope)
 @handle_api_errors
 async def list_notifications(
     request: Request,
@@ -474,7 +492,7 @@ async def list_notifications(
     }
 
 
-@router.post("/read-all")
+@router.post("/read-all", response_model=MarkAllReadEnvelope)
 @handle_api_errors
 async def mark_all_read(request: Request, user_id: str = Query("")) -> dict[str, Any]:
     _require_feature()
@@ -486,7 +504,7 @@ async def mark_all_read(request: Request, user_id: str = Query("")) -> dict[str,
     return {"status": "ok", "marked_read": count}
 
 
-@router.get("/unread-count")
+@router.get("/unread-count", response_model=UnreadCountEnvelope)
 @handle_api_errors
 async def unread_count(
     request: Request,
@@ -504,7 +522,7 @@ async def unread_count(
 # ── Direct send (admin) ──────────────────────────────────────────
 
 
-@router.post("/send")
+@router.post("/send", response_model=NotificationEnvelope)
 @handle_api_errors
 async def send_notification(body: SendNotificationRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -527,7 +545,7 @@ async def send_notification(body: SendNotificationRequest, request: Request) -> 
 # ── Dead letters (admin) ─────────────────────────────────────────
 
 
-@router.get("/dead-letters")
+@router.get("/dead-letters", response_model=DeadLetterListEnvelope)
 @handle_api_errors
 async def list_dead_letters(
     request: Request,
@@ -543,7 +561,7 @@ async def list_dead_letters(
 # ── Preferences ──────────────────────────────────────────────────
 
 
-@router.get("/preferences")
+@router.get("/preferences", response_model=PreferenceEnvelope)
 @handle_api_errors
 async def get_preferences(request: Request, user_id: str = Query("")) -> dict[str, Any]:
     _require_feature()
@@ -556,7 +574,7 @@ async def get_preferences(request: Request, user_id: str = Query("")) -> dict[st
     return {"status": "ok", "preference": pref}
 
 
-@router.put("/preferences")
+@router.put("/preferences", response_model=PreferenceEnvelope)
 @handle_api_errors
 async def update_preferences(body: PreferenceUpdate, request: Request, user_id: str = Query("")) -> dict[str, Any]:
     _require_feature()
@@ -573,7 +591,7 @@ async def update_preferences(body: PreferenceUpdate, request: Request, user_id: 
 # ── Event publishing ─────────────────────────────────────────────
 
 
-@router.post("/events/publish")
+@router.post("/events/publish", response_model=PublishEventEnvelope)
 @handle_api_errors
 async def publish_event(body: PublishEventRequest, request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -589,7 +607,7 @@ async def publish_event(body: PublishEventRequest, request: Request) -> dict[str
 # ── Stats (admin) ────────────────────────────────────────────────
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=StatsEnvelope)
 @handle_api_errors
 async def get_stats(request: Request) -> dict[str, Any]:
     require_admin(request)
@@ -630,7 +648,7 @@ def _check_notification_ownership(notif: Any, request: Request) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
 
 
-@router.get("/{notification_id}")
+@router.get("/{notification_id}", response_model=NotificationEnvelope)
 @handle_api_errors
 async def get_notification(notification_id: str, request: Request) -> dict[str, Any]:
     _require_feature()
@@ -641,7 +659,7 @@ async def get_notification(notification_id: str, request: Request) -> dict[str, 
     return {"status": "ok", "notification": notif.model_dump()}
 
 
-@router.post("/{notification_id}/read")
+@router.post("/{notification_id}/read", response_model=MarkReadEnvelope)
 @handle_api_errors
 async def mark_read(notification_id: str, request: Request) -> dict[str, Any]:
     _require_feature()
@@ -656,7 +674,7 @@ async def mark_read(notification_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "read": True}
 
 
-@router.delete("/{notification_id}")
+@router.delete("/{notification_id}", response_model=DeleteEnvelope)
 @handle_api_errors
 async def delete_notification(notification_id: str, request: Request) -> dict[str, Any]:
     _require_feature()

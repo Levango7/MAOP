@@ -14,6 +14,14 @@ from pydantic import BaseModel
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.evolution_schemas import (
+    AbResultsEnvelope,
+    ApprovalDecisionEnvelope,
+    ApprovalListEnvelope,
+    LoopRollbackEnvelope,
+    LoopStatusEnvelope,
+    LoopTriggerEnvelope,
+)
 from maop.dashboard.services import evolution_service
 
 logger = logging.getLogger(__name__)
@@ -130,7 +138,7 @@ async def api_evolve_apply_suggestion(request: Request, body: EvolveApplySuggest
 # v5.2.0 F2-01: Evolution Loop AC-07 Dashboard Endpoints
 # ═══════════════════════════════════════════════════════════════════
 
-@router.get("/api/evolution/loop/status")
+@router.get("/api/evolution/loop/status", response_model=LoopStatusEnvelope)
 @handle_api_errors("Evolution loop status", error_value={"status": "error", "error": "Status unavailable"})
 async def api_evolution_loop_status(request: Request) -> dict[str, Any]:
     """闭环状态机当前状态 + 最近 cycle 摘要 (AC-07).
@@ -149,7 +157,7 @@ async def api_evolution_loop_status(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail="Evolution loop status unavailable") from exc
 
 
-@router.post("/api/evolution/loop/trigger")
+@router.post("/api/evolution/loop/trigger", response_model=LoopTriggerEnvelope)
 @handle_api_errors("Evolution loop trigger", error_value={"status": "error", "error": "Trigger failed"})
 async def api_evolution_loop_trigger(request: Request, body: EvolutionLoopTriggerRequest) -> dict[str, Any]:
     """手动触发一轮闭环（支持 dry_run）（AC-07）."""
@@ -163,7 +171,7 @@ async def api_evolution_loop_trigger(request: Request, body: EvolutionLoopTrigge
         raise HTTPException(status_code=500, detail="Evolution loop trigger failed, please try again later") from exc
 
 
-@router.get("/api/evolution/approvals")
+@router.get("/api/evolution/approvals", response_model=ApprovalListEnvelope)
 @handle_api_errors("Evolution approvals", error_value={"status": "error", "approvals": []})
 async def api_evolution_approvals(request: Request) -> dict[str, Any]:
     """待审批改进列表 (AC-07).
@@ -178,7 +186,7 @@ async def api_evolution_approvals(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail="Evolution approvals unavailable") from exc
 
 
-@router.post("/api/evolution/approvals/{approval_id}/decision")
+@router.post("/api/evolution/approvals/{approval_id}/decision", response_model=ApprovalDecisionEnvelope)
 @handle_api_errors("Evolution approval decision", error_value={"status": "error", "error": "Decision failed"})
 async def api_evolution_approval_decision(approval_id: str, request: Request, body: EvolutionApprovalDecisionRequest) -> dict[str, Any]:
     """审批通过 / 拒绝 (AC-07).
@@ -202,7 +210,7 @@ async def api_evolution_approval_decision(approval_id: str, request: Request, bo
         raise HTTPException(status_code=500, detail="Evolution approval decision failed, please try again later") from exc
 
 
-@router.get("/api/evolution/ab/{cycle_id}")
+@router.get("/api/evolution/ab/{cycle_id}", response_model=AbResultsEnvelope)
 @handle_api_errors("Evolution A/B results", error_value={"status": "error", "ab_result": None})
 async def api_evolution_ab_results(request: Request, cycle_id: str) -> dict[str, Any]:
     """A/B 结果与显著性检验数据 (AC-06/AC-07).
@@ -221,7 +229,7 @@ async def api_evolution_ab_results(request: Request, cycle_id: str) -> dict[str,
         raise HTTPException(status_code=500, detail="Evolution A/B results unavailable") from exc
 
 
-@router.post("/api/evolution/loop/rollback")
+@router.post("/api/evolution/loop/rollback", response_model=LoopRollbackEnvelope)
 @handle_api_errors("Evolution loop rollback", error_value={"status": "error", "error": "Rollback failed"})
 async def api_evolution_loop_rollback(request: Request, body: EvolutionLoopRollbackRequest) -> dict[str, Any]:
     """手动触发回滚 (AC-05).

@@ -171,7 +171,12 @@ function badgeTone(col, row) {
 function onRowClick(row) { emit('row-click', row); }
 function formatRel(ts) {
   if (ts === null || ts === undefined) return '—';
-  const d = new Date(typeof ts === 'number' ? ts : String(ts));
+  // Producers disagree on unit: audit/blackboard timestamps are epoch **seconds**
+  // (float) while JS-native values are milliseconds. new Date(1.7e9) is 1970,
+  // which rendered every audit row as "~20000 days ago", so anything below the
+  // ms magnitude is treated as seconds.
+  const ms = typeof ts === 'number' && ts < 1e12 ? ts * 1000 : ts;
+  const d = new Date(typeof ms === 'number' ? ms : String(ms));
   if (isNaN(d.getTime())) return String(ts);
   const diff = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
   if (diff < 60) return t('common.secondsAgo', { n: diff });

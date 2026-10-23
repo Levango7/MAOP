@@ -1,10 +1,12 @@
 // Tests for Audit.vue — field mapping + enhancement coverage.
 //
-// The backend may return either `time`/`level`/`target` or the legacy
-// `timestamp`/`severity`/`resource` field names. loadEvents() normalises them:
-//   time   = e.time   || e.timestamp
-//   level  = e.level  || e.severity  || 'info'
-//   target = e.target || e.resource  || ''
+// The wire speaks ONE vocabulary since 2026-10-23: both editions answer with
+// `timestamp` (epoch seconds) / `severity` / `resource` (the personal edition
+// used to spell them `level` / `target`). loadEvents() maps once into the
+// view model:
+//   time   = e.timestamp
+//   level  = e.severity
+//   target = e.resource
 //
 // Enhancement coverage:
 //   - 4 stat cards (today ops / high-risk / active users / anomalies)
@@ -96,57 +98,67 @@ describe('Audit.vue field mapping', () => {
   }
 
   it('maps timestamp/severity/resource to time/level/target', async () => {
+    // Wire shape: both editions emit epoch SECONDS (maop.enterprise.audit
+    // AuditEvent.timestamp / control.audit AuditEvent.timestamp), and one
+    // vocabulary since the 2026-10-23 service unification.
+    const fiveHoursAgo = Math.floor(Date.now() / 1000) - 5 * 3600;
     mockFetch({
       '/api/audit/events': {
         events: [
           {
+            event_id: 'e1',
             action: 'login',
             actor: 'alice',
-            timestamp: '2026-01-01T00:00:00Z',
+            timestamp: fiveHoursAgo,
             severity: 'warning',
             resource: 'server-1',
           },
         ],
       },
-      '/api/audit/summary': { summary: { total: 1, by_action: {}, by_actor: {} } },
+      '/api/audit/summary': { summary: { total_events: 1, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
     const rows = wrapper.findComponent(DataTable).props('rows');
     expect(rows).toHaveLength(1);
-    expect(rows[0].time).toBe('2026-01-01T00:00:00Z');
+    expect(rows[0].time).toBe(fiveHoursAgo);
     expect(rows[0].level).toBe('warning');
     expect(rows[0].target).toBe('server-1');
     expect(rows[0].action).toBe('login');
     expect(rows[0].actor).toBe('alice');
+    // The rendered cell must not read 1970: formatRel has to treat epoch
+    // seconds as seconds.
+    expect(wrapper.find('.dt__time').text()).toBe('5h ago');
     wrapper.unmount();
   });
 
-  it('prefers time/level/target when present and defaults level to info', async () => {
+  it('ignores the pre-unification level/target/time spellings', async () => {
+    // Negative probe: the loader used to chain `e.level || e.severity`,
+    // `e.target || e.resource`, `e.time || e.timestamp`. A row that only
+    // carries the old names must contribute nothing to the view model.
     mockFetch({
       '/api/audit/events': {
         events: [
           {
+            event_id: 'e2',
             action: 'logout',
             actor: 'bob',
-            time: '2026-02-02T00:00:00Z',
-            level: 'critical',
-            target: 'db',
+            severity: 'critical',
+            resource: 'db',
+            timestamp: 1763000000,
           },
-          { action: 'ping', actor: 'carol' },
+          { event_id: 'e3', action: 'ping', actor: 'carol', time: '2020-02-02T00:00:00Z', level: 'info', target: 'old' },
         ],
       },
-      '/api/audit/summary': { summary: { total: 2 } },
+      '/api/audit/summary': { summary: { total_events: 2, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
     const rows = wrapper.findComponent(DataTable).props('rows');
     expect(rows).toHaveLength(2);
-    // explicit values preserved
-    expect(rows[0].time).toBe('2026-02-02T00:00:00Z');
     expect(rows[0].level).toBe('critical');
     expect(rows[0].target).toBe('db');
-    // missing fields fall back: level -> 'info', target -> ''
-    expect(rows[1].level).toBe('info');
-    expect(rows[1].target).toBe('');
+    expect(rows[1].level).toBeUndefined();
+    expect(rows[1].target).toBeUndefined();
+    expect(rows[1].time).toBeUndefined();
     wrapper.unmount();
   });
 
@@ -165,7 +177,7 @@ describe('Audit.vue field mapping', () => {
           },
         ],
       },
-      '/api/audit/summary': { summary: { total: 1 } },
+      '/api/audit/summary': { summary: { total_events: 1, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
     const rows = wrapper.findComponent(DataTable).props('rows');
@@ -245,22 +257,22 @@ describe('Audit.vue enhancement', () => {
   // Build a set of events spread across the last 24h so stat cards + charts
   // have non-trivial data to render.
   function sampleEvents() {
-    const now = Date.now();
-    const iso = (msAgo) => new Date(now - msAgo).toISOString();
+    // Wire shape for both editions: epoch SECONDS, severity/resource names.
+    const now = Math.floor(Date.now() / 1000);
     return [
-      { action: 'login', actor: 'alice', time: iso(1000), level: 'info', target: 'auth', result: 'success' },
-      { action: 'login', actor: 'bob', time: iso(2000), level: 'info', target: 'auth', result: 'success' },
-      { action: 'delete', actor: 'alice', time: iso(3000), level: 'critical', target: 'db', result: 'success' },
-      { action: 'update', actor: 'carol', time: iso(4000), level: 'warning', target: 'config', result: 'success' },
-      { action: 'logout', actor: 'alice', time: iso(5000), level: 'info', target: 'auth', result: 'success' },
-      { action: 'export', actor: 'bob', time: iso(6000), level: 'warning', target: 'report', result: 'failure' },
+      { event_id: 'e1', action: 'login', actor: 'alice', timestamp: now - 1, severity: 'info', resource: 'auth', result: 'success' },
+      { event_id: 'e2', action: 'login', actor: 'bob', timestamp: now - 2, severity: 'info', resource: 'auth', result: 'success' },
+      { event_id: 'e3', action: 'delete', actor: 'alice', timestamp: now - 3, severity: 'critical', resource: 'db', result: 'success' },
+      { event_id: 'e4', action: 'update', actor: 'carol', timestamp: now - 4, severity: 'warning', resource: 'config', result: 'success' },
+      { event_id: 'e5', action: 'logout', actor: 'alice', timestamp: now - 5, severity: 'info', resource: 'auth', result: 'success' },
+      { event_id: 'e6', action: 'export', actor: 'bob', timestamp: now - 6, severity: 'warning', resource: 'report', result: 'failure' },
     ];
   }
 
   it('renders 4 stat cards (today ops / high-risk / active users / anomalies)', async () => {
     mockFetch({
       '/api/audit/events': { events: sampleEvents() },
-      '/api/audit/summary': { summary: { total: 6 } },
+      '/api/audit/summary': { summary: { total_events: 6, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
     const cards = wrapper.findAllComponents(StatCard);
@@ -279,7 +291,7 @@ describe('Audit.vue enhancement', () => {
   it('renders 3 tab options in Segmented (events / rules / history)', async () => {
     mockFetch({
       '/api/audit/events': { events: [] },
-      '/api/audit/summary': { summary: { total: 0 } },
+      '/api/audit/summary': { summary: { total_events: 0, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
     const seg = wrapper.findComponent(Segmented);
@@ -293,7 +305,7 @@ describe('Audit.vue enhancement', () => {
   it('filters rows by keyword search across action/actor/target/detail', async () => {
     mockFetch({
       '/api/audit/events': { events: sampleEvents() },
-      '/api/audit/summary': { summary: { total: 6 } },
+      '/api/audit/summary': { summary: { total_events: 6, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
     // Initial: 6 rows
@@ -313,7 +325,7 @@ describe('Audit.vue enhancement', () => {
   it('filters rows by action select', async () => {
     mockFetch({
       '/api/audit/events': { events: sampleEvents() },
-      '/api/audit/summary': { summary: { total: 6 } },
+      '/api/audit/summary': { summary: { total_events: 6, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
     // FilterBar renders schema selects first (action, level, actor, resource),
@@ -329,7 +341,7 @@ describe('Audit.vue enhancement', () => {
   it('exports CSV via download Blob', async () => {
     mockFetch({
       '/api/audit/events': { events: sampleEvents() },
-      '/api/audit/summary': { summary: { total: 6 } },
+      '/api/audit/summary': { summary: { total_events: 6, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
 
@@ -371,7 +383,7 @@ describe('Audit.vue enhancement', () => {
   it('exports JSON via download Blob', async () => {
     mockFetch({
       '/api/audit/events': { events: sampleEvents() },
-      '/api/audit/summary': { summary: { total: 6 } },
+      '/api/audit/summary': { summary: { total_events: 6, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
 
@@ -405,11 +417,23 @@ describe('Audit.vue enhancement', () => {
   it('switches to rules tab and loads alert rules', async () => {
     mockFetch({
       '/api/audit/events': { events: [] },
-      '/api/audit/summary': { summary: { total: 0 } },
+      '/api/audit/summary': { summary: { total_events: 0, by_action: {}, by_actor: {} } },
       '/api/audit/alert/rules': {
+        status: 'ok',
+        count: 2,
         rules: [
-          { id: 'r1', name: 'Critical delete', condition: 'action=delete AND severity=critical', severity: 'critical', enabled: true },
-          { id: 'r2', name: 'Failed login', condition: 'action=login AND result=failure', severity: 'warning', enabled: false },
+          {
+            rule_id: 'r-1', name: 'Critical delete', description: '', enabled: true,
+            condition_type: 'threshold', condition: { op: '>=', value: 5, window_s: 300, filter: { action: 'delete' } },
+            action: 'notify', action_config: {}, severity: 'critical', tenant_id: '',
+            created_at: 1763000000, updated_at: 1763000000, created_by: 'alice',
+          },
+          {
+            rule_id: 'r-2', name: 'Failed login', description: '', enabled: false,
+            condition_type: 'pattern', condition: { pattern: 'login.*failure' },
+            action: 'webhook', action_config: {}, severity: 'warning', tenant_id: '',
+            created_at: 1763000000, updated_at: 1763000000, created_by: 'bob',
+          },
         ],
       },
     });
@@ -426,6 +450,11 @@ describe('Audit.vue enhancement', () => {
     expect(ruleRows).toHaveLength(2);
     expect(wrapper.text()).toContain('Critical delete');
     expect(wrapper.text()).toContain('Failed login');
+    // condition is a dict on the wire; the row shows op/value/window instead
+    // of Vue's "[object Object]" toString.
+    expect(ruleRows[0].text()).toContain('>= 5 /300s');
+    expect(ruleRows[1].text()).toContain('pattern');
+    expect(wrapper.text()).not.toContain('[object Object]');
     wrapper.unmount();
   });
 
@@ -435,7 +464,7 @@ describe('Audit.vue enhancement', () => {
       if (u === '/api/audit/alert/rules') {
         return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}), text: () => Promise.resolve('') });
       }
-      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ events: [], summary: { total: 0 } }), text: () => Promise.resolve('{}') });
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ events: [], summary: { total_events: 0, by_action: {}, by_actor: {} } }), text: () => Promise.resolve('{}') });
     });
     const wrapper = await mountAudit();
 
@@ -454,7 +483,7 @@ describe('Audit.vue enhancement', () => {
   it('opens rule editor drawer when create button clicked', async () => {
     mockFetch({
       '/api/audit/events': { events: [] },
-      '/api/audit/summary': { summary: { total: 0 } },
+      '/api/audit/summary': { summary: { total_events: 0, by_action: {}, by_actor: {} } },
       '/api/audit/alert/rules': { rules: [] },
     });
     const wrapper = await mountAudit();
@@ -482,10 +511,24 @@ describe('Audit.vue enhancement', () => {
   it('switches to history tab and loads alert history', async () => {
     mockFetch({
       '/api/audit/events': { events: [] },
-      '/api/audit/summary': { summary: { total: 0 } },
+      '/api/audit/summary': { summary: { total_events: 0, by_action: {}, by_actor: {} } },
       '/api/audit/alert/history': {
+        status: 'ok',
+        count: 1,
         alerts: [
-          { id: 'a1', time: '2026-01-01T00:00:00Z', rule_name: 'Critical delete', event: 'delete db', actor: 'alice', severity: 'critical' },
+          {
+            alert_id: 'al-1',
+            rule_id: 'r-1',
+            triggered_at: 1763000000,
+            event_id: 'ev-1',
+            severity: 'critical',
+            message: 'delete exceeded threshold',
+            acknowledged: false,
+            acknowledged_by: '',
+            acknowledged_at: null,
+            tenant_id: 't1',
+            metadata: { rule_name: 'Critical delete', event_actor: 'alice' },
+          },
         ],
       },
     });
@@ -500,14 +543,19 @@ describe('Audit.vue enhancement', () => {
     const dt = wrapper.findComponent(DataTable);
     expect(dt.exists()).toBe(true);
     expect(dt.props('rows')).toHaveLength(1);
-    expect(dt.props('rows')[0].rule_name).toBe('Critical delete');
+    const row = dt.props('rows')[0];
+    expect(row.id).toBe('al-1');
+    expect(row.time).toBe(1763000000);
+    expect(row.rule_name).toBe('Critical delete');
+    expect(row.actor).toBe('alice');
+    expect(row.event).toBe('delete exceeded threshold');
     wrapper.unmount();
   });
 
   it('renders heatmap table when events exist', async () => {
     mockFetch({
       '/api/audit/events': { events: sampleEvents() },
-      '/api/audit/summary': { summary: { total: 6 } },
+      '/api/audit/summary': { summary: { total_events: 6, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
     const heatmapTable = wrapper.find('.heatmap__table');
@@ -521,7 +569,7 @@ describe('Audit.vue enhancement', () => {
   it('renders trend chart Card with Segmented for line/bar switch', async () => {
     mockFetch({
       '/api/audit/events': { events: sampleEvents() },
-      '/api/audit/summary': { summary: { total: 6 } },
+      '/api/audit/summary': { summary: { total_events: 6, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
     // The trend Card contains a Segmented for chart kind switching
@@ -537,7 +585,7 @@ describe('Audit.vue enhancement', () => {
   it('disables export buttons when no visible rows', async () => {
     mockFetch({
       '/api/audit/events': { events: [] },
-      '/api/audit/summary': { summary: { total: 0 } },
+      '/api/audit/summary': { summary: { total_events: 0, by_action: {}, by_actor: {} } },
     });
     const wrapper = await mountAudit();
     const exportButtons = wrapper.findAll('.export-group button');

@@ -21,11 +21,12 @@ from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
 from . import _deps
+from .schemas import RoutesEnvelope
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 
-@router.get("/routes")
+@router.get("/routes", response_model=RoutesEnvelope)
 @handle_api_errors
 async def get_agent_routes(request: Request) -> dict[str, Any]:
     """返回路由配置 (capability → primary/fallback/tertiary)，合并 agent 信息。

@@ -90,6 +90,7 @@ export const messages = {
     'view.agentGateway.usage.successConfig': 'Configuration updated',
     'view.agentGateway.usage.failedClear': 'Failed to clear usage',
     'view.agentGateway.usage.failedConfig': 'Failed to update configuration',
+    'view.agentGateway.usage.failedLoadConfig': 'Failed to load configuration',
   },
 
   zh: {
@@ -183,5 +184,6 @@ export const messages = {
     'view.agentGateway.usage.successConfig': '配置已更新',
     'view.agentGateway.usage.failedClear': '清空使用量失败',
     'view.agentGateway.usage.failedConfig': '更新配置失败',
+    'view.agentGateway.usage.failedLoadConfig': '加载配置失败',
   },
 };

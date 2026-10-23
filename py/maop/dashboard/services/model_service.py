@@ -570,12 +570,16 @@ def get_model_daily_usage(model: str) -> dict[str, Any]:
     Returns
     -------
     dict
-        ``{"usage": dict, "total_tokens": int}``。
+        ``{"usage": dict, "total_tokens": int, "rows": list[dict]}``。
+
+        ``usage`` 按模型折叠（历史契约，前端汇总用）；``rows`` 保留
+        ``(model, agent)`` 粒度——AgentGateway 的「Agent」列此前只读得到
+        折叠后的 map，永远为空。
     """
     gateway = _get_model_gateway()
     usage = gateway.get_daily_usage(model=model)
     total = sum(usage.values())
-    return {"usage": usage, "total_tokens": total}
+    return {"usage": usage, "total_tokens": total, "rows": gateway.get_daily_usage_rows(model=model)}
 
 
 def clear_model_daily_usage(model: str = "") -> dict[str, Any]:
@@ -593,14 +597,57 @@ def clear_model_daily_usage(model: str = "") -> dict[str, Any]:
     return {"cleared": cleared, "model": model}
 
 
-def update_gateway_config(config: Any) -> dict[str, Any]:
-    """更新模型网关配置。
+def get_gateway_config() -> dict[str, Any]:
+    """读取模型网关当前配置。
+
+    2026-10-23 新增：此前只有 ``PUT /api/model-gateway/config``，没有读取端点，
+    所以 AgentGateway 的配置表单永远回填不了（``loadUsage`` 读的
+    ``data.config`` 由 ``GET /api/model-gateway/usage`` 提供，而后者从不发这个键）。
 
     Returns
     -------
     dict
-        空字典（router 包装为 ``{"status": "ok"}``）。
+        ``{"config": dict}``。
     """
     gateway = _get_model_gateway()
-    gateway.update_config(config)
-    return {}
+    return {"config": gateway.config.model_dump(mode="json")}
+
+
+def patch_gateway_config(**updates: Any) -> dict[str, Any]:
+    """按字段合并更新模型网关配置。
+
+    2026-10-23 改：``PUT /api/model-gateway/config`` 原本是整体替换
+    （``gateway.update_config(body)``，body 缺省即 ``permissions=[]``
+    ``enable_quota_check=True``），而前端表单只发
+    ``global_daily_token_limit`` + ``default_policy`` —— 每次保存都会走
+    ``_sync_permissions_to_db()`` 的 ``DELETE FROM model_gateway_permissions``，
+    把用户配好的权限规则全删光。现在只有调用点显式传入的键才生效。
+
+    Parameters
+    ----------
+    **updates
+        需要覆盖的字段（``default_policy`` / ``global_daily_token_limit`` /
+        ``enable_quota_check`` / ``permissions``）。调用方用
+        ``model_dump(exclude_unset=True)`` 取「客户端真正发来的键」。
+        合并与写库由 ``ModelGateway.patch_config`` 持锁完成，避免读-改-写
+        竞态把并发新增的权限规则冲掉。
+
+    Returns
+    -------
+    dict
+        ``{"config": dict}`` — 合并后的生效配置，供表单回读。
+
+    Raises
+    ------
+    ValueError
+        键不是 ``ModelGatewayConfig`` 的字段（否则会被 Pydantic 的
+        ``extra='ignore'`` 静默吞掉，调用方以为改成了）。
+    """
+    from maop.core.agent.llm_chat.model_gateway import ModelGatewayConfig
+
+    unknown = sorted(set(updates) - set(ModelGatewayConfig.model_fields))
+    if unknown:
+        raise ValueError(f"unknown gateway config field(s): {', '.join(unknown)}")
+    gateway = _get_model_gateway()
+    config = gateway.patch_config(**updates)
+    return {"config": config.model_dump(mode="json")}

@@ -286,10 +286,11 @@ async def publish_event(
     event_type: str,
     payload: dict[str, Any],
     tenant_id: str = "",
-) -> list:
+) -> int:
     """Publish an event to the bus (triggers rule-matched delivery).
 
-    Returns the list of delivered target IDs.
+    Returns the number of handlers invoked (``EventBus.publish`` semantics),
+    which the router exposes as ``delivered_to``.
     """
     mgr = _get_manager()
     delivered = await mgr.event_bus.emit(event_type, payload, tenant_id=tenant_id)

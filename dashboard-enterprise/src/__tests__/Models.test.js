@@ -52,13 +52,26 @@ describe('Models.vue reactive→ref usage', () => {
   // Default empty endpoints so loadAll's Promise.allSettled settles cleanly.
   function emptyModelEndpoints(overrides = {}) {
     return {
-      '/api/model/registry': { stats: { total_models: 0, enabled_models: 0, total_providers: 0, thinking_capable: 0 } },
-      '/api/model/list': { models: [] },
+      '/api/model/registry': {
+        stats: {
+          total_models: 0, enabled_models: 0, total_providers: 0, enabled_providers: 0,
+          by_quality: {}, by_latency: {}, by_provider: {}, by_protocol: {},
+          thinking_capable: 0, multimodal_models: 0, tool_calling_models: 0,
+          streaming_models: 0, image_gen_models: 0,
+        },
+      },
+      '/api/model/list': { models: [], count: 0 },
       '/api/model/providers': { providers: [] },
-      '/api/model/agents': { agents: [] },
-      '/api/model/quota': { agents: [] },
-      '/api/model/policies': { policies: [] },
-      '/api/model/budget': { budget: null },
+      '/api/model/agents': { agents: [], count: 0 },
+      '/api/model/quota': { agents: [], count: 0 },
+      '/api/model/policies': { policies: [], count: 0 },
+      '/api/model/budget': {
+        budget: {
+          daily_spend: 0, daily_limit: 0, monthly_spend: 0, monthly_limit: 0,
+          alert_threshold: 0.8, hard_stop: false, daily_remaining: 0,
+          daily_utilization: 0, alerted: false,
+        },
+      },
       ...overrides,
     };
   }
@@ -83,8 +96,14 @@ describe('Models.vue reactive→ref usage', () => {
     mockFetch(emptyModelEndpoints({
       '/api/model/list': {
         models: [
-          { name: 'gpt-4', provider: 'openai', family: 'gpt', context_window: 128000, quality_tier: 'high', latency_tier: 'low', provider_healthy: true, enabled: true },
-          { name: 'llama3', enabled: false },
+          { name: 'gpt-4', provider: 'openai', family: 'gpt', context_window: 128000,
+            max_output: 8192, cost_per_1k_input: 0.03, cost_per_1k_output: 0.06,
+            capabilities: ['chat'], quality_tier: 'excellent', latency_tier: 'medium',
+            provider_healthy: true, enabled: true },
+          { name: 'llama3', provider: '', family: '', context_window: 0,
+            max_output: 0, cost_per_1k_input: 0, cost_per_1k_output: 0,
+            capabilities: [], quality_tier: '', latency_tier: '',
+            provider_healthy: false, enabled: false },
         ],
       },
     }));
@@ -96,15 +115,15 @@ describe('Models.vue reactive→ref usage', () => {
       provider: 'openai',
       family: 'gpt',
       context_window: 128000,
-      quality_tier: 'high',
-      latency_tier: 'low',
+      quality_tier: 'excellent',
+      latency_tier: 'medium',
       provider_healthy: 'healthy',
       enabled: 'enabled',
     });
     // Missing optional fields default to '—' and booleans map to healthy/unhealthy.
     expect(rows[1].provider).toBe('—');
     expect(rows[1].family).toBe('—');
-    expect(rows[1].context_window).toBe('—');
+    expect(rows[1].context_window).toBe(0);
     expect(rows[1].provider_healthy).toBe('unhealthy');
     expect(rows[1].enabled).toBe('disabled');
     wrapper.unmount();
@@ -114,8 +133,10 @@ describe('Models.vue reactive→ref usage', () => {
     mockFetch(emptyModelEndpoints({
       '/api/model/providers': {
         providers: [
-          { name: 'openai', type: 'openai', protocol: 'rest', healthy: true, has_api_key: true, enabled: true },
-          { name: 'local', enabled: false },
+          { name: 'openai', type: 'api', protocol: 'openai_completions', healthy: true,
+            has_api_key: true, enabled: true, base_url: 'https://api.openai.com/v1' },
+          { name: 'local', type: '', protocol: '', healthy: false,
+            has_api_key: false, enabled: false, base_url: '' },
         ],
       },
     }));
@@ -124,8 +145,8 @@ describe('Models.vue reactive→ref usage', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toEqual({
       name: 'openai',
-      type: 'openai',
-      protocol: 'rest',
+      type: 'api',
+      protocol: 'openai_completions',
       healthy: 'healthy',
       has_key: 'yes',
       enabled: 'enabled',
@@ -140,8 +161,11 @@ describe('Models.vue reactive→ref usage', () => {
     mockFetch(emptyModelEndpoints({
       '/api/model/agents': {
         agents: [
-          { name: 'researcher', driver: 'cli', model: 'gpt-4', capabilities: ['search', 'code'], cli_available: true },
-          { name: 'writer' },
+          { name: 'researcher', cli: 'claude', driver: 'cli', model: 'gpt-4', timeout_s: 120,
+            capabilities: ['search', 'code'], description: 'research agent',
+            cli_available: true, cli_path: '/usr/local/bin/claude' },
+          { name: 'writer', cli: '', driver: '', model: '', timeout_s: 120,
+            capabilities: [], description: '', cli_available: false, cli_path: '' },
         ],
       },
     }));
@@ -166,8 +190,10 @@ describe('Models.vue reactive→ref usage', () => {
     mockFetch(emptyModelEndpoints({
       '/api/model/policies': {
         policies: [
-          { name: 'cheap', strategy: 'cost', max_cost_per_task: 0.5, prefer_low_latency: false, fallback_on_error: true },
-          { name: 'fast' },
+          { name: 'cheap', strategy: 'cheapest', max_cost_per_task: 0.5,
+            prefer_low_latency: false, fallback_on_error: true, fallback_on_timeout: true },
+          { name: 'fast', strategy: '', max_cost_per_task: 0,
+            prefer_low_latency: false, fallback_on_error: false, fallback_on_timeout: false },
         ],
       },
     }));
@@ -176,13 +202,13 @@ describe('Models.vue reactive→ref usage', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toEqual({
       name: 'cheap',
-      strategy: 'cost',
+      strategy: 'cheapest',
       max_cost_per_task: '$0.500',
       prefer_low_latency: 'no',
       fallback_on_error: 'yes',
     });
     expect(rows[1].strategy).toBe('—');
-    expect(rows[1].max_cost_per_task).toBe('—');
+    expect(rows[1].max_cost_per_task).toBe('$0.000');
     wrapper.unmount();
   });
 

@@ -22,6 +22,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from maop.core.security.middleware import require_admin
 from maop.core.tenant.context import tenant_id_from_request
 from maop.dashboard.error_handler import handle_api_errors  # 批次3A: 统一异常处理装饰器
+from maop.dashboard.routers.mcp_schemas import McpCombinedEnvelope
 from maop.dashboard.services import data_service
 
 # Re-export shared state for backward compatibility (tests / other routers
@@ -279,7 +280,7 @@ async def api_human_pending(request: Request) -> Any:
 # 后续：把 mcp_discovery 发现的 YAML 服务器播种进 hub，使 omniroute 出现在 UI。
 
 
-@router.get("/api/mcp")
+@router.get("/api/mcp", response_model=McpCombinedEnvelope)
 @handle_api_errors("MCP combined", error_value={"servers": [], "tools": [], "server_count": 0, "tool_count": 0, "error": "MCP combined unavailable"})
 async def api_mcp_combined(request: Request) -> dict[str, Any]:
     require_admin(request)
