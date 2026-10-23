@@ -16,11 +16,18 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import agent_service
+
+from .agent_catalog_schemas import (
+    AgentDeleteEnvelope,
+    AgentEnvelope,
+    AgentListEnvelope,
+    CatalogStatsPayload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +36,13 @@ router = APIRouter()
 
 # ── Pydantic 请求模型 (H-3 fix: 输入校验) ──────────────────────────
 class RegisterAgentRequest(BaseModel):
-    """POST /api/agent-catalog/agents 请求体。"""
+    """POST /api/agent-catalog/agents 请求体。
+
+    未知字段 422：拼错的键（如 ``capabilitie``）若被静默丢弃，注册会以默认
+    值成功，调用方却以为配置已生效。
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(..., min_length=1, max_length=256, description="Agent 唯一标识")
     display_name: str = Field(default="", max_length=256, description="展示名称")
@@ -50,8 +63,12 @@ class RegisterAgentRequest(BaseModel):
 class UpdateAgentRequest(BaseModel):
     """PUT /api/agent-catalog/agents/{name} 请求体（部分更新）。
 
-    只有显式提供的字段会被修改，未提供的字段保留原值。
+    只有显式提供的字段会被修改，未提供的字段保留原值。``name`` 在路径里，
+    不在请求体里——此前视图把整份表单（含 ``name``）发过来，被 Pydantic
+    静默丢弃；现在未知字段一律 422，视图也不再发 ``name``。
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     display_name: str | None = Field(default=None, max_length=256)
     vendor: str | None = Field(default=None, max_length=128)
@@ -84,7 +101,7 @@ def _set_catalog(catalog: Any) -> None:
 
 
 # ── 端点 ──────────────────────────────────────────────────────────
-@router.get("/api/agent-catalog/agents")
+@router.get("/api/agent-catalog/agents", response_model=AgentListEnvelope)
 @handle_api_errors(
     "List agents",
     error_value={"status": "error", "agents": [], "count": 0, "error": "List failed"},
@@ -113,7 +130,7 @@ async def api_get_agent(name: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "agent": agent}
 
 
-@router.post("/api/agent-catalog/agents")
+@router.post("/api/agent-catalog/agents", response_model=AgentEnvelope)
 @handle_api_errors(
     "Register agent",
     error_value={"status": "error", "error": "Register failed"},
@@ -145,7 +162,7 @@ async def api_register_agent(
     return {"status": "ok", "agent": agent}
 
 
-@router.put("/api/agent-catalog/agents/{name}")
+@router.put("/api/agent-catalog/agents/{name}", response_model=AgentEnvelope)
 @handle_api_errors(
     "Update agent",
     error_value={"status": "error", "agent": None, "error": "Update failed"},
@@ -165,7 +182,7 @@ async def api_update_agent(
     return {"status": "ok", "agent": agent}
 
 
-@router.delete("/api/agent-catalog/agents/{name}")
+@router.delete("/api/agent-catalog/agents/{name}", response_model=AgentDeleteEnvelope)
 @handle_api_errors(
     "Delete agent",
     error_value={"status": "error", "error": "Delete failed"},
@@ -215,10 +232,17 @@ async def api_search_agents(
     return {"status": "ok", **result}
 
 
-@router.get("/api/agent-catalog/stats")
+@router.get("/api/agent-catalog/stats", response_model=CatalogStatsPayload)
 @handle_api_errors(
     "Catalog stats",
-    error_value={"status": "error", "count": 0, "healthy_count": 0, "error": "Stats failed"},
+    error_value={
+        "status": "error",
+        "count": 0,
+        "healthy_count": 0,
+        "enabled_count": 0,
+        "capability_count": 0,
+        "error": "Stats failed",
+    },
 )
 async def api_catalog_stats(request: Request) -> dict[str, Any]:
     """返回 Agent Catalog 统计信息。"""

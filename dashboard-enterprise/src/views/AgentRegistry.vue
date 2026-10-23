@@ -24,19 +24,19 @@
           <div class="stats-row">
             <div class="stat-card">
               <span class="stat-card__label">{{ t('view.agentRegistry.stats.total') }}</span>
-              <span class="stat-card__value">{{ stats.total ?? 0 }}</span>
+              <span class="stat-card__value">{{ stats.count ?? 0 }}</span>
             </div>
             <div class="stat-card">
               <span class="stat-card__label">{{ t('view.agentRegistry.stats.enabled') }}</span>
-              <span class="stat-card__value is-ok">{{ stats.enabled ?? 0 }}</span>
+              <span class="stat-card__value is-ok">{{ stats.enabled_count ?? 0 }}</span>
             </div>
             <div class="stat-card">
               <span class="stat-card__label">{{ t('view.agentRegistry.stats.healthy') }}</span>
-              <span class="stat-card__value is-ok">{{ stats.healthy ?? 0 }}</span>
+              <span class="stat-card__value is-ok">{{ stats.healthy_count ?? 0 }}</span>
             </div>
             <div class="stat-card">
               <span class="stat-card__label">{{ t('view.agentRegistry.stats.capabilities') }}</span>
-              <span class="stat-card__value">{{ stats.capabilities ?? 0 }}</span>
+              <span class="stat-card__value">{{ stats.capability_count ?? 0 }}</span>
             </div>
           </div>
 
@@ -530,32 +530,30 @@ function authLabel(a) {
     : a;
 }
 
-function normalizeStatus(s) {
-  return String(s || '').toLowerCase();
+// AgentDescriptor 发的是布尔 healthy/enabled；读字符串 health 会让徽章恒落兜底态。
+function isEnabled(a) {
+  return a.enabled !== false && a.enabled !== 0 && a.enabled !== 'false';
+}
+function isHealthy(a) {
+  return a.healthy !== false && a.healthy !== 0 && a.healthy !== 'false';
 }
 
 function enabledLabel(a) {
-  const enabled = a.enabled !== false && a.enabled !== 0 && a.enabled !== 'false';
-  return enabled
+  return isEnabled(a)
     ? t('view.agentRegistry.status.enabled')
     : t('view.agentRegistry.status.disabled');
 }
 function enabledTone(a) {
-  const enabled = a.enabled !== false && a.enabled !== 0 && a.enabled !== 'false';
-  return enabled ? 'success' : 'neutral';
+  return isEnabled(a) ? 'success' : 'neutral';
 }
 
 function healthLabel(a) {
-  const n = normalizeStatus(a.health || a.health_status);
-  if (n === 'healthy' || n === 'ok' || n === 'up') return t('view.agentRegistry.status.healthy');
-  if (n === 'unhealthy' || n === 'fail' || n === 'down') return t('view.agentRegistry.status.unhealthy');
-  return t('view.agentRegistry.status.unknown');
+  return isHealthy(a)
+    ? t('view.agentRegistry.status.healthy')
+    : t('view.agentRegistry.status.unhealthy');
 }
 function healthTone(a) {
-  const n = normalizeStatus(a.health || a.health_status);
-  if (n === 'healthy' || n === 'ok' || n === 'up') return 'success';
-  if (n === 'unhealthy' || n === 'fail' || n === 'down') return 'fail';
-  return 'neutral';
+  return isHealthy(a) ? 'success' : 'fail';
 }
 
 function agentDisplayName(name) {
@@ -761,8 +759,8 @@ async function submitForm() {
   }
   formSaving.value = true;
   try {
+    const name = form.name.trim();
     const payload = {
-      name: form.name.trim(),
       display_name: form.display_name.trim(),
       vendor: form.vendor.trim(),
       adapter_type: form.adapter_type,
@@ -775,10 +773,11 @@ async function submitForm() {
       fallback_agents: form.fallback_agents.slice(),
     };
     if (editingAgent.value) {
-      await api.put(`/api/agent-catalog/agents/${encodeURIComponent(payload.name)}`, payload);
+      // name 在路径里；UpdateAgentRequest 不声明它（多发会被 422 拒绝）。
+      await api.put(`/api/agent-catalog/agents/${encodeURIComponent(name)}`, payload);
       toast.success(t('view.agentRegistry.form.updateSuccess'));
     } else {
-      await api.post('/api/agent-catalog/agents', payload);
+      await api.post('/api/agent-catalog/agents', { name, ...payload });
       toast.success(t('view.agentRegistry.form.success'));
     }
     showFormModal.value = false;
@@ -819,7 +818,7 @@ async function doDelete() {
 
 // ── Toggle enable / disable ─────────────────────────────────────
 async function toggleEnable(a) {
-  const currentlyEnabled = a.enabled !== false && a.enabled !== 0 && a.enabled !== 'false';
+  const currentlyEnabled = isEnabled(a);
   const nextEnabled = !currentlyEnabled;
   try {
     await api.put(`/api/agent-catalog/agents/${encodeURIComponent(a.name)}`, {
@@ -865,13 +864,10 @@ async function loadStats() {
     const capSet = new Set();
     for (const a of list) for (const c of (a.capabilities || [])) capSet.add(c);
     stats.value = {
-      total: list.length,
-      enabled: list.filter((a) => a.enabled !== false).length,
-      healthy: list.filter((a) => {
-        const n = normalizeStatus(a.health || a.health_status);
-        return n === 'healthy' || n === 'ok' || n === 'up';
-      }).length,
-      capabilities: capSet.size,
+      count: list.length,
+      enabled_count: list.filter(isEnabled).length,
+      healthy_count: list.filter(isHealthy).length,
+      capability_count: capSet.size,
     };
   }
 }

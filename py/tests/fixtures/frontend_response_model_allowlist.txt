@@ -4,11 +4,6 @@
 # any new frontend-called endpoint that is missing from this file.
 # Format: METHOD PATH (path parameters normalized to {})
 
-GET /api/agent-catalog/agents
-POST /api/agent-catalog/agents
-DELETE /api/agent-catalog/agents/{}
-PUT /api/agent-catalog/agents/{}
-GET /api/agent-catalog/stats
 GET /api/agent/upgrade
 POST /api/agent/upgrade
 GET /api/alerts

@@ -223,11 +223,18 @@ def search_agents(capability: list[str]) -> dict[str, Any]:
 
 
 def catalog_stats() -> dict[str, Any]:
-    """返回 Agent Catalog 统计信息。"""
+    """返回 Agent Catalog 统计信息。
+
+    四个计数取自同一次 ``list_all()`` 快照，避免多次加锁期间数据变动导致
+    ``count`` 与 ``healthy_count`` 互相矛盾。
+    """
     catalog = _get_catalog()
+    agents = catalog.list_all()
     return {
-        "count": catalog.count(),
-        "healthy_count": catalog.count_healthy(),
+        "count": len(agents),
+        "healthy_count": sum(1 for a in agents if a.healthy),
+        "enabled_count": sum(1 for a in agents if a.enabled),
+        "capability_count": len({c.value for a in agents for c in a.capabilities}),
     }
 
 
