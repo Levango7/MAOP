@@ -39,6 +39,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### model-gateway 批次：8 条端点建模 + 两个静默数据缺陷（2026-10-23）
+
+P1-b 第六批：`/api/model-gateway/*` 前端在用 8 条端点声明 `response_model`，
+新增 `routers/model_gateway_schemas.py`。权限行/配置/决策三个载荷本来就是
+`ModelPermission`、`ModelGatewayConfig`、`ModelAccessDecision` 的
+`model_dump()`，所以信封**直接复用这三个域模型**而不是再抄一份字段——手抄
+副本迟早和生产者分家。
+
+**⚠ 行为变更：`PUT /api/model-gateway/config` 现在是合并更新**。原先它整体
+替换配置，而 `ModelGatewayConfig.permissions` 缺省就是空表，`update_config()`
+紧接着 `_sync_permissions_to_db()`（`model_gateway.py:558`，第一步就是
+`DELETE FROM model_gateway_permissions`）；仪表盘那个表单只发
+`global_daily_token_limit` + `default_policy`（`AgentGateway.vue` 的
+`updateConfig()`）⇒
+**用户每点一次"更新配置"，就把自己配好的全部权限规则删干净**，界面还报
+"配置已更新"。现在请求体换成 `ModelGatewayConfigPatch`（四字段全可缺省、
+`extra="forbid"` 免得打错的键被 `extra='ignore'` 吞成"200 但没改"），
+只有客户端真发来的键才生效；合并与写库放进
+`ModelGateway.patch_config()`，读-改-写全程持锁。要清空规则得显式发
+`permissions: []`（这条语义保留，且有测试钉住）。顺带：原先缺省被强制重置的
+`enable_quota_check` 现在保持现值；PUT 的回包从 `{"status":"ok"}` 换成生效
+配置，表单不再停留在本地草稿。
+
+**新增 `GET /api/model-gateway/config`**：此前只有 PUT 没有 GET，
+`loadUsage()` 去读 `GET /usage` 的 `data.config`（该端点从不发这个键）⇒
+配置表单永远显示默认值（限额 0、策略 allow），而库里跑的是另一套。
+`ModelGateway.config` 这个 property（返回深拷贝快照）就是为它补的读取口。
+
+**访问检查面板恒显"拒绝"**：前端写 `data.result ?? data`，决策其实在
+`data.decision` 里 ⇒ 兜到信封本体，`allowed` 是 `undefined`，每次检查都渲染
+成"拒绝"。模板另读的两个键根本不存在：`matched_rule` 实为
+`matched_permission.model_pattern`，`remaining_daily_quota` 实为
+`remaining_daily_tokens`。后者的哨兵值和 `formatLimit()` 相反（-1 = 不限、
+0 = 已用尽，而 `formatLimit(0)` 说"不限"），所以单独加 `formatRemaining()`，
+否则"额度用尽"会显示成"不限"。
+
+**用量表把映射当数组遍历**：`GET /usage` 的 `usage` 是 `{model: tokens}`，
+`usageRows.value = data.usage` 后 `v-for` 遍历的是整数 ⇒ 模型列/Token 列全空。
+Agent 列也不可能有值——内存缓存按 `date:model` 折叠，而 SQLite 主键本就是
+`(date, model, agent)`，展开数据一直在存只是没人读。新增
+`ModelGateway.get_daily_usage_rows()`，信封多带一个 `rows`。
+
+**改名规则变成加规则**：编辑弹窗把（可能已被改过的）新 pattern 放进 PUT 的
+URL，后端拿 URL 参数定位原规则 ⇒ 改名时旧规则残留、同一条限额配两遍。
+现在打开弹窗记下 `editingPattern`，PUT 用它定位（后端 `renamed_from` 语义不变）。
+
+**棘轮**：清单 135 → 127（本批 8 条全部出账；新增的 GET /config 直接带
+`response_model`，不入账）。
+
+**验证**：`AgentGateway.vue` 此前**零测试**，补 `AgentGateway.test.js` 14 条
+（权限行、改名走旧 pattern、删除走 DELETE、决策来自 `data.decision`、
+-1 渲染成"不限"、错误分支不假称有结论、用量含 Agent 列、配置表单从
+GET /config 回填、PUT 只带两个键、保存后回读生效值、配置加载失败要显形）；
+新契约 `test_model_gateway_router_contracts.py` 17 条，跑真 `ModelGateway` +
+隔离 tmp SQLite 而非替身——这几条路径正是"替身会跟着旧 bug 一起自洽"的地方。
+定向合跑 148 passed，`tests/server_core + tests/contract` 60 passed，
+前端全量 63 files / 546 tests passed，eslint / ruff / mypy(4 文件) /
+尺寸 / 静默异常 / docs 门禁绿。六处变异全部转红且恢复字节一致：
+`patch_config` 退回整体替换 ⇒ 权限保留测试红；服务层不发 `rows` ⇒ 契约红；
+摘掉 `GET /usage` 的 `response_model` ⇒ 棘轮红；前端改回读信封 / 遍历映射 /
+用新 pattern PUT ⇒ 对应 vitest 红。
+
+
 ### model 批次：10 条路由建模，顺带堵住 `/api/model/select` 外发明文 API key（2026-10-23）
 
 P1-b 第五批：`/api/model/*` 前端在用 8 条 + 顺手做齐 `select` 与 `quota/status`

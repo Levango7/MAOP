@@ -23,7 +23,7 @@ import logging
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any  # noqa: F401
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -250,6 +250,32 @@ class ModelGateway:
                     result[m] = v
             return result
 
+    def get_daily_usage_rows(self, model: str = "") -> list[dict[str, Any]]:
+        """今日使用量按 ``(model, agent)`` 展开，token 降序。
+
+        ``get_daily_usage()`` 折叠成 ``{model: tokens}``，Agent 维度丢失；
+        而 SQLite 侧主键本就是 ``(date, model, agent)``，展开数据一直在存，
+        只是没人读。仪表盘的「Agent」列因此恒空。
+
+        读持久层而非内存缓存：``_daily_usage`` 不含 agent 维度，无法展开。
+        """
+        with self._lock:
+            today = self._today_str()
+            sql = (
+                "SELECT model, agent, tokens FROM model_gateway_usage "
+                "WHERE date = ?"
+            )
+            params: list[Any] = [today]
+            if model:
+                sql += " AND model = ?"
+                params.append(model)
+            sql += " ORDER BY tokens DESC, model ASC, agent ASC"
+            with sqlite_connect(self._db_path) as conn:
+                return [
+                    {"model": row[0], "agent": row[1] or "", "tokens": row[2] or 0}
+                    for row in conn.execute(sql, params).fetchall()
+                ]
+
     def clear_daily_usage(self, model: str = "") -> int:
         """清空今日使用量，返回被清零的条目数。
 
@@ -360,6 +386,37 @@ class ModelGateway:
         with self._lock:
             self._config = config
             self._sync_permissions_to_db()
+
+    @property
+    def config(self) -> ModelGatewayConfig:
+        """当前配置的快照（深拷贝，改它不影响网关）。
+
+        此前没有公开读取口，仪表盘便无法回填「全局日限额 / 默认策略」表单——
+        ``GET /api/model-gateway/config`` 只能靠它补齐。
+        """
+        with self._lock:
+            return self._config.model_copy(deep=True)
+
+    def patch_config(self, **updates: Any) -> ModelGatewayConfig:
+        """按字段合并更新配置，返回合并后的快照。
+
+        读-改-写全程持锁：``update_config`` 是整体替换，若在锁外先读现值
+        再写回，两个调用点并发时后写的会连带把对方刚加的权限规则丢掉——
+        正是本方法要避免的静默删数据。
+
+        Parameters
+        ----------
+        **updates
+            仅覆盖出现的键（``default_policy`` / ``permissions`` /
+            ``global_daily_token_limit`` / ``enable_quota_check``）。
+            键的合法性由调用方校验。
+        """
+        with self._lock:
+            data = self._config.model_dump()
+            data.update(updates)
+            self._config = ModelGatewayConfig(**data)
+            self._sync_permissions_to_db()
+            return self._config.model_copy(deep=True)
 
     # ── Internal: 模式匹配 ────────────────────────────────────────
 

@@ -138,7 +138,7 @@
                   </div>
                   <div class="ac-result__row">
                     <span class="ac-result__key">{{ t('view.agentGateway.accessCheck.matchedRule') }}</span>
-                    <span class="ac-result__val mono">{{ checkResult.matched_rule || t('view.agentGateway.accessCheck.noMatch') }}</span>
+                    <span class="ac-result__val mono">{{ checkResult.matched_permission?.model_pattern || t('view.agentGateway.accessCheck.noMatch') }}</span>
                   </div>
                   <div class="ac-result__row">
                     <span class="ac-result__key">{{ t('view.agentGateway.accessCheck.maxTokens') }}</span>
@@ -146,7 +146,7 @@
                   </div>
                   <div class="ac-result__row">
                     <span class="ac-result__key">{{ t('view.agentGateway.accessCheck.remaining') }}</span>
-                    <span class="ac-result__val mono">{{ formatLimit(checkResult.remaining_daily_quota) }}</span>
+                    <span class="ac-result__val mono">{{ formatRemaining(checkResult.remaining_daily_tokens) }}</span>
                   </div>
                   <div v-if="checkResult.reason" class="ac-result__row">
                     <span class="ac-result__key">{{ t('view.agentGateway.accessCheck.reason') }}</span>
@@ -195,12 +195,12 @@
                 <div class="gw-table__th gw-table__th--num" role="columnheader">{{ t('view.agentGateway.usage.col.tokens') }}</div>
                 <div class="gw-table__th" role="columnheader">{{ t('view.agentGateway.usage.col.agent') }}</div>
               </div>
-              <div v-for="(u, i) in usageRows" :key="u.model + '-' + i" class="gw-table__row" role="row">
+              <div v-for="(u, i) in usageRows" :key="u.model + '-' + (u.agent || '_') + '-' + i" class="gw-table__row" role="row">
                 <div class="gw-table__td" role="cell">
                   <span class="gw-table__name mono">{{ u.model }}</span>
                 </div>
                 <div class="gw-table__td gw-table__td--num" role="cell">
-                  <span class="mono">{{ u.tokens ?? u.token_count ?? 0 }}</span>
+                  <span class="mono">{{ u.tokens }}</span>
                 </div>
                 <div class="gw-table__td" role="cell">
                   <span class="muted">{{ u.agent || '—' }}</span>
@@ -211,6 +211,7 @@
 
           <Card :title="t('view.agentGateway.usage.configTitle')" icon="gear" margin-bottom="var(--sp-4)">
             <div class="cfg-form">
+              <p v-if="errors.config" class="cfg-err">{{ errors.config }}</p>
               <label class="field">
                 <span class="field__label">{{ t('view.agentGateway.usage.globalLimit') }}</span>
                 <input
@@ -368,7 +369,7 @@ const policyOptions = computed(() => [
 
 // ── Data state ──────────────────────────────────────────────────
 const loading = ref(false);
-const errors = ref({ permissions: null, usage: null });
+const errors = ref({ permissions: null, usage: null, config: null });
 const permissions = ref([]);
 const usageRows = ref([]);
 
@@ -381,11 +382,25 @@ function formatLimit(n) {
   return String(num);
 }
 
+// remaining_daily_tokens 用 -1 表示"不限"，0 表示"已用尽"——与 formatLimit
+// 的 0=不限 语义相反，不能复用。
+function formatRemaining(n) {
+  if (n == null) return '—';
+  const num = Number(n);
+  if (isNaN(num)) return '—';
+  if (num === -1) return t('view.agentGateway.accessCheck.unlimited');
+  return String(num);
+}
+
 // ── Permission form modal ───────────────────────────────────────
 const showFormModal = ref(false);
 const editing = ref(false);
 const saving = ref(false);
 const formError = ref('');
+// 编辑对话框打开时的原始 pattern——PUT 用它定位待替换的规则。
+// 曾用 formData.model_pattern（可能已被改成新名字），于是后端把改名当成
+// 新增，旧规则残留、同一条限额配了两遍。
+const editingPattern = ref('');
 const formData = reactive({
   model_pattern: '',
   allowed: true,
@@ -400,6 +415,7 @@ function resetForm() {
   formData.max_tokens_per_call = 0;
   formData.daily_token_limit = 0;
   formData.priority = 100;
+  editingPattern.value = '';
 }
 
 function openAddForm() {
@@ -411,6 +427,7 @@ function openAddForm() {
 
 function openEditForm(p) {
   editing.value = true;
+  editingPattern.value = p.model_pattern || '';
   formData.model_pattern = p.model_pattern || '';
   formData.allowed = p.allowed !== false;
   formData.max_tokens_per_call = p.max_tokens_per_call ?? 0;
@@ -442,7 +459,7 @@ async function submitForm() {
       priority: Number(formData.priority) || 100,
     };
     if (editing.value) {
-      await api.put(`/api/model-gateway/permissions/${encodeURIComponent(pattern)}`, payload);
+      await api.put(`/api/model-gateway/permissions/${encodeURIComponent(editingPattern.value)}`, payload);
       toast.success(t('view.agentGateway.form.successUpdate'));
     } else {
       await api.post('/api/model-gateway/permissions', payload);
@@ -497,7 +514,16 @@ async function runCheck() {
     if (checkForm.agent.trim()) payload.agent = checkForm.agent.trim();
     if (checkForm.session_id.trim()) payload.session_id = checkForm.session_id.trim();
     const data = await api.post('/api/model-gateway/check', payload);
-    checkResult.value = data.result ?? data;
+    // 决策在 data.decision 里；直接读 data 会把信封的 status 当成结论
+    // ——此前 data.result 从不存在，于是每次检查都显示"拒绝"。
+    const decision = data.decision;
+    if (!decision) {
+      const msg = data.error || t('view.agentGateway.accessCheck.failed');
+      checkError.value = msg;
+      toast.error(msg);
+      return;
+    }
+    checkResult.value = decision;
   } catch (err) {
     const msg = (err && err.message) || t('view.agentGateway.accessCheck.failed');
     checkError.value = msg;
@@ -518,15 +544,32 @@ const configForm = reactive({
 async function updateConfig() {
   updatingConfig.value = true;
   try {
-    await api.put('/api/model-gateway/config', {
+    const data = await api.put('/api/model-gateway/config', {
       global_daily_token_limit: Number(configForm.global_daily_token_limit) || 0,
       default_policy: configForm.default_policy,
     });
+    // PUT 是合并更新，回读生效值——未提交的字段（如 enable_quota_check）
+    // 由后端保持现值，界面上要显示真实生效的配置而不是本地草稿。
+    if (data.config) applyConfig(data.config);
     toast.success(t('view.agentGateway.usage.successConfig'));
   } catch (err) {
     toast.error((err && err.message) || t('view.agentGateway.usage.failedConfig'));
   } finally {
     updatingConfig.value = false;
+  }
+}
+
+function applyConfig(config) {
+  configForm.global_daily_token_limit = config.global_daily_token_limit ?? 0;
+  configForm.default_policy = config.default_policy || 'allow';
+}
+
+async function loadConfig() {
+  try {
+    const data = await api.get('/api/model-gateway/config');
+    if (data.config) applyConfig(data.config);
+  } catch (err) {
+    errors.value = { ...errors.value, config: (err && err.message) || t('view.agentGateway.usage.failedConfig') };
   }
 }
 
@@ -549,7 +592,7 @@ async function clearTodayUsage() {
 async function loadPermissions() {
   try {
     const data = await api.get('/api/model-gateway/permissions');
-    permissions.value = data.permissions || data.rules || [];
+    permissions.value = data.permissions || [];
     errors.value = { ...errors.value, permissions: null };
   } catch (err) {
     permissions.value = [];
@@ -560,11 +603,8 @@ async function loadPermissions() {
 async function loadUsage() {
   try {
     const data = await api.get('/api/model-gateway/usage');
-    usageRows.value = data.usage || data.records || [];
-    if (data.config) {
-      configForm.global_daily_token_limit = data.config.global_daily_token_limit ?? 0;
-      configForm.default_policy = data.config.default_policy || 'allow';
-    }
+    // rows 是 (model, agent) 粒度；usage 只是按模型折叠的 map，读它拿不到 agent
+    usageRows.value = data.rows || [];
     errors.value = { ...errors.value, usage: null };
   } catch (err) {
     usageRows.value = [];
@@ -574,7 +614,7 @@ async function loadUsage() {
 
 async function loadAll() {
   loading.value = true;
-  await Promise.allSettled([loadPermissions(), loadUsage()]);
+  await Promise.allSettled([loadPermissions(), loadUsage(), loadConfig()]);
   loading.value = false;
 }
 
@@ -691,6 +731,7 @@ onMounted(() => {
 
 /* ── Config form ──────────────────────────────────────────────── */
 .cfg-form { display: flex; flex-direction: column; gap: var(--sp-3); }
+.cfg-err { color: var(--fail); font-size: var(--fs-sm); margin: 0; }
 .cfg-form__actions { display: flex; justify-content: flex-end; }
 
 /* ── Form fields ───────────────────────────────────────────────── */

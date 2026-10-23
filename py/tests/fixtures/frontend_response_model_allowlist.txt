@@ -88,14 +88,6 @@ GET /api/logs/analysis
 GET /api/memory/search
 GET /api/memory/stats
 POST /api/memory/store
-POST /api/model-gateway/check
-PUT /api/model-gateway/config
-GET /api/model-gateway/permissions
-POST /api/model-gateway/permissions
-DELETE /api/model-gateway/permissions/{}
-PUT /api/model-gateway/permissions/{}
-DELETE /api/model-gateway/usage
-GET /api/model-gateway/usage
 GET /api/observability/config
 GET /api/observability/health
 GET /api/observability/status

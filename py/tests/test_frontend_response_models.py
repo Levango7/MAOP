@@ -162,4 +162,4 @@ def test_only_allowlisted_frontend_endpoints_lack_models():
     )
     # Burn-down ratchet: the allowlist may only shrink. Raising this number is
     # an explicit decision, not something a feature PR should do silently.
-    assert len(allowlist) <= 135, len(allowlist)
+    assert len(allowlist) <= 127, len(allowlist)
