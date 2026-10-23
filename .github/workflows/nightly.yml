@@ -60,7 +60,16 @@ jobs:
   full-e2e:
     name: Full E2E (all browsers)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 2026-10-23：30 → 90。与 flaky-detection 60→120（#137）同一类问题 ——
+    # 超时卡在分布尾部，而超时在这里表现为**整条 run 转 cancelled**（不是 job 报
+    # failure），"nightly 没结果"很容易被误读成"E2E 挂了"。
+    # 实测同一条腿的耗时（run 39559254937 / 39738042722 / 39914634036）：
+    #   10-21 →  5 分 21 秒（success）
+    #   10-22 → 10 分 03 秒（success）
+    #   10-23 → 30 分 18 秒（**cancelled**，撞在 30 上）
+    # 增长与 #140（dashboard 通知渠道/规则/模板配置界面）带来的新增 E2E 用例有关。
+    # 按实测最大值的 3 倍给到 90min。
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
