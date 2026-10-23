@@ -370,11 +370,24 @@ def _set_quota_bucket(bucket: Any) -> None:
         _quota_bucket = bucket
 
 
+def _quota_view(entry: Any) -> dict[str, Any]:
+    """QuotaEntry → 三桶视图 + 重置元信息。
+
+    前端额度卡片读 ``quota.free.total`` / ``.used`` / ``.remaining``。
+    """
+    from maop.core.agent.billing.quota_bucket import quota_bucket_views
+
+    return {
+        **quota_bucket_views(entry),
+        "reset_period": entry.reset_period,
+        "last_reset": entry.last_reset,
+    }
+
+
 def get_agent_quota(agent_name: str) -> dict[str, Any]:
-    """获取 Agent 额度配置，返回 model_dump(mode="json") 后的 dict。"""
+    """获取 Agent 额度配置，返回三桶视图。"""
     bucket = _get_quota_bucket()
-    entry = bucket.get_quota(agent_name)
-    return entry.model_dump(mode="json")
+    return _quota_view(bucket.get_quota(agent_name))
 
 
 def set_agent_quota(agent_name: str, entry: Any) -> None:
@@ -383,10 +396,34 @@ def set_agent_quota(agent_name: str, entry: Any) -> None:
     bucket.set_quota(agent_name, entry)
 
 
-def consume_agent_quota(agent_name: str, amount: int) -> dict[str, Any]:
-    """消耗 Agent 额度，返回 model_dump(mode="json") 后的 result dict。"""
+def set_agent_bucket_quota(agent_name: str, bucket_name: str, total: int) -> dict[str, Any]:
+    """设置单个桶的额度上限，返回更新后的三桶视图。
+
+    Raises
+    ------
+    ValueError
+        桶名无效或 total < 0 时抛出（由 router 映射为 400）。
+    """
     bucket = _get_quota_bucket()
-    result = bucket.consume(agent_name, amount)
+    entry = bucket.set_bucket_quota(agent_name, bucket_name, total)
+    return _quota_view(entry)
+
+
+def consume_agent_quota(
+    agent_name: str, amount: int, bucket_name: str = "auto",
+) -> dict[str, Any]:
+    """消耗 Agent 额度，返回 model_dump(mode="json") 后的 result dict。
+
+    ``bucket_name="auto"`` 时按免费 → 预付 → 后付顺序扣减；指定具体桶时
+    只从该桶扣减。
+
+    Raises
+    ------
+    ValueError
+        桶名无效时抛出（由 router 映射为 400）。
+    """
+    bucket = _get_quota_bucket()
+    result = bucket.consume(agent_name, amount, bucket_name)
     return result.model_dump(mode="json")
 
 

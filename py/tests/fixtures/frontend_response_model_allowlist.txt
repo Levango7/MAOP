@@ -18,7 +18,6 @@ GET /api/auth/status
 GET /api/auth/users
 DELETE /api/auth/users/{}
 PUT /api/auth/users/{}
-GET /api/billing/summary/{}
 GET /api/bridge/adapters
 POST /api/bridge/call
 GET /api/bridge/health
@@ -78,11 +77,6 @@ GET /api/protocol/list
 GET /api/protocol/messages
 POST /api/protocol/register
 POST /api/protocol/unregister
-GET /api/quota/{}
-PUT /api/quota/{}
-POST /api/quota/{}/consume
-POST /api/quota/{}/refund
-POST /api/quota/{}/reset
 GET /api/routing
 GET /api/routing/decisions/recent
 GET /api/routing/decisions/stats

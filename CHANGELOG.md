@@ -39,6 +39,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### quota 批次：8 条端点建模，额度页的四个按钮其实一直是禁用的（2026-10-24）
+
+P1-b 第十二批：`/api/quota/*` 前端在用的 5 条端点 + 同页的 `/api/billing/summary`
+与 `/api/billing/records` 全部声明 `response_model`，新增
+`routers/quota_schemas.py`、`routers/billing_schemas.py`。响应模型复用领域模型
+`ConsumeResult`（`core/agent/billing/quota_bucket.py`）——只有它知道一次消耗
+实际从哪个桶扣了多少。
+
+**额度卡片从来不是"0"，是恒为"无限"**：`GET /api/quota/{agent}` 回的是扁平的
+`QuotaEntry`（`free_quota`/`free_used`），视图读的是嵌套的
+`quota.free.total/.used/.remaining` ⇒ 三个桶全部落到兜底值"无限/0"，数据库里
+有额度也显示不出来。
+
+**"设置额度"把额度清零还弹成功**：`PUT` 的请求体是 `QuotaEntry`，视图发的是
+`{bucket, total}`。Pydantic v2 默认丢弃未声明字段 ⇒ 两个键都被丢掉、模型取默认
+值 ⇒ 该 Agent 的额度被写成全 0，前端却弹"设置成功"。请求体现在一律
+`extra="forbid"`：多发一个键是 422，不是静默改数据。`QuotaBucket` 新增
+`set_bucket_quota()`，只改指名的那个桶，其它桶与已用量原样保留。
+
+**桶下拉框是个装饰**：`consume` 完全忽略请求里的 `bucket`。现在
+`consume(agent, amount, bucket)` 按名扣减（指定桶时**不跨桶借用**，不足即失败并
+给出原因），`auto` 才按 免费 → 预付 → 后付 顺序扣。
+
+**消耗失败被报成成功**：额度不足时端点回 HTTP 200 + `success=false`，视图不看
+`success` 直接弹"消耗成功"。现在按 `success` 分支，失败弹 `reason`。
+
+**空数量被当成 0**：`Number('')` 是 0 不是 NaN ⇒ 空输入"消耗 0"成功、"设置额度
+0"静默清零。新增 `parseAmount()`：空/非数/负数一律拦下并提示，"设额度"才允许 0。
+
+**同页另外两个页签也读错了键**：摘要读 `s.total_cost`（生产者发
+`total_cost_usd`）⇒ 成本恒 `$0.0000`；摘要的桶进度条读 `s.buckets`（从没发过）
+⇒ 恒"无限"。记录表读 `r.tokens`/`r.calls`/`r.cost`/`r.source`，生产者发的是
+`tokens_consumed`/`calls_made`/`cost_usd`/`quota_source` ⇒ 整片表格体渲染成
+"—"；`model` 列则是因为 `billing_records.model` 列一直有写、`_row_to_record`
+却没读回 `BillingRecord`，字段直接丢了。`quota_source` 的真形态是
+`"free:1000,prepaid:234"`（无消耗为 `"none"`），不是裸桶名——视图改为解析后取
+占比最大的那个桶。
+
+**四个操作按钮在真机上点不动**（新测试逮到的）：`:disabled="quotaBusy"` 里
+`quotaBusy` 是字符串，Vue 对布尔属性把 `''` 当"有值"（`includeBooleanAttr('')`
+为真）⇒ 消耗/退还/设置/重置四个按钮**恒为 disabled**。改成 `!!quotaBusy`。
+
+**棘轮**：清单 96 → 90。（`/api/billing/records` 不在清单里：视图用字符串拼接
+URL，抽取器只认字面量 URL——已记入"扩展抽取器"的待办。）
+
+**验证**：`test_quota_route.py` 21 条重写 + 新契约
+`test_quota_router_contracts.py` 23 条——都跑**真** `QuotaBucket`/`BillingEngine`
+（临时 SQLite），不是手写 mock：断言 GET 的嵌套三桶与生产者同值、视图读的桶键
+与记录键都 ⊆ 生产者所发、摘要的 `total_cost_usd` 与桶视图、`/remaining` 与三桶
+视图互不矛盾、旧 PUT 体 422 且额度未被改动、consume 按指名桶扣减、四条改端点
+在 OpenAPI 里的请求体字段与视图实发的一模一样且 `additionalProperties: false`、
+8 条路由都有 `response_model`、每个信封的 `status` 默认 `"error"`、兜底分支回
+`status="error"` 而不是被静默丢弃。前端 `AgentBilling.test.js` 9 条（mock 按真
+生产者形状重写；旧 mock 发明的额度形状让坏卡片一直是绿的）。三处变异逐个转红：
+后端 `get_agent_quota` 改回扁平 `QuotaEntry`（3 条红）、视图改回
+`r.tokens_consumed`→`r.tokens`（2 条红）、视图改回 `b.limit`（1 条红）、去掉
+consume 的失败分支（前端 1 条红）。另：把按钮的 `disabled` 手动置 false 后点击
+立即生效，是"按钮恒禁用"的直接证据。
+
 ### subagent 批次：5 条端点建模，三个行内按钮其实全是坏的（2026-10-23）
 
 P1-b 第十一批：`/api/subagent/*` 前端在用的 5 条端点全部声明 `response_model`，
