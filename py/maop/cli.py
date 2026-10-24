@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from maop.cli_run_outcome import explain_unsuccessful_run
 from maop.config.home import (
     default_home,
     ensure_runtime_root,
@@ -237,6 +238,12 @@ def cmd_run(task: str, depth: int = 0) -> Any:
                 print(f"[stderr] {result.execution.error}", file=sys.stderr)
         if result.block_reason:
             print(f"[BLOCK] 任务被阻塞：{result.block_reason}", file=sys.stderr)
+            sys.exit(1)
+        # 2026-10-24：`LoopResult.success` 是权威信号（exec_result 非空 + is_success + verify_ok），
+        # 此前只把 block_reason 当失败，导致 agent 找不到时仍打印 `[OK] run 完成` 并退出 0 ——
+        # 假成功。这里改为 fail-loud：非成功即非零退出，并说明原因。
+        if not result.success:
+            _emit_fail("run", explain_unsuccessful_run(result) or "未提供进一步信息")
             sys.exit(1)
         print(f"[OK] run 完成 ({elapsed:.1f}ms)")
     except ImportError as exc:
