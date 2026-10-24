@@ -1,0 +1,11 @@
+# Read endpoints that must call require_admin.
+#
+# scripts/check_admin_coverage.py only scans POST/PUT/DELETE/PATCH, so a GET
+# that hands out other tenants' data is structurally invisible to it — which is
+# how GET /api/tenant-blackboard/tenants shipped unguarded through two
+# "multi-tenant admin surface" reviews. These entries are checked by
+# tests/test_admin_required_reads.py against the real endpoint source.
+# Format: ROUTER_FILE METHOD PATH-TEMPLATE # reason
+
+tenant_blackboard.py GET /api/tenant-blackboard/tenants # every tenant id + entry count in the shared board
+tenant_blackboard.py GET /api/tenant-blackboard/tenants/{tenant_id} # another tenant's snapshot and recent entry content

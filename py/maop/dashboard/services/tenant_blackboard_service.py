@@ -33,6 +33,8 @@ def list_tenants() -> list[dict[str, Any]]:
     """Scan the shared blackboard and return a list of distinct tenants.
 
     Each tenant is represented by its ``_tenant_id`` metadata marker.
+    Cross-tenant by construction, so the router gates it behind
+    ``require_admin``.
     """
     bb = get_blackboard()
     raw = bb.get_snapshot()
@@ -56,7 +58,9 @@ def list_tenants() -> list[dict[str, Any]]:
 def get_tenant(tenant_id: str) -> dict[str, Any]:
     """Get detailed info about a single tenant.
 
-    Includes a per-domain snapshot and recent history.
+    Includes a per-domain snapshot and recent history. The superadmin context
+    here reads *another* tenant's data, which is only safe because the router
+    puts ``require_admin`` in front of it.
     """
     bb = get_blackboard()
     ctx = _admin_ctx(tenant_id=tenant_id)
@@ -92,32 +96,19 @@ def get_tenant(tenant_id: str) -> dict[str, Any]:
     }
 
 
-def delete_tenant_data(tenant_id: str) -> dict[str, Any]:
+async def delete_tenant_data(tenant_id: str) -> dict[str, Any]:
     """Delete **all** data for a tenant. Returns the number of entries removed.
 
-    Requires superadmin context.
+    Deletion goes through ``TenantBlackboard.clear``: the ``BB_ADMIN`` gate and
+    the tenant filter live with the class that owns the store. This used to
+    reach into ``bb._lock`` / ``bb._entries`` and re-implement that filter by
+    hand — same effect, but outside every check the wrapper exists to provide.
     """
     bb = get_blackboard()
-
-    raw = bb.get_snapshot()
+    tbb = TenantBlackboard(bb, _admin_ctx(tenant_id=tenant_id))
     total_removed = 0
-    for domain in raw:
-        # Read all entries in this domain and remove ones matching tenant_id
-        tenant_entries = [
-            e for e in bb.read(domain)
-            if e.metadata.get("_tenant_id") == tenant_id
-        ]
-        if tenant_entries:
-            count = len(tenant_entries)
-            # Use the clear method (requires BB_ADMIN)
-            # But tbb.clear only removes tenant entries, which is what we want
-            with bb._lock:
-                before = bb._entries.get(domain, [])
-                bb._entries[domain] = [
-                    e for e in before
-                    if e.metadata.get("_tenant_id") != tenant_id
-                ]
-            total_removed += count
+    for domain in list(bb.get_snapshot()):
+        total_removed += await tbb.clear(domain)
 
     return {"tenant_id": tenant_id, "removed_entries": total_removed}
 
