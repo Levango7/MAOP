@@ -78,7 +78,6 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.core.agent.ops.result_cache": ("unwired", "agent ops 子包整组未接线"),
     "maop.core.agent.ops.sandbox_executor": ("unwired", "agent ops 子包整组未接线"),
     "maop.core.agent.ops.tenant_isolation": ("unwired", "agent ops 子包整组未接线"),
-    "maop.core.agent.ops.usage_statistics": ("unwired", "agent ops 子包整组未接线"),
     "maop.core.agent.registry.preset_agents": ("unwired", "预置 agent 未接入注册表初始化"),
     "maop.core.agent.router.health_check_scheduler": (
         "unwired",
