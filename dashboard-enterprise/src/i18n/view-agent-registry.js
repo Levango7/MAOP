@@ -6,6 +6,7 @@ export const messages = {
     'view.agentRegistry.tab.agents': 'Agents',
     'view.agentRegistry.tab.capabilities': 'Capabilities',
     'view.agentRegistry.tab.fallback': 'Fallback Chains',
+    'view.agentRegistry.tab.recommend': 'Recommend',
 
     // ── Columns ───────────────────────────────────────────────────
     'view.agentRegistry.col.name': 'Name',
@@ -134,6 +135,7 @@ export const messages = {
     'view.agentRegistry.tab.agents': 'Agent 列表',
     'view.agentRegistry.tab.capabilities': '能力视图',
     'view.agentRegistry.tab.fallback': '降级链',
+    'view.agentRegistry.tab.recommend': '推荐',
 
     // ── 列 ────────────────────────────────────────────────────────
     'view.agentRegistry.col.name': '名称',
