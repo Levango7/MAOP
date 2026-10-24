@@ -39,6 +39,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### agent-catalog 批次：5 条端点建模，Agent 页的四张统计卡永远是 0（2026-10-24）
+
+P1-b 第十五批（收官）：`/api/agent-catalog/*` 前端在用的 5 条端点（列表、
+注册、部分更新、删除、统计）全部声明 `response_model`，新增
+`routers/agent_catalog_schemas.py`。行类型直接复用领域模型
+`AgentDescriptor`——`agent_service.list_agents()` 返回的就是它的
+`model_dump(mode="json")`，另写一份 23 字段的镜像只会造出第二份真相
+（日后加字段漏改一处就静默丢数据）。
+
+**四张统计卡从上线起就恒为 0**：`GET /stats` 只回 `count` /
+`healthy_count`，而卡片读的是 `stats.total` / `stats.enabled` /
+`stats.healthy` / `stats.capabilities`——四个键在生产者里都不存在，
+`?? 0` 把缺失吃成 0。`catalog_stats()` 改为取**一次** `list_all()` 快照
+算四个计数（`count` / `healthy_count` / `enabled_count` /
+`capability_count`，能力跨 agent 去重），卡片改读新键。同一次快照顺带
+消掉原先的另一种矛盾：多次加锁之间数据变动会让 `count` 与
+`healthy_count` 互相打架。
+
+**健康徽章恒为"未知"**：`AgentDescriptor` 发的是布尔 `healthy`，徽章读的
+却是 `a.health || a.health_status` ⇒ 永远落到 unknown 分支，健康的 agent
+也显示"未知"。改为 `isEnabled()` / `isHealthy()` 读布尔；`status.unknown`
+i18n 键随之删除（中英各一）——API 只发 true/false，词表不该提供第三态。
+
+**编辑请求体多发 `name`，被静默忽略**：视图 `submitForm` 把 `name` 一起
+PUT，而 `UpdateAgentRequest` 不声明它。实测
+`PUT /api/agent-catalog/agents/a1 {"name":"hacked","display_name":"X"}`
+回 200 且名字仍是 `a1`——改名"成功"了但什么都没发生。两个请求模型都加
+`extra="forbid"`（多发键一律 422），视图把请求体拆成 `{ name, ...payload }`
+（注册）与 `payload`（编辑，name 只在路径里）。
+
+**兜底补齐**：`/stats` 的 `error_value` 原先只写两个计数，另两个靠模型
+默认值垫 0；改为四个都显式写出，兜底字典与模型自洽。
+
+**棘轮**：清单 80 → 75。P1-b 全程 113 → 75。
+
+**验证**：新契约 `test_agent_catalog_router_contracts.py` 21 条——真路由 +
+每测试隔离的 SQLite catalog（`agent_service._set_catalog` 注入，teardown
+归零）+ **真 admin 守卫**（中间件注入角色，不 monkeypatch
+`require_admin`；非 admin 五条调用全 403）：断言列表行的键集**等于**
+`AgentDescriptor.model_dump()` 的字段集、视图静态读取 ⊆ 行（扫描前先剥掉
+字符串字面量，否则 `t('...stats.total')` 这类 i18n 键会混进来）、`healthy`
+是布尔且 `health`/`health_status` 在生产与视图两侧都不存在、统计恰好四键
+且与列表逐条自洽、`capability_count` 跨 agent 去重、四张卡片读的键集与
+`CatalogStatsPayload` 字段一致、注册体 = `name` + payload 十项、编辑体不含
+`name`、PUT 带 `name` → 422 且未半应用、注册拼错字段 → 422 且 agent 不存在、
+未知能力 → 400 而非静默默认、部分更新保留未给字段、删除回 `deleted`、
+`enabled` 开关能往返到列表与统计、OpenAPI 两个请求模型
+`additionalProperties: false` 且 update = create − name、5 条路由都声明响应
+模型、4 个信封 `status` 默认 `"error"`、`error_value` 兜底能过模型校验、
+`HTTPException` 绕过信封并保留 404。前端新增 `AgentRegistry.test.js` 8 条
+（四卡数字、`/stats` 失败时从行派生同样四个数、健康/启用徽章的精确文案、
+注册体带 name、编辑体不带 name、电源键只发 `{enabled}`、加载失败出错误态）。
+变异转红：`catalog_stats()` 回退成两个计数（契约 3 红）、去掉
+`UpdateAgentRequest` 的 `extra="forbid"`（契约 1 红）、去掉列表路由的
+`response_model`（契约 1 红）、`isHealthy()` 改回读 `a.health`（前端 3 红 +
+契约 2 红）、四张卡片改回旧键（前端 2 红 + 契约 1 红）。
+
 ### auth 批次：5 条端点建模，用户列表的"最后登录"列从未有数据（2026-10-24）
 
 P1-b 第十四批：`/api/auth/*` 前端在用的 5 条端点（注册、状态、用户列表、

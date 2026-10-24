@@ -85,7 +85,6 @@ export const messages = {
     'view.agentRegistry.status.disabled': 'Disabled',
     'view.agentRegistry.status.healthy': 'Healthy',
     'view.agentRegistry.status.unhealthy': 'Unhealthy',
-    'view.agentRegistry.status.unknown': 'Unknown',
 
     // ── Empty / error ─────────────────────────────────────────────
     'view.agentRegistry.empty': 'No agents registered',
@@ -214,7 +213,6 @@ export const messages = {
     'view.agentRegistry.status.disabled': '已禁用',
     'view.agentRegistry.status.healthy': '健康',
     'view.agentRegistry.status.unhealthy': '不健康',
-    'view.agentRegistry.status.unknown': '未知',
 
     // ── 空状态 / 错误 ─────────────────────────────────────────────
     'view.agentRegistry.empty': '暂无已注册 Agent',
