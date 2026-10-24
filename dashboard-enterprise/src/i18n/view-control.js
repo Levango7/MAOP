@@ -37,6 +37,16 @@ export const messages = {
     'view.control.timelineVerify': 'Verify',
     'view.control.timelineCost': 'Cost',
     'view.control.timelineFinished': 'Result',
+
+    // ── PEV phase grouping (RunTimeline) ─────────────────────────
+    'view.control.pevPhasePlan': 'Plan',
+    'view.control.pevPhaseExecute': 'Execute',
+    'view.control.pevPhaseVerify': 'Verify',
+    'view.control.pevPhaseOther': 'Other',
+    'view.control.pevEvents': '{n} events',
+    'view.control.pevDuration': '{ms}ms',
+    'view.control.pevAttempt': 'attempt {n}',
+    'view.control.pevGates': 'Gates',
     'view.control.executionControls': 'Execution Controls',
     'view.control.maintenanceActions': 'Maintenance Actions',
     'view.control.runningJobs': 'Job History',
@@ -104,6 +114,16 @@ export const messages = {
     'view.control.timelinePlan': '计划',
     'view.control.timelineStep': '执行',
     'view.control.timelineVerify': '校验',
+
+    // ── PEV 阶段分组（RunTimeline） ──────────────────────────────
+    'view.control.pevPhasePlan': '计划',
+    'view.control.pevPhaseExecute': '执行',
+    'view.control.pevPhaseVerify': '校验',
+    'view.control.pevPhaseOther': '其他',
+    'view.control.pevEvents': '{n} 个事件',
+    'view.control.pevDuration': '{ms}ms',
+    'view.control.pevAttempt': '第 {n} 次尝试',
+    'view.control.pevGates': '门禁',
     'view.control.timelineCost': '成本',
     'view.control.timelineFinished': '结论',
     'view.control.executionControls': '执行控制',
