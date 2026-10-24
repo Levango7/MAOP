@@ -540,12 +540,21 @@ def test_every_frontend_url_is_attributed_or_exempted():
 
 
 def test_non_json_exemptions_are_real_routes() -> None:
-    """An exemption that no longer names a mounted route is a stale comment."""
+    """An exemption that no longer names a route is a stale comment.
+
+    Judged against both profiles: SSO lives only in the enterprise app, so a
+    personal-only lookup would fail a legitimate exemption (and tempt someone
+    to delete it).
+    """
+    from tests.dashboard_app_profiles import all_route_map
+
     exempt = load_entries(NON_JSON)
-    routes = route_schema()
+    routes = all_route_map(normalize_path)
     unknown = sorted(key for key in exempt if key not in routes)
     assert unknown == [], f"non-JSON exemptions with no mounted route: {unknown}"
-    typed = sorted(key for key in exempt if key in routes and has_typed_response(routes[key]))
+    typed = sorted(
+        key for key in exempt if key in routes and has_typed_response(routes[key])
+    )
     assert typed == [], f"exempted endpoints that DO declare a model: {typed}"
 
 

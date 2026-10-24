@@ -1,0 +1,42 @@
+# Enterprise-only endpoints called by the dashboard that still return an untyped dict.
+#
+# The personal ratchet cannot see these: _register_routes gates the tenant /
+# rbac / sso / quotas / n8n / licenses / compliance routers behind
+# FeatureFlag.MULTI_USER, so with no enterprise license they are absent from
+# app.openapi() and the personal gate's `matched` set never contains them.
+# Burn-down list for tests/test_enterprise_response_models.py: delete a line
+# when the endpoint declares a response_model. The gate fails in both
+# directions (new gap, stale line) and the count below may only shrink.
+# Format: METHOD PATH
+
+DELETE /api/sso/providers/{}
+DELETE /api/tenant/{}
+GET /api/licenses/list
+GET /api/licenses/{}
+GET /api/n8n/executions/{}
+GET /api/n8n/health
+GET /api/n8n/workflows
+GET /api/quotas/history
+GET /api/quotas/overview
+GET /api/quotas/{}/alerts
+GET /api/quotas/{}/trend
+GET /api/quotas/{}/usage
+GET /api/rbac/grants
+GET /api/rbac/permissions
+GET /api/rbac/roles
+GET /api/sso/providers
+GET /api/tenant/list
+POST /api/licenses/create
+POST /api/licenses/{}/renew
+POST /api/licenses/{}/revoke
+POST /api/n8n/workflows/{}/trigger
+POST /api/quotas/alerts/{}/resolve
+POST /api/quotas/{}/{}
+POST /api/rbac/grant
+POST /api/rbac/revoke
+POST /api/sso/providers
+POST /api/sso/providers/{}/test
+POST /api/tenant/create
+POST /api/tenant/{}/activate
+POST /api/tenant/{}/suspend
+PUT /api/sso/providers/{}

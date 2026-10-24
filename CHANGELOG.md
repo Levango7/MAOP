@@ -39,6 +39,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 企业版 profile 的同款 response_model 棘轮：31 条端点此前无人看守（2026-10-24）
+
+P1-b 的清单只按**个人版 app** 求交：`_register_routes._register_enterprise_routers`
+被 `FeatureFlag.MULTI_USER` 门控，本机（无企业 license）根本不挂载
+tenant / rbac / sso / quotas / n8n / licenses / compliance 七个 router ——
+于是前端在调、却因 `app.openapi()` 里没有而**同时躲过两条检查**（既不算缺口，
+也不进清单）的端点一直存在。实测：企业版 app 有 74 条 METHOD/PATH 组合，
+其中 **32 条被看板调用，0 条声明 response_model**。
+
+新增（不改动原棘轮的语义）：
+
+- `tests/dashboard_app_profiles.py` —— 直接把七个企业 router 装进一个新 app
+  （它们在树里就存在，挂载只取决于 license），并给出 `personal_app()` /
+  `enterprise_app()` / `route_map()` / `all_route_map()`。
+- `tests/test_enterprise_response_models.py` —— 与个人版同一套判据
+  （复用同一个提取器与 `has_typed_response`）：双向对账（新缺口 / 陈旧条目）、
+  只降不升的上限 31、逐 router 挂载自证（每个模块都必须真的贡献路由，
+  否则"审计面缩小"会看起来像"全绿"）、两棵路由树必须互不相交（同一端点被两
+  个门禁重复登记，修掉一处会让另一处一直喊缺模型）。
+- `fixtures/enterprise_response_model_allowlist.txt` —— 31 条，由实测生成，
+  不手抄。
+- `GET /api/sso/providers/{id}/metadata` 进非 JSON 豁免清单（SAML SP metadata 是
+  `application/xml`），并且该清单的校验改为**两个 profile 合并**后判断 —— 企业版
+  专属路由在个人版查不到，会让一条合法豁免被误判为陈旧。
+
+**验证**：27 条门禁测试全绿（个人 11 + 企业 5 + 读守卫 3 + 看板 RBAC 9 减去重叠）。
+变异转红：从企业清单删一行 ⇒ 1 红并指名 `GET /api/rbac/roles`；给该端点临时加
+`response_model` ⇒ 1 红并给出"这些行该删"（证明门禁会在真正建模后**逼着清单变短**，
+不会只惩罚新增）；从 helper 的模块表里去掉 `licenses` ⇒ 3 红（挂载自证、
+matched 下限、5 条条目变陈旧），即"某个 router 悄悄没装上"不可能蒙混过关。
+变异后按 SHA256 逐字节还原，`rbac.py` 用 `git checkout --` 复原，临时探针脚本已删。
+
 ### 多租户看板读取端点的越权缺口：只读角色可枚举全部租户（2026-10-24）
 
 `/api/tenant-blackboard/*` 是跨租户管理面。实测（真守卫，非 mock）：

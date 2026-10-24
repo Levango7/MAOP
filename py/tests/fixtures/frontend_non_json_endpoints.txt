@@ -10,3 +10,4 @@
 GET /api/feedback/export # file download (CSV, or a raw JSON attachment body)
 GET /api/stream/agent/{} # SSE: StreamingResponse media_type=text/event-stream
 GET /api/stream/dag/{} # SSE: StreamingResponse media_type=text/event-stream
+GET /api/sso/providers/{}/metadata # SAML SP metadata: PlainTextResponse media_type=application/xml
