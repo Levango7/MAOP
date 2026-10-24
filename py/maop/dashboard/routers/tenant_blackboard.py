@@ -1,11 +1,19 @@
 """MAOP Dashboard — Multi-Tenant Blackboard Admin API.
 
+Cross-tenant visibility lives here, so every endpoint that reads tenant data
+requires the admin role: the roster (``/tenants``) and any single tenant's
+snapshot (``/tenants/{id}``) both expose other tenants' identifiers, entry
+counts and content to the caller.
+
 Endpoints:
-- ``GET  /api/tenant-blackboard/tenants`` — list all tenants (read)
-- ``GET  /api/tenant-blackboard/tenants/{tenant_id}`` — tenant details + snapshot (read)
+- ``GET  /api/tenant-blackboard/tenants`` — list all tenants (admin)
+- ``GET  /api/tenant-blackboard/tenants/{tenant_id}`` — tenant details + snapshot (admin)
 - ``DELETE /api/tenant-blackboard/tenants/{tenant_id}`` — purge all tenant data (admin)
 - ``GET  /api/tenant-blackboard/rbac/permissions`` — list valid RBAC permissions (read)
 - ``POST /api/tenant-blackboard/context/validate`` — validate a tenant context (admin)
+
+``/rbac/permissions`` stays open on purpose: it returns the static
+``RBACPermission`` enum, no tenant data.
 """
 
 from __future__ import annotations
@@ -42,8 +50,9 @@ class TenantContextRequest(BaseModel):
 
 @router.get("/tenants")
 @handle_api_errors("tenant list")
-async def list_tenants() -> dict[str, Any]:
-    """List all tenants detected via metadata tagging (read-only)."""
+async def list_tenants(request: Request) -> dict[str, Any]:
+    """List all tenants detected via metadata tagging (admin, read-only)."""
+    require_admin(request)
     return {"status": "ok", "data": tenant_blackboard_service.list_tenants()}
 
 
@@ -52,13 +61,10 @@ async def list_tenants() -> dict[str, Any]:
 
 @router.get("/tenants/{tenant_id}")
 @handle_api_errors("tenant detail")
-async def get_tenant(tenant_id: str) -> dict[str, Any]:
-    """Get detailed snapshot + recent history for a tenant (read-only)."""
-    try:
-        detail = tenant_blackboard_service.get_tenant(tenant_id)
-    except PermissionError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    return {"status": "ok", "data": detail}
+async def get_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
+    """Get detailed snapshot + recent history for a tenant (admin, read-only)."""
+    require_admin(request)
+    return {"status": "ok", "data": tenant_blackboard_service.get_tenant(tenant_id)}
 
 
 # ── Delete tenant data ──────────────────────────────────────────────
@@ -69,7 +75,7 @@ async def get_tenant(tenant_id: str) -> dict[str, Any]:
 async def delete_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Delete ALL data for a tenant (admin, destructive)."""
     require_admin(request)
-    result = tenant_blackboard_service.delete_tenant_data(tenant_id)
+    result = await tenant_blackboard_service.delete_tenant_data(tenant_id)
     return {"status": "ok", "data": result}
 
 

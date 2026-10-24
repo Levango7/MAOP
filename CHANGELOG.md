@@ -39,6 +39,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 多租户看板读取端点的越权缺口：只读角色可枚举全部租户（2026-10-24）
+
+`/api/tenant-blackboard/*` 是跨租户管理面。实测（真守卫，非 mock）：
+
+- **`GET /api/tenant-blackboard/tenants` 完全没有守卫** —— 任何带角色的调用者
+  （`MAOP_AUTH=0` 下即只读角色）都能拿到全部租户 ID、每租户的域与条目数。
+- **`GET /api/tenant-blackboard/tenants/{tenant_id}` 同样没有守卫，且更严重**：
+  服务层 `_admin_ctx(tenant_id=...)` 为**任意**目标租户铸一个 superadmin 上下文，
+  于是只读调用者能读到别的租户的完整快照与最近条目内容。路由里那句
+  `except PermissionError → 403` 是死分支：该服务在任何路径下都不抛这个异常。
+- `DELETE` 有 `require_admin`（此前的怀疑不成立），但 `delete_tenant_data`
+  **绕过 `TenantBlackboard` 直接改 `bb._lock` / `bb._entries`** 手搓租户过滤，
+  把 `BB_ADMIN` 检查和租户过滤搬到了守卫类之外（注释里还写着"use the clear
+  method"却没用）。
+
+修法：两个读取端点补 `require_admin`，删掉死的 403 分支；`delete_tenant_data`
+改 `async` 并逐域走 `TenantBlackboard.clear(domain)`（权限与租户过滤回到拥有
+存储的类里）。`/rbac/permissions` 如实保持开放：它返回的是静态枚举，不含租户
+数据，卡它没有收益。中间件里 `tenant-blackboard` 全版本放行的注释一并保留
+——放行的是"这个版本有没有这个功能"，不是"谁能读别人的数据"。
+
+**为什么这个洞能在两轮评审里活下来**：`scripts/check_admin_coverage.py` 只扫
+POST/PUT/DELETE/PATCH 的函数体，读端点结构性不可见；而
+`test_coordination_m4.py` 的 `admin_client` fixture 把 `require_admin`
+patch 成 no-op —— 同一批测试里 `test_get_tenant_detail` 甚至专门写入
+`{"secret": "acme-123"}` 并断言**只读** `client` 能读到快照，等于把漏洞写进了
+回归基线。变异实验证实：把两个守卫删掉，`test_coordination_m4` 的 43 条测试
+**全绿**。
+
+顺带：该文件顶部的 `sys.path.insert(0, r"F:/Nexus/MAOP/py")` 指向同级另一份
+签出。实测在本机它不生效（conftest 已先导入本树 `maop`），但它是机器专属的
+绝对路径 ⇒ 删除，并把 4 条依赖 no-op fixture 的租户数据测试改用 `admin_client`
+的真实语义。
+
+**新增守卫（防止同类回归）**：`fixtures/admin_required_read_endpoints.txt` +
+`tests/test_admin_required_reads.py` —— 逐条按 AST/inspect 检查列出的读端点
+确实调用 `require_admin(request)`，条目格式 `ROUTER_FILE METHOD PATH # 理由`，
+路由改名或条目丢失都会红。
+
+**验证**：`test_tenant_blackboard_rbac.py` 9 条 + `test_admin_required_reads.py`
+3 条。角色从 `request.state.auth_roles` 注入（与 AuthMiddleware 一致），
+`require_admin` 不被替换，所以 403 是关于产品的证据：只读角色在三个租户数据端点
+上全 403、空角色 403、superadmin 200（RBAC 层级）、枚举端点仍 200、
+`/context/validate` 只读 403 而 admin 200；删除路径的租户隔离实测（两个租户、
+两个域，删一个 ⇒ `removed_entries == 1` 且另一租户条目与内容完好；删不存在的
+租户 ⇒ 0 且不伤及无辜）；另有针对服务源码的断言（`delete_tenant_data` 的可执行
+语句里不再出现 `bb._lock` / `bb._entries`，且确有 `await tbb.clear(domain)`）。
+变异转红：删 `list` 的守卫 ⇒ 3 红（RBAC 2 + 新守卫 1，**旧 m4 套件全绿**）；
+删 `detail` 的守卫 ⇒ 2 红；给删除上下文去掉 `BB_ADMIN` ⇒ 2 红（证明 RBAC 门
+真的被咨询，不是数数）。三份文件变异后按 SHA256 逐字节还原。
+
+门禁：ruff / mypy / silent-exceptions / file-size / api-contract /
+config-drift / doc-reconcile / docs-consistency --gate / wiring 全绿；
+`test_coordination_m4.py` + 新测试 43 passed（单进程 -n 0）。
+
 ### 棘轮提取器：计算型 URL 从此看得见，清单 75 → 82（2026-10-24）
 
 P1-b 收官后回头清点"门禁到底看见了谁"，实测旧的单条正则

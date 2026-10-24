@@ -15,14 +15,11 @@ Design reference: tests/test_coordination_m3.py (M3 test).
 from __future__ import annotations
 
 import asyncio
-import sys
 import threading
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-
-sys.path.insert(0, r"F:/Nexus/MAOP/py")
 
 # ── Fixtures ──────────────────────────────────────────────────────
 
@@ -419,14 +416,14 @@ class TestPrometheusMetrics:
 class TestTenantAdminList:
     """Tests for GET /api/tenant-blackboard/tenants."""
 
-    def test_list_tenants_returns_array(self, client):
-        resp = client.get("/api/tenant-blackboard/tenants")
+    def test_list_tenants_returns_array(self, admin_client):
+        resp = admin_client.get("/api/tenant-blackboard/tenants")
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "ok"
         assert isinstance(body["data"], list)
 
-    def test_list_tenants_shows_seeded_tenants(self, client):
+    def test_list_tenants_shows_seeded_tenants(self, admin_client):
         """Seed tenant data and verify they show up in the list."""
         from maop.core.reliability.blackboard import get_blackboard
         from maop.core.reliability.coordination_tenant import (
@@ -447,7 +444,7 @@ class TestTenantAdminList:
             tbb.write("decision", {"v": "alpha_data"})
         )
         try:
-            resp = client.get("/api/tenant-blackboard/tenants")
+            resp = admin_client.get("/api/tenant-blackboard/tenants")
             assert resp.status_code == 200
             body = resp.json()
             tenant_ids = [t["tenant_id"] for t in body["data"]]
@@ -464,7 +461,7 @@ class TestTenantAdminList:
 class TestTenantAdminDetail:
     """Tests for GET /api/tenant-blackboard/tenants/{tenant_id}."""
 
-    def test_get_tenant_detail(self, client):
+    def test_get_tenant_detail(self, admin_client):
         from maop.core.reliability.blackboard import get_blackboard
         from maop.core.reliability.coordination_tenant import (
             RBACPermission,
@@ -484,7 +481,7 @@ class TestTenantAdminDetail:
             tbb.write("decision", {"secret": "acme-123"})
         )
         try:
-            resp = client.get("/api/tenant-blackboard/tenants/acme-corp")
+            resp = admin_client.get("/api/tenant-blackboard/tenants/acme-corp")
             assert resp.status_code == 200
             body = resp.json()
             assert body["status"] == "ok"
@@ -496,8 +493,8 @@ class TestTenantAdminDetail:
             for _d in list(bb._entries.keys()):
                 asyncio.run(bb.clear(_d))
 
-    def test_get_nonexistent_tenant_returns_empty(self, client):
-        resp = client.get("/api/tenant-blackboard/tenants/ghost-tenant-999")
+    def test_get_nonexistent_tenant_returns_empty(self, admin_client):
+        resp = admin_client.get("/api/tenant-blackboard/tenants/ghost-tenant-999")
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "ok"
