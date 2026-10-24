@@ -284,6 +284,10 @@
             </div>
           </Card>
         </div>
+
+        <div v-show="activeTab === 'recommend'">
+          <AgentRecommend />
+        </div>
       </template>
     </ListPageLayout>
 
@@ -478,6 +482,7 @@ import ListPageLayout from '../components/ListPageLayout.vue';
 import AppIcon from '../components/AppIcon.vue';
 import Card from '../components/Card.vue';
 import Badge from '../components/Badge.vue';
+import AgentRecommend from './AgentRecommend.vue';
 import Segmented from '../components/Segmented.vue';
 import Skeleton from '../components/Skeleton.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -501,6 +506,7 @@ const tabOptions = [
   { value: 'agents', label: t('view.agentRegistry.tab.agents'), icon: 'bot' },
   { value: 'capabilities', label: t('view.agentRegistry.tab.capabilities'), icon: 'zap' },
   { value: 'fallback', label: t('view.agentRegistry.tab.fallback'), icon: 'route' },
+  { value: 'recommend', label: t('view.agentRegistry.tab.recommend'), icon: 'sparkles' },
 ];
 
 // ── Data state ──────────────────────────────────────────────────

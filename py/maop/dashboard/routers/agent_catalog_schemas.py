@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from maop.core.agent.ops.usage_statistics import AgentRecommendation
 from maop.core.agent.registry.agent_catalog import AgentDescriptor
 
 
@@ -49,4 +50,22 @@ class CatalogStatsPayload(BaseModel):
     healthy_count: int = 0
     enabled_count: int = 0
     capability_count: int = 0
+    error: str = ""
+
+
+class RecommendAgentsPayload(BaseModel):
+    """GET /api/agent-catalog/recommend 响应。
+
+    ``agents`` 直接复用领域模型 ``AgentRecommendation``（与上面
+    ``AgentDescriptor`` 同一哲学：不写字段镜像）。
+
+    ``scored=False`` 表示**当前没有任何历史统计数据**（如全新部署），此时
+    ``agents`` 为空是**预期结果**，不是错误。调用方应据此提示"先跑几次任务"，
+    而不是把空列表渲染成"推荐失败"。
+    """
+
+    status: str = "error"
+    agents: list[AgentRecommendation] = Field(default_factory=list)
+    count: int = 0
+    scored: bool = False
     error: str = ""
