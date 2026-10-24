@@ -20,13 +20,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
-from maop.dashboard.services import agent_service
+from maop.dashboard.services import agent_recommend_service, agent_service
 
 from .agent_catalog_schemas import (
     AgentDeleteEnvelope,
     AgentEnvelope,
     AgentListEnvelope,
     CatalogStatsPayload,
+    RecommendAgentsPayload,
 )
 
 logger = logging.getLogger(__name__)
@@ -248,4 +249,41 @@ async def api_catalog_stats(request: Request) -> dict[str, Any]:
     """返回 Agent Catalog 统计信息。"""
     require_admin(request)
     result = agent_service.catalog_stats()
+    return {"status": "ok", **result}
+
+
+@router.get("/api/agent-catalog/recommend", response_model=RecommendAgentsPayload)
+@handle_api_errors(
+    "Recommend agents",
+    error_value={
+        "status": "error",
+        "agents": [],
+        "count": 0,
+        "scored": False,
+        "error": "Recommend failed",
+    },
+)
+async def api_recommend_agents(
+    request: Request,
+    task_type: str = Query("", description="任务类型标签（过滤有相关经验的 Agent）"),
+    capability: list[str] = Query(  # noqa: B008
+        default_factory=list,
+        description="要求的能力（可重复: ?capability=a&capability=b）",
+    ),
+    prefer_free: bool = Query(True, description="是否优先免费 / 包月计费的 Agent"),
+    limit: int = Query(10, ge=1, le=100, description="最多返回多少条（评分已降序）"),
+) -> dict[str, Any]:
+    """按历史使用统计推荐 Agent。
+
+    评分权重：成功率 40% + 成本 30% + 速度 20% + 能力匹配 10%。
+    ``scored=False`` 表示当前没有任何历史统计（如全新部署），此时空列表是
+    预期结果，调用方应提示"先跑几次任务"而不是渲染成"推荐失败"。
+    """
+    require_admin(request)
+    result = agent_recommend_service.recommend_agents(
+        task_type=task_type,
+        capabilities=capability,
+        prefer_free=prefer_free,
+        limit=limit,
+    )
     return {"status": "ok", **result}
