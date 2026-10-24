@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from maop.core.security.middleware import require_admin as _require_admin
 
@@ -34,6 +34,12 @@ from maop.dashboard.error_handler import handle_api_errors
 # ── Service layer ──────────────────────────────────────────────────
 from maop.dashboard.services import auth_service
 
+from .auth_schemas import (
+    AuthMutationEnvelope,
+    AuthRegisterEnvelope,
+    AuthStatusPayload,
+    AuthUsersEnvelope,
+)
 from .state import MAOP_ROOT  # noqa: F401
 
 router = APIRouter()
@@ -102,7 +108,13 @@ class LoginRequest(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    """POST /api/auth/register 请求体。"""
+    """POST /api/auth/register 请求体。
+
+    未知字段直接 422，而不是静默丢弃：前端若把 ``role``（单数）写错，
+    原实现会以默认 ``["read"]`` 建档并回报成功。
+    """
+    model_config = ConfigDict(extra="forbid")
+
     username: str = ""
     password: str = ""
     roles: list[str] = Field(default_factory=lambda: ["read"])
@@ -111,8 +123,11 @@ class RegisterRequest(BaseModel):
 class UpdateUserRequest(BaseModel):
     """PUT /api/auth/users/{username} 请求体。
 
-    所有字段可选——只更新提供的字段。
+    所有字段可选——只更新提供的字段。未知字段 422：拼错的键若被静默
+    丢弃，接口会回报 ``status: ok`` 而实际什么都没改。
     """
+    model_config = ConfigDict(extra="forbid")
+
     roles: list[str] | None = None
     enabled: bool | None = None
     password: str | None = None
@@ -135,7 +150,7 @@ def _get_client_ip(request: Request) -> str:
 
 
 # ── Endpoints ──────────────────────────────────────────────────────
-@router.get("/api/auth/status")
+@router.get("/api/auth/status", response_model=AuthStatusPayload)
 @handle_api_errors("auth status")
 async def auth_status(request: Request) -> Any:
     """Check if auth is enabled and whether user is logged in.
@@ -362,7 +377,7 @@ async def auth_logout(request: Request) -> Any:
     return response
 
 
-@router.post("/api/auth/register")
+@router.post("/api/auth/register", response_model=AuthRegisterEnvelope)
 @handle_api_errors("auth register")
 async def auth_register(request: Request, body: RegisterRequest) -> Any:
     """Register a new user (admin only)."""
@@ -415,7 +430,7 @@ async def auth_register(request: Request, body: RegisterRequest) -> Any:
         raise HTTPException(status_code=500, detail="Registration failed")
 
 
-@router.get("/api/auth/users")
+@router.get("/api/auth/users", response_model=AuthUsersEnvelope)
 @handle_api_errors("auth list users")
 async def auth_users(request: Request) -> Any:
     """List all users (admin only)."""
@@ -437,7 +452,7 @@ async def auth_users(request: Request) -> Any:
         raise HTTPException(status_code=500, detail="Failed to list users")
 
 
-@router.delete("/api/auth/users/{username}")
+@router.delete("/api/auth/users/{username}", response_model=AuthMutationEnvelope)
 @handle_api_errors("auth delete user")
 async def auth_delete_user(username: str, request: Request) -> Any:
     """Delete a user (admin only, cannot delete admin)."""
@@ -462,7 +477,7 @@ async def auth_delete_user(username: str, request: Request) -> Any:
         raise HTTPException(status_code=500, detail="Failed to delete user")
 
 
-@router.put("/api/auth/users/{username}")
+@router.put("/api/auth/users/{username}", response_model=AuthMutationEnvelope)
 @handle_api_errors("auth update user")
 async def auth_update_user(username: str, request: Request, body: UpdateUserRequest) -> Any:
     """Update user roles, enabled status, or password (admin only)."""
