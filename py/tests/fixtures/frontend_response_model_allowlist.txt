@@ -8,6 +8,9 @@ GET /api/agent/upgrade
 POST /api/agent/upgrade
 GET /api/alerts
 POST /api/api-keys/{}/revoke
+POST /api/auth/login
+POST /api/auth/logout
+POST /api/auth/refresh
 GET /api/bridge/adapters
 POST /api/bridge/call
 GET /api/bridge/health
@@ -38,6 +41,7 @@ GET /api/evolve/status
 GET /api/graph/edges
 GET /api/graph/neighbors
 GET /api/graph/nodes
+GET /api/graph/stats
 GET /api/health
 DELETE /api/hooks/{}
 POST /api/hooks/{}/disable
@@ -46,6 +50,9 @@ GET /api/hooks/{}/history
 GET /api/info/activity
 GET /api/info/adrs
 GET /api/info/config
+GET /api/info/edition
+POST /api/info/edition
+GET /api/knowledge-graph
 GET /api/live
 GET /api/logs
 GET /api/logs/analysis

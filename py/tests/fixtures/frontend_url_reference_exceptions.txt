@@ -1,0 +1,11 @@
+# /api/ literals the dashboard source contains that no call rule can place.
+#
+# The ratchet's completeness guard reports every ``/api/`` string in the
+# frontend source that rules 1-3 of ``scan_source_dir`` could not attribute to
+# a call. Each one has to be named here with a reason, so a new indirection
+# that the extractor cannot follow becomes a failing test instead of a
+# silently smaller audit surface. Entries are matched by PATH.
+# Format: METHOD PATH # reason
+
+POST /api/chat/stream # SSE: Chat.vue calls the stream() helper from composables/useStreamingFetch.js, so the URL literal and the fetch(url) site live in different files — no same-file rule can join them
+GET /api/prometheus # not a request at all: Observability.vue renders the string as the detail text of a status card

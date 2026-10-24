@@ -39,6 +39,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 棘轮提取器：计算型 URL 从此看得见，清单 75 → 82（2026-10-24）
+
+P1-b 收官后回头清点"门禁到底看见了谁"，实测旧的单条正则
+（`api\.(get|post|put|delete)\(\s*['"\`]<literal>`）**漏掉 15 条路径**：URL 只要
+先存进变量、拼进表达式、或从常量表里取，正则就看不见。其中 3 条是
+`/api/auth/login|logout|refresh` —— 已经跑过两轮"前端在用端点全建模"的批次，
+这三条从没进过清单，也从没被建模。
+
+提取器改为三条规则 + 一条完备性守卫（`py/tests/test_frontend_response_models.py`）：
+
+1. 首参是字符串字面量 ⇒ 该路径、该方法；
+2. 首参是表达式 ⇒ 取表达式里的字面量，外加它开头那个引用的值：同文件的变量
+   赋值（`const url = '/api/x' + qs`）、常量表的成员
+   （`API_ENDPOINTS.AUTH_REFRESH`、`endpoints[key] || '/api/health'`）、同文件
+   助手的实参（`const get = async (url, sink) => api.get(url)`）；
+3. `fetch` / `fetchWithTimeout` / `EventSource` 也算调用点，动词从同一调用里的
+   `method: 'VERB'` 取，默认 GET；
+4. 守卫：前端源码里**每一条** `/api/` 字面量都必须被规则 1–3 归属，否则就要
+   在 `fixtures/frontend_url_reference_exceptions.txt` 里逐条写理由 —— 新的、
+   解析不出来的间接调用会让构建变红，而不是悄悄把审计面缩小。
+
+规则 2 只在**同文件**内解析（跨文件的唯一例子已如实进豁免清单），并且不做
+"整份文件都算"的粗放归属：那会给 `stores/api.js` 这种传输层造出
+`DELETE /api/auth/logout` 这类根本不存在的调用。归属不确定的键只会多出
+`matched` 里落空的组合，方向上是安全的。
+
+新暴露 7 条真 JSON 缺口（auth login/logout/refresh、`/api/info/edition`
+的 GET+POST、`/api/graph/stats`、`/api/knowledge-graph`）⇒ 进烧除清单，
+**上限 75 → 82**：这是明示决定，不是功能 PR 顺手抬高数字；下一批就把它们建模掉。
+
+3 条不是 JSON 的端点进新文件 `fixtures/frontend_non_json_endpoints.txt`
+（SSE 两条流 + 反馈导出是 CSV/附件下载）。清单里每条都要**命中真实路由且确实没有
+模型**，否则测试失败 —— 豁免清单本身也得可证伪，不能变成新的黑洞。
+
+2 条无法归属的字面量进豁免清单：`Chat.vue` 的 `/api/chat/stream`（走
+`useStreamingFetch` 的 `stream()` 助手，字面量与 `fetch(url)` 分处两个文件）、
+`Observability.vue` 的 `/api/prometheus`（是状态卡的展示文本，根本没发请求 ——
+这条正好是"把所有字面量都当调用"的假阳性，如实写明而不是把门禁调窄）。
+
+**验证**：`test_frontend_response_models.py` 5 → 11 条。新增解析器自测（合成
+源码覆盖字面量 / 拼接 / 跨行 / 表成员 / 助手形参 / 裸 fetch 六种形状，外加
+一条"归属不了的必须被报出来"）、13 条曾经看不见的路径逐条点名、
+两条豁免必须在册、非 JSON 豁免必须命中真实未建模路由。
+变异转红：关掉规则 2（4 红，且清单里 6 项被判为 stale —— 证明这 6 项
+**只有**靠规则 2 才看得见）、删一条非 JSON 豁免（1 红）、删一条引用豁免
+（2 红）。三份文件变异后按 SHA256 逐字节还原，临时探针脚本已删除。
+ruff 抓到并修掉一处 `start/end` 形参遮蔽（PLR1704）。
+
 ### agent-catalog 批次：5 条端点建模，Agent 页的四张统计卡永远是 0（2026-10-24）
 
 P1-b 第十五批（收官）：`/api/agent-catalog/*` 前端在用的 5 条端点（列表、
