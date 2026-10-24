@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
+from ..info_schemas import EditionSwitchPayload
 from ..state import MAOP_ROOT
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class EditionSwitchRequest(BaseModel):
     edition: str = Field(min_length=1, description="Target edition: 'personal' or 'enterprise'")
 
 
-@router.post("/edition")
+@router.post("/edition", response_model=EditionSwitchPayload)
 @handle_api_errors
 async def set_edition_endpoint(request: Request, body: EditionSwitchRequest) -> dict[str, Any]:
     """切换运行时 edition（仅 admin）。

@@ -25,6 +25,8 @@ from maop.dashboard.error_handler import handle_api_errors  # 批次3A: 统一�
 from maop.dashboard.routers.mcp_schemas import McpCombinedEnvelope
 from maop.dashboard.services import data_service
 
+from .data_schemas import GraphStatsPayload
+
 # Re-export shared state for backward compatibility (tests / other routers
 # may import ``get_bridge`` / ``MAOP_ROOT`` from this module).
 from .state import MAOP_ROOT, get_bridge  # noqa: F401
@@ -117,9 +119,15 @@ async def api_optimizer(request: Request) -> dict[str, Any]:
 
 # ── Graph ───────────────────────────────────────────────────────────────
 
-@router.get("/api/graph/stats")
-@handle_api_errors("Graph stats", error_value={"nodes": 0, "edges": 0, "status": "error", "error": "Graph stats unavailable"})
+@router.get("/api/graph/stats", response_model=GraphStatsPayload)
+@handle_api_errors("Graph stats")
 async def api_graph_stats(request: Request) -> dict[str, Any]:
+    """Graph node/edge counts and degree stats.
+
+    失败一律 500 ErrorSchema（下面的 except 把服务异常转成 HTTPException，
+    装饰器只会在 HTTPException 分支渲染它）；旧的 error_value 兜底因为
+    永远到不了而被删除——留着会让模型声明一套从不发生的形状。
+    """
     require_admin(request)
     try:
         return await data_service.get_graph_stats()

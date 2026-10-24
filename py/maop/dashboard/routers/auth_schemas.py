@@ -60,3 +60,25 @@ class AuthMutationEnvelope(BaseModel):
 
     status: str = "error"
     message: str = ""
+
+
+class AuthTokenEnvelope(BaseModel):
+    """POST /api/auth/login 与 POST /api/auth/refresh 的成功响应。
+
+    两处生产者逐字相同（``auth.py`` 的 login / refresh 分支），只有 token
+    来源不同。失败路径由 ``handle_api_errors`` 渲染成 ErrorSchema 的
+    JSONResponse，绕过本模型，因此这里不声明 ``error``/``code``。
+    """
+
+    status: str = "error"
+    token: str = ""
+    username: str = ""
+    roles: list[str] = Field(default_factory=list)
+    expires_in: int = 0
+
+
+class AuthLogoutEnvelope(BaseModel):
+    """POST /api/auth/logout 响应。"""
+
+    status: str = "error"
+    message: str = ""

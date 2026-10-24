@@ -21,8 +21,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from maop.core.security.middleware import require_admin as _require_admin
@@ -35,9 +34,11 @@ from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import auth_service
 
 from .auth_schemas import (
+    AuthLogoutEnvelope,
     AuthMutationEnvelope,
     AuthRegisterEnvelope,
     AuthStatusPayload,
+    AuthTokenEnvelope,
     AuthUsersEnvelope,
 )
 from .state import MAOP_ROOT  # noqa: F401
@@ -191,9 +192,9 @@ async def auth_status(request: Request) -> Any:
     }
 
 
-@router.post("/api/auth/login")
+@router.post("/api/auth/login", response_model=AuthTokenEnvelope)
 @handle_api_errors("auth login")
-async def auth_login(request: Request, body: LoginRequest) -> Any:
+async def auth_login(request: Request, body: LoginRequest, response: Response) -> Any:
     """Login with username/password, returns JWT token."""
     # 批次3A: 用 Pydantic LoginRequest 替代 await request.json()，
     # 由 FastAPI 自动校验请求体并返回 422 而非静默 401。
@@ -254,19 +255,21 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
             auth_service.db_clear_login_failures(username, "user")
             auth_service.db_clear_login_failures(client_ip, "ip")  # H6 fix
 
-        # #4 fix: set JWT as httpOnly cookie (XSS-proof) + return token for API clients
-        response = JSONResponse({
-            "status": "ok",
-            "token": token,
-            "username": result["username"],
-            "roles": result["roles"],
-            "expires_in": int(auth_service._JWT_TTL_S),
-        })
+        # #4 fix: JWT 走 httpOnly cookie（XSS-proof），响应体仍回 token 供 API 客户端使用。
+        # 必须返回模型而不是裸 Response——直接返回 Response 对象会绕过
+        # response_model，模型就成了一句没人执行的承诺。cookie 写在注入的
+        # Response 上，由框架合并进最终响应。
         response.set_cookie(
             key="maop_token", value=token, max_age=int(auth_service._JWT_TTL_S),
             httponly=True, secure=auth_service.tls_enabled, samesite="strict", path="/",
         )
-        return response
+        return AuthTokenEnvelope(
+            status="ok",
+            token=token,
+            username=result["username"],
+            roles=result["roles"],
+            expires_in=int(auth_service._JWT_TTL_S),
+        )
     except HTTPException:
         raise
     except Exception as exc:
@@ -278,21 +281,28 @@ async def auth_login(request: Request, body: LoginRequest) -> Any:
         raise HTTPException(status_code=500, detail="Login failed")
 
 
-@router.post("/api/auth/refresh")
+@router.post("/api/auth/refresh", response_model=AuthTokenEnvelope)
 @handle_api_errors("auth refresh")
-async def auth_refresh(request: Request):
+async def auth_refresh(request: Request, response: Response):
     """Refresh an existing JWT token before it expires.
 
-    Requires a valid (non-expired) token in the Authorization header.
+    Requires a valid (non-expired) token in the Authorization header, or the
+    httpOnly ``maop_token`` cookie the dashboard actually sends.
     Returns a new token with the same identity and roles, extended TTL.
     """
     auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        # M6 之后前端不再设置 Authorization，JWT 只存在于 httpOnly cookie。
+        # 中间件早已接受这条路径（core/security/middleware.py），但本端点此前
+        # 只读 header，于是看板的静默续期每次都 401 —— 会话到点必掉。
+        token = request.cookies.get("maop_token", "")
+    if not token:
         raise HTTPException(
             status_code=401,
             detail="Missing or invalid Authorization header",
         )
-    token = auth_header[7:]
     try:
         _sync_auth_state()
         mgr = auth_service.get_auth_mgr()
@@ -310,13 +320,6 @@ async def auth_refresh(request: Request):
             ttl_s=auth_service._JWT_TTL_S,
             tenant_id=getattr(result, "tenant_id", "") or "",
         )
-        response = JSONResponse({
-            "status": "ok",
-            "token": new_token,
-            "username": result.identity,
-            "roles": result.roles or [],
-            "expires_in": int(auth_service._JWT_TTL_S),
-        })
         response.set_cookie(
             key="maop_token", value=new_token, max_age=int(auth_service._JWT_TTL_S),
             httponly=True, secure=auth_service.tls_enabled, samesite="strict", path="/",
@@ -327,7 +330,13 @@ async def auth_refresh(request: Request):
         except Exception as exc:
             # P0-5: 修正 logger.warning 格式，使用 as exc + %s + exc_info=True
             logger.warning('[auth] auth_refresh：吊销旧 token 失败已忽略（best-effort）: %s', exc, exc_info=True)
-        return response
+        return AuthTokenEnvelope(
+            status="ok",
+            token=new_token,
+            username=result.identity,
+            roles=result.roles or [],
+            expires_in=int(auth_service._JWT_TTL_S),
+        )
     except HTTPException:
         raise
     except Exception :
@@ -338,9 +347,9 @@ async def auth_refresh(request: Request):
         )
 
 
-@router.post("/api/auth/logout")
+@router.post("/api/auth/logout", response_model=AuthLogoutEnvelope)
 @handle_api_errors("auth logout")
-async def auth_logout(request: Request) -> Any:
+async def auth_logout(request: Request, response: Response) -> Any:
     """Logout - revoke JWT token server-side (P1 fix).
 
     M6 fix: 支持从 httpOnly cookie 读取 token（前端不再通过 Authorization header 传递）。
@@ -372,9 +381,8 @@ async def auth_logout(request: Request) -> Any:
         except Exception as exc:
             logger.warning("[auth] Failed to revoke token: %s", exc)
     # M6 fix: 清除 httpOnly cookie，确保前端登录态完全清除。
-    response = JSONResponse({"status": "ok", "message": "Token revoked."})
     response.delete_cookie(key="maop_token", path="/")
-    return response
+    return AuthLogoutEnvelope(status="ok", message="Token revoked.")
 
 
 @router.post("/api/auth/register", response_model=AuthRegisterEnvelope)

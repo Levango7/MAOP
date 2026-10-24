@@ -21,6 +21,8 @@ from fastapi.responses import JSONResponse  # noqa: F401
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 
+from ..info_schemas import EditionInfoPayload
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/info", tags=["info"])
@@ -378,7 +380,7 @@ async def get_architecture(request: Request) -> dict[str, Any]:
     return ARCHITECTURE
 
 
-@router.get("/edition")
+@router.get("/edition", response_model=EditionInfoPayload)
 @handle_api_errors
 async def get_edition(request: Request) -> dict[str, Any]:
     """Return current edition info, feature flags, backends, and degradations."""
