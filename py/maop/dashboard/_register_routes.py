@@ -161,12 +161,14 @@ def _register_core_routers(app: FastAPI) -> None:
         memory,
         model,
         runs,
+        share,
         system,
     )
 
     app.include_router(data.router)
     app.include_router(control.router)
     app.include_router(runs.router)
+    app.include_router(share.router)
     app.include_router(model.router)
     # F2-01 first: evolution_experiment owns the static /api/evolution/ab/list,
     # while evolve_insights owns /api/evolution/ab/{cycle_id}. Starlette picks
