@@ -205,9 +205,26 @@
         <RunTimeline :events="runDrawer.run.events" :tone-fn="statusTone" />
       </div>
       <p v-else class="muted">{{ runDrawer.error || t('view.control.runTimelineEmpty') }}</p>
+
+      <!-- 分享结果：链接由后端生成，这里只负责展示与复制 -->
+      <div v-if="shareLink" class="run-share">
+        <p class="run-share__label">{{ t('view.control.shareCreated') }}</p>
+        <div class="run-share__row">
+          <input class="run-share__input" :value="shareLink" readonly @focus="$event.target.select()" />
+          <button class="act-btn small" @click="copyShareLink">
+            {{ t('view.control.shareCopy') }}
+          </button>
+        </div>
+        <p class="run-share__hint muted">{{ t('view.control.shareHint') }}</p>
+      </div>
+      <p v-if="shareError" class="run-share__error">{{ shareError }}</p>
+
       <template #footer>
         <button class="act-btn small" :disabled="runDrawer.loading" @click="loadRun(runDrawer.traceId)">
           <AppIcon name="refresh" :size="12" /> {{ t('common.refresh') }}
+        </button>
+        <button class="act-btn small" :disabled="sharing || !runDrawer.run" @click="shareRun">
+          <AppIcon name="external-link" :size="12" /> {{ t('view.control.shareRun') }}
         </button>
       </template>
     </DetailDrawer>
@@ -248,6 +265,10 @@ const upgradeLoading = ref(false);
 const lastJobId = ref('');
 const jobDrawer = reactive({ open: false, id: '', loading: false, job: null });
 const runDrawer = reactive({ open: false, traceId: '', loading: false, run: null, error: '' });
+// 分享状态与抽屉解耦：换一个 run 就清空，避免把 A 的链接显示在 B 上。
+const sharing = ref(false);
+const shareLink = ref('');
+const shareError = ref('');
 const runTimeline = ref([]);
 const runs = ref([]);
 const runsLoading = ref(false);
@@ -383,8 +404,41 @@ function openRun(traceId) {
   runDrawer.open = true;
   runDrawer.run = null;
   runDrawer.error = '';
+  shareLink.value = '';
+  shareError.value = '';
   jobDrawer.open = false; // 一次只开一个抽屉
   loadRun(traceId);
+}
+
+// 创建分享链接。后端只返回摘要型分享（不含 events），所以这里拿到的链接
+// 本身就是"可公开"的；默认 168 小时（一周）过期，避免链接永久存活。
+async function shareRun() {
+  if (!runDrawer.traceId || sharing.value) return;
+  sharing.value = true;
+  shareError.value = '';
+  shareLink.value = '';
+  try {
+    const data = await api.post('/api/share', {
+      trace_id: runDrawer.traceId,
+      expires_in_hours: 168,
+    });
+    shareLink.value = `${window.location.origin}/share/${data.token}`;
+  } catch {
+    shareError.value = t('view.control.shareFailed');
+  } finally {
+    sharing.value = false;
+  }
+}
+
+async function copyShareLink() {
+  if (!shareLink.value) return;
+  try {
+    await navigator.clipboard.writeText(shareLink.value);
+    toast.success(t('view.control.shareCopied'));
+  } catch {
+    // 剪贴板在非 HTTPS / 无权限时不可用：输入框已全选，用户可手动复制。
+    toast.warn(t('view.control.shareCopyFailed'));
+  }
 }
 
 async function loadRun(traceId) {
@@ -618,6 +672,29 @@ onMounted(refreshAll);
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ── 分享链接 ─────────────────────────────────────────────── */
+.run-share {
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--bg);
+}
+.run-share__label { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); font-weight: 600; }
+.run-share__row { display: flex; gap: var(--sp-2); }
+.run-share__input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs);
+}
+.run-share__hint { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); }
+.run-share__error { color: var(--danger, #dc2626); font-size: var(--fs-sm); margin-top: var(--sp-2); }
 </style>
 
 
