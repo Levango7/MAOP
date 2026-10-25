@@ -26,8 +26,8 @@ does require admin.
 from __future__ import annotations
 
 import secrets
-import sqlite3
 import time
+from contextlib import contextmanager
 from typing import Any
 
 __all__ = ["create_share", "get_share", "list_shares", "revoke_share"]
@@ -44,14 +44,15 @@ CREATE TABLE IF NOT EXISTS run_shares (
 """
 
 
-def _connect() -> sqlite3.Connection:
-    from maop.core.backends.db_utils import get_db_path
+@contextmanager
+def _connect():
+    """Context manager: sqlite_connect with schema ensured."""
+    from maop.core.backends.db_utils import get_db_path, sqlite_connect
 
     db_path = get_db_path("run_shares")
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
-    conn.execute(_SCHEMA)
-    return conn
+    with sqlite_connect(db_path) as conn:
+        conn.execute(_SCHEMA)
+        yield conn
 
 
 def create_share(
