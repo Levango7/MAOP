@@ -338,9 +338,10 @@ def create_ingest_queue(
 ) -> Any:
     """Factory: return the appropriate ingest queue based on env config.
 
-    Reads ``MAOP_MULTIMODAL_INGEST_MODE``:
-    - ``inprocess`` (default): :class:`MultimodalIngestQueue` (in-memory queue)
-    - ``crossprocess``: :class:`CrossProcessIngestQueue` (MessageQueue transport)
+    Reads multimodal ingest settings from ``maop.config.settings.get_settings()``:
+    - ``multimodal_ingest_mode``: ``inprocess`` (default) or ``crossprocess``
+    - ``multimodal_ingest_topic``: crossprocess topic name
+    - ``multimodal_ingest_consumer_group``: crossprocess consumer group
 
     Parameters
     ----------
@@ -354,18 +355,19 @@ def create_ingest_queue(
     consumer_group : str
         Override consumer group (crossprocess mode only).
     """
-    import os
+    from maop.config.settings import get_settings
 
-    mode = os.environ.get("MAOP_MULTIMODAL_INGEST_MODE", "inprocess").strip().lower()
+    s = get_settings()
+    mode = (s.multimodal_ingest_mode or "inprocess").strip().lower()
     if mode == "crossprocess":
         if mq is None:
             mq = MessageQueue()
         return CrossProcessIngestQueue(
             backend,
             mq,
-            topic=topic or os.environ.get("MAOP_MULTIMODAL_INGEST_TOPIC", DEFAULT_TOPIC),
+            topic=topic or s.multimodal_ingest_topic or DEFAULT_TOPIC,
             consumer_group=consumer_group
-            or os.environ.get("MAOP_MULTIMODAL_INGEST_CONSUMER_GROUP", DEFAULT_CONSUMER_GROUP),
+            or s.multimodal_ingest_consumer_group or DEFAULT_CONSUMER_GROUP,
             batch_size=batch_size,
             flush_interval_s=flush_interval_s,
         )

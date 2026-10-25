@@ -214,6 +214,22 @@ class MAOPSettings(BaseSettings):
                     "(env: MAOP_MULTIMODAL_AUTO_INDEX; empty = auto: on only when "
                     "the resolved provider is semantic; '1' = force on; '0' = force off)",
     )
+    # M2.2 B2 PR-4 (T1.6): 多模态摄入队列模式与跨进程配置。
+    multimodal_ingest_mode: str = Field(
+        default="",
+        description="Multimodal ingest queue mode (env: MAOP_MULTIMODAL_INGEST_MODE; "
+                    "empty = inprocess; 'crossprocess' = use MessageQueue transport)",
+    )
+    multimodal_ingest_topic: str = Field(
+        default="",
+        description="Crossprocess ingest queue topic name "
+                    "(env: MAOP_MULTIMODAL_INGEST_TOPIC; empty = multimodal_ingest)",
+    )
+    multimodal_ingest_consumer_group: str = Field(
+        default="",
+        description="Crossprocess ingest queue consumer group "
+                    "(env: MAOP_MULTIMODAL_INGEST_CONSUMER_GROUP; empty = multimodal_ingest_worker)",
+    )
     # Multi-worker deployments set this to 0 (server.py main() does it
     # automatically when workers>1). The multimodal ingest queue is per-process,
     # so with N workers each would load its own CLIP copy and writes would

@@ -183,32 +183,43 @@ def test_pending_reflects_queue_depth(mq: MessageQueue):
 # ── factory ─────────────────────────────────────────────────
 
 
-def test_factory_defaults_to_inprocess(tmp_path, monkeypatch):
-    """Default mode is in-process (no env override)."""
-    monkeypatch.delenv("MAOP_MULTIMODAL_INGEST_MODE", raising=False)
+def test_factory_defaults_to_inprocess(tmp_path):
+    """Default mode is in-process (no settings override)."""
+    from maop.config.settings import get_settings
+    s = get_settings()
+    # Ensure no override
+    s.multimodal_ingest_mode = ""
     be = _Recorder()
     q = create_ingest_queue(be)
-    assert q.stats()["mode"] != "crossprocess"  # it's in-process
+    assert q.stats()["mode"] == "inprocess"
 
 
-def test_factory_crossprocess_mode(tmp_path, monkeypatch):
-    monkeypatch.setenv("MAOP_MULTIMODAL_INGEST_MODE", "crossprocess")
+def test_factory_crossprocess_mode(tmp_path):
+    from maop.config.settings import get_settings
+    s = get_settings()
+    s.multimodal_ingest_mode = "crossprocess"
     be = _Recorder()
     mq = MessageQueue(db_path=str(tmp_path / "factory.db"))
     q = create_ingest_queue(be, mq=mq)
     assert q.stats()["mode"] == "crossprocess"
 
 
-def test_factory_crossprocess_custom_topic(tmp_path, monkeypatch):
-    monkeypatch.setenv("MAOP_MULTIMODAL_INGEST_MODE", "crossprocess")
-    monkeypatch.setenv("MAOP_MULTIMODAL_INGEST_TOPIC", "custom_topic")
-    monkeypatch.setenv("MAOP_MULTIMODAL_INGEST_CONSUMER_GROUP", "custom_group")
+def test_factory_crossprocess_custom_topic(tmp_path):
+    from maop.config.settings import get_settings
+    s = get_settings()
+    s.multimodal_ingest_mode = "crossprocess"
+    s.multimodal_ingest_topic = "custom_topic"
+    s.multimodal_ingest_consumer_group = "custom_group"
     be = _Recorder()
     mq = MessageQueue(db_path=str(tmp_path / "factory2.db"))
     q = create_ingest_queue(be, mq=mq)
-    s = q.stats()
-    assert s["topic"] == "custom_topic"
-    assert s["consumer_group"] == "custom_group"
+    stats = q.stats()
+    assert stats["topic"] == "custom_topic"
+    assert stats["consumer_group"] == "custom_group"
+    # Cleanup
+    s.multimodal_ingest_mode = ""
+    s.multimodal_ingest_topic = ""
+    s.multimodal_ingest_consumer_group = ""
 
 
 # ── cross-process isolation ─────────────────────────────────
