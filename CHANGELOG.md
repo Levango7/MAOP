@@ -71,6 +71,34 @@ tenant / rbac / sso / quotas / n8n / licenses / compliance 七个 router ——
 matched 下限、5 条条目变陈旧），即"某个 router 悄悄没装上"不可能蒙混过关。
 变异后按 SHA256 逐字节还原，`rbac.py` 用 `git checkout --` 复原，临时探针脚本已删。
 
+**纠正（2026-10-25，PR #152 的 CI 首跑）**：上面「27 条门禁测试全绿」是在**本机**测的，
+本机 editable 装着 MAOS。7 条 pytest 腿上有 3 条红：`sso` / `n8n` / `licenses` 在**模块级**
+就 `from maop.enterprise...` 导入，而企业包在 ADR-017 的第二个私有仓库里，纯净 CI 根本
+import 不到 —— 这条门禁「本机绿、CI 红」的原因不是测试不稳定，是我用「能否 import」当成了
+「能否审计」。修法：
+
+- 三个 import 不动企业包的 router 继续走 app 实测；`sso`/`n8n`/`licenses` 改用
+  `static_route_map()` 从源码读装饰器（路由路径非字面量直接抛错，不猜），
+  `enterprise_route_map()` 把两种视图合并。
+- 新增 `test_the_source_view_matches_the_imported_view`：凡本环境能 import 的 router，
+  **源码视图必须与 app 视图逐键一致**（路由集合 + typed 判定）。本机 7 个全比，
+  纯净 CI 比 4 个 —— 扫描器不能悄悄和 FastAPI 真实挂载不一致。
+- 新增 `test_only_three_routers_need_the_commercial_overlay`：用子进程屏蔽企业包后逐个
+  import，实测谁缺的就是这三个；哪天某个 router 去掉/加上模块级导入，这条会红。
+- `maop.enterprise` 这个字样**必须不出现在测试文件名内容里**：`tests/conftest.py` 会把
+  含该字样的 `test_*.py` 在无企业包环境下整片不收集，一上 CI 就变成「全绿但从未运行」。
+  名字只留在非测试模块 `dashboard_app_profiles.OVERLAY_IMPORT`，并由
+  `test_the_gate_file_stays_collectible` 反向看护。
+- 顺带实测同一条规则的代价：**36 个测试文件在纯净 CI 里被跳过**，其中包括
+  `test_frontend_response_models.py` —— 也就是 P1-b 的个人版棘轮此前只在开发机上生效过，
+  CI 从未跑过它。这条留给后续单独一批处理。
+
+**验证**：本机 7 条全绿；屏蔽企业包仿真纯净 CI 同样 7 条全绿（源码视图兜底生效）。
+变异转红 4 项并按 SHA256 逐字节还原：去掉源码兜底（纯净 CI 仿真下挂载自证红）、
+扫描器把一切都判成 typed（双视图对账红）、把企业包字样写回测试文件（可收集性守卫红）、
+把 `tenant` 误列入需要企业包（探针实测红）。ruff 全绿。
+
+
 ### 多租户看板读取端点的越权缺口：只读角色可枚举全部租户（2026-10-24）
 
 `/api/tenant-blackboard/*` 是跨租户管理面。实测（真守卫，非 mock）：
