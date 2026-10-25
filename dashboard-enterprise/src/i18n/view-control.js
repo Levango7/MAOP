@@ -16,6 +16,16 @@ export const messages = {
     'view.control.jobLoadFailed': 'Failed to load job details',
     'view.control.runTimeline': 'Run timeline',
     'view.control.runTimelineEmpty': 'No timeline recorded for this run.',
+
+    // ── Share ─────────────────────────────────────────────────────
+    'view.control.shareRun': 'Share',
+    'view.control.shareCreated': 'Share link created (expires in 7 days):',
+    'view.control.shareCopy': 'Copy',
+    'view.control.shareCopied': 'Link copied.',
+    'view.control.shareCopyFailed': 'Copy failed — the field is selected, copy it manually.',
+    'view.control.shareFailed': 'Failed to create a share link.',
+    'view.control.shareHint':
+      'Anyone with this link can read the run summary — no agent output or logs are included.',
     'view.control.runHistory': 'Run History',
     'view.control.runHistoryDesc': 'Every recorded run, including tasks started from the command line.',
     'view.control.viewRun': 'View run',
@@ -95,6 +105,15 @@ export const messages = {
     'view.control.jobLoadFailed': '加载任务详情失败',
     'view.control.runTimeline': '运行时间线',
     'view.control.runTimelineEmpty': '这次运行没有留下时间线记录。',
+
+    // ── 分享 ──────────────────────────────────────────────────────
+    'view.control.shareRun': '分享',
+    'view.control.shareCreated': '分享链接已创建（7 天后过期）：',
+    'view.control.shareCopy': '复制',
+    'view.control.shareCopied': '链接已复制。',
+    'view.control.shareCopyFailed': '复制失败 —— 输入框已全选，请手动复制。',
+    'view.control.shareFailed': '创建分享链接失败。',
+    'view.control.shareHint': '任何拿到此链接的人都能查看运行摘要 —— 不含 Agent 输出与日志。',
     'view.control.runHistory': '运行记录',
     'view.control.runHistoryDesc': '包含全部被记账的运行，命令行发起的也在内。',
     'view.control.viewRun': '查看运行',

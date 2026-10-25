@@ -204,6 +204,10 @@ function isActive(item) {
 // overlay immediately with a "Sign In" title — don't wait for 401 errors
 // to trickle in and flash empty pages at the user.
 function showLoginIfRequired() {
+  // 公开分享页不需要登录：token 本身就是授权。若这里也弹登录窗，
+  // 收链接的人根本看不到内容，分享功能等于不存在。
+  if (route.path.startsWith('/share/')) return false;
+
   // 一号用户实测修复（2026-08-31 循环最后主因）：M6 改版后 authToken() 恒
   // 空（token 由 httpOnly cookie 承载，前端不可读）——用它判断登录态等于
   // 永远未登录，每次加载必弹窗。改用 isLoggedIn()（按 user 存在性判断）。

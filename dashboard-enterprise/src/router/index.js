@@ -80,6 +80,10 @@ const routes = [
   { path: '/docs', name: 'docs', component: () => import('../views/Docs.vue') },
 
   // ═══ 旧路径 301 重定向（书签/深链/外部链接兼容，零断链）═══
+  // 公开分享页：不需要登录（App.vue 对 /share/* 不弹登录窗）。
+  // token 本身就是凭证，页面上只有只读摘要。
+  { path: '/share/:token', name: 'share', component: () => import('../views/ShareView.vue') },
+
   { path: '/', redirect: '/home' },
   { path: '/control', redirect: { path: '/run', query: { tab: 'structured' } } },
   { path: '/chat', redirect: { path: '/run', query: { tab: 'chat' } } },

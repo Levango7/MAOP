@@ -21,6 +21,11 @@ describe('ControlPanel.vue', () => {
     originalFetch = global.fetch;
     global.__VITEST__ = true;
     if (typeof window !== 'undefined') window.__VITEST__ = true;
+    // 固定语言：分享按钮的文案断言依赖它（"Share" vs "分享"）。
+    localStorage.setItem('maop_locale', 'en');
+    // DetailDrawer 用 <Teleport to="body">：抽屉内容不在 wrapper 里，
+    // 必须查 document.body；同时清掉上一个用例残留的 teleport 节点。
+    document.body.replaceChildren();
   });
 
   afterEach(() => {
@@ -260,6 +265,80 @@ describe('ControlPanel.vue', () => {
     });
     const wrapper = await mountControlPanel();
     expect(wrapper.find('.control-panel').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  // ── 分享 ──────────────────────────────────────────────────────
+  // 分享按钮调的是 POST /api/share，返回的 token 拼成完整链接给用户复制。
+  // 这里断言两件事：确实发起了创建请求，且链接真的渲染出来 —— 只测前者会
+  // 漏掉"链接拼错/没显示"这种功能看似成功实则不可用的情况。
+
+  function shareRoutes() {
+    return defaultRoutes({
+      '/api/runs?limit=20': {
+        status: 'ok',
+        data: { items: [{ trace_id: 'tr1', steps: 2, duration_ms: 100 }], total: 1 },
+      },
+      '/api/runs/tr1': {
+        status: 'ok',
+        data: { summary: { trace_id: 'tr1' }, events: [], decisions: [] },
+      },
+      '/api/share': { status: 'ok', token: 'tok-abc' },
+    });
+  }
+
+  // DetailDrawer 用 <Teleport to="body">，抽屉内容不在 wrapper 树里，
+  // 必须从 document.body 查询 —— 与 AgentRegistry 等套件的做法一致。
+  function bodyButtons() {
+    return Array.from(document.body.querySelectorAll('button'));
+  }
+
+  function bodyText() {
+    return document.body.textContent || '';
+  }
+
+  it('creates a share link and renders it in the drawer', async () => {
+    mockFetch(shareRoutes());
+    const wrapper = await mountControlPanel();
+
+    // 打开 run 抽屉
+    await wrapper.find('.row-item button').trigger('click');
+    await flushPromises();
+
+    const shareBtn = bodyButtons().find((b) => b.textContent.includes('Share'));
+    expect(shareBtn).toBeTruthy();
+    shareBtn.click();
+    await flushPromises();
+
+    const posted = global.fetch.mock.calls.some(
+      ([url, init]) => String(url) === '/api/share' && (init?.method || 'GET').toUpperCase() === 'POST',
+    );
+    expect(posted).toBe(true);
+
+    const input = document.body.querySelector('.run-share__input');
+    expect(input).toBeTruthy();
+    expect(input.value).toContain('/share/tok-abc');
+    wrapper.unmount();
+  });
+
+  it('shows an error when share creation fails', async () => {
+    global.fetch = vi.fn((url) => {
+      const u = String(url);
+      if (u === '/api/share') {
+        return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}), text: () => Promise.resolve('') });
+      }
+      const body = shareRoutes()[u] ?? {};
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body), text: () => Promise.resolve(JSON.stringify(body)) });
+    });
+    const wrapper = await mountControlPanel();
+
+    await wrapper.find('.row-item button').trigger('click');
+    await flushPromises();
+    bodyButtons().find((b) => b.textContent.includes('Share')).click();
+    await flushPromises();
+
+    expect(bodyText()).toContain('Failed to create a share link');
+    expect(document.body.querySelector('.run-share__input')).toBeNull();
     wrapper.unmount();
   });
 });
