@@ -1,10 +1,12 @@
 """HTTP contracts for the auth / user-management endpoints the console calls.
 
-Five allowlist entries are burned here: ``POST /api/auth/register``,
-``GET /api/auth/status``, ``GET /api/auth/users``, ``DELETE`` and ``PUT`` on
+Eight allowlist entries are burned here: ``POST /api/auth/login``,
+``POST /api/auth/refresh``, ``POST /api/auth/logout``,
+``POST /api/auth/register``, ``GET /api/auth/status``,
+``GET /api/auth/users``, ``DELETE`` and ``PUT`` on
 ``/api/auth/users/{username}``.
 
-Two producer facts this file exists to pin:
+Producer facts this file exists to pin:
 
 1. ``GET /api/auth/status`` has **no** ``status`` key. App/Agents/Chat/Settings
    read only ``auth_enabled`` / ``has_token``; adding an envelope field would
@@ -12,6 +14,9 @@ Two producer facts this file exists to pin:
 2. ``users.created_at`` is epoch **seconds** (``time.time()`` into a ``REAL``
    column). ``Users.vue`` multiplies by 1000; a milliseconds change would make
    every row render as 1970.
+3. ``/api/auth/refresh`` must accept the httpOnly cookie: the M6 dashboard never
+   sets an ``Authorization`` header (``stores/api.js`` has no token to send), so
+   a header-only refresh is dead in production.
 
 The row shape is asserted against ``auth_service.db_list_users()`` over the
 per-test isolated SQLite file (``conftest`` points ``MAOP_DATA_DIR`` at a tmp
@@ -20,6 +25,7 @@ dir), never against a hand-written mock.
 
 from __future__ import annotations
 
+import inspect
 import re
 import time
 from pathlib import Path
@@ -32,14 +38,19 @@ from fastapi.testclient import TestClient
 from maop.core.backends.db_utils import get_db_path
 from maop.dashboard.routers import auth as auth_router
 from maop.dashboard.routers.auth_schemas import (
+    AuthLogoutEnvelope,
     AuthMutationEnvelope,
     AuthRegisterEnvelope,
     AuthStatusPayload,
+    AuthTokenEnvelope,
     AuthUsersEnvelope,
 )
 from maop.dashboard.services import auth_service
 
 CONTRACT_ROUTES: list[tuple[str, str]] = [
+    ("POST", "/api/auth/login"),
+    ("POST", "/api/auth/logout"),
+    ("POST", "/api/auth/refresh"),
     ("POST", "/api/auth/register"),
     ("GET", "/api/auth/status"),
     ("GET", "/api/auth/users"),
@@ -214,6 +225,106 @@ def test_the_delete_confirms_what_it_removed(client) -> None:
     assert "bob" not in {u["username"] for u in _users(client)}
 
 
+# ── login / refresh / logout ──────────────────────────────────────
+
+
+def _login(client: TestClient, username: str = "bob", password: str = "secret123"):
+    return client.post("/api/auth/login", json={"username": username, "password": password})
+
+
+def test_login_returns_the_token_envelope_and_sets_the_cookie(client) -> None:
+    _register(client)
+    resp = _login(client)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert set(body) == {"status", "token", "username", "roles", "expires_in"}, body
+    assert body["status"] == "ok"
+    assert body["username"] == "bob"
+    assert body["roles"] == ["read"]
+    assert body["expires_in"] == int(auth_service._JWT_TTL_S)
+    assert isinstance(body["token"], str) and body["token"]
+
+    cookie = resp.headers["set-cookie"]
+    assert "maop_token=" in cookie
+    assert "HttpOnly" in cookie
+    assert "SameSite=strict" in cookie
+    assert "Path=/" in cookie
+
+
+def test_login_failure_is_the_error_schema(client) -> None:
+    _register(client)
+    resp = _login(client, password="wrong-password")
+    assert resp.status_code == 401, resp.text
+    body = resp.json()
+    assert set(body) == {"status", "error", "code", "detail", "request_id"}, body
+    assert body["status"] == "error"
+    assert body["code"] == "HTTP_401"
+    assert body["error"]
+
+
+def test_refresh_accepts_the_cookie_the_dashboard_actually_sends(client) -> None:
+    """M6: the view has no token to put in an Authorization header, so the
+    cookie path is the only one production can take."""
+    _register(client)
+    old = _login(client).json()["token"]
+    resp = client.post("/api/auth/refresh")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert set(body) == {"status", "token", "username", "roles", "expires_in"}, body
+    assert body["status"] == "ok"
+    assert body["token"] != old
+    assert "maop_token=" in resp.headers["set-cookie"]
+
+    handler = auth_service.get_auth_mgr().jwt_handler
+    assert handler.validate_token(old).authenticated is False
+    assert handler.validate_token(body["token"]).authenticated is True
+
+
+def test_refresh_still_accepts_the_authorization_header() -> None:
+    admin = _make_app()
+    _register(admin)
+    token = _login(admin).json()["token"]
+    # A separate client has no cookie jar, so only the header can authenticate.
+    header_only = _make_app()
+    resp = header_only.post(
+        "/api/auth/refresh",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "ok"
+
+
+def test_refresh_without_a_credential_is_401(client) -> None:
+    resp = client.post("/api/auth/refresh")
+    assert resp.status_code == 401, resp.text
+    assert resp.json()["status"] == "error"
+
+
+def test_logout_revokes_the_cookie_token_and_clears_it(client) -> None:
+    _register(client)
+    token = _login(client).json()["token"]
+    resp = client.post("/api/auth/logout")
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"status": "ok", "message": "Token revoked."}
+    cookie = resp.headers["set-cookie"]
+    assert "maop_token=" in cookie
+    assert "Max-Age=0" in cookie
+    assert auth_service.get_auth_mgr().jwt_handler.validate_token(token).authenticated is False
+
+
+def test_the_token_endpoints_return_models_instead_of_raw_responses() -> None:
+    """A ``JSONResponse`` return would bypass ``response_model`` — the model
+    would be declared in OpenAPI and never executed."""
+    for fn, model in (
+        (auth_router.auth_login, "AuthTokenEnvelope"),
+        (auth_router.auth_refresh, "AuthTokenEnvelope"),
+        (auth_router.auth_logout, "AuthLogoutEnvelope"),
+    ):
+        source = inspect.getsource(fn)
+        assert "JSONResponse" not in source, fn.__name__
+        assert f"return {model}(" in source, fn.__name__
+
+
 # ── request shapes ────────────────────────────────────────────────
 
 
@@ -295,10 +406,18 @@ def test_errors_bypass_the_envelope_and_keep_their_status(client) -> None:
 
 def test_envelope_defaults_are_the_error_branch_defaults() -> None:
     """A missing ``status`` must not default to ``"ok"``."""
-    for model in (AuthRegisterEnvelope, AuthUsersEnvelope, AuthMutationEnvelope):
+    for model in (
+        AuthRegisterEnvelope,
+        AuthUsersEnvelope,
+        AuthMutationEnvelope,
+        AuthTokenEnvelope,
+        AuthLogoutEnvelope,
+    ):
         assert model.model_fields["status"].default == "error", model.__name__
     assert AuthMutationEnvelope.model_fields["message"].default == ""
     assert AuthRegisterEnvelope.model_fields["username"].default == ""
+    assert AuthTokenEnvelope.model_fields["token"].default == ""
+    assert AuthTokenEnvelope.model_fields["expires_in"].default == 0
     # The status payload deliberately has no error-envelope fields at all.
     assert "status" not in AuthStatusPayload.model_fields
     assert "error" not in AuthStatusPayload.model_fields

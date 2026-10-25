@@ -39,6 +39,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 剩余 7 条前端端点建模：静默续期从未成功过（2026-10-25）
+
+棘轮提取器学会看计算型 URL 之后新暴露的 7 条端点全部声明 `response_model`，
+个人版清单 82 → 75（P1-b 全程 113 → 75）。
+
+- **auth 三条** —— 新增 `AuthTokenEnvelope` / `AuthLogoutEnvelope`。login /
+  refresh / logout 原来直接 `return JSONResponse(...)`：FastAPI 对直接返回的
+  Response **不做 response_model 校验**，只加装饰器会得到一个"OpenAPI 里有、
+  执行时从不运行"的模型。改为返回模型、cookie 写到注入的 `Response` 上，
+  响应键集逐字不变。
+- **修掉一个真缺陷**：`POST /api/auth/refresh` 只读 `Authorization: Bearer`，
+  而 M6 之后看板根本不发这个头（`getAuthToken()` 恒返回空串，`withAuth()`
+  不设 Authorization），JWT 只存在于 httpOnly cookie。中间件早已接受 cookie
+  （`core/security/middleware.py:283`），但路由层看不到 —— 于是静默续期每次
+  401，会话到 7200 秒必掉登录。refresh 改为 header 优先、cookie 回退（与
+  logout 同一取法）；现有测试只覆盖 header 路径，所以这个洞一直是全绿的。
+- **`GET/POST /api/info/edition`** —— 新增 `EditionInfoPayload` /
+  `EditionSwitchPayload`；GET 的 5 个键（含视图不读的 `enterprise_available`）
+  与 `edition_info()` 逐字对齐，400/403 仍走 ErrorSchema 并保留状态码。
+- **`GET /api/graph/stats`** —— 新增 `GraphStatsPayload`，恰好四个键。原
+  `error_value` 是**不可达代码**：路由把服务异常转成 `HTTPException`，装饰器
+  先走 HTTPException 分支渲染 ErrorSchema，兜底永远轮不到。保留它会让模型
+  声明一套从不发生的形状，故删除；失败路径固定为 500 ErrorSchema。
+  （空图时 `avg_degree` 由整数 `0` 归一成 `0.0`，语义不变。）
+- **`GET /api/knowledge-graph`** —— `KnowledgeGraphPayload` 嵌套复用生产者的
+  `GraphNodeV2` / `GraphEdgeV2`，`stats` 与响应自身逐条自洽。
+
+**验证**：新增 3 个契约文件，44 条针对性命中（auth 23 / info 8 /
+graph+knowledge 13）；棘轮 + auth/smoke/router 套件 530 passed。变异转红 6 项：
+refresh 去掉 cookie 回退、login 去掉 `response_model`、login 改回裸 Response、
+graph 模型补 `status/error`、edition 模型删 `enterprise_available`、knowledge
+模型删 `stats` —— 全部按 SHA256 逐字节还原。ruff / mypy / api-contract /
+config-drift / doc-reconcile / docs-consistency --gate / silent-exceptions /
+file-size / wiring 全绿。
+
 ### 企业版 profile 的同款 response_model 棘轮：31 条端点此前无人看守（2026-10-24）
 
 P1-b 的清单只按**个人版 app** 求交：`_register_routes._register_enterprise_routers`

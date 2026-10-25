@@ -65,7 +65,7 @@ URL_EXCEPTIONS = FIXTURES / "frontend_url_reference_exceptions.txt"
 # follow computed URLs and found seven endpoints two earlier "model every
 # frontend endpoint" batches had walked past (three auth, two edition, graph
 # stats, knowledge-graph). They are burned down next.
-RATCHET_CAP = 82
+RATCHET_CAP = 75
 
 _QUOTES = {"`": "`", "'": "'", '"': '"'}
 _CALL_HEAD_RE = re.compile(

@@ -25,6 +25,8 @@ from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import knowledge_service
 
+from .knowledge_schemas import KnowledgeGraphPayload
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
@@ -171,7 +173,7 @@ async def vector_index(request: Request) -> dict[str, Any]:
 kg_router = APIRouter(prefix="/api/knowledge-graph", tags=["knowledge-graph"])
 
 
-@kg_router.get("")
+@kg_router.get("", response_model=KnowledgeGraphPayload)
 @handle_api_errors("knowledge graph v2")
 async def get_knowledge_graph_v2(
     request: Request,
