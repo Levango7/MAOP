@@ -234,4 +234,5 @@ class MultimodalIngestQueue:
             "pending": self.pending,
             "batch_size": self._batch_size,
             "flush_interval_s": self._flush_interval_s,
+            "mode": "inprocess",
         }
