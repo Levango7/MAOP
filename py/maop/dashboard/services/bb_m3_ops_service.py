@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 _health_monitor = BlackboardHealthMonitor()
 _health_probes = HealthProbes()
 _active_controllers: dict[str, BlackboardConvergenceController] = {}
+_solve_tasks: dict[str, asyncio.Task[None]] = {}
 
 
 # ── WebSocket event helpers ──────────────────────────────────────────
@@ -262,7 +263,10 @@ async def start_convergence_solve(
                 "error": str(exc),
             })
 
-    asyncio.create_task(_run())
+    task = asyncio.create_task(_run())
+    _active_controllers[sid] = ctrl
+    _solve_tasks[sid] = task
+    task.add_done_callback(lambda t: _solve_tasks.pop(sid, None))
     return {"solve_id": sid, "status": "started"}
 
 
