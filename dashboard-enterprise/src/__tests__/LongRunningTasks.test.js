@@ -25,12 +25,42 @@ import LongRunningTasks from '../views/LongRunningTasks.vue';
  *   2. Cancel must be disabled for terminal states — the backend answers 409
  *      for those, so an enabled button would be a guaranteed error.
  */
+// jsdom 没有 EventSource，自己实现一个最小替身：
+// 记录每个实例、可手动 emit、可断言 close 是否被调用。
+class FakeEventSource {
+  static instances = [];
+
+  constructor(url) {
+    this.url = url;
+    this.closed = false;
+    this.listeners = {};
+    this.onerror = null;
+    FakeEventSource.instances.push(this);
+  }
+
+  addEventListener(type, fn) {
+    (this.listeners[type] ||= []).push(fn);
+  }
+
+  emit(type, payload) {
+    for (const fn of this.listeners[type] || []) {
+      fn({ data: JSON.stringify(payload) });
+    }
+  }
+
+  close() {
+    this.closed = true;
+  }
+}
+
 describe('LongRunningTasks.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     localStorage.setItem('maop_locale', 'en');
     mockGet.mockReset();
     mockPost.mockReset();
+    FakeEventSource.instances = [];
+    global.EventSource = FakeEventSource;
   });
 
   const TASKS = [
@@ -129,5 +159,72 @@ describe('LongRunningTasks.vue', () => {
     const wrapper = mountView();
     await flushPromises();
     expect(wrapper.text()).toContain('Failed to load tasks');
+  });
+
+  // ── SSE 实时进度 ──────────────────────────────────────────────
+  // 三条必须守住的规则（每条写错都会造成连接泄漏或无限重连）：
+  //   1. 只为 pending/running 建流；
+  //   2. done 后必须 close；
+  //   3. 组件卸载必须关闭全部流。
+
+  it('opens one stream per active task only', async () => {
+    mockList([
+      { task_id: 't1', agent_name: 'a', task: 'x', status: 'running', progress: 0.1, progress_message: '' },
+      { task_id: 't2', agent_name: 'a', task: 'y', status: 'completed', progress: 1, progress_message: '' },
+    ]);
+    mountView();
+    await flushPromises();
+
+    expect(FakeEventSource.instances).toHaveLength(1);
+    expect(FakeEventSource.instances[0].url).toContain('/api/long-running-tasks/t1/progress');
+  });
+
+  it('applies progress events to the matching task', async () => {
+    mockList();
+    const wrapper = mountView();
+    await flushPromises();
+
+    const es = FakeEventSource.instances[0];
+    es.emit('progress', { task_id: 't1', progress: 0.8, message: 'step 6/7', status: 'running' });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('80%');
+    expect(wrapper.text()).toContain('step 6/7');
+  });
+
+  it('closes the stream and reloads on done', async () => {
+    mockList();
+    mountView();
+    await flushPromises();
+
+    const es = FakeEventSource.instances[0];
+    es.emit('done', { task_id: 't1', status: 'completed', result: 'ok' });
+    await flushPromises();
+
+    expect(es.closed).toBe(true);
+    // 终态后任务会从活跃列表消失，需要重新拉取
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it('closes the stream on error instead of letting it retry forever', async () => {
+    mockList();
+    mountView();
+    await flushPromises();
+
+    const es = FakeEventSource.instances[0];
+    // EventSource 默认会在 onerror 后无限重连（404 时尤其危险）
+    es.onerror();
+    expect(es.closed).toBe(true);
+  });
+
+  it('closes every stream when the component unmounts', async () => {
+    mockList();
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(FakeEventSource.instances).toHaveLength(2); // t1 running + t2 pending
+    wrapper.unmount();
+
+    expect(FakeEventSource.instances.every((es) => es.closed)).toBe(true);
   });
 });

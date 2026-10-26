@@ -62,7 +62,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
 import { useI18n } from '../i18n';
 import PageHeader from '../components/PageHeader.vue';
@@ -100,11 +100,78 @@ async function load() {
   try {
     const data = await api.get('/api/long-running-tasks');
     tasks.value = data.tasks || [];
+    syncStreams();
   } catch {
     error.value = t('view.longRunningTasks.loadFailed');
   } finally {
     loading.value = false;
   }
+}
+
+// ── SSE 实时进度 ──────────────────────────────────────────────
+// 每个活跃任务一条 EventSource。三条硬约束：
+//  1. **404 会无限重连**：EventSource 的 onerror 默认按 3s 重试，任务不存在时
+//     永远重试下去 ⇒ 任何 error 都必须显式 close。
+//  2. **终态必须 close**：收到 done 后流不会自己关（服务端关流会触发 onerror，
+//     又回到第 1 条）。
+//  3. **组件卸载必须 closeAll**：否则路由切走后连接泄漏。
+const streams = new Map();
+
+function closeStream(taskId) {
+  const es = streams.get(taskId);
+  if (es) {
+    es.close();
+    streams.delete(taskId);
+  }
+}
+
+function closeAll() {
+  for (const id of [...streams.keys()]) closeStream(id);
+}
+
+function subscribe(task) {
+  if (streams.has(task.task_id)) return;
+  if (typeof EventSource === 'undefined') return; // SSR / 测试环境兜底
+
+  const es = new EventSource(
+    `/api/long-running-tasks/${encodeURIComponent(task.task_id)}/progress`,
+  );
+  streams.set(task.task_id, es);
+
+  es.addEventListener('progress', (event) => {
+    let payload;
+    try {
+      payload = JSON.parse(event.data);
+    } catch {
+      return; // 半截帧（断流时可能发生）直接忽略，等下一次推送
+    }
+    const target = tasks.value.find((x) => x.task_id === payload.task_id);
+    if (!target) return;
+    if (typeof payload.progress === 'number') target.progress = payload.progress;
+    if (payload.message !== undefined) target.progress_message = payload.message;
+    if (payload.status) target.status = payload.status;
+  });
+
+  es.addEventListener('done', () => {
+    closeStream(task.task_id);
+    // 任务进终态后会从"活跃列表"里消失，需要重新拉一次
+    load();
+  });
+
+  es.onerror = () => {
+    closeStream(task.task_id);
+  };
+}
+
+// 只为 pending / running 建流；已消失或已终态的任务关掉旧流。
+function syncStreams() {
+  const active = tasks.value.filter((x) => isCancellable(x.status));
+  const activeIds = new Set(active.map((x) => x.task_id));
+
+  for (const id of [...streams.keys()]) {
+    if (!activeIds.has(id)) closeStream(id);
+  }
+  for (const task of active) subscribe(task);
 }
 
 function askCancel(task) {
@@ -130,6 +197,7 @@ async function confirmCancel() {
 }
 
 onMounted(() => load());
+onUnmounted(closeAll);
 </script>
 
 <style scoped>

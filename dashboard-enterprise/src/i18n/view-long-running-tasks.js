@@ -20,7 +20,7 @@ export const messages = {
     'view.longRunningTasks.cancelled': 'Task cancelled.',
     'view.longRunningTasks.cancelFailed': 'Failed to cancel this task.',
     'view.longRunningTasks.sseNote':
-      'Progress shown here is a snapshot from the last refresh. A live SSE stream exists at /progress but is not wired into this page yet.',
+      'Progress updates live while this page is open. If the stream drops, refresh to resync.',
   },
   zh: {
     'view.longRunningTasks.title': '长任务',
@@ -43,6 +43,6 @@ export const messages = {
     'view.longRunningTasks.cancelled': '任务已取消。',
     'view.longRunningTasks.cancelFailed': '取消该任务失败。',
     'view.longRunningTasks.sseNote':
-      '此处进度是上次刷新的快照。/progress 有实时 SSE 流，但尚未接入本页。',
+      '本页打开期间进度会实时更新；若流断开，刷新一次即可重新同步。',
   },
 };
