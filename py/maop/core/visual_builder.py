@@ -27,6 +27,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from maop.core.memory.semantic_cache import semantic_cache
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -397,5 +399,5 @@ def optimization_hints(
         "top_waste_agent": top_agent,
         "top_waste_agent_cost_usd": round(top_agent_cost, 4),
         "suggestions": suggestions,
-        "cache_hit_rate": None,  # TODO: wire to SemanticCacheStats
+        "cache_hit_rate": semantic_cache.stats().hit_rate,
     }
