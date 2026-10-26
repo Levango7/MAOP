@@ -21,7 +21,7 @@
 #    uv pip compile pyproject.toml --extra enterprise --universal --header -o requirements.frozen.txt
 aiosqlite==0.22.1
     # via maop-orchestrator (pyproject.toml)
-alembic==1.20.0
+alembic==1.20.1
     # via maop-orchestrator (pyproject.toml)
 annotated-doc==0.0.5
     # via fastapi
@@ -44,7 +44,7 @@ click==8.5.0
     # via uvicorn
 cryptography==50.0.2
     # via maop-orchestrator (pyproject.toml)
-fastapi==0.143.2
+fastapi==0.161.1
     # via maop-orchestrator (pyproject.toml)
 h11==0.16.0
     # via
