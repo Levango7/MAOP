@@ -135,10 +135,11 @@ pip install maop-orchestrator
 # 备选 A：从 GitHub 子目录安装（跟着 master 走）：
 pip install "maop-orchestrator @ git+https://github.com/Levango7/MAOP.git@master#subdirectory=py"
 # 备选 B：装 Release 附件（每个 tag 由 CI 的 Release Assets 作业自动构建并挂载）。
-# 下面这条是实测可装的：2026-10-13 从 v5.4.0 的 tag 提交构建，干净 venv 里
-# `pip install` 该 wheel 后 `python -m maop --help` 正常输出
-# （wheel 1,743,628 B / sdist 2,566,969 B，与 Release 附件字节数回读一致）：
-pip install "https://github.com/Levango7/MAOP/releases/download/v5.4.0/maop_orchestrator-5.4.0-py3-none-any.whl"
+# 下面这条是实测可装的：2026-10-27 从 v5.5.0 的 tag 提交构建，干净 venv 里
+# `pip install` 该 wheel 后 `import maop` 报 5.5.0、`maop --help` 正常输出，
+# 且 wheel 内的前端 dist 含新增的示例库页面
+# （wheel 3,600,721 B / sdist 4,581,903 B，与 Release 附件字节数回读一致）：
+pip install "https://github.com/Levango7/MAOP/releases/download/v5.5.0/maop_orchestrator-5.5.0-py3-none-any.whl"
 # 企业版（私有仓库）：安装厂商交付的 wheel，或授权后用 gh 下载
 gh release download enterprise-v<版本> --repo Levango7/MAOS --pattern "*.whl"   # 需 gh auth login
 pip install ./maop_enterprise-<版本>-py3-none-any.whl
@@ -471,7 +472,7 @@ Key architectural decisions in [docs/adr/](docs/adr/README.md):
 
 ## 版本说明
 
-MAOP 个人版（v5.4.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
+MAOP 个人版（v5.5.0）为单机/小团队设计，包含完整的 Agent 编排、记忆系统、工具集成能力。
 
 **企业版功能**（RBAC、多租户、SSO、配额管理、审计日志、分布式执行等）由独立的商业包 **MAOS**（`maop-enterprise`）提供，需商业授权。个人版不包含这些功能。
 
