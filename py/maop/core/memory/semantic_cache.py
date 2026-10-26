@@ -325,3 +325,9 @@ class SemanticCache:
                 "[semantic_cache] auto-cleanup removed %d expired entries",
                 removed,
             )
+
+
+# Module-level semantic cache singleton used by cost-hints / visual-builder
+# reporting.  Prefer injecting a per-instance cache where testable; this
+# default instance backs the global get_cost_hints() path.
+semantic_cache = SemanticCache()
