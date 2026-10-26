@@ -45,6 +45,7 @@ const routes = [
   { path: '/capability/long-running-tasks', name: 'long-running-tasks', component: () => import('../views/LongRunningTasks.vue') },
   { path: '/capability/agent-billing', name: 'agent-billing', component: () => import('../views/AgentBilling.vue') },
   { path: '/capability/agent-gateway', name: 'agent-gateway', component: () => import('../views/AgentGateway.vue') },
+  { path: '/capability/agent-recommend', name: 'agent-recommend', component: () => import('../views/AgentRecommend.vue') },
 
   // ── 运维 ──
   { path: '/operate', name: 'monitor', component: () => import('../views/Monitor.vue') },

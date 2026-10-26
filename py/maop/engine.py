@@ -413,6 +413,11 @@ class Engine:
         # can only come from the caller's graph.
         stuck = [sid for sid in step_by_id if sid not in done]
         if stuck:
+            if len(stuck) == 1:
+                raise ValueError(
+                    f"Cycle detected: step '{stuck[0]}' never became ready "
+                    "(dangling dependency or unreachable step)"
+                )
             cycle_chain = stuck + [stuck[0]]
             raise ValueError(f"Cycle detected: {' -> '.join(cycle_chain)}")
 
