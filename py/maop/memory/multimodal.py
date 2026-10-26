@@ -32,6 +32,7 @@ from maop.core.memory.fusion import reciprocal_rank_fusion
 from maop.core.memory.multimodal_backend import MultimodalBackend
 from maop.core.memory.multimodal_embed import ImageInput, MultimodalEmbeddingProvider
 from maop.core.memory.multimodal_ingest import MultimodalIngestQueue
+from maop.core.memory.multimodal_ingest_cp import CrossProcessIngestQueue
 from maop.core.memory.multimodal_store import (
     MODALITY_IMAGE,
     MODALITY_TEXT,
@@ -69,7 +70,9 @@ class MultimodalMemory:
             store if store is not None else MultimodalStore()
         )
         self._text_search = text_search
-        self._queue: MultimodalIngestQueue | None = None
+        # 具体类型取决于 multimodal_ingest_mode（inprocess | crossprocess），
+        # 两者共享 submit/drain/close/start/pending/stats/closed 接口。
+        self._queue: MultimodalIngestQueue | CrossProcessIngestQueue | None = None
         self._queue_closed = False
 
     # ── properties ────────────────────────────────────────────
@@ -126,10 +129,17 @@ class MultimodalMemory:
     # ── async ingest (M2.2 B2 PR-3, ADR-022 D4) ─────────────────
 
     @property
-    def ingest_queue(self) -> MultimodalIngestQueue:
-        """Background batcher for non-blocking ingestion (lazily started)."""
+    def ingest_queue(self) -> MultimodalIngestQueue | CrossProcessIngestQueue:
+        """Background batcher for non-blocking ingestion (lazily started).
+
+        The concrete class depends on configuration (``multimodal_ingest_mode``):
+        the in-process queue by default, the cross-process ``MessageQueue``
+        transport when enabled. Both expose the same submit/drain/close API.
+        """
         if self._queue is None:
-            self._queue = MultimodalIngestQueue(self._store)
+            from maop.core.memory.multimodal_ingest_cp import create_ingest_queue
+
+            self._queue = create_ingest_queue(self._store)
         return self._queue
 
     def store_async(
