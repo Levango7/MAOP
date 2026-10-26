@@ -112,7 +112,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tini && rm -rf 
 
 LABEL maintainer="MAOP Team"
 LABEL description="MAOP Agent Orchestration Platform"
-LABEL version="5.4.0"
+LABEL version="5.5.0"
 
 # Create non-root user
 RUN groupadd -r maop && useradd -r -g maop -d /app -s /sbin/nologin maop

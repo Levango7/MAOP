@@ -39,6 +39,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+（暂无）
+
+## [5.5.0] — 2026-10-27
+
+### 看板：六个「后端有、前端零接入」的域全部补齐（2026-10-25 / 10-26）
+
+先做了一次端点清单对账，确认这些域**后端早已可用、看板一条入口都没有**，逐个接上：
+
+- **agent 推荐**（#154）—— `recommend` 端点接进 Agent 注册页的推荐 tab。
+- **PEV 时间线**（#155）—— `RunTimeline` 按 plan / execute / verify 三阶段分组，
+  原先是一条平铺的事件流，看不出阶段归属。
+- **Agent 版本管理**（#156）—— 列表 + 激活。
+- **凭据保险箱**（#157）—— 只显示掩码，明文刻意不开放；删除 / 轮换走二次确认。
+- **长任务**（#158）—— 列表 + 取消（终态按钮禁用，后端对这些状态返回 409）。
+- **结果分享**（#159）—— 见下条，它连后端都没有。
+
+### 结果分享：从 0 到 1（#159）
+
+`grep -rn "share" routers/` 此前零命中 —— README 承诺过"分享结果"，但没有任何实现。
+
+**核心约束：只分享摘要，绝不分享事件。** `run_service.get_run_detail` 返回的
+`events[].payload` 含 `stdout` / `stderr` / `error`，这些经常夹带绝对路径、环境变量，
+偶尔还有 agent 原样回显的密钥；而分享链接**天然是给未授权者看的**。所以
+`share_service` 只存 `_summarize` 的输出，不存 events。测试里构造了带
+`API_KEY=sk-live-SECRET` 的 stdout，断言分享结果里该串、绝对路径、`events`、`stdout`
+一个都不出现。
+
+**权限刻意不对称**：`POST` / `GET`（列表）/ `DELETE` 需要 admin，而
+**`GET /api/share/{token}` 无需认证** —— token 本身就是授权，这正是分享链接的意义。
+过期与不存在一律 404，不区分两者（区分会让攻击者能探测某个 token 是否曾有效）。
+
+**一处不改就整个功能无效的地方**：`App.vue` 的 `showLoginIfRequired()` 在启动时对
+未登录用户弹登录窗。收链接的人如果没有这一行放行，根本看不到内容。
+
+### 补齐已交付页面里的洞：三个"有页面但做不了事"的地方
+
+- **凭据创建表单**（#163）—— #157 只有列表 / 删除 / 轮换，**没有创建入口**，
+  一个空的保险箱无法通过 UI 变成非空。6 种类型按 `credential_type` 动态出字段。
+  注意后端 `create_credential` **只校验类型合法性，不校验敏感字段是否为空**，
+  所以"哪个字段必填"这条规则只能由前端持有。
+- **版本回滚 + 灰度**（#164）—— #156 只有激活。回滚入口只放在 active 行
+  （`POST /{id}/rollback` 的语义是"把当前版本置 retired"，放 draft 行语义就错了）；
+  候选版本按 `agent_id` 单独拉一次（当前页 20 条会让回滚目标缺项）；
+  `duration_seconds = 0` 不提交（后端 `CanaryConfig` 要求 `ge=1`）。
+- **长任务 SSE 实时进度**（#165）—— #158 显示的是"上次刷新的快照"。接上
+  `EventSource` 后有三条必须守住的规则：`onerror` 必须显式 close（默认会 3 秒
+  无限重连，404 时永不停止）、`done` 必须 close 并重载、`onUnmounted` 必须关闭全部流。
+
+### 示例任务库：从 0 到 1（#166）
+
+新用户面对空白任务框，不知道 prompt 该怎么写。新增 `/capability/examples`，
+6 个可直接执行的示例（重构 / 测试 / 审查 / 迁移 / 文档 / 缺陷修复），
+每个都说明"为什么这个示例有代表性"。
+
+**设计决策：纯前端**（`src/data/examples.js`），不走后端 API —— 示例是产品内容
+不是用户数据，不引入新只读端点、新鉴权面、新迁移；文案直接走既有 i18n 双语。
+复制的命令与 README 一致（`maop run --task "<prompt>"`），测试断言了这一点。
+
+**关于 onboard**：核实后**不做**。`CoachMarks.vue`（272 行）已是完整的全局引导
+（4 步、`localStorage` 幂等、目标缺失自动跳过，2026-09-01 还适配过一次），
+`Overview.vue` 的注释也记录着"移除 OnboardingWizard —— 与全局 CoachMarks 构成重复"。
+再造一个就是重复。
+
+### 修复
+
+- **`maop run` 不再报假成功**（#148）—— 子进程非零退出时此前仍返回成功。
+- **`share_service` 改用 `sqlite_connect`**（`6788257`）—— 初版用裸
+  `sqlite3.connect` + `with conn`，而 `with conn` 是**事务**上下文管理器
+  （只 commit/rollback，**不 close**），违反 `test_sqlite_connection_hygiene.py`
+  的连接卫生门禁，CI 9 腿全红。改为 `@contextmanager` 包装 `sqlite_connect`
+  （自动 WAL + busy_timeout + foreign_keys + finally close）。
+
+### 验证
+
+新增 / 扩充的前端套件：`CredentialVault` 15 passed、`AgentVersions` 12 passed、
+`LongRunningTasks` 13 passed、`Examples` 8 passed、`ShareView` 5 passed、
+`ControlPanel` 12 passed；后端 `test_share_service` 9 passed。
+ruff / mypy / eslint 全绿；59 个 `view-*.js` 的 en/zh 键逐文件比对 0 mismatch。
+
+---
+
 ### 剩余 7 条前端端点建模：静默续期从未成功过（2026-10-25）
 
 棘轮提取器学会看计算型 URL 之后新暴露的 7 条端点全部声明 `response_model`，
