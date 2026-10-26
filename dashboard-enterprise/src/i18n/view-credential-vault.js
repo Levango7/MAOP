@@ -13,8 +13,32 @@ export const messages = {
     'view.credentialVault.col.actions': 'Actions',
 
     // ── Actions ───────────────────────────────────────────────────
+    'view.credentialVault.action.create': 'New credential',
     'view.credentialVault.action.rotate': 'Rotate',
     'view.credentialVault.action.delete': 'Delete',
+
+    // ── Create form ───────────────────────────────────────────────
+    'view.credentialVault.form.title': 'New credential',
+    'view.credentialVault.form.type': 'Type',
+    'view.credentialVault.form.agent': 'Agent',
+    'view.credentialVault.form.agentHint': 'e.g. codex',
+    'view.credentialVault.form.agentRequired': 'Agent name is required.',
+    'view.credentialVault.form.name': 'Label (optional)',
+    'view.credentialVault.form.nameHint': 'Shown in the list',
+    'view.credentialVault.form.fieldRequired': '{field} is required.',
+    'view.credentialVault.form.submit': 'Create',
+    'view.credentialVault.form.saving': 'Creating…',
+
+    // ── Field labels ──────────────────────────────────────────────
+    'view.credentialVault.field.api_key': 'API key',
+    'view.credentialVault.field.oauth_access_token': 'OAuth access token',
+    'view.credentialVault.field.oauth_refresh_token': 'OAuth refresh token',
+    'view.credentialVault.field.oauth_expires_at': 'OAuth expiry (epoch seconds)',
+    'view.credentialVault.field.username': 'Username',
+    'view.credentialVault.field.password': 'Password',
+    'view.credentialVault.field.license_key': 'License key',
+    'view.credentialVault.field.cookie_string': 'Cookie string',
+    'view.credentialVault.field.bearer_token': 'Bearer token',
 
     // ── Confirm ───────────────────────────────────────────────────
     'view.credentialVault.confirm.deleteTitle': 'Delete this credential?',
@@ -28,6 +52,8 @@ export const messages = {
     // ── States ────────────────────────────────────────────────────
     'view.credentialVault.empty': 'No credentials stored yet.',
     'view.credentialVault.loadFailed': 'Failed to load credentials.',
+    'view.credentialVault.created': 'Credential created.',
+    'view.credentialVault.createFailed': 'Failed to create this credential.',
     'view.credentialVault.deleted': 'Credential deleted.',
     'view.credentialVault.rotated': 'Credential rotated.',
     'view.credentialVault.deleteFailed': 'Failed to delete this credential.',
@@ -49,8 +75,32 @@ export const messages = {
     'view.credentialVault.col.actions': '操作',
 
     // ── Actions ───────────────────────────────────────────────────
+    'view.credentialVault.action.create': '新建凭据',
     'view.credentialVault.action.rotate': '轮换',
     'view.credentialVault.action.delete': '删除',
+
+    // ── 新建表单 ──────────────────────────────────────────────────
+    'view.credentialVault.form.title': '新建凭据',
+    'view.credentialVault.form.type': '类型',
+    'view.credentialVault.form.agent': 'Agent',
+    'view.credentialVault.form.agentHint': '例如 codex',
+    'view.credentialVault.form.agentRequired': 'Agent 名不能为空。',
+    'view.credentialVault.form.name': '显示名（可选）',
+    'view.credentialVault.form.nameHint': '列表中展示用',
+    'view.credentialVault.form.fieldRequired': '{field} 不能为空。',
+    'view.credentialVault.form.submit': '创建',
+    'view.credentialVault.form.saving': '创建中…',
+
+    // ── 字段标签 ──────────────────────────────────────────────────
+    'view.credentialVault.field.api_key': 'API Key',
+    'view.credentialVault.field.oauth_access_token': 'OAuth Access Token',
+    'view.credentialVault.field.oauth_refresh_token': 'OAuth Refresh Token',
+    'view.credentialVault.field.oauth_expires_at': 'OAuth 过期时间（epoch 秒）',
+    'view.credentialVault.field.username': '用户名',
+    'view.credentialVault.field.password': '密码',
+    'view.credentialVault.field.license_key': 'License Key',
+    'view.credentialVault.field.cookie_string': 'Cookie 字符串',
+    'view.credentialVault.field.bearer_token': 'Bearer Token',
 
     // ── Confirm ───────────────────────────────────────────────────
     'view.credentialVault.confirm.deleteTitle': '删除这条凭据？',
@@ -64,6 +114,8 @@ export const messages = {
     // ── States ────────────────────────────────────────────────────
     'view.credentialVault.empty': '尚未存储任何凭据。',
     'view.credentialVault.loadFailed': '凭据列表加载失败。',
+    'view.credentialVault.created': '凭据已创建。',
+    'view.credentialVault.createFailed': '创建该凭据失败。',
     'view.credentialVault.deleted': '凭据已删除。',
     'view.credentialVault.rotated': '凭据已轮换。',
     'view.credentialVault.deleteFailed': '删除该凭据失败。',
