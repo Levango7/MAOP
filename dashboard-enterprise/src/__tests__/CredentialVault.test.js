@@ -157,4 +157,103 @@ describe('CredentialVault.vue', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('Failed to load credentials');
   });
+
+  // ── 新建凭据 ──────────────────────────────────────────────────
+  // 后端不校验"该类型的敏感字段是否为空"，所以前端必须自己拦。
+  // 这几个用例的核心就是：**校验不通过时一个请求都不能发出去**。
+
+  async function openCreateForm() {
+    mockList();
+    const wrapper = mountView();
+    await flushPromises();
+    await wrapper.findAll('button').find((b) => b.text() === 'New credential').trigger('click');
+    await flushPromises();
+    return wrapper;
+  }
+
+  function fieldLabels(wrapper) {
+    return wrapper.findAll('.cv-form__label').map((n) => n.text());
+  }
+
+  it('opens the create form with only api_key field by default', async () => {
+    const wrapper = await openCreateForm();
+    expect(wrapper.find('.cv-form').exists()).toBe(true);
+    const labels = fieldLabels(wrapper);
+    expect(labels.some((l) => l.includes('API key'))).toBe(true);
+    // 默认类型下不该出现其他类型的字段
+    expect(labels.some((l) => l.includes('Username'))).toBe(false);
+  });
+
+  it('switches visible fields with the credential type', async () => {
+    const wrapper = await openCreateForm();
+    await wrapper.find('.cv-form select').setValue('username_password');
+    await flushPromises();
+
+    const labels = fieldLabels(wrapper);
+    expect(labels.some((l) => l.includes('Username'))).toBe(true);
+    expect(labels.some((l) => l.includes('Password'))).toBe(true);
+    expect(labels.some((l) => l.includes('API key'))).toBe(false);
+  });
+
+  it('refuses to submit without an agent name', async () => {
+    const wrapper = await openCreateForm();
+    await wrapper.findAll('button').find((b) => b.text() === 'Create').trigger('click');
+    await flushPromises();
+
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('Agent name is required');
+  });
+
+  it('refuses to submit when the type-required secret is empty', async () => {
+    const wrapper = await openCreateForm();
+    const inputs = wrapper.findAll('.cv-form input');
+    // 第 1 个是 agent_name，第 2 个是 name，第 3 个是 api_key
+    await inputs[0].setValue('codex');
+    await wrapper.findAll('button').find((b) => b.text() === 'Create').trigger('click');
+    await flushPromises();
+
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('API key is required');
+  });
+
+  it('posts only the fields relevant to the chosen type', async () => {
+    const wrapper = await openCreateForm();
+    const inputs = wrapper.findAll('.cv-form input');
+    await inputs[0].setValue('codex');
+    await inputs[1].setValue('primary');
+    await inputs[2].setValue('sk-abc');
+    mockPost.mockResolvedValue({ status: 'ok' });
+
+    await wrapper.findAll('button').find((b) => b.text() === 'Create').trigger('click');
+    await flushPromises();
+
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [url, body] = mockPost.mock.calls[0];
+    expect(url).toBe('/api/credential-vault/credentials');
+    expect(body).toEqual({
+      credential_type: 'api_key',
+      agent_name: 'codex',
+      name: 'primary',
+      api_key: 'sk-abc',
+    });
+    // 不能把无关类型的空字段一并塞给后端
+    expect(body).not.toHaveProperty('username');
+    expect(body).not.toHaveProperty('cookie_string');
+  });
+
+  it('closes the form and reloads after a successful create', async () => {
+    const wrapper = await openCreateForm();
+    const inputs = wrapper.findAll('.cv-form input');
+    await inputs[0].setValue('codex');
+    await inputs[2].setValue('sk-abc');
+    mockPost.mockResolvedValue({ status: 'ok' });
+
+    await wrapper.findAll('button').find((b) => b.text() === 'Create').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('.cv-form').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Credential created');
+    // 1 次初始加载 + 1 次创建后重载
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
 });
