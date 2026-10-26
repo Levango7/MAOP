@@ -534,7 +534,10 @@ def cmd_migrate_pg_init() -> None:
     from pathlib import Path
 
     pg_ini = Path(__file__).resolve().parent / "migrations" / "pg" / "alembic.ini"
-    subprocess.call(["alembic", "-c", str(pg_ini), "upgrade", "head"])
+    rc = subprocess.call(["alembic", "-c", str(pg_ini), "upgrade", "head"])
+    if rc != 0:
+        _emit_fail("migrate pg-init", f"alembic 退出码 {rc}")
+        sys.exit(1)
 
 
 def cmd_migrate_sqlite_to_pg(args: list[str]) -> None:

@@ -1,4 +1,4 @@
-# Agent Coordination（多代理工作区协调）
+﻿# Agent Coordination（多代理工作区协调）
 
 > 2026-10-10 建立。本仓库（F:\Nexus\MAOP）曾有多个 Agent 会话并行工作。
 > **2026-10-10 更新：WorkBuddy 已关闭，本仓现由 ZCode（本会话）全权负责**——
@@ -29,12 +29,28 @@
 7. **gh api -f body= 里禁反引号**（bash 会当命令替换吞掉正文——踩过三次）；
    用 `--input <json 文件>` 传 PR/Issue 正文。
 
+## 本会话任务（CommandCodeBot，MAOS 企业版挂件）
+
+- [x] 全量评估 MAOP/MAOS 架构并给出结论 — DONE
+- [ ] 修复 audit.py resolve_audit_key 调用不存在的 LicenseManager.current_license_material()，导致审计链永久降级 v1 — **因 P0 #7 完整性清单保护且无生产私钥无法重签，已回滚，暂不修改**
+- [x] 修复 cli.py cmd_migrate_pg_init 不检查 alembic 返回码 — DONE
+- [x] 修复 engine.py 单元素 stuck 循环检测输出误导 — DONE
+
 ## 当前已知并发风险点
 
 - 前端 E2E 目录（`e2e/`）——若双方都在扩 E2E，**各用各的 spec 文件名**，
   不要往同一个 spec 文件里加用例。
 - `py/maop/core/scheduling/`、`py/maop/core/reliability/`、`py/maop/engine_utils.py`——
   本会话近几轮的主战场（批 B/C + 批量化），如需动这些文件先看本表上方条目。
+
+## 领地登记（ZCode session_f62ccbe…，2026-10-27 第一轮）
+
+- **进行中**：MAOS 仓 T1.5 phase 2 三平台矩阵（分支 `feat/t15-three-platform-matrix`，独立 worktree `F:/Nexus/MAOS-t15`）。
+  领地=MAOS 的 `scripts/build_enterprise_binary.py`、`scripts/verify_wheel.py`、`.github/workflows/binary-matrix.yml`。
+  **不碰** MAOP 任何文件、不碰 MAOS `maop/enterprise/*`（CommandCodeBot 主战场）。
+- MAOS 本仓已建 `F:/Nexus/MAOS/AGENT-COORD.md` 作为 MAOS 侧留言板，后续 MAOS 工作请在那边登记。
+- 本会话持有生产签名私钥（离线机、不入仓）：enterprise 模块改动需重签完整性清单时可协调代签。
+
 
 ## 已完成的领地操作（2026-10-27）
 
