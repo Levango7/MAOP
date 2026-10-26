@@ -128,14 +128,17 @@ def test_worker_consumes_and_batches(mq: MessageQueue):
     q = CrossProcessIngestQueue(be, mq, batch_size=4, flush_interval_s=0.3, start=False)
     q.submit_many([_item(f"e{i}") for i in range(4)])
     q.start()
-    deadline = time.monotonic() + 3.0
-    while not be.calls and time.monotonic() < deadline:
-        time.sleep(0.02)
-    assert be.calls, "worker never flushed"
-    assert sum(len(c) for c in be.calls) == 4
-    # Messages are ACKed.
-    stats = mq.stats()
-    assert stats.by_topic.get(DEFAULT_TOPIC, 0) == 0
+    try:
+        deadline = time.monotonic() + 3.0
+        while not be.calls and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert be.calls, "worker never flushed"
+        assert sum(len(c) for c in be.calls) == 4
+        # Messages are ACKed.
+        stats = mq.stats()
+        assert stats.by_topic.get(DEFAULT_TOPIC, 0) == 0
+    finally:
+        q.close(drain=False, timeout=2.0)
 
 
 def test_close_drains_pending(mq: MessageQueue):
@@ -191,7 +194,11 @@ def test_factory_defaults_to_inprocess(tmp_path):
     s.multimodal_ingest_mode = ""
     be = _Recorder()
     q = create_ingest_queue(be)
-    assert q.stats()["mode"] == "inprocess"
+    try:
+        assert q.stats()["mode"] == "inprocess"
+    finally:
+        # 工厂默认 start=True：不 close 会留下活线程（leak-probe 会抓）。
+        q.close(drain=False, timeout=2.0)
 
 
 def test_factory_crossprocess_mode(tmp_path):
@@ -201,7 +208,12 @@ def test_factory_crossprocess_mode(tmp_path):
     be = _Recorder()
     mq = MessageQueue(db_path=str(tmp_path / "factory.db"))
     q = create_ingest_queue(be, mq=mq)
-    assert q.stats()["mode"] == "crossprocess"
+    try:
+        assert q.stats()["mode"] == "crossprocess"
+    finally:
+        # worker 线程持有的 MessageQueue 在 tmp_path 清理后就打不开 DB 了 ——
+        # 不 close 会在后续测试里刷 "unable to open database file" 噪声。
+        q.close(drain=False, timeout=2.0)
 
 
 def test_factory_crossprocess_custom_topic(tmp_path):
@@ -213,9 +225,12 @@ def test_factory_crossprocess_custom_topic(tmp_path):
     be = _Recorder()
     mq = MessageQueue(db_path=str(tmp_path / "factory2.db"))
     q = create_ingest_queue(be, mq=mq)
-    stats = q.stats()
-    assert stats["topic"] == "custom_topic"
-    assert stats["consumer_group"] == "custom_group"
+    try:
+        stats = q.stats()
+        assert stats["topic"] == "custom_topic"
+        assert stats["consumer_group"] == "custom_group"
+    finally:
+        q.close(drain=False, timeout=2.0)
     # Cleanup
     s.multimodal_ingest_mode = ""
     s.multimodal_ingest_topic = ""

@@ -129,7 +129,7 @@ class MultimodalMemory:
     # ── async ingest (M2.2 B2 PR-3, ADR-022 D4) ─────────────────
 
     @property
-    def ingest_queue(self):
+    def ingest_queue(self) -> MultimodalIngestQueue | CrossProcessIngestQueue:
         """Background batcher for non-blocking ingestion (lazily started).
 
         The concrete class depends on configuration (``multimodal_ingest_mode``):
