@@ -40,6 +40,7 @@ const routes = [
   { path: '/capability/agent-proxy', name: 'agent-proxy', component: () => import('../views/AgentProxy.vue') },
   { path: '/capability/agent-registry', name: 'agent-registry', component: () => import('../views/AgentRegistry.vue') },
   { path: '/capability/agent-versions', name: 'agent-versions', component: () => import('../views/AgentVersions.vue') },
+  { path: '/capability/examples', name: 'examples', component: () => import('../views/Examples.vue') },
   { path: '/capability/credential-vault', name: 'credential-vault', component: () => import('../views/CredentialVault.vue') },
   { path: '/capability/long-running-tasks', name: 'long-running-tasks', component: () => import('../views/LongRunningTasks.vue') },
   { path: '/capability/agent-billing', name: 'agent-billing', component: () => import('../views/AgentBilling.vue') },
