@@ -46,3 +46,12 @@
   bandit nosec。目标测试 50 passed。
 - **data_service.py 拆分**（1185 → 509 行，PR #171 已合并）：§2 Logs → `services/data/logs.py`，
   §3 Analysis → `services/data/analysis.py`。详见 PR #171。
+- **agent_service.py 拆分**（843 → 479 行）：§1 Catalog → `services/agent/catalog.py`（243 行），
+  §3-4 Proxy/Gateway → `services/agent/gateway.py`（277 行），`services/agent/__init__.py` 聚合。
+  父模块保留 §2 Router + §5 Collaboration + §6 SubAgent + 转发 import（`__all__` 不变）
+  + PEP 562 `__getattr__`（代理子模块模块级变量 `_agent_proxy` 等）。allowlist 移除（6→4）。
+  门禁全绿：ruff / mypy / file-size / silent-exceptions / config-drift / api-contract /
+  wiring / docs-consistency / coverage-ratchet / bandit nosec。agent 测试 396 passed（16 文件）。
+- **evolution_service.py 拆分**（806 → 601 行）：F2-01 Evolution Loop AC-07 → `services/evolution/loop.py`（277 行），
+  `services/evolution/__init__.py` 聚合。父模块保留 evolution_experiment + evolve_insights + 转发 import。
+  allowlist 移除（6→4）。门禁全绿。evolution 测试 223 passed（14 文件）。

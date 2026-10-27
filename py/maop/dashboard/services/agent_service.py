@@ -15,6 +15,14 @@
 
 每个子域对应一组 ``_get_xxx`` 单例访问器 + 业务函数。单例使用
 双重检查锁定保护，与原 router 风格一致；``_set_xxx`` 供测试注入。
+
+子模块拆分（file-size ratchet）：
+
+- ``services/agent/catalog.py`` — §1 Agent Catalog（注册中心管理）
+- ``services/agent/gateway.py`` — §3 Bridge + §4 Gateway（代理 + 规则/审计/预算）
+
+两个子模块的 public 名称由本模块转发 import，``__all__`` 不变，
+调用方和测试无需改动。
 """
 
 from __future__ import annotations
@@ -23,219 +31,59 @@ import logging
 import threading
 from typing import Any
 
+# ── 转发 import（子模块拆分，__all__ 不变）──────────────────────
+# 公共函数由 __all__ 引用（ruff 不报 unused）；
+# 内部 accessor 由 router/test 通过 agent_service._get_xxx() 访问，需 noqa F401 抑制。
+from maop.dashboard.services.agent.catalog import (  # noqa: F401
+    _get_catalog,
+    _set_catalog,
+    catalog_stats,
+    delete_agent,
+    get_agent,
+    list_agents,
+    register_agent,
+    search_agents,
+    update_agent,
+    update_agent_health,
+)
+from maop.dashboard.services.agent.gateway import (  # noqa: F401
+    _get_bridge,
+    _get_gateway,
+    _register_adapter_from_config,
+    _set_bridge,
+    _set_gateway,
+    add_proxy_rule,
+    bridge_adapters,
+    bridge_call,
+    bridge_health,
+    bridge_sync_config,
+    check_budget,
+    get_budget_summary,
+    list_proxy_rules,
+    query_audit,
+    remove_proxy_rule,
+    set_department_budget,
+)
+
 logger = logging.getLogger(__name__)
 
 
-# ══════════════════════════════════════════════════════════════════
-# §1  Agent Catalog — 注册中心管理
-# ══════════════════════════════════════════════════════════════════
-
-_catalog: Any = None
-_catalog_lock = threading.Lock()
-
-
-def _get_catalog() -> Any:
-    """惰性初始化全局 AgentCatalog 单例。"""
-    global _catalog
-    if _catalog is None:
-        with _catalog_lock:
-            if _catalog is None:
-                from maop.core.agent.registry.agent_catalog import AgentCatalog
-                _catalog = AgentCatalog.default()
-    return _catalog
-
-
-def _set_catalog(catalog: Any) -> None:
-    """供测试注入自定义 catalog（隔离 DB）。"""
-    global _catalog
-    with _catalog_lock:
-        _catalog = catalog
-
-
-def list_agents(enabled: bool | None) -> dict[str, Any]:
-    """列出所有已注册 Agent，可选按 enabled 过滤。
-
-    Parameters
-    ----------
-    enabled : bool | None
-        True 仅返回启用；False 仅返回禁用；None 返回全部。
-
-    Returns
-    -------
-    dict
-        ``{"agents": [...], "count": int}`` — agents 为 model_dump 后的 dict 列表。
-    """
-    catalog = _get_catalog()
-    if enabled is True:
-        agents = catalog.list_enabled()
-    elif enabled is False:
-        agents = [a for a in catalog.list_all() if not a.enabled]
-    else:
-        agents = catalog.list_all()
-    return {
-        "agents": [a.model_dump(mode="json") for a in agents],
-        "count": len(agents),
-    }
-
-
-def get_agent(name: str) -> dict[str, Any] | None:
-    """获取单个 Agent 详情。返回 model_dump 后的 dict 或 None（不存在）。"""
-    catalog = _get_catalog()
-    desc = catalog.get(name)
-    if desc is None:
-        return None
-    return desc.model_dump(mode="json")
-
-
-def register_agent(
-    *,
-    name: str,
-    display_name: str,
-    vendor: str,
-    version: str,
-    adapter_type: str,
-    capabilities: list[str],
-    billing_model: str,
-    auth_method: str,
-    max_concurrent: int,
-    rate_limit_per_min: int,
-    timeout_s: float,
-    retry_count: int = 3,
-    fallback_agents: list[str] | None = None,
-    enabled: bool,
-) -> dict[str, Any]:
-    """注册新 Agent（或更新同名 Agent）。
-
-    将字符串能力/计费/授权转换为枚举，构建 AgentDescriptor 并注册。
-    返回注册后的 descriptor model_dump。
-
-    Raises
-    ------
-    ValueError
-        当 capability / billing_model / auth_method 字符串无法映射到枚举。
-    """
-    from maop.core.agent.registry.agent_catalog import (
-        AgentCapability,
-        AgentDescriptor,
-        AuthMethod,
-        BillingModel,
-    )
-
-    # 转换枚举 — 无法映射时抛 ValueError，由 router 转为 HTTPException(400)
-    caps = [AgentCapability(c) for c in capabilities]
-    bm = BillingModel(billing_model)
-    am = AuthMethod(auth_method)
-
-    desc = AgentDescriptor(
-        name=name,
-        display_name=display_name,
-        vendor=vendor,
-        version=version,
-        adapter_type=adapter_type,
-        capabilities=caps,
-        billing_model=bm,
-        auth_method=am,
-        max_concurrent=max_concurrent,
-        rate_limit_per_min=rate_limit_per_min,
-        timeout_s=timeout_s,
-        retry_count=retry_count,
-        fallback_agents=fallback_agents or [],
-        enabled=enabled,
-    )
-    catalog = _get_catalog()
-    catalog.register(desc)
-    logger.info("[agent_catalog_service] registered agent: %s", name)
-    return desc.model_dump(mode="json")
-
-
-def update_agent(name: str, changes: dict[str, Any]) -> dict[str, Any] | None:
-    """部分更新已注册 Agent；返回更新后的 descriptor，Agent 不存在时返回 None。
-
-    未出现在 ``changes`` 中的字段保留原值。字段校验由 ``AgentDescriptor``
-    完成（例如降级链自引用会抛 ``ValueError``）。
-    """
-    from maop.core.agent.registry.agent_catalog import AgentDescriptor
-
-    catalog = _get_catalog()
-    existing = catalog.get(name)
-    if existing is None:
-        return None
-
-    merged = existing.model_dump(mode="json")
-    merged.update(changes)
-    merged["name"] = name
-    desc = AgentDescriptor(**merged)
-    catalog.register(desc)
-    logger.info("[agent_catalog_service] updated agent: %s", name)
-    return desc.model_dump(mode="json")
-
-
-def delete_agent(name: str) -> bool:
-    """删除（注销）一个 Agent。返回是否删除成功。"""
-    catalog = _get_catalog()
-    return bool(catalog.delete(name))
-
-
-def update_agent_health(name: str, healthy: bool) -> bool:
-    """更新指定 Agent 的健康状态。返回 Agent 是否存在。"""
-    catalog = _get_catalog()
-    desc = catalog.get(name)
-    if desc is None:
-        return False
-    catalog.update_health(name, healthy)
-    return True
-
-
-def search_agents(capability: list[str]) -> dict[str, Any]:
-    """按能力搜索 Agent，返回具备所有指定能力的启用 Agent。
-
-    Parameters
-    ----------
-    capability : list[str]
-        能力过滤列表（可重复）。空列表则返回所有启用 Agent。
-
-    Returns
-    -------
-    dict
-        ``{"agents": [...], "count": int}``。
-
-    Raises
-    ------
-    ValueError
-        当 capability 字符串无法映射到 AgentCapability 枚举。
-    """
-    from maop.core.agent.registry.agent_catalog import AgentCapability
-
-    catalog = _get_catalog()
-    if not capability:
-        agents = catalog.list_enabled()
-    else:
-        caps = [AgentCapability(c) for c in capability]
-        # 逐个能力搜索取交集（search 已过滤 enabled=True）
-        result_sets = [{a.name for a in catalog.search(c)} for c in caps]
-        common = set.intersection(*result_sets) if result_sets else set()
-        all_agents = {a.name: a for a in catalog.list_enabled()}
-        agents = [all_agents[n] for n in sorted(common)]
-    return {
-        "agents": [a.model_dump(mode="json") for a in agents],
-        "count": len(agents),
-    }
-
-
-def catalog_stats() -> dict[str, Any]:
-    """返回 Agent Catalog 统计信息。
-
-    四个计数取自同一次 ``list_all()`` 快照，避免多次加锁期间数据变动导致
-    ``count`` 与 ``healthy_count`` 互相矛盾。
-    """
-    catalog = _get_catalog()
-    agents = catalog.list_all()
-    return {
-        "count": len(agents),
-        "healthy_count": sum(1 for a in agents if a.healthy),
-        "enabled_count": sum(1 for a in agents if a.enabled),
-        "capability_count": len({c.value for a in agents for c in a.capabilities}),
-    }
+# PEP 562: 代理子模块的模块级变量（单例 + lock），保持向后兼容。
+# 子模块拆分后 _agent_proxy / _catalog 等变量定义在子模块中；
+# 通过 `__getattr__` 让 agent_service._agent_proxy 等直接访问继续工作。
+# 不加缓存：_set_xxx() 会重新赋值子模块变量，缓存会返回旧值。
+def __getattr__(name: str) -> Any:
+    for mod_name in ("catalog", "gateway"):
+        try:
+            mod = __import__(
+                f"maop.dashboard.services.agent.{mod_name}",
+                fromlist=[name],
+            )
+        except ImportError:  # silent-ok: scan-continue — 子模块可能不存在或不含该属性，继续尝试下一个
+            continue
+        if hasattr(mod, name):
+            return getattr(mod, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -356,242 +204,6 @@ def active_counts() -> dict[str, Any]:
     for a in all_agents:
         active[a.name] = agent_router.get_active_count(a.name)
     return {"active": active, "count": len(active)}
-
-
-# ══════════════════════════════════════════════════════════════════
-# §3  Agent Proxy (Bridge) — 适配器代理
-# ══════════════════════════════════════════════════════════════════
-
-_agent_proxy: Any = None
-_agent_proxy_lock = threading.Lock()
-
-
-def _get_bridge(maop_root: Any = None) -> Any:
-    """惰性初始化全局 AgentProxy 单例。
-
-    Parameters
-    ----------
-    maop_root : Any
-        MAOP 根路径（str 或 Path）。首次初始化时使用；后续调用忽略。
-    """
-    global _agent_proxy
-    if _agent_proxy is None:
-        with _agent_proxy_lock:
-            if _agent_proxy is None:
-                from maop.core.agent.delegation.agent_proxy import AgentProxy
-                _agent_proxy = AgentProxy(root_dir=str(maop_root))
-    return _agent_proxy
-
-
-def _set_bridge(bridge: Any) -> None:
-    """供测试注入自定义 bridge（隔离）。"""
-    global _agent_proxy
-    with _agent_proxy_lock:
-        _agent_proxy = bridge
-
-
-def bridge_adapters() -> dict[str, Any]:
-    """列出所有 bridge 适配器及其状态。"""
-    bridge = _get_bridge()
-    names = bridge.list_adapters()
-    statuses = []
-    for name in names:
-        try:
-            s = bridge.get_status(name)
-            statuses.append(s.model_dump())
-        except Exception:
-            statuses.append({"name": name, "error": "status unavailable"})
-    return {"adapters": statuses, "count": len(statuses)}
-
-
-def _register_adapter_from_config(bridge: Any, adapter_name: str) -> bool:
-    """把 agents.yaml 里配置的 agent 按需构建成 bridge 适配器并注册。
-
-    为什么需要它（2026-10-05）：`AgentProxy` 的注册表**从来没有人往里放过东西** ——
-    `register()` 在全仓只有定义处和测试调用。于是 `/api/bridge/adapters` 永远返回空表、
-    `/api/bridge/call` 对任何名字都回 404（那个 404 是"适配器未找到"的正常语义，不是
-    端点坏了；坏的是**从来没人注册**）。路由、鉴权、请求模型、错误脱敏都写好了，
-    缺的只是这一步。
-
-    刻意做成**按需**（调用时才建）而不是启动时批量注册：agents.yaml 有 30+ 条配置，
-    启动即构造全部适配器既慢又可能踩到重量级适配器的构造副作用。
-
-    Returns
-    -------
-    bool
-        是否成功注册（配置里没有这个 agent 或构建失败时为 False）。
-    """
-    from maop.config.loader import ConfigLoader
-    from maop.core.agent.adapters.adapter_factory import build_adapter
-    from maop.delegate.agent_resolver import AgentResolver
-
-    try:
-        config = ConfigLoader(project_root=getattr(bridge, "_root", None)).load()
-        agent_cfg = AgentResolver(config).resolve(adapter_name)
-        if agent_cfg is None:
-            return False
-        bridge.register(adapter_name, build_adapter(agent_cfg))
-        return True
-    except Exception as exc:
-        logger.warning("[bridge] 按需注册适配器 %s 失败：%s", adapter_name, exc)
-        return False
-
-
-def bridge_call(adapter_name: str, task: str, kwargs: dict[str, Any]) -> Any:
-    """通过 bridge 适配器代理调用。
-
-    若该名字还没注册但 agents.yaml 里有同名 agent，则先按需构建并注册 —— 否则这个
-    端点对开箱配置也只会回 404（注册表本来是空的）。
-
-    Raises
-    ------
-    KeyError
-        适配器不存在（既没注册、配置里也没有）。
-    RuntimeError
-        调用执行失败。
-    """
-    bridge = _get_bridge()
-    if bridge.get(adapter_name) is None:
-        _register_adapter_from_config(bridge, adapter_name)
-    return bridge.call(adapter_name, task, **kwargs)
-
-
-def bridge_health() -> dict[str, Any]:
-    """检查所有 bridge 适配器健康状态。"""
-    bridge = _get_bridge()
-    return bridge.health_check_all()
-
-
-def bridge_sync_config(adapter_name: str, config: dict[str, Any]) -> None:
-    """同步 bridge 适配器配置。
-
-    Raises
-    ------
-    KeyError
-        适配器不存在。
-    """
-    bridge = _get_bridge()
-    bridge.sync_config(adapter_name, config)
-
-
-# ══════════════════════════════════════════════════════════════════
-# §4  Agent Proxy Gateway — 规则/审计/预算
-# ══════════════════════════════════════════════════════════════════
-
-_gateway: Any = None
-_gateway_lock = threading.Lock()
-
-
-def _get_gateway() -> Any:
-    """惰性初始化全局 AgentProxyGateway 单例。"""
-    global _gateway
-    if _gateway is None:
-        with _gateway_lock:
-            if _gateway is None:
-                from maop.core.agent.auth.agent_proxy_gateway import AgentProxyGateway
-                _gateway = AgentProxyGateway()
-    return _gateway
-
-
-def _set_gateway(gateway: Any) -> None:
-    """供测试注入自定义 gateway（隔离 DB）。"""
-    global _gateway
-    with _gateway_lock:
-        _gateway = gateway
-
-
-def add_proxy_rule(
-    *,
-    internal_path: str,
-    external_agent: str,
-    allowed_departments: list[str],
-    enabled: bool,
-) -> str:
-    """添加代理规则，返回 rule_id。"""
-    from maop.core.agent.auth.agent_proxy_gateway import ProxyRule
-
-    rule = ProxyRule(
-        internal_path=internal_path,
-        external_agent=external_agent,
-        allowed_departments=allowed_departments,
-        enabled=enabled,
-    )
-    gateway = _get_gateway()
-    gateway.add_proxy_rule(rule)
-    logger.info(
-        "[agent_proxy_service] 添加规则 id=%s path=%s",
-        rule.rule_id, rule.internal_path,
-    )
-    return rule.rule_id
-
-
-def list_proxy_rules() -> dict[str, Any]:
-    """列出全部代理规则。"""
-    gateway = _get_gateway()
-    rules = gateway.list_proxy_rules()
-    return {
-        "rules": [r.model_dump(mode="json") for r in rules],
-        "count": len(rules),
-    }
-
-
-def remove_proxy_rule(rule_id: str) -> None:
-    """移除代理规则。"""
-    gateway = _get_gateway()
-    gateway.remove_proxy_rule(rule_id)
-
-
-def query_audit(*, user: str, agent: str, limit: int) -> dict[str, Any]:
-    """查询审计日志（按时间倒序）。"""
-    gateway = _get_gateway()
-    events = gateway.query_audit(user=user, agent=agent, limit=limit)
-    return {
-        "events": [e.model_dump(mode="json") for e in events],
-        "count": len(events),
-    }
-
-
-def set_department_budget(
-    *,
-    department: str,
-    agent: str,
-    monthly_budget: float,
-    used: float,
-    reset_day: int,
-) -> dict[str, str]:
-    """设置部门预算，返回 ``{"department": ..., "agent": ...}``。"""
-    from maop.core.agent.auth.agent_proxy_gateway import DepartmentBudget
-
-    budget = DepartmentBudget(
-        department=department,
-        agent=agent,
-        monthly_budget=monthly_budget,
-        used=used,
-        reset_day=reset_day,
-    )
-    gateway = _get_gateway()
-    gateway.set_department_budget(budget)
-    logger.info(
-        "[agent_proxy_service] 设置预算 dept=%s agent=%s monthly=%.2f",
-        department, agent, monthly_budget,
-    )
-    return {"department": department, "agent": agent}
-
-
-def get_budget_summary(department: str) -> dict[str, Any]:
-    """查询预算汇总。"""
-    gateway = _get_gateway()
-    budgets = gateway.get_budget_summary(department=department)
-    return {
-        "budgets": [b.model_dump(mode="json") for b in budgets],
-        "count": len(budgets),
-    }
-
-
-def check_budget(department: str, agent: str, cost: float) -> bool:
-    """检查部门预算是否足够扣减。"""
-    gateway = _get_gateway()
-    return bool(gateway.check_budget(department, agent, cost))
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -842,3 +454,46 @@ def subagent_transcript(mgr: Any, agent_id: str) -> Any:
         由 caller（router）传入。
     """
     return mgr.get_live_transcript(agent_id)
+
+
+__all__ = [
+    "_get_collaboration",
+    "_get_router",
+    "_get_subagent_mgr",
+    "_set_collaboration",
+    "_set_router",
+    "_set_subagent_mgr",
+    "acquire_slot",
+    "active_counts",
+    "add_proxy_rule",
+    "agent_route",
+    "bridge_adapters",
+    "bridge_call",
+    "bridge_health",
+    "bridge_sync_config",
+    "catalog_stats",
+    "check_budget",
+    "delete_agent",
+    "execute_custom",
+    "execute_pattern",
+    "get_agent",
+    "get_budget_summary",
+    "get_pattern_by_name",
+    "list_agents",
+    "list_patterns",
+    "list_proxy_rules",
+    "list_strategies",
+    "query_audit",
+    "register_agent",
+    "release_slot",
+    "remove_proxy_rule",
+    "search_agents",
+    "set_department_budget",
+    "subagent_cancel",
+    "subagent_list",
+    "subagent_spawn",
+    "subagent_transcript",
+    "subagent_wait",
+    "update_agent",
+    "update_agent_health",
+]
