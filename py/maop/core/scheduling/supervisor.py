@@ -55,6 +55,7 @@ from typing import Any
 
 from maop.core.observability.metrics import get_metrics
 from maop.core.scheduling.failure_detector import (
+    AgentHealth,
     FailurePatternDetector,
     get_failure_detector,
 )
@@ -165,9 +166,9 @@ class Supervisor(
         # process-wide failure-detector singleton.
         self._detector: FailurePatternDetector = detector or get_failure_detector()
 
-        # Health checker (default uses self as detector for metrics probe).
+        # Health checker (default uses the composed detector for metrics probe).
         self._health_checker = health_checker or HealthChecker(
-            detector=self,
+            detector=self._detector,
             registry=agent_registry,
         )
         # Rule engine.
@@ -280,7 +281,7 @@ class Supervisor(
         """Return all-agent health snapshot (delegated to composed detector)."""
         return self._detector.get_stats()
 
-    def get_agent_health(self, agent_id: str):
+    def get_agent_health(self, agent_id: str) -> AgentHealth | None:
         """Return single-agent health snapshot (delegated to composed detector)."""
         return self._detector.get_agent_health(agent_id)
 
