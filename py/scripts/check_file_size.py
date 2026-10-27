@@ -38,9 +38,14 @@ EXEMPT_PREFIXES: tuple[str, ...] = ("maop/migrations/",)
 
 #: Files above the threshold at gate-introduction time (2026-10-12).
 #: Each entry needs a reason and a split schedule; entries may only be REMOVED.
-#: 2026-10-27 清零：最后一个条目 distributed_scheduler.py 已拆成 6 文件子包，
-#: 全仓文件规模门禁从"白名单放行"进入"无豁免"状态。
-ALLOWED_OVERSIZE: dict[str, str] = {}
+#: 2026-10-28 变基裁定：master 已清零（五刀全拆完，"无豁免"）；唯一保留条目是本
+#: 分支新接入 ScopeMiddleware 的冲线，拆分排期写入理由，随下一批处理。
+ALLOWED_OVERSIZE: dict[str, str] = {
+    "maop/core/security/middleware.py":
+        "2026-10-27 因接入 ScopeMiddleware 冲线 1188；拆分排期：AuthMiddleware / "
+        "ScopeMiddleware / 速率与 IP 白名单三块各成模块（参照 core/mcp/ 子包先例），"
+        "随 services 层拆分运动后一批处理",
+}
 
 
 def _rel(path: pathlib.Path) -> str:

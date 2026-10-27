@@ -106,6 +106,7 @@ class RedisBlackboardSync:
         self._pubsub_timeout = pubsub_timeout
         self._running = False
         self._listener_task: asyncio.Task | None = None
+        self._subscriber_tasks: set[asyncio.Task] = set()
         self._subscribed = False
 
     # ── Lifecycle ─────────────────────────────────────────────────
@@ -255,8 +256,11 @@ class RedisBlackboardSync:
             try:
                 result = cb(entry)
                 if asyncio.iscoroutine(result):
-                    # Schedule coroutine execution (non-blocking)
-                    asyncio.create_task(_await_or_log(result, entry.entry_id))
+                    # Schedule coroutine execution (non-blocking) and track the task
+                    # so exceptions are surfaced and tasks aren't silently destroyed.
+                    task = asyncio.create_task(_await_or_log(result, entry.entry_id))
+                    self._subscriber_tasks.add(task)
+                    task.add_done_callback(self._subscriber_tasks.discard)
             except Exception as exc:
                 logger.debug("[bb-merge] subscriber error: %s", exc)
 

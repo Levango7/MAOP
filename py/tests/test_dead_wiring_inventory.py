@@ -106,10 +106,25 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
         "unwired",
         "音视频契约层：全仓零引用 —— maop/ 与 tests/ 里没有任何导入方，连测试都没碰它",
     ),
-    "maop.core.memory.semantic_cache": ("unwired", "语义缓存未接入记忆读路径"),
+    # semantic_cache 条目移除：089897a 已把 cache_hit_rate 接上 SemanticCache（#168 并入）；
+    # plan_quality 条目不恢复：master 4d03594 随子包化移除（包路径被隐含引用）。
     "maop.core.reliability.blackboard_engine_bridge": (
         "unwired",
         "黑板↔M0 分布式执行后端的桥，DistributedTaskBackend 未构造它",
+    ),
+    "maop.core.coordination.a2a_gateway": (
+        "unwired",
+        (
+            "阶段3 A2A 统一门户（PLAN_SCHEDULING_LAYERING.md 问题#7）："
+            "集成测试已覆盖，dashboard lifespan 接线在途"
+        ),
+    ),
+    "maop.core.scheduling.health_service": (
+        "unwired",
+        (
+            "阶段1 统一健康探测（PLAN_SCHEDULING_LAYERING.md 任务1.2）："
+            "联邦 e2e 测试已覆盖，dashboard 启动接线在途"
+        ),
     ),
     "maop.core.reliability.dag_scheduler": ("unwired", "DAG 调度器未接线"),
     "maop.core.reliability.distributed_checkpoint": (

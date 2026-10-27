@@ -116,11 +116,30 @@ def _cleanup_dag_ws(
     heartbeat_task: asyncio.Task | None,
     push_task: asyncio.Task | None,
 ) -> None:
-    """Cleanup DAG WebSocket resources: cancel tasks and unsubscribe."""
-    if heartbeat_task:
-        heartbeat_task.cancel()
-    if push_task:
-        push_task.cancel()
+    """Cleanup DAG WebSocket resources: cancel tasks and unsubscribe.
+
+    Tasks are cancelled here; a done callback is registered on each so that any
+    non-cancellation exception they raised is logged instead of surfacing later
+    as "Task was destroyed but it is pending!" when the event loop closes.
+    """
+    for task in (heartbeat_task, push_task):
+        if task is not None and not task.done():
+            task.cancel()
+
+    def _log_task_exc(t: asyncio.Task) -> None:
+        try:
+            if t.cancelled():
+                return
+            exc = t.exception()
+            if exc is not None:
+                logger.exception("[dag-ws] background task failed: %r", exc)
+        except Exception:  # pragma: no cover — defensive
+            pass  # silent-ok: defensive-probe — 异常日志回调自身失败不再外抛
+
+    for task in (heartbeat_task, push_task):
+        if task is not None:
+            task.add_done_callback(_log_task_exc)
+
     try:
         bus.unsubscribe(node_topic, on_node)
     except Exception:

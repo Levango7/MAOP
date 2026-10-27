@@ -424,6 +424,26 @@ def start(
         _write_pid(root, proc.pid)
         logger.info("MAOP started: pid=%d, dashboard=%s:%d", proc.pid, host, port)
 
+        # 立即检查子进程是否已提前退出（端口占用、模块导入失败等）。
+        # 否则 start() 会返回 STARTING 而进程已死，调用方毫无感知。
+        if proc.poll() is not None:
+            _stderr_drain.join(timeout=2.0)
+            stderr_output = b"".join(_stderr_buf).decode(
+                "utf-8", errors="replace"
+            )[-500:]
+            _remove_pid(root)
+            logger.error("MAOP subprocess exited immediately: %s", stderr_output)
+            return SystemStatus(
+                status=ServiceStatus.ERROR,
+                pid=proc.pid,
+                config=DeployConfig(root_dir=str(root), dashboard_port=port),
+                components=[ComponentHealth(
+                    name="subprocess",
+                    status=HealthStatus.UNHEALTHY,
+                    message=f"Process exited immediately (rc={proc.returncode}): {stderr_output}",
+                )],
+            )
+
         # P2-P3 fix (M8): 就绪检查 — 轮询 health_check 直到成功或超时
         if wait_ready:
             components = _wait_for_ready(

@@ -39,6 +39,16 @@ from maop.core.scheduling.failure_detector import (
 )
 from maop.core.scheduling.worker_pool import WorkerRegistry
 
+try:  # AgentIdentity 联邦映射（阶段1：身份与健康）
+    from maop.core.agent.identity import get_agent_identity
+except Exception:  # pragma: no cover - 导入失败不应阻塞调度器
+    get_agent_identity = None  # type: ignore[assignment]
+
+try:  # AgentCatalog 健康标志（阶段1：身份与健康）
+    from maop.core.agent.registry.agent_catalog import AgentCatalog
+except Exception:  # pragma: no cover - 导入失败不应阻塞调度器
+    AgentCatalog = None  # type: ignore[assignment,misc]
+
 if TYPE_CHECKING:
     import redis  # noqa: F401
 
@@ -51,6 +61,15 @@ class DistributedScheduler(
     _ResultsMixin,
 ):
     """Dispatch a DAG of nodes to a Redis Streams task queue.
+
+    职责边界（阶段2 P1-1）：
+      * 只负责 **DAG 分层 + Redis Streams 分布式分发**：拓扑分层、入队
+        ``maop:tasks``、多 worker 能力亲和匹配、失败自动检测与重排、
+        结果聚合。
+      * 不负责单 agent 的直接执行与 driver 调用——这些属于
+        :class:`~maop.delegate.dispatch_core.Dispatcher`。
+      * 两者不互相调用：DistributedScheduler 不调用 Dispatcher.driver，
+        Dispatcher 不向 DistributedScheduler 入队。
 
     Parameters
     ----------
@@ -357,7 +376,42 @@ class DistributedScheduler(
     ) -> str:
         """Dispatch a single node to the task stream; return stream msg id."""
         capable = self._registry.capable_workers(node.affinity.required)
-        selected = self._select_worker(node.affinity.required, capable)
+
+        # 阶段1：身份与健康 — 过滤掉 unhealthy/drained 的 worker。
+        # worker_id 映射到 agent_name，再检查 AgentCatalog.healthy
+        # 和 FailurePatternDetector weight。
+        healthy_capable: list[str] = []
+        if get_agent_identity is not None and AgentCatalog is not None:
+            _identity = get_agent_identity()
+            _catalog = AgentCatalog.default()
+            _detector = self._failure_detector
+            for wid in capable:
+                agent_names = _identity.resolve_agent_name(worker_id=wid)
+                if agent_names is None:
+                    # 找不到映射，保守放行（避免误杀未注册的 worker）
+                    healthy_capable.append(wid)
+                    continue
+                agent_name = agent_names
+                _desc = _catalog.get(agent_name)
+                if _desc is not None and not _desc.healthy:
+                    logger.debug(
+                        "[dist-sched] skipping unhealthy agent=%s (worker=%s)",
+                        agent_name, wid,
+                    )
+                    continue
+                if _detector.get_weight(agent_name) <= 0.0:
+                    logger.debug(
+                        "[dist-sched] skipping drained agent=%s (worker=%s)",
+                        agent_name, wid,
+                    )
+                    continue
+                healthy_capable.append(wid)
+        else:
+            healthy_capable = list(capable)
+
+        selected = self._select_worker(
+            node.affinity.required, capable=healthy_capable,
+        )
         if not capable and node.affinity.required:
             logger.warning(
                 "[dist-sched] node %s requires affinity %s but no capable worker; "

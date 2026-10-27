@@ -59,7 +59,7 @@ router = APIRouter(prefix="/api/agent-versions", tags=["agent-versions"])
 # ── Endpoints: 创建版本 ──────────────────────────────────────────
 
 
-@router.post("")
+@router.post("", include_in_schema=False, deprecated=True)
 @handle_api_errors
 async def create_version(
     body: VersionCreate, request: Request
@@ -117,7 +117,7 @@ async def list_versions(
 # ── Endpoints: 获取版本详情 ──────────────────────────────────────
 
 
-@router.get("/{version_id}")
+@router.get("/{version_id}", include_in_schema=False, deprecated=True)
 @handle_api_errors
 async def get_version(version_id: str, request: Request) -> dict[str, Any]:
     """获取版本详情 — 已认证, IDOR 防护."""
@@ -139,7 +139,7 @@ async def get_version(version_id: str, request: Request) -> dict[str, Any]:
 # ── Endpoints: 更新版本 ──────────────────────────────────────────
 
 
-@router.put("/{version_id}")
+@router.put("/{version_id}", include_in_schema=False, deprecated=True)
 @handle_api_errors
 async def update_version(
     version_id: str,
@@ -166,7 +166,7 @@ async def update_version(
 # ── Endpoints: 删除版本 ──────────────────────────────────────────
 
 
-@router.delete("/{version_id}")
+@router.delete("/{version_id}", include_in_schema=False, deprecated=True)
 @handle_api_errors
 async def delete_version(version_id: str, request: Request) -> dict[str, Any]:
     """删除版本 — admin only. 软删除: 状态置为 deleted."""
@@ -283,7 +283,7 @@ async def configure_canary(
 # ── Endpoints: 查询灰度发布状态 ──────────────────────────────────
 
 
-@router.get("/{version_id}/canary")
+@router.get("/{version_id}/canary", include_in_schema=False, deprecated=True)
 @handle_api_errors
 async def get_canary(version_id: str, request: Request) -> dict[str, Any]:
     """查询灰度发布状态 — 已认证. 返回该版本所有灰度记录."""
@@ -307,7 +307,7 @@ async def get_canary(version_id: str, request: Request) -> dict[str, Any]:
 # ── Endpoints: 查询版本指标 ──────────────────────────────────────
 
 
-@router.get("/{version_id}/metrics")
+@router.get("/{version_id}/metrics", include_in_schema=False, deprecated=True)
 @handle_api_errors
 async def get_version_metrics(version_id: str, request: Request) -> dict[str, Any]:
     """查询版本指标 — 已认证.
