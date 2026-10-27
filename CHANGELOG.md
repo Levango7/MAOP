@@ -39,7 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-（暂无）
+### services 层拆分运动：agent_service + evolution_service
+
+- **agent_service.py**（843 → 479 行）：§1 Agent Catalog → `services/agent/catalog.py`（243 行），
+  §3-4 Agent Proxy/Gateway → `services/agent/gateway.py`（277 行），`services/agent/__init__.py` 聚合。
+  父模块保留 §2 Agent Router + §5 Collaboration + §6 SubAgent + 转发 import（`__all__` 不变）
+  + PEP 562 `__getattr__`（代理子模块模块级变量 `_agent_proxy` 等，兼容 test 直接访问）。
+- **evolution_service.py**（806 → 601 行）：F2-01 Evolution Loop AC-07 → `services/evolution/loop.py`（277 行），
+  `services/evolution/__init__.py` 聚合。父模块保留 evolution_experiment + evolve_insights + 转发 import。
+- allowlist 6→4（移除 agent_service + evolution_service）。门禁全绿 + agent 396 / evolution 223 测试。
 
 ## [5.5.0] — 2026-10-27
 

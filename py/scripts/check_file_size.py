@@ -50,10 +50,6 @@ ALLOWED_OVERSIZE: dict[str, str] = {
         "路由注册聚合点；拆分需先拆 router 模块（与 ROUTES 清单联动）",
     "maop/core/scheduling/distributed_scheduler.py":
         "分布式调度核心；拆分排期：结果流/失败检测/选工三块",
-    "maop/dashboard/services/agent_service.py":
-        "拆分排期：下一批 services 层拆分运动（chat_service 已完成）",
-    "maop/dashboard/services/evolution_service.py":
-        "拆分排期：下一批 services 层拆分运动（chat_service 已完成）",
 }
 
 
