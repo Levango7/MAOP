@@ -29,6 +29,7 @@ would only re-state the assumption under test.
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -433,11 +434,40 @@ def test_the_summary_success_rate_is_a_percentage(client: TestClient) -> None:
     assert 0.0 <= data["success_rate_pct"] <= 100.0
 
 
-def test_task_trends_bucket_success_and_failure(client: TestClient) -> None:
-    data = client.get("/api/analysis/task-trends").json()["data"]
+def test_task_trends_bucket_success_and_failure(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """分桶契约：同一 UTC 日的一成一败必须落进**一个**桶，且**不看真实时钟**。
+
+    以前这条不带参数请求（走 ``_parse_date_range`` 的"最近 24h"回退），事件时间戳用
+    夹具里的 ``now-3600`` / ``now-1800`` —— 两个都是真实时钟的函数，于是 **UTC 午夜后
+    一小时内跑就是两个桶**：本机（UTC+8）实测红，CI 因为一天内跑完而看不见这个红。
+    "要等午夜才能复现"本身就是这条用例的缺陷。所以这里不冻时钟、也不把期望值 1 改成
+    2 凑绿，而是整条改用**字面日**：显式给出覆盖该日的区间 + 该日内的两个固定时刻。
+    任何时刻跑都是同一份输入 ⇒ 恒为 1 个桶。
+    """
+    day = "2026-10-27"
+    day_start = datetime(2026, 10, 27, tzinfo=timezone.utc).timestamp()
+    monkeypatch.setattr(
+        data_service, "_get_audit_events",
+        lambda limit=5000: [
+            {
+                "timestamp": day_start + 9 * 3600,
+                "action": "task.run", "level": "info", "detail": {},
+            },
+            {
+                "timestamp": day_start + 8 * 3600 + 1800,
+                "action": "task.run", "level": "error", "detail": {},
+            },
+        ],
+    )
+
+    url = f"/api/analysis/task-trends?date_from={day}T00:00:00Z&date_to={day}T23:59:59Z"
+    data = client.get(url).json()["data"]
     assert data["granularity"] == "day"
     assert data["bucket_count"] == len(data["series"]) == 1
     bucket = data["series"][0]
+    assert bucket["bucket"] == day
     assert bucket["success"] == 1
     assert bucket["failure"] == 1
     assert bucket["timeout"] == 0
