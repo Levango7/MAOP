@@ -47,7 +47,11 @@ from maop.dashboard.routers.analysis_schemas import (
     SummaryEnvelope,
     TaskTrendsEnvelope,
 )
-from maop.dashboard.services import data_service
+
+# 深分析实现已切到 services/data/analysis.py（文件规模棘轮，2026-10-27）；
+# helper 在**该模块**里解析，patch 必须打在它上面（打在 data_service 上
+# 只改转发绑定，实现读不到）。
+from maop.dashboard.services.data import analysis as analysis_impl
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ANALYSIS_VIEW = REPO_ROOT / "dashboard-enterprise" / "src" / "views" / "Analysis.vue"
@@ -235,25 +239,33 @@ def analysis_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Real producers, faked backends."""
     monkeypatch.setattr(analysis_router, "require_admin", lambda request: None)
     monkeypatch.setattr(state, "get_bridge", lambda: _FakeBridge())
-    monkeypatch.setattr(data_service, "_get_cost_tracker", lambda: _FakeTracker())
-    monkeypatch.setattr(data_service, "_safe_psutil", lambda: _FakePsutil())
+    monkeypatch.setattr(analysis_impl, "_get_cost_tracker", lambda: _FakeTracker())
+    monkeypatch.setattr(analysis_impl, "_safe_psutil", lambda: _FakePsutil())
     monkeypatch.setattr(
-        data_service, "_get_db_pool_stats",
+        analysis_impl, "_get_db_pool_stats",
         lambda: {"max_size": 8, "in_use": 3, "available": 5},
     )
     monkeypatch.setattr(
-        data_service, "_get_cache_stats",
+        analysis_impl, "_get_cache_stats",
         lambda: {
             "hits": 9, "misses": 1, "evictions": 0,
             "size": 10, "max_size": 100, "hit_rate": 0.9,
         },
     )
     now = time.time()
+    # 两个事件必须落在**同一个 UTC 自然日**：原先固定 now-3600 / now-1800，
+    # 每天 UTC 00:00–01:00 之间两事件跨日 ⇒ bucket_count == 1 的断言假红
+    #（2026-10-27 00:2x UTC 实测复现，属午夜边界 flaky，与实现无关）。
+    # 锚定「今天已过时长」的后半段：同一天、且不晚于现在。
+    day_start = now - (now % 86400)
+    span = max(1.0, now - day_start)
+    evt_a = day_start + span * 0.5
+    evt_b = day_start + span
     monkeypatch.setattr(
-        data_service, "_get_audit_events",
+        analysis_impl, "_get_audit_events",
         lambda limit=5000: [
-            {"timestamp": now - 3600, "action": "task.run", "level": "info", "detail": {}},
-            {"timestamp": now - 1800, "action": "task.run", "level": "error", "detail": {}},
+            {"timestamp": evt_a, "action": "task.run", "level": "info", "detail": {}},
+            {"timestamp": evt_b, "action": "task.run", "level": "error", "detail": {}},
         ],
     )
     monkeypatch.setattr(
