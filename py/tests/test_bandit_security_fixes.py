@@ -76,7 +76,7 @@ NOSEC_INVENTORY: frozenset[str] = frozenset({
     "maop/dashboard/routers/agent_versions_helpers.py:B608:1",
     "maop/dashboard/services/agent_versions_service.py:B608:8",
     "maop/dashboard/services/auth_service.py:B608:1",
-    "maop/dashboard/services/chat_service.py:B608:10",
+    "maop/dashboard/services/chat/feedback.py:B608:10",
     "maop/deploy.py:B310:1",
     "maop/memory/search.py:B608:7",
     "maop/memory/store.py:B608:1",

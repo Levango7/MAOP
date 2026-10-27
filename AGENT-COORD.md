@@ -35,3 +35,14 @@
   不要往同一个 spec 文件里加用例。
 - `py/maop/core/scheduling/`、`py/maop/core/reliability/`、`py/maop/engine_utils.py`——
   本会话近几轮的主战场（批 B/C + 批量化），如需动这些文件先看本表上方条目。
+
+## 已完成的领地操作（2026-10-27）
+
+- **chat_service.py 拆分**（1152 → 482 行）：§2 Stream → `services/chat/streaming.py`（251 行），
+  §5 Feedback → `services/chat/feedback.py`（503 行）。父模块保留 §1 Chat + §3 React + §4 Debate
+  + 转发 import（`__all__` 不变）。allowlist 条目移除（7→6），nosec inventory 条目更新
+  （`chat_service.py:B608:10` → `chat/feedback.py:B608:10`）。门禁全绿：ruff / mypy /
+  file-size / silent-exceptions / config-drift / api-contract / wiring / docs-consistency /
+  bandit nosec。目标测试 50 passed。
+- **data_service.py 拆分**（1185 → 509 行，PR #171 已合并）：§2 Logs → `services/data/logs.py`，
+  §3 Analysis → `services/data/analysis.py`。详见 PR #171。
