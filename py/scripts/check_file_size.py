@@ -44,8 +44,6 @@ ALLOWED_OVERSIZE: dict[str, str] = {
         "先决条件：批量训练特征要改成执行期观测来的真值（现在由 _infer_gates 重建），"
         "并为持久化模型加 feature_schema 标记 —— 详见 tests/test_plan_quality.py::"
         "test_online_learning_flips_structural_ranking 的 xfail 说明",
-    "maop/dashboard/services/data_service.py":
-        "拆分排期：按域切 dashboard/services/data/（查询/导出/聚合三块）",
     "maop/dashboard/services/chat_service.py":
         "拆分排期：会话存储与流式输出分离，参照 mcp_hub 拆法",
     "maop/core/agent/registry/preset_agents.py":
