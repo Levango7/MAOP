@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 # Match failure-relevant lines in pytest output.
-_MATCH = re.compile(r"FAILED|Error|assert|raise|Traceback", re.I)
+_MATCH = re.compile(r"FAILED|Error|assert|raise|Traceback", re.IGNORECASE)
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 _MAX_LINES = 20

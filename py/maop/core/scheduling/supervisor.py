@@ -56,7 +56,6 @@ from typing import Any
 from maop.core.observability.metrics import get_metrics
 from maop.core.scheduling.failure_detector import (
     FailurePatternDetector,
-    _AgentState,
     get_failure_detector,
 )
 from maop.core.scheduling.supervisor_action import SupervisorActionMixin

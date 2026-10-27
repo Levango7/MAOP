@@ -12,30 +12,23 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from maop.core.scheduling.failure_detector import (  # noqa: E402
+from maop.core.scheduling.failure_detector import (
     FailurePatternDetector,
     get_failure_detector,
     get_supervisor,
     set_failure_detector,
     set_supervisor,
 )
-from maop.core.scheduling.supervisor import (  # noqa: E402
-    AgentOperationalStatus,
+from maop.core.scheduling.supervisor import (
     AlertLevel,
-    DispatchDecision,
-    HealthProbe,
-    RuleEngine,
     Supervisor,
     SupervisorAction,
-    SupervisorRule,
     default_rules,
 )
 

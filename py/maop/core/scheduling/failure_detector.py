@@ -556,7 +556,6 @@ def get_supervisor() -> Any | None:
     returns ``None`` so callers can branch with ``if supervisor is not None:``
     and degrade to current behaviour.
     """
-    global _supervisor_instance
     with _detector_lock:
         return _supervisor_instance
 

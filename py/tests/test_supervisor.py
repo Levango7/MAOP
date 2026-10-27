@@ -54,10 +54,12 @@ from maop.core.scheduling.supervisor import (
 def supervisor():
     """Fresh Supervisor with a small window for fast test transitions."""
     s = Supervisor(
-        window_size=10,
-        failure_rate_threshold=0.30,
-        timeout_threshold=1.0,
-        recovery_consecutive_successes=3,
+        detector=FailurePatternDetector(
+            window_size=10,
+            failure_rate_threshold=0.30,
+            timeout_threshold=1.0,
+            recovery_consecutive_successes=3,
+        ),
         patrol_interval_s=0.05,  # fast for tests
     )
     set_supervisor(s)
@@ -72,12 +74,14 @@ def supervisor_with_bus():
 
     bus = EventBus()
     s = Supervisor(
-        window_size=10,
-        failure_rate_threshold=0.30,
-        timeout_threshold=1.0,
-        recovery_consecutive_successes=3,
+        detector=FailurePatternDetector(
+            window_size=10,
+            failure_rate_threshold=0.30,
+            timeout_threshold=1.0,
+            recovery_consecutive_successes=3,
+            event_bus=bus,
+        ),
         patrol_interval_s=0.05,
-        event_bus=bus,
     )
     set_supervisor(s)
     yield s, bus
