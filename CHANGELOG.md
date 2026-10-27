@@ -39,6 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 拆分收尾：质量门禁清单同步（PR #172 CI 修复）
+
+- `check_file_size.py` ALLOWED_OVERSIZE 清零 —— 最后一条 distributed_scheduler.py 已拆为
+  6 文件子包，全仓进入"无豁免"状态（白名单只许减的棘轮首次归零）
+- `test_dead_wiring_inventory.py` KNOWN_ORPHANS 移除 preset_agents + plan_quality ——
+  两模块子包化后按口径被排除在孤儿扫描之外（包由子模块/包路径隐含引用）
+- `_failure.py` TimeoutError 处理器恢复"单行 except + silent-ok 标记同行"——拆分时的
+  跨行改写让 `_marker_on` 扫不到标记（只扫 except 头行与首语句行），被误报为静默处理器；
+  Docs consistency gate 红灯同根因
+- 本地验证：门禁 32 例 + 分布式 132 例全绿；silent / filesize 两脚本 exit 0
+
 ### services 层拆分运动：distributed_scheduler 子包化
 
 - **distributed_scheduler.py**（950 行 → 6 文件子包）：

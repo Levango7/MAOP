@@ -78,7 +78,6 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.core.agent.ops.result_cache": ("unwired", "agent ops 子包整组未接线"),
     "maop.core.agent.ops.sandbox_executor": ("unwired", "agent ops 子包整组未接线"),
     "maop.core.agent.ops.tenant_isolation": ("unwired", "agent ops 子包整组未接线"),
-    "maop.core.agent.registry.preset_agents": ("unwired", "预置 agent 未接入注册表初始化"),
     "maop.core.agent.router.health_check_scheduler": (
         "unwired",
         "健康检查调度器无生产调用方（本批修过它的 flake 测试，但没人启动它）",
@@ -106,14 +105,6 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.core.memory.multimodal_av_contracts": (
         "unwired",
         "音视频契约层：全仓零引用 —— maop/ 与 tests/ 里没有任何导入方，连测试都没碰它",
-    ),
-    "maop.core.memory.plan_quality": (
-        "unwired",
-        (
-            "F2-04 计划质量学习链仅测试引用。批量训练特征由 _infer_gates(routing_key)+默认预算**重建**"
-            "而非执行期观测 ⇒ 结构排序主张当前不成立（见 test_plan_quality.py::"
-            "test_online_learning_flips_structural_ranking 的 xfail 与前置条件）"
-        ),
     ),
     "maop.core.memory.semantic_cache": ("unwired", "语义缓存未接入记忆读路径"),
     "maop.core.reliability.blackboard_engine_bridge": (

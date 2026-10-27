@@ -48,9 +48,7 @@ class _FailureDetectionMixin:
                     stop.wait(),
                     timeout=self._failure_check_interval,
                 )
-            except (
-                asyncio.TimeoutError
-            ):  # silent-ok: expected-signal — 超时/不存在即等待的信号，非错误
+            except asyncio.TimeoutError:  # silent-ok: expected-signal — 超时/不存在即等待的信号，非错误
                 continue
             else:
                 return

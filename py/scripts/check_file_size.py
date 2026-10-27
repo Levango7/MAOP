@@ -38,10 +38,9 @@ EXEMPT_PREFIXES: tuple[str, ...] = ("maop/migrations/",)
 
 #: Files above the threshold at gate-introduction time (2026-10-12).
 #: Each entry needs a reason and a split schedule; entries may only be REMOVED.
-ALLOWED_OVERSIZE: dict[str, str] = {
-    "maop/core/scheduling/distributed_scheduler.py":
-        "分布式调度核心；拆分排期：结果流/失败检测/选工三块",
-}
+#: 2026-10-27 清零：最后一个条目 distributed_scheduler.py 已拆成 6 文件子包，
+#: 全仓文件规模门禁从"白名单放行"进入"无豁免"状态。
+ALLOWED_OVERSIZE: dict[str, str] = {}
 
 
 def _rel(path: pathlib.Path) -> str:
