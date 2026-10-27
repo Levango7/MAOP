@@ -17,13 +17,38 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
+from maop.config.env import get_root_dir
+from maop.config.loader import load_config
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers import state
 from maop.dashboard.services import routing_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/routing", tags=["routing"])
+
+
+def _resolve_root() -> str:
+    return str(get_root_dir(default=str(state.MAOP_ROOT)))
+
+
+@router.get("")
+@handle_api_errors("routing preview root")
+async def routing_root(request: Request) -> dict[str, Any]:
+    """GET /api/routing — 返回所有路由列表，供前端 Tools.vue 根路径调用。"""
+    require_admin(request)
+    root = _resolve_root()
+    config = load_config(root)
+    routes = []
+    for rk, route in config.routing.items():
+        routes.append({
+            "routing_key": rk,
+            "primary": route.primary,
+            "fallback": route.fallback or None,
+            "tertiary": route.tertiary or None,
+        })
+    return {"status": "ok", "data": {"routes": routes}}
 
 
 @router.post("/match")

@@ -111,6 +111,15 @@ async def disconnect_server(server_name: str, request: Request) -> dict[str, Any
     return await plugin_service.disconnect_server(server_name)
 
 
+@router.get("", response_model=ServerListEnvelope)
+@handle_api_errors
+async def mcp_root(request: Request) -> dict[str, Any]:
+    """GET /api/mcp — 聚合返回 servers 列表与计数，供前端 Tools.vue 根路径调用。"""
+    require_admin(request)
+    result = plugin_service.list_servers()
+    return {"status": "ok", **result}
+
+
 @router.get("/servers", response_model=ServerListEnvelope)
 @handle_api_errors
 async def list_servers(request: Request) -> dict[str, Any]:
