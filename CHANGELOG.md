@@ -73,6 +73,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **evolution_service.py**（806 → 601 行）：F2-01 Evolution Loop AC-07 → `services/evolution/loop.py`（277 行），
   `services/evolution/__init__.py` 聚合。父模块保留 evolution_experiment + evolve_insights + 转发 import。
 - allowlist 6→4（移除 agent_service + evolution_service）。门禁全绿 + agent 396 / evolution 223 测试。
+### Added
+
+- **DAG 执行路径接上租户归属**（补 `docs/configuration.md`「多租户（企业版）现状与边界」
+  2026-10-06 那张表里列的第 ①②③ 步）。此前 `POST /api/dag/execute` 整条链上**读不到租户身份**，
+  所以在漏斗里加任何门都做出来是空开关 —— 文档当时就是这么记的。现在：
+
+  - 路由用 `core/tenant/context.py` 的**唯一**入口从认证态取身份（**绝不从请求体取**：那是 G-07
+    修过的越权口子），非空时用 `tenant_context()` 包住整次执行，下游 `current_tenant()` 读得到；
+    响应体新增 `tenant_id`。
+  - 新增租户生命周期门：租户登记为 `suspended` / `terminated`、或**登记表非空却查无此租户**时 403。
+    三种"无从检查"**故意**放行 —— 没有租户身份（个人版/认证关闭）、企业租户能力不可用
+    （未装包或 edition 未开 `tenant_isolation`）、登记表为空（没接租户库）。把"查不到"读成
+    "不许"的门会把所有未接租户库的部署一律打死，比没有门更糟：它看起来在工作。
+  - **未**接 `check_agent_access` / `check_resource_quota`：企业版 `TenantManager` 根本没有
+    `check_agent_access`，其用量只能从 PG 载入、MAOP 侧没有写入路径，硬接就是一个恒不触发的假门。
+    该项仍是未接线事实，见文档表格；`chat` 与 `maop run` 两条入口也还没接。
+
+  新守卫 `py/tests/test_dag_tenant_attribution.py`（18 条）。变异验证逐条有射程：去掉
+  `tenant_context` 包裹 → 2 红；空登记表也判拒 → 1 红；`try_get_manager` 退回只挡
+  `ImportError`（即那版会把个人版每次 DAG 执行打成 500 的实现）→ 3 红；路由不再抛 403 → 2 红；
+  给请求模型加租户字段或改 `extra="allow"` → 各 1 红。
 
 ## [5.5.0] — 2026-10-27
 

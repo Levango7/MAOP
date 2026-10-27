@@ -72,6 +72,7 @@ async def auto_split(
 
 async def execute_dag(
     *, nodes: list[dict[str, Any]], edges: list[dict[str, Any]],
+    tenant_id: str = "",
 ) -> dict[str, Any]:
     """执行前端工作流编辑器导出的 DAG，返回 trace_id + 步骤结果.
 
@@ -84,11 +85,17 @@ async def execute_dag(
         DAG 节点列表。
     edges : list[dict]
         DAG 边列表（source→target）。
+    tenant_id : str
+        本次执行所属租户，**只能由调用方从认证态取**（见
+        ``core/tenant/context.py::tenant_id_from_request``）。非空时用
+        ``tenant_context()`` 包住整次执行，使编排链下游
+        ``current_tenant()`` 读得到身份；空串（个人版/认证关闭）也照样设进
+        作用域 —— "明确知道没有租户"与"没人设过"对下游是两回事。
 
     Returns
     -------
     dict
-        ``{"run_id": str, "success": bool, "steps": list}``。
+        ``{"run_id": str, "success": bool, "tenant_id": str, "steps": list}``。
 
     Raises
     ------
@@ -156,10 +163,14 @@ async def execute_dag(
                 error="Step execution failed",
             )
 
-    result = await Engine(step_executor=_default_step_executor).run(steps)
+    from maop.core.tenant.context import tenant_context
+
+    with tenant_context(tenant_id):
+        result = await Engine(step_executor=_default_step_executor).run(steps)
     return {
         "run_id": result.trace_id,
         "success": result.success,
+        "tenant_id": tenant_id,
         "steps": [s.model_dump() for s in result.steps],
     }
 

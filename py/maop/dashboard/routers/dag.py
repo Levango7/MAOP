@@ -22,8 +22,9 @@ from pydantic import BaseModel, Field
 
 from maop.core.scheduling.task_splitter import TaskSplitError
 from maop.core.security.middleware import require_admin
+from maop.core.tenant.context import tenant_id_from_request
 from maop.dashboard.error_handler import handle_api_errors
-from maop.dashboard.services import execution_service
+from maop.dashboard.services import execution_service, tenant_service
 
 logger = logging.getLogger(__name__)
 
@@ -95,12 +96,21 @@ async def execute_dag(
 
     将编辑器节点（agent/tool/condition/parallel）映射为 :class:`WorkflowStep`，
     按 edges 推导依赖关系后调用 :class:`Engine` 执行。需要管理员权限。
+
+    租户归属取自认证态（``request.state.tenant_id``，由中间件按 JWT claim 写入），
+    **不从请求体取** —— 那是 G-07 修过的越权口子（调用方可以随便声明自己属于哪个
+    租户）。租户被登记为 suspended / terminated、或租户表非空却查无此租户时拒绝。
     """
     require_admin(request)
+    tenant_id = tenant_id_from_request(request)
+    block_reason = tenant_service.execution_block_reason(tenant_id)
+    if block_reason:
+        raise HTTPException(status_code=403, detail=block_reason)
     try:
         result = await execution_service.execute_dag(
             nodes=body.nodes,
             edges=body.edges,
+            tenant_id=tenant_id,
         )
         return {"status": "ok", **result}
     except ValueError as exc:
