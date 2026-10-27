@@ -449,7 +449,7 @@ def test_task_trends_bucket_success_and_failure(
     day = "2026-10-27"
     day_start = datetime(2026, 10, 27, tzinfo=timezone.utc).timestamp()
     monkeypatch.setattr(
-        data_service, "_get_audit_events",
+        analysis_impl, "_get_audit_events",
         lambda limit=5000: [
             {
                 "timestamp": day_start + 9 * 3600,
