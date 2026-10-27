@@ -703,27 +703,32 @@ def test_get_supervisor_returns_none_when_unconfigured():
     assert get_supervisor() is None
 
 
-def test_supervisor_inherits_failure_detector():
-    """Supervisor is a FailurePatternDetector (polymorphism)."""
+def test_supervisor_composes_failure_detector():
+    """Supervisor 组合 FailurePatternDetector（不再继承），被动 API 委派正常。"""
     s = Supervisor()
-    assert isinstance(s, FailurePatternDetector)
-    # All passive APIs still work.
+    assert not isinstance(s, FailurePatternDetector)
+    # 被动检测 API 在 Supervisor 上直接可用，委派给内部 detector。
     s.record_result("a", success=True, latency=0.1)
     assert s.get_weight("a") == 1.0
     stats = s.get_stats()
     assert "agents" in stats
+    health = s.get_agent_health("a")
+    assert health is not None
 
 
-def test_supervisor_set_supervisor_polymorphism():
-    """set_supervisor makes get_failure_detector return the Supervisor."""
+def test_get_supervisor_independent_slot():
+    """get_supervisor() / set_supervisor() 操作独立于 get_failure_detector() 槽位。"""
+    set_supervisor(None)
+    assert get_supervisor() is None
     s = Supervisor()
     set_supervisor(s)
+    assert get_supervisor() is s
+    # get_failure_detector() 返回独立的 FailurePatternDetector 单例，不受 Supervisor 影响。
     from maop.core.scheduling.failure_detector import get_failure_detector
-
-    detector = get_failure_detector()
-    assert detector is s
-    assert isinstance(detector, Supervisor)
+    fd = get_failure_detector()
+    assert fd is not s
     set_supervisor(None)
+    assert get_supervisor() is None
 
 
 # ── 11. Dashboard API ─────────────────────────────────────────────
