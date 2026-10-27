@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### services 层拆分运动：distributed_scheduler 子包化
+
+- **distributed_scheduler.py**（950 行 → 6 文件子包）：
+  - `_models.py` — `_SCHED_NS` 常量、`_F_*` 字段名、`NodeAffinity`、`TaskAssignment`、
+    `_NodeSpec`、`DistributedResult`、`SchedulingError`、`_json_dumps`、`_decode`、`node_spec_from_step`
+  - `_worker_selection.py` — `_WorkerSelectionMixin._select_worker`（affinity 加权选择）
+  - `_failure.py` — `_FailureDetectionMixin._failure_detection_loop`（心跳巡检）
+  - `_results.py` — `_ResultsMixin._read_results` / `_merge_spawns` / `_parse_stream_id` / `post_result`
+  - `_scheduler.py` — `DistributedScheduler`（`__init__` + `run` + `_compute_layers` + `_dispatch_and_collect` + `_dispatch_node` + properties + `__repr__`）
+  - `__init__.py` — 公开 API 转发（`__all__` 完整覆盖外部导入）
+- 外部导入路径不变：`from maop.core.scheduling.distributed_scheduler import DistributedScheduler` 等全部兼容
+- 门禁全绿：ruff / mypy / 117 tests（distributed_execution + audit_fixes + failure_detector + e2e）
+- Mimosa 安全钩子拦截 f-string format specifier（`!r`/`:.0f`）于 raise 语句 → 改用 plain interpolation
+
 ### services 层拆分运动：agent_service + evolution_service
 
 - **agent_service.py**（843 → 479 行）：§1 Agent Catalog → `services/agent/catalog.py`（243 行），

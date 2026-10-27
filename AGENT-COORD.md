@@ -55,3 +55,9 @@
 - **evolution_service.py 拆分**（806 → 601 行）：F2-01 Evolution Loop AC-07 → `services/evolution/loop.py`（277 行），
   `services/evolution/__init__.py` 聚合。父模块保留 evolution_experiment + evolve_insights + 转发 import。
   allowlist 移除（6→4）。门禁全绿。evolution 测试 223 passed（14 文件）。
+- **distributed_scheduler.py 拆分**（950 → 6 文件子包）：`_models.py`（常量/数据类/异常）、
+  `_worker_selection.py`（_WorkerSelectionMixin）、`_failure.py`（_FailureDetectionMixin）、
+  `_results.py`（_ResultsMixin）、`_scheduler.py`（DistributedScheduler 组合 + DAG 执行）、
+  `__init__.py`（公开 API 转发）。外部导入路径不变。门禁全绿：ruff / mypy / 117 tests。
+  commit `89d2603`。Mimosa 拦 f-string format specifier（`!r`/`:.0f`）于 raise 语句 →
+  改用 plain interpolation（无 format specifier），错误消息由 logger.error 承载详情。
