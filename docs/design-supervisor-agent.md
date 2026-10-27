@@ -1135,7 +1135,7 @@ async def api_supervisor_action(body: SupervisorActionRequest) -> dict[str, Any]
 | 文件路径 | 修改内容 | 兼容性 |
 |----------|----------|--------|
 | `py/maop/core/scheduling/failure_detector.py` | 模块底部新增 `get_supervisor()` / `set_supervisor()` 单例访问函数；`AgentHealth` 扩展 `operational_status` 字段；**[C-1] 修正 `_publish_event` 方法：`emit()` → `publish(Event)`，TYPE_CHECKING 导入从 `enterprise.notification.event_bus` 更新为 `core.reliability.event_bus`** | `get_failure_detector()` 保留，`Supervisor` 继承故既有调用零改动；`operational_status` 默认值兼容原 `status`；`_publish_event` 修正后统一使用 `core.reliability.event_bus.EventBus`，与 `engine.py` 导入一致 |
-| `py/maop/dashboard/_register_routes.py` | 注册 `supervisor` 路由 | 新增注册行，既有路由不变 |
+| `py/maop/dashboard/_register_routes/` | 注册 `supervisor` 路由 | 新增注册行，既有路由不变 |
 | `py/maop/engine.py` | `_execute_step()` 插入 `check_before_dispatch` / `check_after_dispatch` 调用 | 监督者未配置时退化为现状（`supervisor is None` 分支） |
 | `py/maop/loop_executor.py` | `_execute_with_retry()` 替换固定重试为 `get_retry_strategy` 动态策略 | 监督者未配置时退化为现有 `lc.iterative_max_attempts` |
 

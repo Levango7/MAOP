@@ -831,7 +831,7 @@ async def controller_status() -> dict[str, Any]:
 
 #### 2.5.3　路由注册集成
 
-在 `py/maop/dashboard/_register_routes.py` 的 `register_routers(app)` 函数中，参照 `knowledge` 路由的注册方式新增：
+在 `py/maop/dashboard/_register_routes/` 的 `register_routers(app)` 函数中，参照 `knowledge` 路由的注册方式新增：
 
 ```python
 # 代码示例：路由注册集成（Python）
@@ -859,7 +859,7 @@ logger.info("[server] Router: blackboard enabled")
 
 | 文件路径 | 修改内容 | 影响范围 |
 |----------|----------|----------|
-| `py/maop/dashboard/_register_routes.py` | 在 `register_routers(app)` 中新增 `blackboard` 路由注册（4 行，参照 `knowledge` 路由模式） | 仅新增 include_router，无破坏性变更 |
+| `py/maop/dashboard/_register_routes/` | 在 `register_routers(app)` 中新增 `blackboard` 路由注册（4 行，参照 `knowledge` 路由模式） | 仅新增 include_router，无破坏性变更 |
 | `py/maop/core/reliability/__init__.py` | 导出黑板核心类（`Blackboard`、`KnowledgeSource` 等），便于上层 `from maop.core.reliability import Blackboard` | 仅新增导出，向后兼容 |
 
 ### 3.3　数据库变更
@@ -893,7 +893,7 @@ routers/blackboard.py (路由)
     └─ 依赖 security/middleware.py (已有，require_admin)
     │
     ▼
-_register_routes.py (注册)
+_register_routes/ (注册)
     └─ 新增 include_router(blackboard_router.router)
 ```
 

@@ -33,7 +33,7 @@
 | `py/maop/engine.py`（631 行） | 执行引擎集成点 | 存在，`_execute_step()` 位于第 375 行，签名与设计文档一致 |
 | `py/maop/loop_executor.py`（270 行） | 循环执行器集成点 | 存在，`_execute_with_retry()` 使用 `lc.iterative_max_attempts`，集成方案可行 |
 | `py/maop/core/evolution/evolution_loop.py`（343 行） | 演化循环集成点 | 存在，`run_cycle()` 第 130 行，但 DEBATE 插入需修改方法体（见 3.3.2 节详述） |
-| `py/maop/dashboard/_register_routes.py` | 路由注册集成点 | 存在，黑板/辩论/监督者路由注册可行 |
+| `py/maop/dashboard/_register_routes/` | 路由注册集成点 | 存在，黑板/辩论/监督者路由注册可行 |
 
 ---
 
@@ -248,7 +248,7 @@ evaluate = self._phase_evaluate(debated_suggestions)  # 改参数
 **通过项**：
 
 - 分层复用关系清晰：黑板语义层复用 EventBus（事件分发）+ 三层记忆（持久化后端），不重写基础设施（design-blackboard.md:456-479）。
-- `py/maop/dashboard/_register_routes.py` 已验证存在，路由注册集成可行。
+- `py/maop/dashboard/_register_routes/` 已验证存在，路由注册集成可行。
 
 ### 4.2 风险性审核
 

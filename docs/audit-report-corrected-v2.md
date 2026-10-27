@@ -101,10 +101,10 @@ for dep_id in step.depends_on:
 
 | 文件 | 行号 | 值 |
 |------|------|-----|
-| `_register_routes.py` | 430 | `no-cache, no-store, must-revalidate` |
-| `_register_routes.py` | 439 | `public, max-age=3600` |
-| `_register_routes.py` | 449 | `public, max-age=86400` |
-| `_register_routes.py` | 536 | `no-cache, no-store, must-revalidate` |
+| `_register_routes/` | 430 | `no-cache, no-store, must-revalidate` |
+| `_register_routes/` | 439 | `public, max-age=3600` |
+| `_register_routes/` | 449 | `public, max-age=86400` |
+| `_register_routes/` | 536 | `no-cache, no-store, must-revalidate` |
 | `static.py` | 37 | `no-cache, no-store, must-revalidate` |
 | `static.py` | 50 | `public, max-age=3600` |
 | `static.py` | 64 | `public, max-age=86400` |
@@ -305,7 +305,7 @@ for dep_id in step.depends_on:
 
 ### 5.5 Cache-Control 设置
 
-全库共 10 处 Cache-Control 设置，分布于 `_register_routes.py`（4 处）、`static.py`（4 处）、`chat.py`（1 处）、`stream.py`（1 处）。"所有 API 响应未设置"的论断不成立。
+全库共 10 处 Cache-Control 设置，分布于 `_register_routes/`（4 处）、`static.py`（4 处）、`chat.py`（1 处）、`stream.py`（1 处）。"所有 API 响应未设置"的论断不成立。
 
 ### 5.6 无 executor 时误报 SUCCESS 已修复
 

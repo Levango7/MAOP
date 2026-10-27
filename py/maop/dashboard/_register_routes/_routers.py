@@ -1,51 +1,21 @@
-"""Route registration for the MAOP dashboard server.
+# _register_routes: API router registration.
+# Split from _register_routes.py into _register_routes/_routers.py.
 
-Extracted from ``server.py``.  Holds:
-  - ``register_routers(app)`` — all ``app.include_router()`` calls
-  - ``register_static_routes(app, serve_dir)`` — index/style/favicon/health/
-    CSP/Prometheus/v1-version/SPA-fallback
-  - ``register_websocket(app)`` — WebSocket endpoint
-  - ``_register_v1_aliases()`` — module-level (tests import it directly)
-  - ``health()`` — module-level (contract tests import it directly)
-
-Re-exported by ``server.py`` for backward compatibility.
-"""
 from __future__ import annotations
 
 import logging
-import time
-from pathlib import Path
-from typing import Any
 
-from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
-from fastapi import Request as _Req
-from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.responses import JSONResponse as _JResp
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI
 
-from maop import __version__ as MAOP_VERSION
-from maop.config.edition import FeatureFlag, get_edition, has_feature
-
-# WebSocket pool / lock live in _ws_manager; import them so register_websocket
-# can use the same singletons.
-from maop.dashboard._ws_manager import _ws_clients, _ws_lock
+from maop.config.edition import get_edition
 from maop.dashboard.routers import auth as _auth_mod
-from maop.dashboard.routers import state as _state
 from maop.dashboard.routers.routing_preview import router as routing_preview_router
 
 logger = logging.getLogger(__name__)
 
-# Module-level reference to the FastAPI app, set by ``register_routers``.
-# ``_register_v1_aliases`` and ``health`` read it so they can stay zero-arg
-# (tests call ``_register_v1_aliases()`` and ``asyncio.run(health())`` directly).
-_app: FastAPI | None = None
-
-# ── CSP violation ring buffer (module-level so tests can inspect/trim) ──
-_csp_violations: list[dict] = []
-_CSP_VIOLATION_MAX = 200  # keep last 200 violations in memory
+__all__: list[str] = []
 
 
-# ── Include routers ────────────────────────────────────────────────
 def _register_enterprise_routers(app: FastAPI) -> None:
     """Register enterprise-only routers (tenant, rbac, sso, quotas, n8n, licenses).
 
@@ -53,6 +23,10 @@ def _register_enterprise_routers(app: FastAPI) -> None:
     so that personal edition (which lacks the router module) degrades gracefully
     with a warning instead of crashing on startup.
     """
+    # 延迟导入：has_feature 被 test_gdpr_compliance 通过 patch.object(RR, "has_feature")
+    # 打桩，必须从包的 __dict__ 在调用时查找才能拿到桩版本。
+    from maop.dashboard._register_routes import FeatureFlag, has_feature
+
     if has_feature(FeatureFlag.MULTI_USER):
         try:
             # `# type: ignore` is required because mypy cannot
@@ -503,39 +477,6 @@ def _register_agent_versions_router(app: FastAPI) -> None:
         logger.warning("[server] Router MISSING: agent-versions (import error: %s)", _e)
 
 
-def register_routers(app: FastAPI) -> None:
-    """Register all API routers (core + enterprise + optional)."""
-    global _app
-    _app = app
-
-    _register_core_routers(app)
-    _register_api_keys_router(app)
-    _register_workflow_routers(app)
-    _register_data_routers(app)
-    _register_scheduling_routers(app)
-    _register_a2a_router(app)
-
-    # ── Enterprise-only routers ────────────────────────────────────────
-    # t19 (2026-07-21): removed redundant `from maop.config.edition import
-    # has_feature, FeatureFlag` — these symbols were already imported at line 52
-    # and the duplicate import triggered ruff F811.
-    #
-    # B1 (2026-07-22): replaced silent `except ImportError: logger.debug(...)`
-    # (which used `# type: ignore` to mask missing modules) with
-    # explicit `logger.warning` + a `has_<name>_router` flag. The previous
-    # behavior silently degraded ENTERPRISE mode to "router enabled but 404
-    # on every call" because the missing module was treated as a non-event.
-    # Enterprise routers (files already exist in routers/) (routers/{rbac,tenant,audit,sso}.py)
-    # and flip these flags to True.
-    _register_audit_router(app)
-    _register_enterprise_routers(app)
-    _register_notifications_and_config(app)
-    _register_feedback_router(app)
-    _register_agent_versions_router(app)
-    _register_desktop_dispatch_routers(app)
-    _register_relay_platform_router(app)
-
-
 def _register_relay_platform_router(app: FastAPI) -> None:
     """注册第三方中转平台管理路由（/api/relay-platforms/*）。
 
@@ -584,295 +525,36 @@ def _register_desktop_dispatch_routers(app: FastAPI) -> None:
     app.include_router(agent_proxy_gateway_router.router)
 
 
-# ── Health ─────────────────────────────────────────────────────────
-async def health() -> Any:
-    # Minimal critical-dependency probe: the metadata storage (SQLite/PostgreSQL)
-    # that backs the dashboard. A lightweight `SELECT 1` forces a real round-trip
-    # without scanning tables, so the endpoint stays cheap and is safe to call
-    # from Docker/K8s probes. If storage is unreachable the process is unhealthy
-    # and we return 503 so orchestrators stop routing traffic / alert.
-    storage_ok = True
-    try:
-        from maop.core.backends.db_utils import get_db_path, get_pool
-        pool = get_pool(get_db_path())
-        conn = pool.acquire()
-        try:
-            conn.execute("SELECT 1")
-        finally:
-            pool.release(conn)
-    except Exception as exc:
-        storage_ok = False
-        logger.warning("[health] storage dependency check failed: %s", exc)
+def register_routers(app: FastAPI) -> None:
+    """Register all API routers (core + enterprise + optional)."""
+    # 通过包的 __dict__ 设置 _app，使 _register_v1_aliases 能在调用时读到。
+    import maop.dashboard._register_routes as _rr
 
-    active_agents = 0
-    try:
-        _agents = await _state.get_bridge().agent_stats()
-        active_agents = len(_agents) if isinstance(_agents, list) else 0
-    except Exception:
-        logger.warning("获取 active_agents 数量失败（健康检查路由），将按 0 处理", exc_info=True)
+    _rr._app = app
 
-    if not storage_ok:
-        return _JResp(
-            status_code=503,
-            content={
-                "status": "error",
-                "reason": "storage_unavailable",
-                "version": MAOP_VERSION,
-                "edition": get_edition().value,
-            },
-        )
-    return {"status": "ok", "version": MAOP_VERSION, "edition": get_edition().value,
-            "dashboard": f"MAOP Dashboard v{MAOP_VERSION} (FastAPI)",
-            "uptime_ms": round((time.time() - _state.start_time) * 1000),
-            "active_agents": active_agents,
-            "tls": _state.tls_enabled, "auth": _state.auth_enabled, "rate_limit": _state.rl_enabled}
+    _register_core_routers(app)
+    _register_api_keys_router(app)
+    _register_workflow_routers(app)
+    _register_data_routers(app)
+    _register_scheduling_routers(app)
+    _register_a2a_router(app)
 
-
-# ── Static files + health + CSP + Prometheus + v1-version + SPA fallback ──
-
-def _serve_index_html(serve_dir: Path) -> Any:
-    """Return index.html from ``serve_dir`` (or 404 fallback)."""
-    html_path = serve_dir / "index.html"
-    if html_path.exists():
-        return HTMLResponse(html_path.read_text(encoding="utf-8"), headers={"Cache-Control":"no-cache, no-store, must-revalidate"})
-    return HTMLResponse("<h1>index.html not found</h1>", status_code=404)
-
-
-def _serve_style_css(serve_dir: Path) -> Any:
-    """Return style.css from ``serve_dir`` (or 404 fallback)."""
-    css_path = serve_dir / "style.css"
-    if not css_path.exists():
-        css_path = serve_dir / "src" / "style.css"
-    if css_path.exists():
-        return FileResponse(css_path, media_type="text/css", headers={"Cache-Control":"public, max-age=3600"})
-    return HTMLResponse("/* not found */", status_code=404)
-
-
-def _serve_favicon(serve_dir: Path) -> Any:
-    """Return favicon.svg from ``serve_dir`` (or 404 fallback)."""
-    fav = serve_dir / "favicon.svg"
-    if not fav.exists():
-        fav = serve_dir / "public" / "favicon.svg"
-    if fav.exists():
-        return FileResponse(fav, media_type="image/svg+xml", headers={"Cache-Control":"public, max-age=86400"})
-    return HTMLResponse("", status_code=404)
-
-
-def _mount_asset_dirs(app: FastAPI, serve_dir: Path) -> None:
-    """Mount Vite asset directories (``assets`` / ``src`` / ``public``) on ``app``."""
-    for _asset_dir_name in ["assets", "src"]:
-        _asset_dir = serve_dir / _asset_dir_name
-        if _asset_dir.exists():
-            app.mount(f"/{_asset_dir_name}", StaticFiles(directory=str(_asset_dir)), name=f"static-{_asset_dir_name}")
-    _public_dir = serve_dir / "public"
-    if _public_dir.exists():
-        app.mount("/public", StaticFiles(directory=str(_public_dir)), name="static-public")
-
-
-def _build_csp_entry(body: dict[str, Any]) -> dict[str, Any]:
-    """Extract a CSP violation entry from the report body."""
-    report = body.get("csp-report", {})
-    return {
-        "ts": time.time(),
-        "document_uri": report.get("document-uri", ""),
-        "violated_directive": report.get("violated-directive", ""),
-        "blocked_uri": report.get("blocked-uri", ""),
-        "source_file": report.get("source-file", ""),
-        "line_number": report.get("line-number", ""),
-    }
-
-
-def register_static_routes(app: FastAPI, serve_dir: Path) -> None:
-    """Register index/style/favicon/asset mounts/health/CSP/Prometheus/
-    v1-version/SPA-fallback routes on ``app``."""
-    @app.get("/")
-    async def index() -> Any:
-        return _serve_index_html(serve_dir)
-
-    @app.get("/style.css")
-    async def style_css() -> Any:
-        return _serve_style_css(serve_dir)
-
-    @app.get("/favicon.svg")
-    async def favicon() -> Any:
-        return _serve_favicon(serve_dir)
-
-    _mount_asset_dirs(app, serve_dir)
-
-    @app.get("/api/health")
-    async def health_endpoint() -> Any:
-        return await health()
-
-    # ── CSP Violation Report Endpoint ──────────────────────────────────
-    @app.post("/api/csp-report")
-    async def csp_report(request: _Req) -> Any:
-        """Receive CSP violation reports from the browser.
-
-        When CSP is in Report-Only mode (or enforce mode with report-uri),
-        the browser POSTs violation details here.  We log them and keep
-        a ring buffer for dashboard inspection.
-        """
-        try:
-            body = await request.json()
-        except Exception:
-            return _JResp(status_code=400, content={"error": "Invalid JSON"})
-        entry = _build_csp_entry(body)
-        logger.warning(
-            "CSP violation: directive=%s blocked=%s uri=%s source=%s:%s",
-            entry["violated_directive"], entry["blocked_uri"],
-            entry["document_uri"], entry["source_file"], entry["line_number"],
-        )
-        _csp_violations.append(entry)
-        if len(_csp_violations) > _CSP_VIOLATION_MAX:
-            _csp_violations.pop(0)
-        return {"status": "ok"}
-
-    @app.get("/api/csp-violations")
-    async def csp_violations() -> Any:
-        """Return recent CSP violations for dashboard display."""
-        return {"violations": list(reversed(_csp_violations)), "count": len(_csp_violations)}
-
-    # ── Prometheus metrics endpoint ────────────────────────────────────
-    @app.get("/api/prometheus")
-    async def prometheus_metrics() -> Any:
-        """Prometheus text-format metrics exposition endpoint.
-
-        Returns all registered metrics (counters, gauges, histograms) in
-        Prometheus text exposition format.  Scrape with:
-            scrape_configs:
-              - job_name: 'maop'
-                metrics_path: /api/prometheus
-                static_configs:
-                  - targets: ['localhost:9079']
-        """
-        from fastapi import Response
-
-        from maop.core.monitoring.monitoring import metrics as _metrics
-        text = _metrics.to_prometheus()
-        return Response(content=text, media_type="text/plain; version=0.0.4; charset=utf-8")
-
-    @app.get("/api/v1/version")
-    async def api_v1_version() -> Any:
-        """Return current API version."""
-        return {"version": MAOP_VERSION, "api_version": "v1", "status": "stable"}
-
-    # ── SPA fallback for Vue3 client-side routes ───────────────────────
-    # Any non-API, non-asset path returns index.html so the Vue router can
-    # render /monitor, /settings, etc.
+    # ── Enterprise-only routers ────────────────────────────────────────
+    # t19 (2026-07-21): removed redundant `from maop.config.edition import
+    # has_feature, FeatureFlag` — these symbols were already imported at line 52
+    # and the duplicate import triggered ruff F811.
     #
-    # 2026-09-23 修复：原实现**没有排除 /api/**，与上方注释的承诺不符。
-    # "已注册的路由先匹配"只对**存在**的 API 路径成立；未注册的 /api/* 会落到
-    # 这里返回 200 + index.html，前端 res.json() 抛
-    #   Unexpected token '<', "<!DOCTYPE "... is not valid JSON
-    # 把"端点不存在"伪装成解析错误，且掩盖真实缺口。本项目已因此踩坑三次
-    # （kg_router、compliance.router 定义未挂载；本次 alerts/audit/mcp 端点
-    # 缺失），每次都靠人肉发现。
-    #
-    # 现在对 /api/ 前缀显式返回 404 JSON，让契约缺口在第一次调用就暴露。
-    @app.get("/{full_path:path}")
-    async def spa_fallback(full_path: str) -> Any:
-        if full_path == "api" or full_path.startswith("api/"):
-            return _JResp(
-                status_code=404,
-                content={
-                    "status": "error",
-                    "error": "Not Found",
-                    "code": "HTTP_404",
-                    "detail": f"/{full_path}",
-                },
-            )
-        return _serve_index_html(serve_dir)
-
-
-# ── WebSocket endpoint ─────────────────────────────────────────────
-def register_websocket(app: FastAPI) -> None:
-    """Register the /ws WebSocket endpoint on ``app``."""
-    @app.websocket("/ws")
-    async def websocket_endpoint(ws: WebSocket) -> Any:
-        # Auth must be validated BEFORE accept() — BaseHTTPMiddleware cannot
-        # intercept WebSocket scope, so we enforce it here directly.
-        if _auth_mod._auth_enabled:
-            # #5 fix: token via Sec-WebSocket-Protocol subprotocol (not URL query)
-            # Browser: new WebSocket(url, [token]). Avoids URL/access-log exposure.
-            # Fallback: query param kept for non-browser clients (curl, CLI).
-            token = ws.query_params.get("token", "")
-            if not token:
-                # Try Sec-WebSocket-Protocol header (browser subprotocol)
-                protocols = ws.headers.get("sec-websocket-protocol", "")
-                if protocols:
-                    # Format: "token, <actual_token>" or just "<actual_token>"
-                    parts = [p.strip() for p in protocols.split(",") if p.strip()]
-                    if parts:
-                        token = parts[-1]  # last protocol identifier
-            if not token:
-                # M7 fix: same-origin browser WS handshakes carry the httpOnly
-                # maop_token cookie automatically. The frontend no longer stores
-                # the JWT in localStorage (XSS-readable), so the subprotocol
-                # path has no client-side token source — the cookie is the
-                # browser's primary credential. Explicit query/subprotocol
-                # tokens still take precedence for non-browser clients.
-                token = ws.cookies.get("maop_token", "")
-            if not token:
-                await ws.close(code=4401, reason="Authentication required")
-                return
-            try:
-                mgr = _auth_mod.get_auth_mgr()
-                payload = mgr.jwt_handler.validate_token(token)
-                # validate_token always returns an AuthResult (never None).
-                # Must check .authenticated flag — otherwise forged/expired
-                # tokens bypass WebSocket auth entirely (P1-1 fix).
-                if not payload or not getattr(payload, "authenticated", False):
-                    await ws.close(code=4401, reason="Invalid token")
-                    return
-            except Exception:
-                await ws.close(code=4401, reason="Authentication failed")
-                return
-        await ws.accept()
-        async with _ws_lock:
-            _ws_clients.add(ws)
-        try:
-            await ws.send_json({"type": "hello", "msg": "MAOP Dashboard WebSocket connected", "ts": time.time()})
-            while True:
-                data = await ws.receive_text()
-                if data == "ping":
-                    await ws.send_json({"type": "pong", "ts": time.time()})
-        except WebSocketDisconnect:  # silent-ok: ws-disconnect — 客户端断开
-            pass
-        finally:
-            async with _ws_lock:
-                _ws_clients.discard(ws)
-
-
-# --- API v1 aliases (backward-compatible versioning) -------------------
-# Register /api/v1/* aliases for every /api/* route so the frontend can
-# migrate incrementally to a versioned API. Old /api/xxx paths remain
-# fully functional (no breaking change). Exempt endpoints - health
-# (K8s/Docker probes), stream (SSE token-via-query), auth (login/logout/
-# refresh) - stay unversioned for infrastructure compatibility.
-def _register_v1_aliases() -> None:
-    """Register /api/v1/* aliases for all /api/* routes (except auth/stream/health)."""
-    if _app is None:
-        raise RuntimeError("_register_v1_aliases called before register_routers")
-    EXEMPT = {
-        "/api/health",
-        "/api/stream",
-        "/api/auth/login",
-        "/api/auth/logout",
-        "/api/auth/refresh",
-    }
-    v1 = APIRouter()
-    existing = {getattr(r, "path", None) for r in _app.routes}
-    for route in _app.routes:
-        path = getattr(route, "path", "")
-        if not path.startswith("/api/") or path in EXEMPT:
-            continue
-        endpoint = getattr(route, "endpoint", None)
-        if endpoint is None:
-            continue
-        v1_path = "/api/v1" + path[4:]
-        if v1_path in existing:
-            continue
-        methods = getattr(route, "methods", None) or {"GET"}
-        v1.add_api_route(v1_path, endpoint, methods=methods)
-    _app.include_router(v1)
-    logger.info("[server] Registered %d /api/v1/* alias routes", len(v1.routes))
+    # B1 (2026-07-22): replaced silent `except ImportError: logger.debug(...)`
+    # (which used `# type: ignore` to mask missing modules) with
+    # explicit `logger.warning` + a `has_<name>_router` flag. The previous
+    # behavior silently degraded ENTERPRISE mode to "router enabled but 404
+    # on every call" because the missing module was treated as a non-event.
+    # Enterprise routers (files already exist in routers/) (routers/{rbac,tenant,audit,sso}.py)
+    # and flip these flags to True.
+    _register_audit_router(app)
+    _register_enterprise_routers(app)
+    _register_notifications_and_config(app)
+    _register_feedback_router(app)
+    _register_agent_versions_router(app)
+    _register_desktop_dispatch_routers(app)
+    _register_relay_platform_router(app)

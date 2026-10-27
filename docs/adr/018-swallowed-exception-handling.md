@@ -98,7 +98,7 @@ except Exception as exc:
 - `py/maop/core/budget_guard.py` — 1 处 swallowed exception
 - `py/maop/evolve.py` — 2 处 swallowed exception
 - `py/maop/dashboard/frontend/static.py` — 1 处 swallowed exception
-- `py/maop/dashboard/frontend/_register_routes.py` — 1 处 swallowed exception
+- `py/maop/dashboard/_register_routes/` — 1 处 swallowed exception
 - `py/maop/dashboard/frontend/ws_dag.py` — 1 处 swallowed exception
 - `py/maop/dashboard/upgrade_service.py` — 1 处 swallowed exception
 - `py/maop/dashboard/notifications.py` — 1 处 swallowed exception
