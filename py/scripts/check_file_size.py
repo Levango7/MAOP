@@ -44,8 +44,6 @@ ALLOWED_OVERSIZE: dict[str, str] = {
         "先决条件：批量训练特征要改成执行期观测来的真值（现在由 _infer_gates 重建），"
         "并为持久化模型加 feature_schema 标记 —— 详见 tests/test_plan_quality.py::"
         "test_online_learning_flips_structural_ranking 的 xfail 说明",
-    "maop/dashboard/services/chat_service.py":
-        "拆分排期：会话存储与流式输出分离，参照 mcp_hub 拆法",
     "maop/core/agent/registry/preset_agents.py":
         "数据表为主的注册清单；如继续增长改为 YAML/JSON 数据文件",
     "maop/dashboard/_register_routes.py":
@@ -53,9 +51,9 @@ ALLOWED_OVERSIZE: dict[str, str] = {
     "maop/core/scheduling/distributed_scheduler.py":
         "分布式调度核心；拆分排期：结果流/失败检测/选工三块",
     "maop/dashboard/services/agent_service.py":
-        "拆分排期：与 chat_service 同批（services 层拆分运动）",
+        "拆分排期：下一批 services 层拆分运动（chat_service 已完成）",
     "maop/dashboard/services/evolution_service.py":
-        "拆分排期：与 chat_service 同批（services 层拆分运动）",
+        "拆分排期：下一批 services 层拆分运动（chat_service 已完成）",
 }
 
 
