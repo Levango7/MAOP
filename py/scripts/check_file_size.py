@@ -39,11 +39,6 @@ EXEMPT_PREFIXES: tuple[str, ...] = ("maop/migrations/",)
 #: Files above the threshold at gate-introduction time (2026-10-12).
 #: Each entry needs a reason and a split schedule; entries may only be REMOVED.
 ALLOWED_OVERSIZE: dict[str, str] = {
-    "maop/core/memory/plan_quality.py":
-        "拆分排期：抽取器+模型 / 版本链 / 数据管道 / 评估器四块（参照 core/mcp/ 子包先例）。"
-        "先决条件：批量训练特征要改成执行期观测来的真值（现在由 _infer_gates 重建），"
-        "并为持久化模型加 feature_schema 标记 —— 详见 tests/test_plan_quality.py::"
-        "test_online_learning_flips_structural_ranking 的 xfail 说明",
     "maop/core/agent/registry/preset_agents.py":
         "数据表为主的注册清单；如继续增长改为 YAML/JSON 数据文件",
     "maop/dashboard/_register_routes.py":
