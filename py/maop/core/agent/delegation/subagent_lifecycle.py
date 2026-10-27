@@ -1,35 +1,35 @@
 """MAOP SubAgent Manager — Unified sub-agent lifecycle and hierarchical delegation.
 
-合并自 ``subagent_lifecycle.py``（async 生命周期）+ ``subagent_delegation.py``
-（同步层级委派）。两套实现共享同一 ``subagents`` 表（通过 ``subagent_db`` 统一
-schema），现合并为单一 ``SubAgentManager``，保留两套方法集：
+拆分（阶段2 P2）：
+  - ``SubAgentDelegate``：同步层级委派（spawn_child / terminate / get /
+    list_children / get_tree / send / receive / purge_messages）。
+  - ``SubAgentManager(SubAgentDelegate)``：继承委派能力，再承担 async 生命周期
+    （spawn / wait / cancel / spawn_and_wait_all / list_agents / get_live_transcript）。
 
-- **生命周期方法**（async）：``spawn`` / ``wait`` / ``cancel`` /
-  ``spawn_and_wait_all`` / ``list_agents`` / ``get_live_transcript``
-- **委派方法**（sync）：``spawn_child`` / ``terminate`` / ``get`` /
-  ``list_children`` / ``get_tree`` / ``send`` / ``receive`` / ``purge_messages``
+二者共享同一 ``subagents`` 表（通过 ``subagent_db`` 统一 schema）。
 
-向后兼容：``SubagentManager`` 作为 ``SubAgentManager`` 的别名保留。
+向后兼容：``SubagentManager`` 作为 ``SubAgentManager`` 的别名保留；
+``maop.delegate.dispatch_tools._get_subagent_manager`` 和
+``maop.dashboard.services.agent_service._get_subagent_mgr`` 导入路径不变。
 
 Usage::
 
     from maop.core.agent.delegation.subagent_lifecycle import (
-        SubAgentManager, AgentConfig, SubagentInfo,
+        SubAgentManager, SubAgentDelegate, AgentConfig, SubagentInfo,
     )
 
+    # Sync hierarchical delegation (via SubAgentDelegate)
     mgr = SubAgentManager(root_dir="/path/to/MAOP")
+    info = mgr.spawn_child(parent="orchestrator", agent="coder", task="fix bug")
+    mgr.terminate(info.id, exit_code=0)
 
-    # Async lifecycle: spawn a single sub-agent
+    # Async lifecycle (SubAgentManager own)
     agent_id = await mgr.spawn(
         config=AgentConfig(name="code-reviewer", model="deepseek-chat"),
         task="Review the authentication module",
         context={"files": ["auth/login.py"]},
     )
     result = await mgr.wait(agent_id, timeout=300)
-
-    # Sync hierarchical delegation: spawn a child under a parent
-    info = mgr.spawn_child(parent="orchestrator", agent="coder", task="fix bug")
-    mgr.terminate(info.id, exit_code=0)
 """
 
 from __future__ import annotations
@@ -99,7 +99,7 @@ class TranscriptEntry(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
-# ── Delegation Models (merged from subagent_delegation.py) ──────
+# ── Delegation Models (owned by SubAgentDelegate) ───────────────────
 
 
 class SubagentInfo(BaseModel):
@@ -133,20 +133,193 @@ class AgentTreeNode(BaseModel):
     children: list[str] = Field(default_factory=list)
 
 
-# ── Parallel Implementation Note ──────────────────────────────
-# NOTE: 本模块原为两套并行 subagent 实现之一（async 生命周期）。
-# 另一套是 subagent_delegation.py 的同步层级委派实现。
-# P0-2 (2026-08-07): 已将 subagent_delegation.py 的方法合并到本模块的
-# SubAgentManager 中（spawn_child/terminate/get/list_children/get_tree/
-# send/receive/purge_messages），subagent_delegation.py 现为重定向 shim。
-# SubagentManager 作为 SubAgentManager 的别名保留以向后兼容。
+# ── SubAgentDelegate — synchronous hierarchical delegation ──────────
 
-class SubAgentManager:
+
+class SubAgentDelegate:
+    """同步层级委派：spawn_child / terminate / get / list_children / get_tree /
+    send / receive / purge_messages。
+
+    独立于 async 生命周期，可单独实例化使用；``SubAgentManager`` 继承它
+    以复用委派能力。
+    """
+
+    def __init__(self, root_dir: str | Path) -> None:
+        self._root = Path(root_dir)
+        self._data_dir = self._root / "data"
+        self._data_dir.mkdir(parents=True, exist_ok=True)
+        self._db_path = get_subagent_db_path()
+        self._init_db()
+
+    def _init_db(self) -> None:
+        """初始化 subagent DB（共享 schema，自动迁移旧表）。"""
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        migrate_legacy_subagent_db()
+
+    def _connect(self):
+        return sqlite_connect(self._db_path, foreign_keys=False)
+
+    # ── spawn_child / terminate / get / list_children / get_tree ───
+
+    def spawn_child(
+        self,
+        parent: str,
+        agent: str,
+        task: str = "",
+        max_depth: int = 5,
+        *,
+        call_chain: list[str] | None = None,
+        max_self_ref_depth: int = 3,
+    ) -> SubagentInfo:
+        """Spawn a child agent under a parent. Enforces max recursion depth."""
+        if call_chain is not None:
+            child_depth = len(call_chain)
+            self_refs = sum(1 for a in call_chain if a == agent)
+            if self_refs >= max_self_ref_depth:
+                raise ValueError(
+                    f"Self-reference limit ({max_self_ref_depth}) exceeded for '{agent}' "
+                    f"in chain: {' → '.join(call_chain + [agent])}"
+                )
+            if child_depth >= max_depth:
+                raise ValueError(
+                    f"Max subagent depth ({max_depth}) exceeded: {' → '.join(call_chain + [agent])}"
+                )
+        else:
+            parent_depth = self._get_depth(parent)
+            child_depth = parent_depth + 1
+            if child_depth > max_depth:
+                raise ValueError(f"Max subagent depth ({max_depth}) exceeded: {parent} → {agent}")
+
+        sa_id = f"sa-{uuid.uuid4().hex[:8]}"
+        now = datetime.now(timezone.utc).isoformat()
+        info = SubagentInfo(
+            id=sa_id, parent_agent=parent, child_agent=agent,
+            task=task, status="spawned", created_at=now, depth=child_depth,
+        )
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO subagents (id, parent_agent, child_agent, task, status, created_at, depth) VALUES (?,?,?,?,?,?,?)",
+                (info.id, info.parent_agent, info.child_agent, info.task, info.status, info.created_at, info.depth),
+            )
+        logger.info("[subagent] Spawned %s under %s (depth=%d)", sa_id, parent, child_depth)
+        return info
+
+    def terminate(self, sa_id: str, exit_code: int = 0) -> SubagentInfo | None:
+        """Mark a subagent as completed/failed."""
+        info = self.get(sa_id)
+        if info is None:
+            return None
+        now = datetime.now(timezone.utc).isoformat()
+        status = "completed" if exit_code == 0 else "failed"
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE subagents SET status=?, finished_at=?, exit_code=? WHERE id=?",
+                (status, now, exit_code, sa_id),
+            )
+        info.status = status
+        info.finished_at = now
+        info.exit_code = exit_code
+        return info
+
+    def get(self, sa_id: str) -> SubagentInfo | None:
+        """Get subagent info by ID."""
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM subagents WHERE id=?", (sa_id,)).fetchone()
+        if row is None:
+            return None
+        return SubagentInfo(**dict(row))
+
+    def list_children(self, parent: str, status: str | None = None) -> list[SubagentInfo]:
+        """List all child subagents of a parent agent."""
+        with self._connect() as conn:
+            if status:
+                rows = conn.execute(
+                    "SELECT * FROM subagents WHERE parent_agent=? AND status=?",
+                    (parent, status),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM subagents WHERE parent_agent=?", (parent,),
+                ).fetchall()
+        return [SubagentInfo(**dict(r)) for r in rows]
+
+    def get_tree(self, root_agent: str) -> AgentTreeNode:
+        """Build an agent tree starting from root_agent."""
+        children = self.list_children(root_agent)
+        child_names = []
+        for c in children:
+            child_names.append(c.child_agent)
+        depth = self._get_depth(root_agent)
+        parent = self._get_parent(root_agent)
+        node = AgentTreeNode(agent_name=root_agent, depth=depth, parent=parent, children=child_names)
+        return node
+
+    # ── send / receive / purge_messages ─────────────────────────────
+
+    def send(
+        self, sender: str, recipient: str, msg_type: str = "info",
+        payload: dict[str, Any] | None = None,
+    ) -> AgentMessage:
+        """Send a message from one agent to another."""
+        msg_id = f"msg-{uuid.uuid4().hex[:8]}"
+        now = datetime.now(timezone.utc).isoformat()
+        msg = AgentMessage(
+            id=msg_id, sender=sender, recipient=recipient,
+            msg_type=msg_type, payload=payload or {}, created_at=now,
+        )
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO agent_messages (id, sender, recipient, msg_type, payload, created_at) VALUES (?,?,?,?,?,?)",
+                (msg.id, msg.sender, msg.recipient, msg.msg_type, json.dumps(msg.payload), msg.created_at),
+            )
+        return msg
+
+    def receive(self, recipient: str, limit: int = 100) -> list[AgentMessage]:
+        """Receive all pending messages for an agent."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM agent_messages WHERE recipient=? ORDER BY created_at LIMIT ?",
+                (recipient, limit),
+            ).fetchall()
+        messages = []
+        for r in rows:
+            d = dict(r)
+            d["payload"] = json.loads(d.get("payload", "{}"))
+            messages.append(AgentMessage(**d))
+        return messages
+
+    def purge_messages(self, recipient: str) -> int:
+        """Delete all messages for a recipient after processing."""
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM agent_messages WHERE recipient=?", (recipient,))
+        return int(cursor.rowcount)
+
+    # ── internal helpers ────────────────────────────────────────────
+
+    def _get_depth(self, agent_name: str) -> int:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT MAX(depth) as max_depth FROM subagents WHERE child_agent=?",
+                (agent_name,),
+            ).fetchone()
+        return row["max_depth"] if row and row["max_depth"] is not None else 0
+
+    def _get_parent(self, agent_name: str) -> str | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT parent_agent FROM subagents WHERE child_agent=? ORDER BY created_at DESC LIMIT 1",
+                (agent_name,),
+            ).fetchone()
+        return row["parent_agent"] if row else None
+
+
+# ── SubAgentManager — async lifecycle + inherited delegation ───────
+
+
+class SubAgentManager(SubAgentDelegate):
     """Manage sub-agent lifecycle AND hierarchical delegation.
 
-    合并自原 ``SubAgentManager``（async 生命周期）+ 原 ``SubagentManager``
-    （同步层级委派）。两套方法集共享同一 ``subagents`` 表（通过
-    ``subagent_db`` 统一 schema）。
+    继承 ``SubAgentDelegate`` 的同步委派方法，再承担 async 生命周期方法。
 
     生命周期方法（async）::
 
@@ -154,7 +327,7 @@ class SubAgentManager:
         result = await mgr.wait(agent_id, timeout=300)
         mgr.cancel(agent_id)
 
-    委派方法（sync）::
+    委派方法（sync，继承自 SubAgentDelegate）::
 
         info = mgr.spawn_child(parent="A", agent="B", task="...")
         mgr.terminate(info.id, exit_code=0)
@@ -170,24 +343,10 @@ class SubAgentManager:
     """
 
     def __init__(self, root_dir: str | Path) -> None:
-        self._root = Path(root_dir)
-        self._data_dir = self._root / "data"
-        self._data_dir.mkdir(parents=True, exist_ok=True)
-        self._db_path = get_subagent_db_path()
-        self._init_db()
+        super().__init__(root_dir)
         self._running: dict[str, asyncio.Task[Any]] = {}
 
-    def _init_db(self) -> None:
-        """初始化 subagent DB（共享 schema，自动迁移旧表）。
-
-        使用 maop.core.subagent_db 的统一 schema（两套实现的字段超集），
-        并自动迁移旧 DB 文件中可能存在的缺列场景。
-        """
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        migrate_legacy_subagent_db()
-
-    def _connect(self):
-        return sqlite_connect(self._db_path, foreign_keys=False)
+    # ── Async lifecycle ─────────────────────────────────────────────
 
     async def spawn(
         self,
@@ -231,16 +390,13 @@ class SubAgentManager:
                 if isinstance(result, AgentResult):
                     return result
             except asyncio.TimeoutError:
-                # P1-fix: asyncio.shield(atask) 超时后，wait_for 取消的只是
-                # shield 创建的包装协程，被 shield 保护的 atask 本身仍会在
-                # 后台继续运行（这正是 shield 的语义），造成任务泄漏——
-                # 资源不释放、回调不触发，且事件循环关闭时抛
-                # "Task was destroyed but it is pending!" 警告。
-                # 显式取消 atask 并 await 其终止，确保子任务真正结束。
+                # asyncio.shield(atask) 超时后，wait_for 取消的只是 shield 创建的包装协程，
+                # 被 shield 保护的 atask 本身仍会在后台继续运行 —— 显式取消 atask 并 await
+                # 其终止，确保子任务真正结束。
                 atask.cancel()
                 try:
                     await atask
-                except (asyncio.CancelledError, Exception):  # silent-ok: interrupt — 用户中断/任务取消
+                except (asyncio.CancelledError, Exception):  # silent-ok: interrupt
                     pass
                 self._update_status(agent_id, AgentStatus.FAILED, error="Timeout")
                 return AgentResult(
@@ -459,165 +615,6 @@ class SubAgentManager:
                    (id, agent_id, timestamp, event, data) VALUES (?, ?, ?, ?, ?)""",
                 (entry_id, agent_id, time.time(), event, json.dumps(data)),
             )
-
-    # ── Hierarchical delegation methods (merged from subagent_delegation.py) ──
-    # 以下方法原属 SubagentManager（同步层级委派），P0-2 合并迁入。
-    # spawn 重命名为 spawn_child 以与 async spawn 区分（委派 vs 生命周期语义）。
-
-    def spawn_child(
-        self,
-        parent: str,
-        agent: str,
-        task: str = "",
-        max_depth: int = 5,
-        *,
-        call_chain: list[str] | None = None,
-        max_self_ref_depth: int = 3,
-    ) -> SubagentInfo:
-        """Spawn a child agent under a parent. Enforces max recursion depth.
-
-        Parameters
-        ----------
-        call_chain : list[str] | None
-            The current delegation chain (e.g. ["MAOP", "mavis", "MAOP"]).
-            Used for self-referential loop detection. If None, falls back
-            to DB-based depth tracking.
-        max_self_ref_depth : int
-            Maximum times the same agent can appear in a call chain
-            (prevents infinite self-delegation).
-        """
-        if call_chain is not None:
-            child_depth = len(call_chain)
-            self_refs = sum(1 for a in call_chain if a == agent)
-            if self_refs >= max_self_ref_depth:
-                raise ValueError(
-                    f"Self-reference limit ({max_self_ref_depth}) exceeded for '{agent}' "
-                    f"in chain: {' → '.join(call_chain + [agent])}"
-                )
-            if child_depth >= max_depth:
-                raise ValueError(
-                    f"Max subagent depth ({max_depth}) exceeded: {' → '.join(call_chain + [agent])}"
-                )
-        else:
-            parent_depth = self._get_depth(parent)
-            child_depth = parent_depth + 1
-            if child_depth > max_depth:
-                raise ValueError(f"Max subagent depth ({max_depth}) exceeded: {parent} → {agent}")
-
-        sa_id = f"sa-{uuid.uuid4().hex[:8]}"
-        now = datetime.now(timezone.utc).isoformat()
-        info = SubagentInfo(
-            id=sa_id, parent_agent=parent, child_agent=agent,
-            task=task, status="spawned", created_at=now, depth=child_depth,
-        )
-        with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO subagents (id, parent_agent, child_agent, task, status, created_at, depth) VALUES (?,?,?,?,?,?,?)",
-                (info.id, info.parent_agent, info.child_agent, info.task, info.status, info.created_at, info.depth),
-            )
-        logger.info("[subagent] Spawned %s under %s (depth=%d)", sa_id, parent, child_depth)
-        return info
-
-    def terminate(self, sa_id: str, exit_code: int = 0) -> SubagentInfo | None:
-        """Mark a subagent as completed/failed."""
-        info = self.get(sa_id)
-        if info is None:
-            return None
-        now = datetime.now(timezone.utc).isoformat()
-        status = "completed" if exit_code == 0 else "failed"
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE subagents SET status=?, finished_at=?, exit_code=? WHERE id=?",
-                (status, now, exit_code, sa_id),
-            )
-        info.status = status
-        info.finished_at = now
-        info.exit_code = exit_code
-        return info
-
-    def get(self, sa_id: str) -> SubagentInfo | None:
-        """Get subagent info by ID."""
-        with self._connect() as conn:
-            row = conn.execute("SELECT * FROM subagents WHERE id=?", (sa_id,)).fetchone()
-        if row is None:
-            return None
-        return SubagentInfo(**dict(row))
-
-    def list_children(self, parent: str, status: str | None = None) -> list[SubagentInfo]:
-        """List all child subagents of a parent agent."""
-        with self._connect() as conn:
-            if status:
-                rows = conn.execute(
-                    "SELECT * FROM subagents WHERE parent_agent=? AND status=?",
-                    (parent, status),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM subagents WHERE parent_agent=?", (parent,),
-                ).fetchall()
-        return [SubagentInfo(**dict(r)) for r in rows]
-
-    def get_tree(self, root_agent: str) -> AgentTreeNode:
-        """Build an agent tree starting from root_agent."""
-        children = self.list_children(root_agent)
-        child_names = []
-        for c in children:
-            child_names.append(c.child_agent)
-        depth = self._get_depth(root_agent)
-        parent = self._get_parent(root_agent)
-        node = AgentTreeNode(agent_name=root_agent, depth=depth, parent=parent, children=child_names)
-        return node
-
-    def send(self, sender: str, recipient: str, msg_type: str = "info", payload: dict[str, Any] | None = None) -> AgentMessage:
-        """Send a message from one agent to another."""
-        msg_id = f"msg-{uuid.uuid4().hex[:8]}"
-        now = datetime.now(timezone.utc).isoformat()
-        msg = AgentMessage(
-            id=msg_id, sender=sender, recipient=recipient,
-            msg_type=msg_type, payload=payload or {}, created_at=now,
-        )
-        with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO agent_messages (id, sender, recipient, msg_type, payload, created_at) VALUES (?,?,?,?,?,?)",
-                (msg.id, msg.sender, msg.recipient, msg.msg_type, json.dumps(msg.payload), msg.created_at),
-            )
-        return msg
-
-    def receive(self, recipient: str, limit: int = 100) -> list[AgentMessage]:
-        """Receive all pending messages for an agent."""
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM agent_messages WHERE recipient=? ORDER BY created_at LIMIT ?",
-                (recipient, limit),
-            ).fetchall()
-        messages = []
-        for r in rows:
-            d = dict(r)
-            d["payload"] = json.loads(d.get("payload", "{}"))
-            messages.append(AgentMessage(**d))
-        return messages
-
-    def purge_messages(self, recipient: str) -> int:
-        """Delete all messages for a recipient after processing."""
-        with self._connect() as conn:
-            cursor = conn.execute("DELETE FROM agent_messages WHERE recipient=?", (recipient,))
-        return int(cursor.rowcount)
-
-    def _get_depth(self, agent_name: str) -> int:
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT MAX(depth) as max_depth FROM subagents WHERE child_agent=?",
-                (agent_name,),
-            ).fetchone()
-        return row["max_depth"] if row and row["max_depth"] is not None else 0
-
-    def _get_parent(self, agent_name: str) -> str | None:
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT parent_agent FROM subagents WHERE child_agent=? ORDER BY created_at DESC LIMIT 1",
-                (agent_name,),
-            ).fetchone()
-        return row["parent_agent"] if row else None
 
 
 # ── Backward-compat alias ──────────────────────────────────────

@@ -54,7 +54,11 @@ from collections import deque
 from typing import Any
 
 from maop.core.observability.metrics import get_metrics
-from maop.core.scheduling.failure_detector import FailurePatternDetector
+from maop.core.scheduling.failure_detector import (
+    FailurePatternDetector,
+    _AgentState,
+    get_failure_detector,
+)
 from maop.core.scheduling.supervisor_action import SupervisorActionMixin
 from maop.core.scheduling.supervisor_dispatch import SupervisorDispatchMixin
 from maop.core.scheduling.supervisor_health import HealthChecker
@@ -90,21 +94,40 @@ class Supervisor(
     SupervisorDispatchMixin,
     SupervisorActionMixin,
     SupervisorPatrolMixin,
-    FailurePatternDetector,
 ):
     """Proactive supervisor: passive detector + patrol + 6 control actions.
 
     Architecture layers
     -------------------
-    - **Passive (inherited)**: ``record_result`` / ``get_weight`` /
-      ``get_stats`` / drain / recovery — unchanged.
+    - **Passive (composed via ``self._detector``)**: ``record_result`` /
+      ``get_weight`` / ``get_stats`` / drain / recovery — unchanged,
+      delegated to the composed :class:`FailurePatternDetector`.
     - **Proactive (new)**: ``patrol`` loop / ``warn`` / ``replace`` /
       ``degrade`` / ``terminate`` / ``upgrade``.
     - **Adjudication (new)**: ``adjudicate`` — called by the debate
       orchestrator on stalemate (lazy, no-op when debate is unused).
 
+    组合（阶段2 P2，继承改为组合）
+    --------------------------
+    ``Supervisor`` **不再继承** ``FailurePatternDetector``，而是持有一个
+    被动检测器字段 ``self._detector``，并委派 ``record_result`` /
+    ``get_weight`` / ``get_stats`` 等被动检测 API。四个 mixin
+   （``supervisor_action`` / ``supervisor_status`` / ``supervisor_patrol`` /
+    ``supervisor_dispatch``）不再直接访问 detector 私有属性（`_agents`、
+    `_lock`、`_agent_health_locked`），而是通过公共 API 或组合字段访问。
+
+    被动检测器默认由 ``get_failure_detector()`` 提供（进程级单例），也可
+    通过构造参数 ``detector`` 注入（便于测试）。
+
+    向后兼容：
+    - 被动检测 API（record_result / get_weight / get_stats / get_agent_health）
+      在 Supervisor 上直接可用，既有调用方零改动。
+    - ``get_supervisor()`` / ``set_supervisor()`` 单例槽位不变（各自独立槽位）。
+
     Parameters
     ----------
+    detector : FailurePatternDetector | None
+        被动检测器实例。为 None 时使用 ``get_failure_detector()`` 单例。
     health_checker : HealthChecker | None
         Probe executor. When None, a default is constructed.
     rules : list[SupervisorRule] | None
@@ -121,12 +144,14 @@ class Supervisor(
     evolution_cooldown_s : float
         Cooldown for evolution-trigger suggestions (default 600s).
     **kwargs : Any
-        Forwarded to FailurePatternDetector (window_size, etc.).
+        Reserved (forward-compatible; no longer forwarded to detector,
+        detector is constructed independently).
     """
 
     def __init__(
         self,
         *,
+        detector: FailurePatternDetector | None = None,
         health_checker: HealthChecker | None = None,
         rules: list[SupervisorRule] | None = None,
         patrol_interval_s: float = 60.0,
@@ -136,9 +161,11 @@ class Supervisor(
         evolution_cooldown_s: float = _EVOLUTION_TRIGGER_COOLDOWN_S,
         agent_registry: Any = None,
         routing_store: Any = None,
-        **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
+        # Passive detector (composed, not inherited). Defaults to the
+        # process-wide failure-detector singleton.
+        self._detector: FailurePatternDetector = detector or get_failure_detector()
+
         # Health checker (default uses self as detector for metrics probe).
         self._health_checker = health_checker or HealthChecker(
             detector=self,
@@ -205,6 +232,27 @@ class Supervisor(
         # already held by get_retry_strategy / check_before_dispatch.
         self._supervisor_lock = threading.RLock()
 
+        # ── Detector-config passthrough (for get_supervisor_status) ──
+        # 原由 FailurePatternDetector.__init__ 设置的配置字段，现在由
+        # Supervisor 直接持有（不再继承 detector），以保持
+        # get_supervisor_status() 返回完整 config。
+        self._window_size = self._detector._window_size
+        self._failure_rate_threshold = self._detector._failure_rate_threshold
+        self._timeout_threshold = self._detector._timeout_threshold
+        self._recovery_consecutive_successes = (
+            self._detector._recovery_consecutive_successes
+        )
+
+        # ── Backward-compat proxy for mixin internal access ──────────
+        # 四个 mixin 直接访问 detector 私有属性（_agents / _lock /
+        # _agent_health_locked / _event_bus）。Supervisor 改为组合后，
+        # 将 detector 的这些内部状态代理为 Supervisor 的受保护属性，
+        # mixin 无需改动（dict 与锁是共享引用，修改立即生效）。
+        self._agents = self._detector._agents
+        self._lock = self._detector._lock
+        self._agent_health_locked = self._detector._agent_health_locked
+        self._event_bus = self._detector._event_bus
+
     # ── Public config accessors ────────────────────────────────
 
     @property
@@ -216,6 +264,30 @@ class Supervisor(
         """Hot-update the rule set (called by dashboard API)."""
         self._rule_engine.set_rules(rules)
         logger.info("[supervisor] rule set updated (%d rules)", len(rules))
+
+    # ── Passive-detector delegation (向后兼容：调用方零改动) ─────────
+
+    def record_result(
+        self, agent_id: str, success: bool, latency: float = 0.0
+    ) -> None:
+        """Record one task outcome (delegated to composed detector)."""
+        self._detector.record_result(agent_id, success=success, latency=latency)
+
+    def get_weight(self, agent_id: str) -> float:
+        """Return current scheduling weight (delegated to composed detector)."""
+        return self._detector.get_weight(agent_id)
+
+    def get_stats(self) -> dict[str, Any]:
+        """Return all-agent health snapshot (delegated to composed detector)."""
+        return self._detector.get_stats()
+
+    def get_agent_health(self, agent_id: str):
+        """Return single-agent health snapshot (delegated to composed detector)."""
+        return self._detector.get_agent_health(agent_id)
+
+    def reset(self, agent_id: str | None = None) -> None:
+        """Clear recorded state (delegated to composed detector)."""
+        self._detector.reset(agent_id)
 
 
 # ── Re-exports for backward compatibility ─────────────────────

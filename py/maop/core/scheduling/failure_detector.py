@@ -519,8 +519,12 @@ class FailurePatternDetector:
             logger.debug("[failure-detector] event publish failed: %s", exc)
 
 
-# ── Module-level singleton (lazy) ────────────────────────────────────
+# ── Module-level singletons (lazy) ────────────────────────────────────
+# 被动检测器（FailurePatternDetector）和主动监督者（Supervisor）各自拥有
+# 独立的进程级槽位，避免二者互相覆盖。Supervisor 不再继承
+# FailurePatternDetector（改为组合 self._detector），故不再复用同一槽位。
 _detector_instance: FailurePatternDetector | None = None
+_supervisor_instance: Any = None
 _detector_lock = threading.Lock()
 
 
@@ -534,7 +538,7 @@ def get_failure_detector() -> FailurePatternDetector:
 
 
 def set_failure_detector(detector: FailurePatternDetector | None) -> None:
-    """Replace (or clear with ``None``) the global singleton.
+    """Replace (or clear with ``None``) the global failure-detector singleton.
 
     Used by tests to inject a configured detector without touching
     module-level state between test cases.
@@ -544,43 +548,29 @@ def set_failure_detector(detector: FailurePatternDetector | None) -> None:
         _detector_instance = detector
 
 
-# ── Supervisor singleton accessors ────────────────────────────────────
-# 监督者（Supervisor）继承 FailurePatternDetector，二者共享同一进程级单例。
-# get_supervisor() 返回 Supervisor 实例（若已配置），否则返回 None。
-# set_supervisor() 由 Supervisor 初始化路径或测试注入调用，将 Supervisor
-# 实例注册为 failure_detector 单例（多态生效：get_failure_detector() 返回
-# 的对象 isinstance(_, Supervisor) 为 True，既有调用方零改动即获得新能力）。
-
-def get_supervisor() -> FailurePatternDetector | None:
+def get_supervisor() -> Any | None:
     """Return the process-wide Supervisor singleton, or ``None`` if unconfigured.
 
-    The Supervisor is stored in the same slot as the failure detector
-    (Supervisor inherits FailurePatternDetector). When no Supervisor has
-    been set (passive-only mode), this returns ``None`` so callers can
-    branch with ``if supervisor is not None:`` and degrade to current
-    behaviour. When a plain FailurePatternDetector was set (no
-    Supervisor layer), this returns the detector instance — callers
-    should treat the return as "supervisor or detector" and check for
-    Supervisor-specific attributes via hasattr / isinstance.
+    The Supervisor is stored in its own slot (separate from the failure
+    detector). When no Supervisor has been set (passive-only mode), this
+    returns ``None`` so callers can branch with ``if supervisor is not None:``
+    and degrade to current behaviour.
     """
-
+    global _supervisor_instance
     with _detector_lock:
-        return _detector_instance
+        return _supervisor_instance
 
 
-def set_supervisor(supervisor: FailurePatternDetector | None) -> None:
+def set_supervisor(supervisor: Any | None) -> None:
     """Set (or clear with ``None``) the process-wide Supervisor singleton.
 
-    The Supervisor instance is stored in the failure-detector singleton
-    slot so that ``get_failure_detector()`` returns the Supervisor
-    (polymorphism: Supervisor inherits FailurePatternDetector) and all
-    existing scheduling-path calls transparently gain Supervisor
-    capabilities. Pass ``None`` to disable the supervisor layer and
-    fall back to plain FailurePatternDetector behaviour.
+    The Supervisor instance is stored in its own supervisor slot (separate
+    from the failure-detector singleton slot). Pass ``None`` to disable the
+    supervisor layer and fall back to plain FailurePatternDetector behaviour.
     """
-    global _detector_instance
+    global _supervisor_instance
     with _detector_lock:
-        _detector_instance = supervisor
+        _supervisor_instance = supervisor
 
 
 
