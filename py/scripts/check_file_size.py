@@ -39,8 +39,6 @@ EXEMPT_PREFIXES: tuple[str, ...] = ("maop/migrations/",)
 #: Files above the threshold at gate-introduction time (2026-10-12).
 #: Each entry needs a reason and a split schedule; entries may only be REMOVED.
 ALLOWED_OVERSIZE: dict[str, str] = {
-    "maop/dashboard/_register_routes.py":
-        "路由注册聚合点；拆分需先拆 router 模块（与 ROUTES 清单联动）",
     "maop/core/scheduling/distributed_scheduler.py":
         "分布式调度核心；拆分排期：结果流/失败检测/选工三块",
 }

@@ -1064,19 +1064,19 @@ userlist haproxy_users
 
 #### 3.3.1 问题分析
 
-**根因**：`static.py:136` 与 `_register_routes.py:469` 重复定义同一 prometheus 指标，导致注册冲突或指标覆盖。
+**根因**：`static.py:136` 与 `_register_routes/:469` 重复定义同一 prometheus 指标，导致注册冲突或指标覆盖。
 
-**证据**：`py/maop/static.py:136` 与 `py/maop/_register_routes.py:469` 重复定义。
+**证据**：`py/maop/static.py:136` 与 `py/maop/dashboard/_register_routes/:469` 重复定义。
 
 **影响范围**：指标值可能被覆盖或注册时报错。
 
 #### 3.3.2 修复方案
 
-**文件**：`py/maop/static.py:136` 或 `py/maop/_register_routes.py:469`（保留一处）
+**文件**：`py/maop/static.py:136` 或 `py/maop/dashboard/_register_routes/:469`（保留一处）
 
 **修改内容**：
 - 移除其中一处的重复定义，统一到单一注册点。
-- 推荐保留 `_register_routes.py` 中的定义（路由注册中心）。
+- 推荐保留 `_register_routes/` 中的定义（路由注册中心）。
 
 **代码示例：移除重复注册（Python）**
 ```python
@@ -1124,7 +1124,7 @@ from maop._register_routes import REQUEST_COUNT
 | `py/maop/control.py` | M4 |
 | `py/maop/engine_utils.py` | M5 |
 | `py/maop/static.py` | Low-5 |
-| `py/maop/_register_routes.py` | Low-5 |
+| `py/maop/dashboard/_register_routes/` | Low-5 |
 | `py/maop/config/env.py`（新增） | M2, M3 |
 | `py/maop/config/agents_validator.py`（新增） | M1 |
 | `.github/workflows/ci.yml` | H3, H4, H5 |

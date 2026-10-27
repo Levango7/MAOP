@@ -45,7 +45,7 @@
 
 | 函数 | 文件 | 行数 | CC | 拆分状态 |
 |------|------|------|-----|----------|
-| `register_routers` | `dashboard/_register_routes.py:49` | 327→248 | 21 | 已拆分（提取 `_register_enterprise_routers`） |
+| `register_routers` | `dashboard/_register_routes/:49` | 327→248 | 21 | 已拆分（提取 `_register_enterprise_routers`） |
 | `maop_execute` | `maop_execute.py:113` | 297 | 24 | **暂缓**（见下方风险评估） |
 | `_execute_step` | `engine.py:399` | 292 | 27 | **暂缓**（见下方风险评估） |
 | `call_tool` | `core/mcp/mcp_hub.py:303` | 261 | 19 | **暂缓**（见下方风险评估） |
@@ -235,7 +235,7 @@ Dashboard 路由器通过模块级变量引用管理器实例，在 `lifespan` �
 |------|-------------|------|
 | `dashboard/routers/*.py` | `_worktree_mgr`, `_tool_audit`, `_tenant_manager`, `_subagent_mgr`, `_bridge`, `_registry`, `_sso_manager`, `_decision_store`, `_rbac_manager`, `_quota_manager`, `_protocol_reg`, `_notification_manager`, `_event_bus`, `_model_registry`, `_api_key_vault`, `_mcp_hub`, `_mcp_marketplace`, `_license_manager`, `_hook_mgr`, `_compliance_mgr`, `_budget_guard`, `_auth_mgr`, `_enterprise_logger`, `_alert_engine`, `_agent_proxy` | 路由器依赖注入 |
 | `dashboard/server.py`, `dashboard/lifespan.py` | `_shutting_down` | 关闭标志 |
-| `dashboard/_register_routes.py` | `_app` | FastAPI 应用实例 |
+| `dashboard/_register_routes/` | `_app` | FastAPI 应用实例 |
 | `dashboard/_ws_manager.py` | `_ws_snapshot_cache`, `_ws_snapshot_ts` | WebSocket 快照缓存 |
 
 #### 3. 信号处理标志（2 处）
@@ -311,5 +311,5 @@ $ python -m pytest py/tests/ --timeout=60 -x
 | `py/maop/migrations/pg/env.py` | C-P1-7: try-except-pass → logger.debug + 添加 logger |
 | `py/maop/core/agent/llm_chat/react_loop.py` | C-P1-2: 提取 `_extract_final_answer` 和 `_append_assistant_message` |
 | `py/maop/dashboard/ws_dag.py` | C-P1-2: 提取 `_authenticate_dag_ws`、`_handle_dag_control_message`、`_cleanup_dag_ws` |
-| `py/maop/dashboard/_register_routes.py` | C-P1-3: 提取 `_register_enterprise_routers` |
+| `py/maop/dashboard/_register_routes/` | C-P1-3: 提取 `_register_enterprise_routers` |
 | `docs/p1-code-evaluation.md` | 新增评估文档 |
