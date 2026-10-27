@@ -42,6 +42,15 @@ class CoordMCPHubBridge:
     """Bridge a production :class:`maop.core.mcp.MCPHub` into the
     coordination layer's simplified hub interface.
 
+    边界（阶段2 P1-5）：
+      * 唯一协调层 MCP 适配入口：生产 ``MCPHub`` -> 协调层简化 API
+        (``register_server`` / ``find_tools`` / ``async_find_tools`` /
+        ``call_tool``)。
+      * 不负责 MCP 传输层实现（Stdio/SSE/WebSocket/StreamableHTTP）——
+        由 ``maop.core.mcp.mcp_hub_transport`` 负责。
+      * 不负责单 agent 工具执行适配——那是 ``maop.core.agent.adapters.mcp_bridge_adapter``
+        (MCPBridgeAdapter) 的职责，两者不重叠。
+
     The production MCPHub is the single source of truth for tool registry;
     this bridge just adapts its API so coordination code (agent registry,
     MCP capability matching, BB task context) can discover tools.
@@ -191,11 +200,24 @@ class CoordMCPHubBridge:
 
     # ── Delegation passthrough ────────────────────────────────────
 
-    async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
-        """Call a tool by name via the production hub."""
-        if hasattr(self._hub, 'call_tool_by_name'):
-            return await self._hub.call_tool_by_name(tool_name, arguments)
-        raise NotImplementedError("Production hub does not support call_tool_by_name")
+    async def call_tool(self, tool_name: str, arguments: dict[str, Any] | None = None) -> Any:
+        """Call a tool by name via the production hub.
+
+        Resolves the tool to its owning server via :meth:`async_find_tools`,
+        then forwards to :meth:`MCPHub.call_tool`. Raises ``KeyError`` if
+        no matching tool is found.
+        """
+        arguments = arguments or {}
+        found = await self.async_find_tools(tool_name)
+        matches = [t for t in found if t.get("name") == tool_name]
+        if not matches:
+            raise KeyError(f"Tool {tool_name!r} not found on any MCP server")
+        server_id = matches[0].get("server")
+        if server_id is None:
+            raise KeyError(f"Tool {tool_name} match carries no server id")
+        if not hasattr(self._hub, "call_tool"):
+            raise NotImplementedError("Production hub does not support call_tool")
+        return await self._hub.call_tool(server_id, tool_name, arguments)
 
     @property
     def production_hub(self) -> Any:

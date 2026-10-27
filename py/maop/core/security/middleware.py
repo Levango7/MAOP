@@ -122,6 +122,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         roles, identity = _disabled_auth_roles(client_host)
         request.state.auth_roles = roles
         request.state.auth_identity = identity
+        request.state.auth_scopes = []
         request.state.tenant_id = ""
         return cast(Response, await call_next(request))
 
@@ -169,6 +170,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 # P0-1 fix: legacy results carry no tenant → "" (unchanged
                 # behaviour); new-ApiKeyManager results propagate theirs.
                 request.state.tenant_id = getattr(result, "tenant_id", "") or ""
+                # Legacy paths carry no scopes → empty list (ScopeMiddleware
+                # will treat missing/empty scopes as deny for protected routes).
+                request.state.auth_scopes = []
                 return cast(Response, await call_next(request))
             return JSONResponse(
                 status_code=401,
@@ -227,6 +231,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 request.state.auth_roles = result.roles
                 # P0-1 fix: JWT results carry no tenant claim yet → "".
                 request.state.tenant_id = getattr(result, "tenant_id", "") or ""
+                # JWT/legacy paths carry no scopes → empty list.
+                request.state.auth_scopes = []
                 return cast(Response, await call_next(request))
             return JSONResponse(
                 status_code=401,
@@ -317,6 +323,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # admin-gated handlers still 403 in this window.
         request.state.auth_identity = "anonymous"
         request.state.auth_roles = ["read"]
+        request.state.auth_scopes = []
+        request.state.tenant_id = ""
         return cast(Response, await call_next(request))
 
     async def _authenticate_with_api_key_manager(
@@ -378,23 +386,141 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return response
 
 
+# ── Scope Middleware ─────────────────────────────────────────
+
+class ScopeMiddleware(BaseHTTPMiddleware):
+    """Route-level scope authorization middleware.
+
+    Runs *after* AuthMiddleware so ``request.state.auth_scopes`` / ``auth_roles``
+    are already populated. Checks each protected path against a configured
+    scope-requirement table and rejects (403) requests whose scopes/roles do
+    not satisfy the requirement.
+
+    Design notes
+    ------------
+    - Route registration happens *after* middleware setup, so path-based
+      requirements are expressed as path *prefixes* matched against
+      ``request.url.path`` rather than route names.
+    - If no requirement matches a path and ``default_required_scopes`` is
+      empty, the path is allowed through (auth already happened in
+      AuthMiddleware; this middleware only adds scope gating).
+    - ``auth_scopes`` comes from the new ApiKeyManager; legacy/JWT/auth-disabled
+      paths set ``auth_scopes = []``, so they satisfy no scope requirement
+      beyond roles. Roles are checked via ``default_required_roles`` if set.
+    """
+
+    def __init__(
+        self,
+        app: Any,
+        *,
+        enabled: bool = True,
+        scope_requirements: dict[str, list[str]] | None = None,
+        default_required_scopes: list[str] | None = None,
+        default_required_roles: list[str] | None = None,
+        exempt_paths: list[str] | None = None,
+    ):
+        super().__init__(app)
+        self.enabled = enabled
+        # path prefix -> list of required scopes (ALL must be present)
+        self.scope_requirements = scope_requirements or {}
+        self.default_required_scopes = set(default_required_scopes or [])
+        self.default_required_roles = set(default_required_roles or [])
+        self.exempt_paths = set(exempt_paths or [
+            "/", "/api/health",
+            "/api/docs", "/openapi.json",
+            "/api/auth/login", "/api/auth/status",
+        ])
+
+    def _required_scopes_for(self, path: str) -> list[str] | None:
+        """Return required scopes for ``path`` if any scope_requirement matches,
+        else None. Longest prefix wins."""
+        matched: list[tuple[int, list[str]]] = []
+        for prefix, scopes in self.scope_requirements.items():
+            if path == prefix or path.startswith(prefix.rstrip("/") + "/"):
+                matched.append((len(prefix), scopes))
+        if not matched:
+            return None
+        matched.sort(key=lambda x: x[0], reverse=True)
+        return matched[0][1]
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        if not self.enabled:
+            return cast(Response, await call_next(request))
+
+        path = request.url.path
+        if path in self.exempt_paths:
+            return cast(Response, await call_next(request))
+
+        # Determine required scopes for this path.
+        required_scopes = self._required_scopes_for(path)
+        if required_scopes is None:
+            required_scopes = list(self.default_required_scopes)
+
+        required_roles = set(self.default_required_roles)
+
+        # Gather effective scopes/roles from auth state.
+        auth_scopes = set(getattr(request.state, "auth_scopes", []) or [])
+        auth_roles = set(getattr(request.state, "auth_roles", []) or [])
+
+        # Scope check: ALL required scopes must be present.
+        if required_scopes and not set(required_scopes).issubset(auth_scopes):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error": "Forbidden",
+                    "detail": f"Missing required scopes: {', '.join(required_scopes)}",
+                },
+            )
+
+        # Role check: at least one required role must be present (if any required).
+        if required_roles and not (auth_roles & required_roles):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error": "Forbidden",
+                    "detail": f"Missing required roles: {', '.join(sorted(required_roles))}",
+                },
+            )
+
+        return cast(Response, await call_next(request))
+
+
 # ── Rate Limit Middleware ─────────────────────────────────────────
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """FastAPI middleware for per-IP rate limiting.
 
-    Uses MAOP.core.rate_limiter.TokenBucket by default.
+    Uses Redis-backed sliding-window counter when ``MAOP_REDIS_URL`` is set
+    (or ``redis_url`` param passed), falling back to an in-memory token bucket
+    when Redis is unavailable or not configured.
 
     .. note::
-        **M-7 限制说明**：本中间件使用 **内存 token bucket**（``self._buckets``），
-        速率限制状态仅存在于当前进程内存中。这意味着：
+        **Multi-process behavior**:
+        - Redis backend: shared across all workers, consistent rate limiting.
+        - In-memory fallback: per-process only; actual threshold is
+          ``rate × worker_count`` under uvicorn/gunicorn multi-worker.
 
-        1. **进程重启后状态丢失** —— 重启后所有令牌桶重置，突发限流暂时失效。
-        2. **多进程部署不共享状态** —— 在 uvicorn/gunicorn 多 worker 部署下，
-           每个 worker 维护独立的限流状态，实际限流阈值为 ``rate × worker_count``。
+    .. note::
+        **Skip paths**: health checks, Prometheus metrics, and static assets
+        are excluded from rate limiting by default so monitoring probes are
+        never throttled.
+    """
 
-        如需跨进程一致的限流，请考虑使用 Redis-backed 方案（如
-        ``redis-py`` + Lua 脚本实现滑动窗口或 token bucket）。
+    _REDIS_LUA_SLIDING_WINDOW = """
+        local key = KEYS[1]
+        local now = tonumber(ARGV[1])
+        local window = tonumber(ARGV[2])
+        local limit = tonumber(ARGV[3])
+        -- Remove entries outside the window
+        redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
+        local count = redis.call('ZCARD', key)
+        if count >= limit then
+            local ttl = redis.call('TTL', key)
+            return {-1, ttl}
+        end
+        redis.call('ZADD', key, now, now .. ':' .. math.random(1,1000000))
+        redis.call('EXPIRE', key, window)
+        return {count + 1, 0}
     """
 
     def __init__(
@@ -405,16 +531,42 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         burst: int = 60,           # Max burst
         enabled: bool = True,
         key_func: Callable | None = None,  # Custom key extraction (default: client IP)
+        redis_url: str | None = None,
+        skip_paths: list[str] | None = None,
     ):
         super().__init__(app)
         self.enabled = enabled
         self.rate = rate
         self.burst = burst
         self.key_func = key_func or self._default_key
+        self.redis_url = redis_url or __import__("os").environ.get("MAOP_REDIS_URL")
+        self._redis: Any = None
+        self._redis_ttl = max(1, int(burst / rate)) + 5  # seconds to keep keys
+        self._skip_paths = set(skip_paths or [
+            "/api/health", "/", "/api/prometheus", "/metrics",
+            "/api/docs", "/openapi.json",
+        ])
+        self._skip_extensions = (".css", ".js", ".ico", ".png", ".svg", ".woff2", ".woff", ".ttf")
         self._buckets: dict[str, Any] = {}
         self._request_count = 0  # for periodic cleanup
         # B20: 保护 _buckets/_request_count 的并发读写。
         self._lock = threading.Lock()
+        self._redis_available = self._init_redis()
+
+    def _init_redis(self) -> bool:
+        """Best-effort Redis connection. Returns True if available."""
+        if not self.redis_url:
+            return False
+        try:
+            import redis  # type: ignore
+            self._redis = redis.Redis.from_url(self.redis_url, socket_connect_timeout=1, socket_timeout=1)
+            self._redis.ping()
+            logger.info("RateLimitMiddleware: Redis backend connected (%s)", self.redis_url)
+            return True
+        except Exception as exc:  # pragma: no cover — Redis is optional
+            logger.warning("RateLimitMiddleware: Redis unavailable (%s), falling back to in-memory", exc)
+            self._redis = None
+            return False
 
     @staticmethod
     def _default_key(request: Request) -> str:
@@ -432,18 +584,37 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 return xff.split(",")[0].strip()  # type: ignore
         return request.client.host if request.client else "unknown"
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        if not self.enabled:
-            return cast(Response, await call_next(request))
+    def _should_skip(self, path: str) -> bool:
+        """Return True if the path should bypass rate limiting."""
+        return path in self._skip_paths or any(
+            path.endswith(ext) for ext in self._skip_extensions
+        )
 
-        # Skip health checks and static
-        path = request.url.path
-        if path in ("/api/health", "/"):
-            return cast(Response, await call_next(request))
+    def _redis_check(self, key: str) -> tuple[bool, float]:
+        """Check rate limit via Redis sliding window.
 
-        key = self.key_func(request)
+        Returns (allowed, retry_after_seconds).
+        """
+        assert self._redis is not None
+        now = time.time()
+        window = int(self._redis_ttl)
+        count, ttl = self._redis.eval(
+            self._REDIS_LUA_SLIDING_WINDOW,
+            1,
+            f"ratelimit:{key}",
+            now,
+            window,
+            self.burst,
+        )
+        if count == -1:
+            return False, float(ttl or 0)
+        return True, 0.0
 
-        # Simple in-memory token bucket per key
+    def _memory_check(self, key: str) -> tuple[bool, float]:
+        """Check rate limit via in-memory token bucket.
+
+        Returns (allowed, retry_after_seconds).
+        """
         now = time.monotonic()
 
         # B20: 加锁保护 _buckets/_request_count 的并发读写。
@@ -466,16 +637,43 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
             if bucket["tokens"] < 1.0:
                 retry_after = (1.0 - bucket["tokens"]) / self.rate
-                return JSONResponse(
-                    status_code=429,
-                    content={
-                        "error": "Rate limit exceeded",
-                        "retry_after_s": round(retry_after, 2),
-                    },
-                    headers={"Retry-After": str(int(retry_after) + 1)},
-                )
+                return False, retry_after
 
             bucket["tokens"] -= 1.0
+        return True, 0.0
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        if not self.enabled:
+            return cast(Response, await call_next(request))
+
+        # Skip health checks, metrics, static assets
+        path = request.url.path
+        if self._should_skip(path):
+            return cast(Response, await call_next(request))
+
+        key = self.key_func(request)
+
+        # Prefer Redis backend; fall back to in-memory transparently.
+        if self._redis_available and self._redis is not None:
+            try:
+                allowed, retry_after = self._redis_check(key)
+            except Exception as exc:  # pragma: no cover — Redis transient failure
+                logger.warning("RateLimitMiddleware: Redis check failed (%s), falling back to in-memory", exc)
+                self._redis_available = False
+                allowed, retry_after = self._memory_check(key)
+        else:
+            allowed, retry_after = self._memory_check(key)
+
+        if not allowed:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": "Rate limit exceeded",
+                    "retry_after_s": round(retry_after, 2),
+                },
+                headers={"Retry-After": str(int(retry_after) + 1)},
+            )
+
         return cast(Response, await call_next(request))
 
 
@@ -493,37 +691,41 @@ _CSP_DANGEROUS_TOKENS: dict[str, str] = {
 }
 
 
-def _validate_connect_src(connect_src: str) -> None:
+def _validate_connect_src(connect_src: str, *, production: bool = False) -> None:
     """Validate CSP ``connect-src`` value for dangerous patterns.
 
-    This is a **trust-policy audit**, not a hard gate. The CSP
-    ``connect-src`` directive controls where the browser can issue
-    ``fetch()``, ``XMLHttpRequest``, and WebSocket connections. A
-    permissive value undermines the entire CSP XSS mitigation.
+    This is a **trust-policy audit**. The CSP ``connect-src`` directive controls
+    where the browser can issue ``fetch()``, ``XMLHttpRequest``, and WebSocket
+    connections. A permissive value undermines the entire CSP XSS mitigation.
 
     Trust policy
     ------------
     - ``'self'`` (default): trusted — same-origin only.
     - ``'none'``: trusted — most restrictive.
     - ``https://host`` / ``wss://host``: trusted — encrypted, explicit host.
-    - Dangerous tokens (see ``_CSP_DANGEROUS_TOKENS``): logged at WARNING
-      but NOT rejected, because:
-        * Development environments may need ``http:`` for localhost.
-        * Public API gateways may need ``*``.
-        * The operator is responsible for the CSP policy; we surface
-          the risk but do not override their decision.
-    - Empty string: rejected (would produce ``connect-src`` with no
-      sources, which defaults to ``default-src`` — confusing and
-      likely unintended).
+    - Dangerous tokens (see ``_CSP_DANGEROUS_TOKENS``):
+        * Non-production: logged at WARNING but NOT rejected, because dev
+          environments may need ``http:`` for localhost or ``*`` for a public
+          API gateway.
+        * Production (``production=True``): **fail-closed** — raises
+          ``ValueError`` so the server refuses to start with a weakened CSP.
+    - Empty string: rejected (would produce ``connect-src`` with no sources,
+      which defaults to ``default-src`` — confusing and likely unintended).
 
     Args:
         connect_src: The raw ``connect-src`` value (e.g. ``"'self'"``,
             ``"'self' wss://api.example.com"``).
+        production: When True, dangerous tokens cause a hard failure instead
+            of a warning.
 
     Raises:
-        ValueError: If ``connect_src`` is empty (would produce an
-            invalid/ambiguous directive).
+        ValueError: If ``connect_src`` is empty, or (when production=True)
+            when a dangerous token is present.
     """
+    import os
+    if production is None:
+        production = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
+
     if not connect_src or not connect_src.strip():
         raise ValueError(
             "CSP connect-src must not be empty — an empty value produces "
@@ -537,28 +739,30 @@ def _validate_connect_src(connect_src: str) -> None:
     for token in tokens:
         # Check exact-match dangerous tokens (e.g. "*", "http:")
         if token in _CSP_DANGEROUS_TOKENS:
-            logger.warning(
-                "[CSP] connect-src contains dangerous token %r: %s. "
-                "This weakens the Content-Security-Policy. Ensure this is "
-                "intentional (e.g. dev environment) and not present in "
-                "production.",
-                token, _CSP_DANGEROUS_TOKENS[token],
+            msg = (
+                f"[CSP] connect-src contains dangerous token {token!r}: "
+                f"{_CSP_DANGEROUS_TOKENS[token]}. "
             )
+            if production:
+                raise ValueError(msg + "Production CSP must not contain dangerous tokens. Use explicit https:// hosts.")
+            logger.warning(msg + "This weakens the Content-Security-Policy. Ensure this is intentional (e.g. dev environment).")
         # Check prefix-match for http:// and ws:// (scheme + explicit host)
         elif token.startswith("http://"):
-            logger.warning(
-                "[CSP] connect-src allows plain HTTP origin %r — "
+            msg = (
+                f"[CSP] connect-src allows plain HTTP origin {token!r} — "
                 "connections to this host are unencrypted (MITM risk). "
-                "Prefer https:// in production.",
-                token,
             )
+            if production:
+                raise ValueError(msg + "Production CSP must not allow plain HTTP origins. Prefer https://.")
+            logger.warning(msg + "Prefer https:// in production.")
         elif token.startswith("ws://"):
-            logger.warning(
-                "[CSP] connect-src allows plain WebSocket origin %r — "
+            msg = (
+                f"[CSP] connect-src allows plain WebSocket origin {token!r} — "
                 "connections to this host are unencrypted (MITM risk). "
-                "Prefer wss:// in production.",
-                token,
             )
+            if production:
+                raise ValueError(msg + "Production CSP must not allow plain WebSocket origins. Prefer wss://.")
+            logger.warning(msg + "Prefer wss:// in production.")
 
 
 class CSPMiddleware(BaseHTTPMiddleware):
@@ -594,6 +798,7 @@ class CSPMiddleware(BaseHTTPMiddleware):
         report_uri: str | None = None,
         connect_src: str = "'self'",
         extra_directives: str = "",
+        production: bool = False,
     ):
         super().__init__(app)
         self.enabled = enabled
@@ -602,11 +807,9 @@ class CSPMiddleware(BaseHTTPMiddleware):
 
         # t88-L9: validate connect-src before building the policy.
         # connect-src governs XHR/fetch/WebSocket destinations — a
-        # misconfigured value can punch a hole through the CSP. We log
-        # warnings for dangerous patterns but do not raise, because some
-        # deployments legitimately need them (e.g. `*` for a public
-        # API gateway, `http:` for localhost dev).
-        _validate_connect_src(connect_src)
+        # misconfigured value can punch a hole through the CSP. In production
+        # mode, dangerous tokens cause a hard failure (fail-closed).
+        _validate_connect_src(connect_src, production=production)
 
         # Build CSP policy string
         directives = [
@@ -713,3 +916,273 @@ def require_admin(request: Request) -> None:
     if not ({"admin", "superadmin"} & set(roles)):
         from fastapi import HTTPException
         raise HTTPException(403, "Admin role required")
+
+
+# ── Audit Middleware ─────────────────────────────────────────────────
+
+class AuditMiddleware(BaseHTTPMiddleware):
+    """Records every API request as an audit log entry.
+
+    Fields captured: timestamp, method, path, user identity/roles, tenant_id,
+    status_code, latency_ms, client_ip, user_agent.
+    Output goes to a structured ``maop.audit`` logger (JSON-ish log record),
+    which operators can ship to SIEM / log aggregation.
+    """
+
+    def __init__(
+        self,
+        app: Any,
+        *,
+        enabled: bool = True,
+        exclude_paths: list[str] | None = None,
+    ):
+        super().__init__(app)
+        self.enabled = enabled
+        self.exclude_paths = set(exclude_paths or ["/api/health", "/", "/api/docs", "/openapi.json"])
+        self._logger = logging.getLogger("maop.audit")
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        if not self.enabled:
+            return cast(Response, await call_next(request))
+
+        path = request.url.path
+        if path in self.exclude_paths:
+            return cast(Response, await call_next(request))
+
+        start = time.monotonic()
+        response = cast(Response, await call_next(request))
+        latency_ms = round((time.monotonic() - start) * 1000.0, 2)
+
+        self._logger.info(
+            "audit: method=%s path=%s status=%s latency_ms=%s "
+            "identity=%s roles=%s tenant=%s ip=%s ua=%s",
+            request.method,
+            path,
+            getattr(response, "status_code", 0),
+            latency_ms,
+            getattr(request.state, "auth_identity", "") or "",
+            ",".join(getattr(request.state, "auth_roles", []) or []),
+            getattr(request.state, "tenant_id", "") or "",
+            (request.client.host if request.client else ""),
+            request.headers.get("user-agent", ""),
+        )
+        return response
+
+
+# ── IP Allowlist / Blocklist Middleware ──────────────────────────────
+
+class IPAllowlistMiddleware(BaseHTTPMiddleware):
+    """Global IP allowlist/blocklist middleware.
+
+    Operates before auth: requests from blocked IPs are rejected with 403
+    regardless of credentials. Requests from IPs not on the allowlist (when
+    allowlist is non-empty) are also rejected with 403. This provides a
+    network-level gate independent of per-API-key IP restrictions.
+
+    Config via env vars:
+      MAOP_IP_BLOCKLIST   comma-separated CIDRs / IPs to block
+      MAOP_IP_ALLOWLIST   comma-separated CIDRs / IPs to allow (empty = allow all)
+    """
+
+    def __init__(
+        self,
+        app: Any,
+        *,
+        enabled: bool = True,
+        blocklist: list[str] | None = None,
+        allowlist: list[str] | None = None,
+    ):
+        super().__init__(app)
+        self.enabled = enabled
+        self.blocklist = blocklist or []
+        self.allowlist = allowlist or []
+
+    def _matches(self, ip: str, patterns: list[str]) -> bool:
+        import ipaddress
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        for pat in patterns:
+            pat = pat.strip()
+            if not pat:
+                continue
+            try:
+                if "/" in pat:
+                    if addr in ipaddress.ip_network(pat, strict=False):
+                        return True
+                elif addr == ipaddress.ip_address(pat):
+                    return True
+            except ValueError:
+                continue  # silent-ok: scan-continue — 单个非法网段/地址模式跳过继续匹配后续
+        return False
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        if not self.enabled:
+            return cast(Response, await call_next(request))
+
+        client_ip = request.client.host if request.client else ""
+        # Trust-proxy awareness for real client IP.
+        import os
+        if os.environ.get("MAOP_TRUST_PROXY", "0") == "1":
+            xff = request.headers.get("x-forwarded-for", "")
+            if xff:
+                client_ip = xff.split(",")[0].strip()
+
+        if client_ip and self._matches(client_ip, self.blocklist):
+            return JSONResponse(status_code=403, content={"error": "IP blocked"})
+
+        if self.allowlist and client_ip and not self._matches(client_ip, self.allowlist):
+            return JSONResponse(status_code=403, content={"error": "IP not allowed"})
+
+        return cast(Response, await call_next(request))
+
+
+# ── Request Size Limit Middleware ────────────────────────────────────
+
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Rejects requests whose body exceeds a configured byte limit.
+
+    FastAPI/Starlette do not enforce a request-body size cap by default,
+    making the service vulnerable to large-body DoS. This middleware reads
+    the ``Content-Length`` header and short-circuits oversized requests
+    before the body is parsed.
+
+    Config:
+      max_bytes: maximum allowed body size in bytes (default 10 MiB)
+    """
+
+    def __init__(
+        self,
+        app: Any,
+        *,
+        enabled: bool = True,
+        max_bytes: int = 10 * 1024 * 1024,
+    ):
+        super().__init__(app)
+        self.enabled = enabled
+        self.max_bytes = max_bytes
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        if not self.enabled:
+            return cast(Response, await call_next(request))
+
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                size = int(content_length)
+            except ValueError:
+                size = 0
+            if size > self.max_bytes:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": "Request body too large",
+                        "max_bytes": self.max_bytes,
+                    },
+                )
+
+        return cast(Response, await call_next(request))
+
+
+# ── One-call setup (extended) ────────────────────────────────────────
+
+def setup_security_middleware(
+    app: FastAPI,
+    *,
+    auth_enabled: bool = False,
+    rate_limit_enabled: bool = True,
+    rate_limit_per_sec: float = 30.0,
+    rate_limit_burst: int = 60,
+    redis_url: str | None = None,
+    cors_origins: list[str] | None = None,
+    audit_enabled: bool = True,
+    ip_blocklist: list[str] | None = None,
+    ip_allowlist: list[str] | None = None,
+    request_size_limit_enabled: bool = True,
+    request_size_max_bytes: int = 10 * 1024 * 1024,
+    csp_enabled: bool = True,
+    csp_report_only: bool = False,
+    csp_connect_src: str = "'self'",
+    csp_extra_directives: str = "",
+    production: bool = False,
+) -> None:
+    """Configure the full production security middleware stack.
+
+    Registration order (Starlette applies last-added first, outermost):
+      1. CORS              — outermost, adds CORS headers first
+      2. CSP / Security headers — applied on response
+      3. RateLimit         — throttle traffic
+      4. Auth              — authenticate + authorize
+      5. Audit             — log every request (after IP gate, before auth)
+      6. IPAllowlist/Blocklist — network-level gate before auth
+      7. RequestSizeLimit  — reject oversized bodies first (cheap, pre-body)
+
+    Call this after creating the app but before adding routes.
+    """
+    import os
+    if production is None:
+        production = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
+
+    # 1. Request size limit (cheapest reject, before body parse) — innermost
+    if request_size_limit_enabled:
+        app.add_middleware(
+            RequestSizeLimitMiddleware,
+            enabled=True,
+            max_bytes=request_size_max_bytes,
+        )
+
+    # 2. IP allowlist / blocklist (network gate, before auth)
+    app.add_middleware(
+        IPAllowlistMiddleware,
+        enabled=True,
+        blocklist=ip_blocklist or [],
+        allowlist=ip_allowlist or [],
+    )
+
+    # 3. Audit logging (every request after IP gate)
+    if audit_enabled:
+        app.add_middleware(AuditMiddleware, enabled=True)
+
+    # Auth (business-logic layer)
+    if auth_enabled:
+        app.add_middleware(AuthMiddleware, enabled=True)
+
+    # Scope authorization (after Auth, injects auth_scopes/auth_roles onto state)
+    if auth_enabled:
+        app.add_middleware(ScopeMiddleware, enabled=True)
+
+    # Rate limiting
+    if rate_limit_enabled:
+        app.add_middleware(
+            RateLimitMiddleware,
+            rate=rate_limit_per_sec,
+            burst=rate_limit_burst,
+            enabled=True,
+            redis_url=redis_url,
+        )
+
+    # CSP / Security headers (outermost response layer, before CORS)
+    if csp_enabled:
+        app.add_middleware(
+            CSPMiddleware,
+            enabled=True,
+            report_only=csp_report_only,
+            connect_src=csp_connect_src,
+            extra_directives=csp_extra_directives,
+            production=production,
+        )
+
+    # CORS - outermost
+    from fastapi.middleware.cors import CORSMiddleware
+    if not cors_origins:
+        from maop.config.settings import get_settings
+        cors_origins = get_settings().cors_origin_list()
+    origins = cors_origins
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "X-API-Key", "Content-Type"],
+    )

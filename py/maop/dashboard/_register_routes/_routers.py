@@ -174,14 +174,11 @@ def _register_workflow_routers(app: FastAPI) -> None:
     app.include_router(worktree.router)
     app.include_router(protocol.router)
 
-    from maop.dashboard.routers import hook as hook_router
-
-    app.include_router(hook_router.router)
-
-    # 任务199: Hook 可视化配置 CRUD API（/api/hooks 复数路径，与 /api/hook/* 互补）
     from maop.dashboard.routers import hooks as hooks_router
 
     app.include_router(hooks_router.router)
+
+    # 任务199: Hook 可视化配置 CRUD API（/api/hooks 复数路径，前端全量迁移至复数路径）
 
     from maop.dashboard.routers import stream as stream_router
 

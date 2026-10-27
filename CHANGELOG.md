@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to MAOP (Plan-Execute-Verify) are documented in this file.
 
@@ -94,6 +94,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tenant_context` 包裹 → 2 红；空登记表也判拒 → 1 红；`try_get_manager` 退回只挡
   `ImportError`（即那版会把个人版每次 DAG 执行打成 500 的实现）→ 3 红；路由不再抛 403 → 2 红；
   给请求模型加租户字段或改 `extra="allow"` → 各 1 红。
+### 多 Agent 调度分层：阶段1（身份与健康）+ 阶段3（A2A 统一门户）落地
+
+按 `py/maop/core/agent/PLAN_SCHEDULING_LAYERING.md` 推进：
+
+- **任务1.1 AgentIdentity 联邦映射表**（`core/agent/identity.py`）：打通 AgentCatalog /
+  AgentRegistry / RedisAgentRegistry / WorkerRegistry 四套 ID 体系，
+  `agent_name ↔ card_id ↔ worker_id` 双向映射 + 进程级单例。
+- **任务1.2 HealthService 统一探测**（`core/scheduling/health_service.py`）：
+  CLI `--version` / HTTP health_url / TCP ping 三段探测，结果写入
+  `AgentCatalog.update_health` + 内存缓存；注册 3 个 silent-ok 标记（取消/超时/关闭回执）。
+- **任务1.3 调度前健康门禁**：`dispatch_core.py` 在 driver 执行前校验
+  `AgentCatalog.get(name).healthy`，unhealthy 时走 fallback；`distributed_scheduler.py`
+  分发前检查目标 worker 健康。drained（weight==0）同样拒绝。
+- **问题#7 A2A 统一门户**（`core/coordination/a2a_gateway.py`）：A2AGateway 整合
+  A2AClient/A2AManager/A2ABlackboardBridge，集成测试 + live transport 测试覆盖，
+  dashboard lifespan 接线在途（KNOWN_ORPHANS 已登记）。
+- **ScopeMiddleware 新接入**（`core/security/middleware.py` 593→1188 行）：路由级
+  scope 授权中间件；AuthMiddleware 各认证路径统一写 `request.state.auth_scopes`；
+  尺寸门禁按"AuthMiddleware / ScopeMiddleware / 速率+IP 白名单三块"拆分排期登记。
+- **迁移三枚**：004_config_snapshots / 005_hooks_hook_logs / 006_unify_api_keys；
+  `routers/hook.py`（169 行）随 006 统一密钥迁移删除，`routers/memory.py`、
+  `routers/quotas.py`、`routers/agent_versions.py`、`ws_dag.py`、`deploy.py` 配套调整。
+
+### P2 组合化遗留修正（test_supervisor 34 error 清零）
+
+- `test_supervisor.py` 两个 fixture 改为组合式构造：
+  `supervisor(detector=FailurePatternDetector(window_size=10, ...))`
+  （P2 组合化后 Supervisor.__init__ 不再接受继承来的窗口参数）。
+- `supervisor.py` HealthChecker 默认 detector 从 `self` 改传 `self._detector`
+  （继承语义残留）；`get_agent_health` 补返回注解；remove-unused `global`。
+- `mcp_coord_bridge.py` 工具匹配缺失 server id 时显式 raise（mypy 收窄）。
+- `semantic_cache` 已被 visual_builder 接线（76fec32），移出 KNOWN_ORPHANS。
 
 ## [5.5.0] — 2026-10-27
 

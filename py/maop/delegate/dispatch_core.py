@@ -66,6 +66,14 @@ _DEFAULT_PRIORITY: int = 3               # 默认调度优先级（1=最高, 5=�
 class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixin):
     """Config-driven agent dispatcher with circuit-breaker protection.
 
+    职责边界（阶段2 P1-1）：
+      * 只负责 **单 agent 的同步/异步任务分发**：输入 agent 名 + task，通过 driver
+        直接执行并返回 DispatchResult。
+      * 不负责 DAG 分层、Redis Streams 入队、多 worker 负载均衡、失败自动重排——
+        这些属于 :class:`~maop.core.scheduling.distributed_scheduler.DistributedScheduler`。
+      * 两者不互相调用：Dispatcher 不向 DistributedScheduler 入队，
+        DistributedScheduler 不调用 Dispatcher.driver。
+
     Resolution order:
       1. YAML config (agents.yaml / workflows)
       2. AgentRegistry + CapabilityMatcher (auto-discovered agents)
@@ -263,6 +271,32 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
                 trace_id=trace_id, routing_key=routing_key,
             )
             return DispatchResult(result=result, breaker_tripped=False)
+
+        # 1.2. Health gate — reject dispatch to unhealthy/drained agents.
+        try:
+            from maop.core.agent.registry.agent_catalog import AgentCatalog
+            from maop.core.scheduling.failure_detector import (
+                get_failure_detector,
+            )
+            _catalog = AgentCatalog.default()
+            _desc = _catalog.get(agent)
+            if _desc is not None and not _desc.healthy:
+                result = new_result(
+                    agent=agent, task=task,
+                    exit_code=-7, error=f"Agent '{agent}' is unhealthy — dispatch rejected",
+                    trace_id=trace_id, routing_key=routing_key,
+                )
+                return DispatchResult(result=result, breaker_tripped=False)
+            _detector = get_failure_detector()
+            if _detector.get_weight(agent) <= 0.0:
+                result = new_result(
+                    agent=agent, task=task,
+                    exit_code=-7, error=f"Agent '{agent}' is drained (weight=0) — dispatch rejected",
+                    trace_id=trace_id, routing_key=routing_key,
+                )
+                return DispatchResult(result=result, breaker_tripped=False)
+        except Exception as exc:
+            logger.debug("[dispatch] Health gate check unavailable (non-blocking): %s", exc)
 
         # 1.1. Guardrail check — reject if input violates safety rules
         # P2-fix: guardrail 参数名统一为 `guardrail`（与 guardrail.py 模块名一致），
