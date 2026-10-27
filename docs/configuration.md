@@ -517,7 +517,8 @@ agent_versions 等）据此过滤查询结果；`TenantManager` 另提供 `Tenan
 
 `py/maop/core/tenant/context.py` 的 `tenant_context(tenant_id)` 提供显式作用域，把租户身份
 带进非请求代码（如派发链）：`with tenant_context(tid): await dispatcher.dispatch(...)`。
-它是为后续接线预留的**唯一**注入点；本轮只提供原语，**没有改变任何执行路径**。
+它是为后续接线预留的**唯一**注入点；写这段时它还没有任何执行路径在用 ——
+2026-10-27 起 `POST /api/dag/execute` 已用它把身份带进编排链，见下一小节。
 
 **2026-10-06 更正一处我自己给轻了的估计**：原先写"补齐需动三处"，其中第 ① 处
 （"派发漏斗里读 `current_tenant()` 并调 `TenantManager`"）听起来像加一个开关就行，
@@ -542,6 +543,24 @@ agent_versions 等）据此过滤查询结果；`TenantManager` 另提供 `Tenan
 
 因此本项**没有**随批 I 落代码：宁可留一个明确的未接线事实，也不要一个看起来已启用的假门禁。
 其余两项（② 熔断器/LB 状态键加租户前缀、③ 数据路径按租户分域）仍是独立的更大改动。
+
+### 2026-10-27：第 ①②③ 步已在 dashboard DAG 入口落地，④⑤ 仍未做
+
+上表那四行"实测拿不到身份"现在**对 `POST /api/dag/execute` 不再成立**：
+
+| 步 | 现状 |
+|---|---|
+| ① 路由取身份 | `routers/dag.py` 走 `core/tenant/context.py` 的唯一入口，**只读 `request.state`**（步骤 ① 原文写的是 `require_tenant_id`，即缺租户就 403 —— 那等于替第 ⑤ 步做了决定，会把个人版/认证关闭的 admin 一律打死，故改用软读 `tenant_id_from_request`） |
+| ② 服务层签名 | `execution_service.execute_dag(*, nodes, edges, tenant_id="")`，keyword-only、默认空串，既有调用点零改动 |
+| ③ 作用域覆盖 | `tenant_context(tenant_id)` 包住 `Engine.run(...)`，因此步骤执行器与 `Dispatcher.dispatch` 都读得到 `current_tenant()`。刻意**不**把 `tenant_id` 塞进模板 `context` 字典 —— 那会让一个叫 `tenant_id` 的 DAG 变量被静默覆盖 |
+| ④ 漏斗里的 `check_agent_access` | **未做**。企业版 `TenantManager` 压根没有这个方法（它只有 `check_quota` / `get_usage` / CRUD），而 core 版那个读的是 `data/maop.db` 的 `tenants` 表，与仪表盘的 PG 注册表**不是同一个数据源**。照原计划接上，得到的是"按一个没人写的表来放行/拦截"的门 |
+| ⑤ 无身份时的策略 | 本次入口采取**分档**而非全局开关：无身份 = 不管（个人版/认证关闭本来就没有租户边界）；有身份且登记表非空 = 未登记即拒、`suspended`/`terminated` 即拒；登记表为空 = 不管（否则打死所有没接租户库的部署）。`maop run` 与 chat 两条入口**还没接**，它们的第 ⑤ 步策略仍待产品定 |
+
+响应体随之多了 `tenant_id`（见 `docs/API_CHANGELOG.md`）。契约由
+`py/tests/test_dag_tenant_attribution.py` 钉住，其中一条专门盯"G-07 越权口子不许重新打开"：
+断言请求模型**结构上**带不了租户声明（加字段或改 `extra="allow"` 都会判红），
+而不只是断言"当前传进去不生效"—— 后者是零射程的，因为 pydantic 默认丢弃 extras
+时那条 mutation 本来就是惰性的。
 
 ---
 

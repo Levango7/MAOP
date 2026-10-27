@@ -4,6 +4,17 @@ All notable changes to the MAOP REST API and WebSocket API.
 
 ## Unreleased (2026-10-06)
 
+### Added
+- `POST /api/dag/execute` 响应体新增 `tenant_id` —— 本次执行所属租户，**只取自认证态**
+  （`request.state.tenant_id`，由中间件按 JWT claim 写入）；无租户边界（个人版 / 认证关闭）时为空串。
+  请求体**不接受** `tenant_id`：从 body/query 取租户是 G-07 修过的越权口子，且已加结构守卫
+  （给请求模型加租户字段或改 `extra="allow"` 都会判红）。
+- 同一端点新增租户生命周期门：登记表非空时，未登记的租户、或状态为 `suspended` / `terminated`
+  的租户返回 403。拒绝原因在响应的 `error` 字段（`handle_api_errors` 把 `detail` 统一置空）。
+  三种"无从检查"的情形**放行**：无租户身份、企业租户能力不可用（未装包或 edition 未开
+  `tenant_isolation`）、登记表为空。逐条语义与理由见 `docs/configuration.md`
+  「多租户（企业版）现状与边界」的 2026-10-27 小节。
+
 ### Changed
 - 通知的三个列表端点 `GET /api/notifications/channels|rules|templates`：admin「不带 `?tenant_id=`」的语义改为**显式跨租户**。
   MAOS `f9cbc70`（2026-10-03）把空 `tenant_id` 的含义从"所有租户"收紧为"没有租户的行"，跨租户必须走 `all_tenants=True`。
