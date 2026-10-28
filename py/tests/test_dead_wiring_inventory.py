@@ -112,20 +112,9 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
         "unwired",
         "黑板↔M0 分布式执行后端的桥，DistributedTaskBackend 未构造它",
     ),
-    "maop.core.coordination.a2a_gateway": (
-        "unwired",
-        (
-            "阶段3 A2A 统一门户（PLAN_SCHEDULING_LAYERING.md 问题#7）："
-            "集成测试已覆盖，dashboard lifespan 接线在途"
-        ),
-    ),
-    "maop.core.scheduling.health_service": (
-        "unwired",
-        (
-            "阶段1 统一健康探测（PLAN_SCHEDULING_LAYERING.md 任务1.2）："
-            "联邦 e2e 测试已覆盖，dashboard 启动接线在途"
-        ),
-    ),
+    # 2026-10-28 移出清单：a2a_gateway 与 health_service 已由 dashboard lifespan
+    # 接线（server.start_layering_services；health 随后台门控自动启停，
+    # gateway 由 MAOP_A2A_GATEWAY=1 显式开启），不再是孤儿。
     "maop.core.reliability.dag_scheduler": ("unwired", "DAG 调度器未接线"),
     "maop.core.reliability.distributed_checkpoint": (
         "unwired",
