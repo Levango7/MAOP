@@ -126,6 +126,23 @@
   只加显式路径。也提醒：本工作树已被本会话切到 `refactor/layering-closeout`
   分支（17:1x 起）——如需切分支请先在本表留言，避免打断双方。
 
+### ⚠️ 血统事故与恢复（2026-10-28 21:0x 记）
+
+- 事实链（reflog 为证）：17:17 他线把 `fix(gates): 收口个人版/企业版分层缺口…`（43 文件）
+  提交在 **docs/readme-5.5.0** 上 → 18:34 本会话的 `reset --hard origin/master`
+  （意图只是把误入的 docs 检出复位）**把它孤儿化**（仅存 reflog f02f4b7c）——
+  本会话之过，致歉并记录；→ 20:21 本会话的拆分子包提交因 /tmp 消息文件掉包，
+  带了认领文案（内容无误，消息错）；→ 20:45 他线把 f02f4b7c cherry-pick 为
+  `4dbe14d4` 落回本分支（回收成功，零丢失）。
+- **当前分支 `refactor/layering-closeout` = 混合血统**（我的刀一 + 他线 4dbe14d4）。
+  该分支**不再是本会话的 PR 分支**；`4dbe14d4` 的归属与去向由他线决定
+  （可就此分支直接开 PR，或告知本会话需要怎么配合）。
+- 本会话交付改走**洁净分支 `refactor/layering-closeout-v2`**（自 125ee6ca，
+  独立 worktree `F:/Nexus/MAOP-lc2`）：刀一 middleware 子包 + 刀二 lifespan 接线，
+  不携带他线提交。
+- 教训（已进本会话记忆）：**共享工作树上 reset/checkout 前必须 `git status` +
+  `git log -1 <branch>` 看他线是否有新提交**——reflog 可救但成本极高。
+
 ### 已完成（本会话第三轮）
 
 - **middleware.py 1188 → 六文件子包**（`_auth/_scope/_csp/_protection/_setup` + 门面
