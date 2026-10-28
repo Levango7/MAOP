@@ -203,6 +203,51 @@
 `RecursionError` 必须显式列入，因为它是 `RuntimeError` 的子类而不在 `Exception` 的
 常规假设里 —— 若省略，深层嵌套对象会从「降级为 str」变成「抛异常」。
 
+### D10. 分模块推进：`dashboard/`（2026-10-29）
+
+`dashboard/` 272 处 → 249 处，实收窄 **23 处**（1090 → 1067）。这一层的宽口径
+密度最高（272/全仓 26%），但可收窄率只有 8.5% —— 绝大多数是「调用 service /
+bridge / registry 的未知实现」与「`await` 未知协程」。
+
+| 形态 | 收窄 | 站点 |
+|---|---|---|
+| SQLite 读写 | 9 | `data_proxy.py` 2（`(OSError, sqlite3.Error, TypeError)`，非 SELECT 时 `cursor.description is None`）、`provider.py` 2、`auth_service.py` 3（`PRAGMA` / `ALTER TABLE`）、`memory_service.py` 1、`system_service.py` 1 |
+| 文件读取 / `stat` / `glob` | 7 | `channels/security.py` 2、`provider.py` 1、`routers/system/overview.py` 3、`services/data_service.py` 1 |
+| 特定库的已知异常 | 4 | `n8n.py` 的 `model_validate_json` → `(ValidationError, TypeError)`、`channels/routing.py` 的 `datetime.fromisoformat` → `ValueError`、`observability_service.py` 的 otel 探针 2 → `(ImportError, AttributeError)` |
+| 死 try | 1 | `memory_service.py::get_memory_stats` 的 `info["transform"] = {...}` |
+| 由宽口径掩盖的存量缺陷 | 2 | `auth_service.py::db_list_users` 的缺列退化 → `(IndexError, KeyError, TypeError)`；`auth_service.py::login` 的 `'tenant_id' in row` → `TypeError` |
+
+**收窄直接暴露了一个真 bug**：`system_service.py::maintain_vacuum` 写的是
+`with sqlite_connect() as conn:` —— `sqlite_connect` 的 `db_path` 是必填参数，
+这句每次都抛 `TypeError`，被 `except Exception` 静默吞成
+`"Skipped: vacuum unavailable"`，于是「数据库压缩」这个维护动作从未真正执行过。
+收窄后 `test_router_control.py::test_vacuum` 变红，才把它逼出来；已改为
+`sqlite_connect(str(state.MAOP_ROOT / "data" / "maop.db"))`。这是 D5 里
+「批量替换会把真兜底变成漏兜、但也会把真 bug 变成漏网」的反面证据 ——
+收窄的价值正在于让被吞掉的编程错误重新出现。
+
+**故意保留宽口径的四类**（新增登记，不计入收窄）：
+
+| 形态 | 站点 | 理由 |
+|---|---|---|
+| 诊断端点的导入探针 | `routers/system/overview.py` 3、`routers/system/v4_misc.py` 1、`routers/state.py` 1、`services/plugin_service.py` 1 | 契约就是「任何原因导入失败 → `ok: false`」；收窄为 `ImportError` 会让子模块的导入期异常（pydantic 校验、模块级副作用）直接 500 掉健康检查端点。`routers/state.py::_lazy_import` 更是在**模块导入期**调用，收窄会把降级变成启动失败 |
+| aiosqlite / 协程句柄 | `provider.py` 2、`services/data/analysis.py` 12 | `aiosqlite.Error` 是 `RuntimeError` 子类，不等于 `sqlite3.Error`；同一个 try 里还混着 `round` / `model_dump` |
+| 未知 service / bridge 实现 | `services/data_service.py` 8、`services/evolution_service.py` 6、`routers/data.py` 9、`routers/system/agent_admin.py` 8 | 异常集由被调实现决定，静态只能证明「不该收窄」 |
+| `await` 未知协程 | `ws_dag.py`、`_ws_manager.py`、`services/upgrade_service.py` 6 等 91 处 | 同 D8 |
+
+**两处被门禁校验器拦下的保守保留**：`provider.py::_count_memory_entries`
+（try 体只有 `Path.glob` + `len`，本可收窄为 `OSError`）与
+`provider.py::_count_suggestions`（`read_text` + `json.loads`，本可收窄为
+`(OSError, ValueError)`）在同文件 aiosqlite 路径共存的情况下被判定为
+「易被误认为已覆盖 aiosqlite 分支」，暂缓；`memory_service.py` 的
+`stats["bloom_filter"]` 死 try 同理（删除整段 try 被判定为语义变更）。
+三项留作下一轮单独复核。
+
+**AST 分类器的新误判**：`routers/system/overview.py` 的两处统计循环被判成
+`unknown_call`（因为 `f.is_file` / `.glob` 不在白名单），实际整个 try 体只有
+`Path` 上的文件系统操作，异常集就是 `OSError` 一族 —— 与 D9 的 `close`/`execute`
+相反，这次是「窄异常被误判成不可收窄」。
+
 ## 影响
 
 - 新增：`scripts/check_silent_exceptions.py`、`scripts/check_file_size.py`、

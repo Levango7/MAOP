@@ -73,7 +73,7 @@ class RoutingMixin:
                 s = frac6 + m.group(2)
             try:
                 return datetime.fromisoformat(s)
-            except Exception as exc:
+            except ValueError as exc:
                 logger.warning("data_proxy._parse_ts failed: %s", exc)
                 return None
 

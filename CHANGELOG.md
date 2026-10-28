@@ -39,6 +39,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 宽口径异常：`dashboard/` 模块第四批（2026-10-29）
+
+- `dashboard/` 272 处 → 249 处，实收窄 **23 处**：SQLite 读写 9（`data_proxy.py` 2、
+  `provider.py` 2、`auth_service.py` 3、`memory_service.py` 1、`system_service.py` 1）、
+  文件读取/`stat`/`glob` 7、特定库已知异常 4（`n8n.py` 的 `model_validate_json`、
+  `channels/routing.py` 的 `datetime.fromisoformat`、otel 探针 2）、死 try 1、
+  租户列缺列的退化分支 2。
+- **收窄逼出一个真 bug**：`system_service.py::maintain_vacuum` 一直写
+  `sqlite_connect()`（漏传必填的 `db_path`），每次都抛 `TypeError` 并被
+  `except Exception` 静默吞成 `"Skipped: vacuum unavailable"` —— 该维护动作从未
+  真正执行过。已改为 `sqlite_connect(str(state.MAOP_ROOT / "data" / "maop.db"))`，
+  `test_router_control.py::test_vacuum` 由红转绿。
+- 故意保留宽口径的四类登记见 ADR-023 D10：诊断端点的导入探针（契约要求
+  「任何原因导入失败 → ok:false」，收窄会让健康检查 500）、`aiosqlite.Error`
+  是 `RuntimeError` 子类而非 `sqlite3.Error`、未知 service/bridge 实现、
+  `await` 未知协程 91 处。
+- `BROAD_EXCEPT_BASELINE` 1090 → 1067。
+
 ### 宽口径异常：`memory/` + `core/backends/` + `core/reliability/` 模块第三批（2026-10-29）
 
 - 三模块合计收窄 **42 处**（`memory/` 64→50、`core/backends/` 59→44、

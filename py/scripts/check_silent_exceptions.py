@@ -82,9 +82,12 @@ SUPPRESS_BASELINE = 46
 #: ``core/scheduling/`` 收窄 2 处（json.dumps 兜底、删掉一处只会 ``return None``
 #: 的死 try）。第五轮：1132 → 1090，``memory/`` 14 处、``core/backends/`` 15 处、
 #: ``core/reliability/`` 13 处（sqlite CRUD、unlink、import 探针、prometheus 指标），
-#: 三个模块的不可收窄归因见 ADR-023 D9。登记条目一旦 try 体缩小到
+#: 三个模块的不可收窄归因见 ADR-023 D9。同日第六轮：1090 → 1067，
+#: ``dashboard/`` 收窄 23 处（诊断端点的文件读取与 stat、sqlite CRUD、
+#: ``datetime.fromisoformat``、pydantic ``model_validate_json``、otel 可选依赖
+#: 探针），该模块剩余 249 处的归因见 ADR-023 D10。登记条目一旦 try 体缩小到
 #: 只剩 import 或单一已知 API，必须收窄并下调本基线。
-BROAD_EXCEPT_BASELINE = 1090
+BROAD_EXCEPT_BASELINE = 1067
 
 
 def _iter_py_files() -> Iterator[pathlib.Path]:

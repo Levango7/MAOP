@@ -66,7 +66,7 @@ def _compute_file_counts_sync() -> dict[str, Any]:
         for tf in test_dir.glob("test_*.py"):
             try:
                 tests_total += tf.read_text(encoding="utf-8", errors="replace").count("def test_")
-            except Exception as exc:
+            except OSError as exc:
                 logger.warning('Failed to count test functions: %s', exc)
     return {
         "source_files": source_files,
@@ -221,7 +221,7 @@ async def api_system_resources(request: Request) -> dict[str, Any]:
                         sqlite_used_mb += f.stat().st_size / 1024 / 1024
                     except OSError as exc:
                         logger.warning('Failed to stat %s: %s', f, exc)
-    except Exception as exc:
+    except OSError as exc:
         logger.warning('SQLite stat failed: %s', exc)
         sqlite_error = "SQLite stat failed"
     sqlite_db: dict[str, Any] = {
@@ -246,7 +246,7 @@ async def api_system_resources(request: Request) -> dict[str, Any]:
                             vector_used_mb += f.stat().st_size / 1024 / 1024
                         except OSError as exc:
                             logger.warning('Failed to stat %s: %s', f, exc)
-    except Exception as exc:
+    except OSError as exc:
         logger.warning('Vector stat failed: %s', exc)
         vector_error = "Vector stat failed"
     vector_index: dict[str, Any] = {

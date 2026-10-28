@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import math
+import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
@@ -205,7 +206,7 @@ def get_memory_deep_stats() -> dict[str, Any]:
                     "SELECT agent, COUNT(*) as cnt FROM episodic_memory GROUP BY agent ORDER BY cnt DESC"
                 ).fetchall()
             stats["episodic_by_agent"] = {r[0] or "unknown": r[1] for r in rows}
-        except Exception:
+        except (OSError, sqlite3.Error):
             stats["episodic_by_agent"] = {}
     except Exception:
         logger.debug("Failed to get episodic stats", exc_info=True)
@@ -255,10 +256,7 @@ def get_neural_status() -> dict[str, Any]:
         }
     except Exception:
         logger.debug("Failed to get memory stats", exc_info=True)
-    try:
-        info["transform"] = {"enabled": True, "layers": 3, "steps": ["plan", "execute", "verify"]}
-    except Exception:
-        logger.debug("Failed to check workflow engine", exc_info=True)
+    info["transform"] = {"enabled": True, "layers": 3, "steps": ["plan", "execute", "verify"]}
     return info
 
 

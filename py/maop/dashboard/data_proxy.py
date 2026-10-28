@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -131,7 +132,8 @@ class DataProxy(
             cursor = conn.execute(sql, params)
             cols = [d[0] for d in cursor.description]
             return [dict(zip(cols, row)) for row in cursor.fetchall()]
-        except Exception as exc:
+        except (OSError, sqlite3.Error, TypeError) as exc:
+            # TypeError：传入非 SELECT 语句时 cursor.description 为 None。
             logger.warning("[bridge] maop.db query failed: %s", exc)
             return []
         finally:
@@ -151,7 +153,8 @@ class DataProxy(
             cursor = conn.execute(sql, params)
             cols = [d[0] for d in cursor.description]
             return [dict(zip(cols, row)) for row in cursor.fetchall()]
-        except Exception as exc:
+        except (OSError, sqlite3.Error, TypeError) as exc:
+            # TypeError：传入非 SELECT 语句时 cursor.description 为 None。
             logger.warning("[bridge] memory.db query failed: %s", exc)
             return []
         finally:

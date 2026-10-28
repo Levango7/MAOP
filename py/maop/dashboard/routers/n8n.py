@@ -19,7 +19,7 @@ import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field  # noqa: F401
+from pydantic import BaseModel, ConfigDict, Field, ValidationError  # noqa: F401
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
@@ -100,7 +100,7 @@ async def receive_webhook(request: Request) -> dict[str, Any]:
     # 的 raw_body 解析，既保留签名校验又获得 Pydantic 校验。
     try:
         payload = N8nWebhookPayload.model_validate_json(raw_body)
-    except Exception as exc:
+    except (ValidationError, TypeError) as exc:
         # 批次3A: 脱敏——JSON 解析错误细节不暴露给客户端，仅日志记录。
         logger.warning("[n8n] Invalid JSON in webhook: %s", exc)
         raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
