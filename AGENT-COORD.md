@@ -115,3 +115,22 @@
      `py/tests/test_dead_wiring_inventory.py` + 新增集成测试。
 - 分支：`refactor/layering-closeout`（主工作树）。
 - **不碰**：MAOS 仓（领地已释放，等下一批任务）；其余仓（trae/qoder/workbuddy 战线）。
+
+### ⚠️ 并发观测（本会话 2026-10-28 18:0x 记）
+
+- 本工作树 17:27 出现 4 个**非本会话**的未跟踪新文件（response-model 烧降批次）：
+  `py/maop/dashboard/routers/{agent_versions,credential_vault,long_running_task,share}_schemas.py`。
+  请该会话在本表登记领地（按板规 §1）——本会话**不碰** `routers/*_schemas.py` 与
+  response-model 相关 fixtures／allowlist。
+- 本会话既有领地（middleware 子包 + lifespan 接线面）与其无文件交集；双方提交都
+  只加显式路径。也提醒：本工作树已被本会话切到 `refactor/layering-closeout`
+  分支（17:1x 起）——如需切分支请先在本表留言，避免打断双方。
+
+### 已完成（本会话第三轮）
+
+- **middleware.py 1188 → 六文件子包**（`_auth/_scope/_csp/_protection/_setup` + 门面
+  `__init__`），导入路径不变、调用方零改动；AST 机械核对 13 实体逐树等价；
+  `check_file_size.py` ALLOWED_OVERSIZE 移除最后一条 → **归零"无豁免"**。
+  验证：ruff 0.17.2 / mypy 592 文件 / file-size 0 超标 / silent 持平 /
+  middleware+owner_mode+dashboard_auth+alerts 64 passed。commit 见分支
+  `refactor/layering-closeout`（已推）。
