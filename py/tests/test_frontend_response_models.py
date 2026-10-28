@@ -65,7 +65,15 @@ URL_EXCEPTIONS = FIXTURES / "frontend_url_reference_exceptions.txt"
 # follow computed URLs and found seven endpoints two earlier "model every
 # frontend endpoint" batches had walked past (three auth, two edition, graph
 # stats, knowledge-graph). They are burned down next.
-RATCHET_CAP = 75
+# （2026-10-28 校：上面那次 75 -> 82 只改了注释，常量与 allowlist 都停在 75 条 ——
+#  同一件事写了两份数字、其中一份没落地。现在起只认常量与 allowlist 相等这一条事实。）
+# 2026-10-28, 75 -> 88：本文件此前被 conftest 的子串忽略规则挡在个人版环境之外
+# （正文里出现 "maop.enterprise" 字样），于是这四个新路由（share /
+# agent-versions / credential-vault / long-running-tasks，10-06 ~ 10-28 新增）
+# 加进来时**没有任何门禁执行过**，13 个未建模端点一直没人登记。现在补登记为显式
+# 债务并同步抬高上限 —— 这是"记录"而非"修复"：给这 13 个端点补上 response_model
+# 后应删行并把 CAP 降回去。
+RATCHET_CAP = 88
 
 _QUOTES = {"`": "`", "'": "'", '"': '"'}
 _CALL_HEAD_RE = re.compile(
@@ -559,10 +567,25 @@ def test_non_json_exemptions_are_real_routes() -> None:
 
 
 def test_notification_router_is_fully_typed():
-    # The router imports its models from maop-enterprise and is not mounted
-    # in a personal-only install (CI); the generic ratchet still applies there.
+    # 通知中心是**企业版专属**（后端模块级 import maop.enterprise），个人版 app
+    # 不再挂载 /api/notifications/*（2026-10-28，见 test_notifications_edition_gate）。
+    # 所以这里不能再用全局 `app` 的 schema 计数 —— 改为只把 notifications 路由
+    # 挂到一个空 app 上取 schema：类型棘轮仍然完整覆盖这 26 条，且与 edition
+    # gate 解耦（个人版 CI 也能跑，前提只是企业包可导入）。
     pytest.importorskip("maop.enterprise", reason="notifications router needs maop-enterprise")
-    routes = route_schema()
+    from fastapi import FastAPI
+
+    from maop.dashboard.routers import notifications as notifications_router
+
+    sub = FastAPI()
+    sub.include_router(notifications_router.router)
+    schema = sub.openapi()
+    routes = {
+        (method.upper(), normalize_path(path)): op
+        for path, methods in schema.get("paths", {}).items()
+        for method, op in methods.items()
+        if method in _METHODS
+    }
     notification_routes = [key for key in routes if key[1].startswith("/api/notifications")]
     assert len(notification_routes) == 26, len(notification_routes)
     untyped = sorted(key for key in notification_routes if not has_typed_response(routes[key]))

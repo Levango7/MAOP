@@ -68,6 +68,22 @@
   v4.3 / v4.3.0）；新增测试扫这两个文件里 `MAOP v\d` 字面量即红。第三方 CLI 版本
   （如 `Cline v3.0.46`）不受影响。
 
+### D5. 宽口径异常棘轮（2026-10-28 追加）
+
+静默门禁只抓「处理器里没有日志/重抛」的形态，但**宽口径 `except Exception`** 是另一类
+假降级来源：它带 logger，看起来合规，实际把 `AttributeError`/`TypeError`/`KeyError`
+这类**编程错误**也一起吞掉，于是故障被记成"降级"而不是崩溃。
+
+- **实测**：`except Exception` / `except BaseException` 共 1156 处（另有 2 处裸 `except:`）。
+- **硬失败**：裸 `except:` 一律红（会连 `KeyboardInterrupt`/`SystemExit` 一起吞），不进棘轮。
+- **棘轮**：`BROAD_EXCEPT_BASELINE = 1142`，双向——新增即红；收窄后必须同步下调。
+- **本轮实收窄 14 处**：所有「`try` 体只有 `import`」的可选依赖守卫改为
+  `except ImportError`（`mcp_hub_metrics`、`mcp_cache`、`mcp_concurrency`、
+  `agent_scanner`、`multimodal` 等）。这类改写零语义风险：`try` 体里除了 import
+  没有别的语句，能抛的只有导入错误。
+- **不做**：不批量改剩余 1142 处。逐处收窄需要知道每个站点的**预期异常集**，批量
+  替换会把真正的宽口径兜底变成漏兜。剩余存量按模块随重构逐步收窄，每收一次降一次基线。
+
 ## 影响
 
 - 新增：`scripts/check_silent_exceptions.py`、`scripts/check_file_size.py`、

@@ -20,6 +20,11 @@ from fastapi.testclient import TestClient
 
 from maop.config.edition import Edition, reset_edition, set_edition
 
+# SSO 路由模块级依赖 maop.enterprise。个人版环境显式跳过（收集得到、skip 计数可见），
+# 而不是靠 conftest 的子串忽略 —— 旧注释里写着「由 collect_ignore 机制跳过」，
+# 但那种跳过在报告里完全不可见。
+pytest.importorskip("maop.enterprise", reason="SSO 路由依赖 maop-enterprise（MAOS）")
+
 
 @pytest.fixture(autouse=True)
 def _enterprise_edition(monkeypatch: pytest.MonkeyPatch) -> Any:

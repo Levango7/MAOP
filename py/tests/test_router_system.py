@@ -396,8 +396,12 @@ class TestAuditEvents:
         # ADR-017 (2026-08-20): enterprise modules moved to private repo MAOS.
         # This test exercises the enterprise branch's error path; skip when
         # maop.enterprise is not installed (personal-edition CI).
-        # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-        # enterprise installed (maop-enterprise wheel): guard removed
+        # 2026-10-28: 原守卫曾被删（注释写着 "guard removed"，因为开发机装了企业包），
+        # 于是个人版 CI 静默跳过本文件后这条从未被验证过 —— 现恢复为显式 skip。
+        pytest.importorskip(
+            "maop.enterprise.audit",
+            reason="本用例验证企业审计分支的异常路径（MAOS 私有仓）",
+        )
         from maop.dashboard.services import observability_service as _audit_mod
         _audit_mod._enterprise_logger = None
         # 2026-08-11 hardening: 无 license 时 has_feature(AUDIT_LOG) 为 False,

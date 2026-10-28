@@ -413,7 +413,7 @@ def _pg_backend_selected() -> bool:
     """
     try:
         from maop.config.settings import get_settings
-    except Exception:  # pragma: no cover - defensive: settings import failure
+    except ImportError:  # pragma: no cover - defensive: settings import failure
         return False
     override = get_settings().multimodal_backend.strip().lower()
     if override in ("sqlite", "pg", "postgresql"):

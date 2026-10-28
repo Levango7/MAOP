@@ -75,7 +75,7 @@ class MCPHubMetricsMixin:
                 MAOP_MCP_CALL_AUDITED_TOTAL,
                 MAOP_MCP_CALL_DENIED_TOTAL,
             )
-        except Exception as exc:
+        except ImportError as exc:
             logger.warning(
                 "[mcp_hub_metrics] Failed to import MCP call metrics, skipping audit record: %s",
                 exc, exc_info=True,
@@ -91,7 +91,7 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_calls_total (label=server,tool)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CALLS_TOTAL
-        except Exception as exc:
+        except ImportError as exc:
             logger.warning(
                 "[mcp_hub_metrics] Failed to import MAOP_MCP_CALLS_TOTAL, skipping call attempt: %s",
                 exc, exc_info=True,
@@ -103,7 +103,7 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_call_errors_total (label=server,tool)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CALL_ERRORS_TOTAL
-        except Exception as exc:
+        except ImportError as exc:
             logger.warning(
                 "[mcp_hub_metrics] Failed to import MAOP_MCP_CALL_ERRORS_TOTAL, skipping error record: %s",
                 exc, exc_info=True,
@@ -116,7 +116,7 @@ class MCPHubMetricsMixin:
         class in monitoring.py does not carry labels)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CALL_DURATION_SECONDS
-        except Exception as exc:
+        except ImportError as exc:
             logger.warning(
                 "[mcp_hub_metrics] Failed to import MAOP_MCP_CALL_DURATION_SECONDS, skipping duration: %s",
                 exc, exc_info=True,
@@ -131,7 +131,7 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_health_check_total (label=server,result)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_HEALTH_CHECK_TOTAL
-        except Exception as exc:
+        except ImportError as exc:
             logger.warning(
                 "[mcp_hub_metrics] Failed to import MAOP_MCP_HEALTH_CHECK_TOTAL, skipping health check: %s",
                 exc, exc_info=True,
@@ -145,7 +145,7 @@ class MCPHubMetricsMixin:
         """+1 on MAOP_mcp_servers_connected (no labels)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_SERVERS_CONNECTED
-        except Exception as exc:
+        except ImportError as exc:
             logger.warning(
                 "[mcp_hub_metrics] Failed to import MAOP_MCP_SERVERS_CONNECTED, skipping inc: %s",
                 exc, exc_info=True,
@@ -157,7 +157,7 @@ class MCPHubMetricsMixin:
         """-1 on MAOP_mcp_servers_connected (no labels)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_SERVERS_CONNECTED
-        except Exception as exc:
+        except ImportError as exc:
             logger.warning(
                 "[mcp_hub_metrics] Failed to import MAOP_MCP_SERVERS_CONNECTED, skipping dec: %s",
                 exc, exc_info=True,
@@ -169,7 +169,7 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_cache_hit_total (label=server)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CACHE_HIT_TOTAL
-        except Exception as exc:
+        except ImportError as exc:
             logger.warning(
                 "[mcp_hub_metrics] Failed to import MAOP_MCP_CACHE_HIT_TOTAL, skipping hit: %s",
                 exc, exc_info=True,
@@ -181,7 +181,7 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_cache_miss_total (label=server)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_CACHE_MISS_TOTAL
-        except Exception as exc:
+        except ImportError as exc:
             logger.warning(
                 "[mcp_hub_metrics] Failed to import MAOP_MCP_CACHE_MISS_TOTAL, skipping miss: %s",
                 exc, exc_info=True,
@@ -193,7 +193,7 @@ class MCPHubMetricsMixin:
         """Increment MAOP_mcp_rate_limited_total (label=server)."""
         try:
             from maop.core.monitoring.monitoring import MAOP_MCP_RATE_LIMITED_TOTAL
-        except Exception as exc:
+        except ImportError as exc:
             logger.warning(
                 "[mcp_hub_metrics] Failed to import MAOP_MCP_RATE_LIMITED_TOTAL, skipping rate limit: %s",
                 exc, exc_info=True,

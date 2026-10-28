@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+from maop.dashboard import _ws_manager
 from maop.dashboard._ws_manager import _ws_clients, _ws_lock
 from maop.dashboard.routers import auth as _auth_mod
 
@@ -63,7 +64,15 @@ def register_websocket(app: FastAPI) -> None:
         async with _ws_lock:
             _ws_clients.add(ws)
         try:
-            await ws.send_json({"type": "hello", "msg": "MAOP Dashboard WebSocket connected", "ts": time.time()})
+            await ws.send_json({
+                "type": "hello",
+                "msg": "MAOP Dashboard WebSocket connected",
+                "ts": time.time(),
+                # 多 worker 下本 worker 可能不跑推送循环（MAOP_BACKGROUND_TASKS=0）。
+                # 显式告诉客户端，避免它一直等 snapshot 帧。
+                "push_enabled": _ws_manager._ws_push_enabled,
+            })
+
             while True:
                 data = await ws.receive_text()
                 if data == "ping":

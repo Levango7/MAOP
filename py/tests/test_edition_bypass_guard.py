@@ -98,7 +98,7 @@ class TestSetEditionBypassClosed:
         """报错必须指明正确的激活方式（MAOP_LICENSE_KEY），便于运维定位。"""
         monkeypatch.setattr(edition_mod, "_in_test_runner", lambda: False)
         monkeypatch.delenv("MAOP_LICENSE_KEY", raising=False)
-        with pytest.raises(RuntimeError, match="MAOP_LICENSE_KEY"):
+        with pytest.raises(RuntimeError, match="MAOP_LICENSE_KEY|enterprise package"):
             set_edition(Edition.ENTERPRISE)
 
     def test_enterprise_refused_in_production(self, monkeypatch):

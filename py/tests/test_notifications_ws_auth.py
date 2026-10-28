@@ -4,9 +4,15 @@ P0 fix (2026-08-29): ``/api/notifications/ws`` previously accepted
 unauthenticated connections when no token was supplied — the ``if token:``
 guard skipped validation entirely, bypassing MAOP_AUTH=1 (ws_broadcast.py
 already closed with 4401 in that case). These tests pin the corrected
-behaviour with a minimal stub WebSocket (no enterprise dependency —
-``test_notifications.py`` is module-skipped because ``maop.enterprise``
-is unpublished, so they live in their own file).
+behaviour with a minimal stub WebSocket.
+
+Note (2026-10-28): this file is NOT an enterprise feature test — the WS auth
+gate lives in the maop main package. But importing the notifications router
+drags in ``notification_schemas`` → ``maop.enterprise.notification.models``,
+so the whole module is skipped when maop-enterprise is absent. That skip is
+declared explicitly below instead of relying on conftest's old substring
+literal ignore (which matched the words in this very docstring and hid the
+file — 111 assertions — from every personal-edition run).
 
 Covered cases:
   - auth enabled + no token            -> close(4401, "Authentication required"), never accept
@@ -20,7 +26,13 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import pytest
 from fastapi import WebSocketDisconnect
+
+pytest.importorskip(
+    "maop.enterprise.notification.models",
+    reason="notifications router needs maop-enterprise (personal edition gates it off)",
+)
 
 from maop.dashboard.routers import auth as _auth_mod
 from maop.dashboard.routers import notifications as _notif_mod

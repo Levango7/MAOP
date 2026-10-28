@@ -30,6 +30,8 @@ publish（仅 tag push `v*`；2026-10-06 才补上 tag 触发，见 §3 第 3 �
   - `py/scripts/check_silent_exceptions.py`：静默 `except … pass/continue/...` 必须有
     `# silent-ok: <闭集类别> — <理由>`（或按 ADR-018 记日志）；存量 81 条+47 处
     `contextlib.suppress` 进基线，**双向棘轮**（新增红、基线条目失效也红，只许减）。
+    同一脚本还管**宽口径异常**（ADR-023 D5）：裸 `except:` 一律硬失败；`except Exception`
+    / `except BaseException` 共 1142 处进双向棘轮，新增即红、收窄后必须下调。
   - `py/scripts/check_file_size.py`：单文件 800 行上限，`migrations/` 整体豁免，
     存量 7 个文件 allowlist 带拆分排期、双向一致（拆完必须移除条目）。
   两侧的守卫在 `py/tests/test_quality_gates.py`（变异自证 + 双向一致性 + ci.yml 接线断言）。
@@ -215,7 +217,16 @@ required 上下文 4 条，其余保护项全关：
   lint / 9 平台 pytest / 前端 / e2e / 迁移 / pip-audit / bandit / SBOM / perf-smoke /
   lock-drift / **wheel 安装冒烟**（`wheel-install`：先构建前端，把构建出的 wheel 全依赖装进干净 venv，
   再在仓库外目录跑 `maop init` + `maop start` 并断言首页与个人版端点均 200；覆盖 editable 结构上
-  看不见的"少打包一个模块 / 包元数据有误 / 前端与 config 没进 wheel"）的结论
+  看不见的"少打包一个模块 / 包元数据有误 / 前端与 config 没进 wheel"）/
+  **个人版安装冒烟**（`personal-install-smoke`：只装 `maop-orchestrator`，先断言
+  `maop.enterprise` 确实不可导入，再在屏蔽企业包的进程里逐个导入 `dashboard.routers`
+  —— 白名单（licenses / n8n / notification_schemas / notifications / relay_platform / sso）
+  之外的任何 ImportError、以及白名单内模块"其实能导入"，都判红；脚本
+  `py/scripts/check_personal_imports.py`。同一作业随后在**纯个人版环境**里跑六个
+  版本耦合门禁：`test_enterprise_test_surface`（企业测试清单与 AST 双向一致）、
+  `test_edition_switch_guard` / `test_edition_bypass_guard`（无 license 不许升企业版）、
+  `test_notifications_edition_gate`、`test_maos_version_floor`、
+  `test_frontend_response_models`（response_model 棘轮 —— 此前从未在此环境执行））的结论
   折进自己的红绿（判定脚本 `py/scripts/ci_merge_gate.py`，规则见 §7.3 末段）。
   这一条替代了过去单独把 lint、前端设为 required 的做法，覆盖面更大。
 - `strict: false`（不要求分支领先，避免每次主干合并把在跑的 PR 全部判过期）、

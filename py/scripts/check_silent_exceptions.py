@@ -12,12 +12,17 @@ Why AST + tokenize (not regex): the previous sweep script matched only
 ValueError:``) and multi-line layouts escaped — and comments are invisible to
 AST, so the marker check needs ``tokenize``.
 
-Two ratchets, both bidirectional (a stale entry fails the gate just like a
+Three ratchets, all bidirectional (a stale entry fails the gate just like a
 new violation fails it, so the baseline can only shrink):
 
 * silent handlers not in ``SILENT_EXCEPTION_BASELINE`` → fail
 * ``contextlib.suppress(...)`` count above ``SUPPRESS_BASELINE`` → fail
   (``suppress(Exception)`` is exactly "swallow without a trace")
+* 宽口径 ``except Exception`` / ``except BaseException`` count above
+  ``BROAD_EXCEPT_BASELINE`` → fail. 宽口径把本应上抛的编程错误
+  （``AttributeError`` / ``TypeError`` / ``KeyError``）也一起吞掉，是「假降级」
+  的主要来源；它比「静默」更隐蔽，因为处理器里往往有 logger。裸 ``except:``
+  会连 ``KeyboardInterrupt`` / ``SystemExit`` 一起吞，一律硬失败。
 
 Usage::
 
@@ -66,6 +71,11 @@ SILENT_EXCEPTION_BASELINE: frozenset[str] = frozenset({
 #: ``with suppress(asyncio.CancelledError)`` 合并成 ``drain_cancelled()``
 #: 一个带理由标记的处理器（顺带让这条关停路径变得可测）。
 SUPPRESS_BASELINE = 46
+
+#: Ratchet for 宽口径 ``except Exception`` / ``except BaseException``。只许下降：
+#: 每收窄一处就把这个数字改小。2026-10-28: 1156 → 1142（14 处「try 体只有
+#: import」的可选依赖守卫收窄为 ``except ImportError``）。
+BROAD_EXCEPT_BASELINE = 1142
 
 
 def _iter_py_files() -> Iterator[pathlib.Path]:
@@ -259,6 +269,33 @@ def count_suppress_calls() -> int:
     return total
 
 
+def count_broad_handlers() -> tuple[int, list[str], dict[str, int]]:
+    """宽口径 ``except Exception/BaseException`` 计数。
+
+    Returns ``(total, bare_except_locations, per_file_counts)``.
+    裸 ``except:`` 单独返回，因为它是硬失败而不是棘轮。
+    """
+    total = 0
+    bare: list[str] = []
+    per_file: dict[str, int] = {}
+    for path in _iter_py_files():
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ExceptHandler):
+                continue
+            if node.type is None:
+                bare.append(f"{_rel(path)}:{node.lineno}")
+                continue
+            if _exc_type_text(node) in ("Exception", "BaseException"):
+                total += 1
+                rel = _rel(path)
+                per_file[rel] = per_file.get(rel, 0) + 1
+    return total, bare, per_file
+
+
 def _key(entry: dict[str, object]) -> str:
     return f"{entry['path']}:{entry['line']}:{entry['kind']}"
 
@@ -269,10 +306,15 @@ def main(argv: list[str]) -> int:
     keys = sorted(_stable_key(v) for v in violations)
     by_key = {_stable_key(v): f"{v['path']}:{v['line']}" for v in violations}
     suppress = count_suppress_calls()
+    broad, bare, broad_per_file = count_broad_handlers()
 
     if "--print-baseline" in argv:
         print(json.dumps(
-            {"silent_exceptions": keys, "suppress_calls": suppress},
+            {
+                "silent_exceptions": keys,
+                "suppress_calls": suppress,
+                "broad_except_handlers": broad,
+            },
             ensure_ascii=False, indent=2,
         ))
         return 0
@@ -318,10 +360,35 @@ def main(argv: list[str]) -> int:
             "tighten SUPPRESS_BASELINE in scripts/check_silent_exceptions.py"
         )
 
+    if bare:
+        failed = True
+        print(
+            f"FAIL: {len(bare)} bare ``except:`` handler(s) — 它会连 "
+            "KeyboardInterrupt / SystemExit 一起吞掉："
+        )
+        for item in bare:
+            print(f"  {item}")
+    if broad > BROAD_EXCEPT_BASELINE:
+        failed = True
+        print(
+            f"FAIL: 宽口径 ``except Exception`` 计数 {broad} > 基线 {BROAD_EXCEPT_BASELINE}。"
+            "新增宽口径必须改为具体异常类型，或在 ADR-023 记录理由后上调基线。"
+        )
+        top = sorted(broad_per_file.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+        for rel, count in top:
+            print(f"  {rel}: {count}")
+    elif broad < BROAD_EXCEPT_BASELINE:
+        failed = True
+        print(
+            f"FAIL: 宽口径 ``except Exception`` 计数 {broad} < 基线 "
+            f"{BROAD_EXCEPT_BASELINE} — 已收窄，请把 BROAD_EXCEPT_BASELINE 下调"
+        )
+
     if not quiet:
         print(
             f"silent handlers: {len(keys)} (baseline {len(SILENT_EXCEPTION_BASELINE)}), "
-            f"suppress calls: {suppress} (baseline {SUPPRESS_BASELINE})"
+            f"suppress calls: {suppress} (baseline {SUPPRESS_BASELINE}), "
+            f"broad except: {broad} (baseline {BROAD_EXCEPT_BASELINE})"
         )
     if failed:
         return 1

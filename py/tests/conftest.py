@@ -14,30 +14,28 @@ from pathlib import Path
 
 import pytest
 
+from tests.enterprise_test_manifest import ENTERPRISE_ONLY_TEST_FILES
+
 # ── 企业版测试的可选性 ────────────────────────────────────────────
 # `maop.enterprise` 由**独立的 maop-enterprise 包（MAOS 私有仓库）**提供，
 # 通过同命名空间注入到 maop 包里（ADR-017 双仓库物理隔离）。
 #
 # - 本地开发机：通常 editable 安装了 MAOS → maop.enterprise 可导入 →
 #   企业版测试正常收集运行。
-# - CI / 纯净环境：只有 maop，没有 maop-enterprise → 26 个测试文件在
-#   **收集阶段**就 ImportError，导致整轮 pytest 全平台失败。
-#   （workflow 注释亦记载：2026-08-30 unit tests failed on ALL 9 platforms
-#    while identical code + env passes locally。）
+# - 个人版环境（只有 maop，没有 maop-enterprise）：模块顶层 `import
+#   maop.enterprise` 的文件在**收集阶段**就 ImportError，会让整轮 pytest 崩掉。
 #
-# 故在此显式检测：企业包不可用时跳过这些文件的收集，而不是让整轮测试崩掉。
-# 两种写法都要匹配：`maop.enterprise`（导入路径）与 `maop-enterprise`（包名 /
-# 注释里常这么写，如 test_router_misc_coverage.py 的
-# "enterprise installed (maop-enterprise wheel): guard removed"）。
-_ENTERPRISE_MARKERS = ("maop.enterprise", "maop-enterprise")
-# 间接依赖（自身不含上述字样，但经 fixture/被导入模块链式引入 maop.enterprise）。
-# 例：test_relay_platform.py → routers.relay_platform → services.integration_service
-#     → maop.enterprise.n8n（模块级导入）。
-# 注：生产侧已有守卫（_register_relay_platform_router 用 try/except 降级为
-# warning），故这**不是**产品缺陷，只是这些测试需要企业包。
-_ENTERPRISE_INDIRECT = (
-    "test_relay_platform.py",
-)
+# 处理原则（v5.5.1 起，替代此前的「正文含 maop.enterprise 字样就忽略」）：
+#   1. **只有真正在模块顶层 import 企业包的文件才忽略** —— 旧实现按子串扫描，
+#      把仅在注释里提到企业包的正常用例（test_backends.py、test_router_system.py
+#      等）也一并忽略了，个人版 CI 因此长期少跑一批双版可跑的用例（纯盲区）。
+#   2. 清单是**声明式**的：清单在 tests/enterprise_test_manifest.py，必须与真实情况
+#      一致，由 tests/test_enterprise_test_surface.py 用 AST 双向校验（漏登记新文件、
+#      条目过期都判红）—— 从此「哪些企业用例在个人版没跑」是一个可核对的数字，
+#      而不是一份静默的忽略。
+#   3. 其余含企业依赖的用例自行守卫（文件顶部 importorskip / skipif，或按用例
+#      importorskip），在个人版里**被收集并显式 skip**，skip 计入 pytest 汇总。
+#
 # 注意：find_spec 在模块不可导入时会**抛出** ImportError / ModuleNotFoundError，
 # 而不是返回 None。若不捕获，conftest 自身加载失败会让整轮测试全崩（比不守卫
 # 更糟）。故必须 try/except。
@@ -46,16 +44,9 @@ try:
 except (ImportError, ValueError):  # ModuleNotFoundError 是 ImportError 子类
     _ent_spec = None
 
-if _ent_spec is None:
-    _tests_root = Path(__file__).resolve().parent
-    _ignored = {
-        str(p.relative_to(_tests_root))
-        for p in _tests_root.rglob("test_*.py")
-        if any(m in p.read_text(encoding="utf-8", errors="ignore")
-               for m in _ENTERPRISE_MARKERS)
-    }
-    _ignored.update(_ENTERPRISE_INDIRECT)
-    collect_ignore = sorted(_ignored)
+ENTERPRISE_AVAILABLE: bool = _ent_spec is not None
+if not ENTERPRISE_AVAILABLE:
+    collect_ignore = sorted(ENTERPRISE_ONLY_TEST_FILES)
 
 # ── Force test environment BEFORE any maop import ──────────────────
 # server.py import 时固化 _auth_enabled / _rl_enabled（get_settings 单例、

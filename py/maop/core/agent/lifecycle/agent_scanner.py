@@ -356,7 +356,7 @@ class AgentScanner:
         result: dict[str, tuple[str, list[str], str]] = {}
         try:
             import yaml
-        except Exception:
+        except ImportError:
             return result
         cfg_path = self._find_config()
         if not cfg_path:

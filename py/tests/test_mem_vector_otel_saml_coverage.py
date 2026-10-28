@@ -488,6 +488,21 @@ class TestOtel:
 
 # ── SAML Handler ────────────────────────────────────────────────────
 
+
+def _enterprise_available() -> bool:
+    """企业包是否可导入（本类被测对象在 maop.enterprise，MAOS 私有仓）。"""
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec("maop.enterprise") is not None
+    except (ImportError, ValueError):  # find_spec 不可解析时抛异常而非返回 None
+        return False
+
+
+@pytest.mark.skipif(
+    not _enterprise_available(),
+    reason="SAML handler 在 maop-enterprise（MAOS）：个人版跳过，本文件其余覆盖照跑",
+)
 class TestSamlHandler:
     def test_init(self):
         from maop.enterprise.saml_handler import SAMLHandler

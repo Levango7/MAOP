@@ -39,6 +39,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 阶段三：异常收敛 / 租户权威归属 / WS 推送降级显式化（2026-10-28）
+
+- **宽口径异常进入门禁**（ADR-023 D5）：`check_silent_exceptions.py` 新增裸 `except:`
+  硬失败 + `except Exception`/`except BaseException` 双向棘轮（`BROAD_EXCEPT_BASELINE=1142`）。
+  实测存量 1156 处宽口径 + 2 处裸 `except:`。本轮实收窄 **14 处**——所有「`try` 体只有
+  `import`」的可选依赖守卫改 `except ImportError`（`mcp_hub_metrics` / `mcp_cache` /
+  `mcp_concurrency` / `agent_scanner` / `multimodal` 等），零语义风险；剩余 1142 处按模块
+  随重构逐步收窄，不批量替换。
+- **租户实现权威归属钉死**：`core/tenant/manager.py` 的 docstring 写明它是**个人版**实现
+  （生产引用 0 处、仅测试使用），dashboard 的权威实现是企业版 `maop.enterprise.tenant`；
+  `core/agent/ops/__init__.py` 里"实际生效的是 core.tenant"的旧断言同步更正。
+  新增 `tests/test_tenant_authority.py` 锁边界：dashboard 租户服务只准导入企业版，
+  运行面（dashboard/worker/delegate/control）不得导入个人版租户注册表。
+- **多 worker 下 WS 推送关闭改为显式**：`lifespan` 在 `MAOP_BACKGROUND_TASKS=0` 时把
+  `_ws_push_enabled` 置 False 并打 WARNING；`/ws` 的 `hello` 帧新增 `push_enabled` 字段，
+  客户端可据此改走轮询，而不是连上后永远等不到 snapshot。新增
+  `tests/test_ws_push_degradation.py` 锁该契约。
+
+### 个人版测试盲区收口 + 跨仓契约进入 CI（2026-10-28）
+
+`tests/conftest.py` 原来按「文件正文里出现 `maop.enterprise` 字样」设置
+`collect_ignore` —— 26 个文件在个人版环境被**静默忽略**，其中 20 个其实只在注释/
+docstring 里提到企业包（`test_backends.py`、`test_router_system.py`、
+`test_frontend_response_models.py`、`test_notifications_ws_auth.py` …），
+双版都能跑却被一起挡掉。后果不是抽象的：`test_frontend_response_models` 带着 13 个
+未建模端点，它的棘轮门禁在个人版**从未执行过**；`test_notifications_ws_auth`
+（WS 鉴权的 P0 回归，111 条断言）同样从未在这个环境跑过。
+
+- **忽略判据从「子串」改为「模块顶层真实 import」**（AST 判定），清单移到
+  `tests/enterprise_test_manifest.py` 声明；仅 17 个文件 + 1 个间接依赖
+  （`test_relay_platform.py`）仍整体忽略，其余**被收集并显式 skip**（skip 计入汇总）。个人版下
+  这 18 个文件之外的一律照跑。
+- **新增 `tests/test_enterprise_test_surface.py`**（两份清单双向校验）：漏登记
+  （新增企业测试忘登记 → 个人版收集即 ImportError 崩全轮）、过期条目（文件已改/
+  已删）、以及「引用了企业包但没进清单又没自带跳过守卫」全部判红 —— 后者直接针对
+  4 处 `guard removed` 注释所记录的复发（开发机装了企业包 → 守卫被删 → 个人版永远
+  没人发现）。它本身零企业依赖，个人版 CI 必跑。
+- **恢复 4 处被删掉的守卫**：`test_router_system.py::test_error_handling`、
+  `test_router_misc_coverage.py`（TenantList/TenantCreate）、
+  `test_sso_router_callback_guard.py`、`test_edition_bypass_guard.py` 的错误消息匹配
+  放宽为 `MAOP_LICENSE_KEY|enterprise package`（个人版报的是后者，导出报错 vs
+  包缺失是两种不同的拒绝原因）。
+- **补登记 13 个未建模端点**（share / agent-versions / credential-vault /
+  long-running-tasks，10-06 ~ 10-28 新增）为显式债务，`RATCHET_CAP` 75→88
+  （与 allowlist 实际 88 条对齐）；
+  这是**记录**不是修复 —— 补 `response_model` 后应删行并把 CAP 降回。
+- **`personal-install-smoke` 作业从「导入冒烟」扩展为「导入冒烟 + 版本耦合门禁」**：
+  纯个人版环境里跑 `test_enterprise_test_surface` / `test_edition_switch_guard` /
+  `test_edition_bypass_guard` / `test_notifications_edition_gate` /
+  `test_maos_version_floor` / `test_frontend_response_models`。
+
+同轮把**跨仓契约**接进 MAOS CI（MAOS 侧改动，见其 CHANGELOG）：新增
+`maop-enterprise-contract` 作业，装两仓后直接跑本仓 24 个企业依赖测试文件
+（SSO / 通知 / tenant / quota / audit / license / CRL / pg_persist / n8n / HA /
+容器化）。此前这条依赖方向（MAOP → MAOS）没有任何流水线验证：MAOS 改个类名、
+挪个模块，本仓 CI 全绿，直到客户按 5.5.0 装上 MAOS 才炸。本地实测该批
+647 passed / 38 skipped。
+
+### 双版边界收口：通知中心归企业版 + 个人版安装冒烟 + MAOS 版本地板（2026-10-28）
+
+三处"文档说双版可用、代码实际只企业版能跑"的静默退化，以及一条只能靠文档
+声明的跨仓版本约束，在本轮一次性收口：
+
+- **通知中心改为企业版专属（FeatureFlag.NOTIFICATION_CENTER）**：`routers/notifications.py`
+  与 `notification_schemas.py` 模块级 import `maop.enterprise.notification.models`，
+  `services/notification_service.py` 惰性 import `EventBus/NotificationManager` ——
+  个人版此前**路由无条件挂载**，第一次调用即 ImportError→500，而前端 `/notifications`
+  也无条件暴露。现 `_register_notifications_and_config` 按新 FeatureFlag gate
+  （个人版不挂载、`/api/alerts` 告警入站不受影响），前端 `nav.js` 与路由
+  `meta.requiresEnterprise` 同步隐藏。`/api/info/edition` 的 feature 表因此多出
+  `notification_center` 一项。
+- **新增 `py/scripts/check_personal_imports.py` + CI 作业 `personal-install-smoke`**：
+  在**屏蔽 `maop.enterprise`** 的进程里逐个导入 `dashboard.routers`，把"某 router
+  偷偷依赖企业包"从运行期一行 warning 变成可失败的断言。企业版专属模块走白名单
+  （licenses / n8n / notification_schemas / notifications / relay_platform / sso），
+  **白名单过期（其实能导入）同样红灯**，防止豁免名单逐年腐蚀。CI 作业仅装
+  `maop-orchestrator` 并先断言 `maop.enterprise` 确实不可导入。
+- **MAOS 版本地板进入运行期**：`config/edition.py` 新增 `MIN_MAOS_VERSION = "5.2.3"`
+  与 `_check_maos_version_floor()`，企业版激活（license 通过）后读
+  `importlib.metadata.version("maop-enterprise")`，低于地板抛 `RuntimeError` 并给出
+  升级命令；读不到版本只告警，测试运行器内降级为 ERROR 日志，联调可用
+  `MAOP_SKIP_MAOS_VERSION_CHECK=1` 跳过。配套 `tests/test_maos_version_floor.py`
+  新增 5 例（含"运行期地板必须与 README 声明一致"）。校验实现在 MAOP 一侧，
+  因为 MAOS 的 `.py` 受完整性 manifest 签名保护（见 README 该节说明）。
+
 ### 拆分收尾：质量门禁清单同步（PR #172 CI 修复）
 
 - `check_file_size.py` ALLOWED_OVERSIZE 清零 —— 最后一条 distributed_scheduler.py 已拆为

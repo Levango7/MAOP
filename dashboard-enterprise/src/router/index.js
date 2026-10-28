@@ -77,8 +77,10 @@ const routes = [
 
   // ── 设置 ──
   { path: '/settings', name: 'settings', component: () => import('../views/Settings.vue') },
-  { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue') },
-  { path: '/notifications/config', name: 'notification-config', component: () => import('../views/NotificationConfig.vue') },
+  // 2026-10-28: 通知中心后端依赖 maop.enterprise（个人版不挂载 /api/notifications/*），
+  // 因此路由同样需要企业版守卫，避免个人版用户进入一个必然 500 的页面。
+  { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue'), meta: { requiresEnterprise: true } },
+  { path: '/notifications/config', name: 'notification-config', component: () => import('../views/NotificationConfig.vue'), meta: { requiresEnterprise: true } },
   { path: '/docs', name: 'docs', component: () => import('../views/Docs.vue') },
 
   // ═══ 旧路径 301 重定向（书签/深链/外部链接兼容，零断链）═══

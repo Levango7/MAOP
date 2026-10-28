@@ -1114,6 +1114,72 @@ jobs:
             --home /tmp/fr-home \
             --port 9188
 
+  # ── 个人版安装冒烟（不安装 MAOS）───────────────────────────────────────
+  # 背景：MAOS（`maop-enterprise`）是私有包，与 MAOP 分开发布，个人版用户只装
+  # `maop-orchestrator`。dashboard 的每个 router 都是 try/except ImportError +
+  # logger.warning —— 这是有意的容错，但也意味着"某个 router 偷偷依赖了企业包"
+  # 在运行期只留下一行 warning：CI 全绿、启动成功，个人版功能静默 404（通知中心
+  # 就是这么被发现的）。本作业在**屏蔽 maop.enterprise** 的进程里逐个导入
+  # routers，把这种退化变成可失败的断言（企业版白名单见脚本内
+  # EXPECTED_ENTERPRISE_ONLY，白名单过期同样会红）。
+  # 端点级验证由 wheel-install 的 first-run smoke 覆盖（同样是纯个人版环境）。
+  personal-install-smoke:
+    name: Personal install (no MAOS) import smoke
+    needs: scope
+    if: needs.scope.outputs.code == 'true'   # docs-only 时跳过（跳过可见，不像白名单那样静默）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: py
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -e .
+      - name: Assert maop.enterprise is really absent
+        # 前提不成立时（有人把 MAOS 塞进依赖）本作业就失去了意义，必须红。
+        run: |
+          python - <<'PY'
+          import importlib.util, sys
+          if importlib.util.find_spec("maop.enterprise") is not None:
+              sys.exit("FAIL: 当前环境里有 maop.enterprise —— 本作业的前提（纯个人版安装）不成立")
+          print("OK: maop.enterprise 不可导入（纯个人版环境）")
+          PY
+      - name: Router import sweep (blocked maop.enterprise)
+        run: python scripts/check_personal_imports.py -v
+
+      - name: Install test tooling
+        # 本作业此前只做「导入冒烟」——「个人版环境里测试能不能跑」从来没验证过。
+        # tests/conftest.py 原来按「正文里出现 maop.enterprise 字样」忽略，
+        # 于是 20 个双版可跑的测试文件（test_backends、test_router_system、
+        # test_frontend_response_models …）在个人版 CI 里**静默**跳过，共 456 条
+        # 用例从未在这个环境执行过；其中 test_frontend_response_models 带着 13 个
+        # 未建模端点，而它的门禁在个人版从未运行。
+        run: pip install pytest pytest-asyncio pytest-timeout pytest-xdist
+
+      - name: Edition gates + enterprise test surface (pure personal edition)
+        # 这一批是**版本耦合**的守卫，只有跑在纯个人版环境里才有意义：
+        #   - test_enterprise_test_surface：企业测试清单与 AST 双向一致 + 惰性
+        #     import 的用例必须自带跳过守卫（防止「guard removed」复发）；
+        #   - test_edition_switch_guard / test_edition_bypass_guard：无 license 时
+        #     不许升企业版；
+        #   - test_notifications_edition_gate：通知中心在个人版不挂载；
+        #   - test_maos_version_floor：MAOP 与 MAOS 的双向版本地板；
+        #   - test_frontend_response_models：response_model 棘轮（此前从未在此环境跑）。
+        #
+        # 不跑全量 `--collect-only`：它需要 lxml 等仅测试用依赖，而「router 是否偷依赖
+        # 企业包」已由上一步 check_personal_imports.py 用屏蔽进程扫全 88 个 router 覆盖。
+        run: |
+          python -m pytest -q -o addopts="" -n 0 \
+            tests/test_enterprise_test_surface.py \
+            tests/test_edition_switch_guard.py \
+            tests/test_edition_bypass_guard.py \
+            tests/test_notifications_edition_gate.py \
+            tests/test_maos_version_floor.py \
+            tests/test_frontend_response_models.py
+
   # ── Publish to PyPI ─────────────────────────────────────────────
   publish:
     name: Publish to PyPI
@@ -1329,7 +1395,7 @@ jobs:
   # py/scripts/ci_merge_gate.py，单测与结构守卫见 py/tests/test_ci_merge_gate.py。
   gate:
     name: CI merge gate
-    needs: [scope, lint, test, frontend, e2e, migrations, audit, sast, sbom, perf-smoke, lock-drift, wheel-install]
+    needs: [scope, lint, test, frontend, e2e, migrations, audit, sast, sbom, perf-smoke, lock-drift, wheel-install, personal-install-smoke]
     if: always()
     runs-on: ubuntu-latest
     steps:

@@ -80,6 +80,10 @@ class FeatureFlag(str, Enum):
     AUTH_AUTO = "auth_auto"
     N8N_INTEGRATION = "n8n_integration"
     LICENSE_MANAGEMENT = "license_management"
+    # 通知中心：后端（/api/notifications/*）依赖 `maop.enterprise.notification`
+    # 的 EventBus / NotificationManager，个人版首次调用即 ImportError，故整个
+    # 功能（含前端入口）只对企业版开放。个人版的告警入站 /api/alerts 不受影响。
+    NOTIFICATION_CENTER = "notification_center"
 
 
 _PERSONAL_FEATURES: frozenset[FeatureFlag] = frozenset({
@@ -114,6 +118,7 @@ _ENTERPRISE_FEATURES: frozenset[FeatureFlag] = frozenset({
     FeatureFlag.AUTH_AUTO,
     FeatureFlag.N8N_INTEGRATION,
     FeatureFlag.LICENSE_MANAGEMENT,
+    FeatureFlag.NOTIFICATION_CENTER,
 })
 
 _FEATURE_MAP: dict[Edition, frozenset[FeatureFlag]] = {
@@ -206,7 +211,98 @@ def detect_edition() -> Edition:
 
     with _edition_lock:
         _current_edition = result
+    # 企业版已激活时再做一次 MAOS 版本地板校验（见 `_check_maos_version_floor`）。
+    # 放在缓存赋值之后：即便校验抛错，进程状态也已是终态，不会出现
+    # "半初始化 edition" 让后续 get_edition() 返回陈旧值的窗口。
+    if result is Edition.ENTERPRISE:
+        _check_maos_version_floor()
     return result
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# MAOS（maop-enterprise）版本地板
+# ════════════════════════════════════════════════════════════════════════════
+
+#: MAOP 侧要求的最低 MAOS 发行版（与 README「版本兼容地板」节一致）。
+#: 5.2.3 起 MAOS 的 ``tenant_id=""`` 不再等于"所有租户"，MAOP 5.2.1 的通知
+#: 列表端点据此改为显式传 ``all_tenants=True``；旧 MAOS 收到该参数会 TypeError
+#: （路由 500），新 MAOS 配旧 MAOP 则 admin 列表恒空 —— 属于"装得上、跑不动"。
+MAOS_DIST_NAME = "maop-enterprise"
+MIN_MAOS_VERSION = "5.2.3"
+
+#: 开发/联调逃生阀：允许在版本地板不满足时继续启动（仅告警）。
+MAOS_VERSION_SKIP_ENV = "MAOP_SKIP_MAOS_VERSION_CHECK"
+
+
+def _parse_version_tuple(text: str) -> tuple[int, ...]:
+    """``"5.2.3"`` / ``"5.2.3rc1"`` → 可比较的数字元组（预发布按主版本比较）。"""
+    parts: list[int] = []
+    for piece in str(text).strip().split("."):
+        digits = ""
+        for ch in piece:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def get_installed_maos_version() -> str:
+    """已安装的 ``maop-enterprise`` 发行版版本号；不可用/读不到时返回 ``""``。"""
+    try:
+        from importlib.metadata import version
+
+        return version(MAOS_DIST_NAME)
+    except Exception:
+        return ""
+
+
+def _check_maos_version_floor() -> None:
+    """企业版激活后校验 MAOS 版本下限，避免"装得上、跑不动"。
+
+    为什么不能只靠 ``pyproject.toml``：MAOS 是私有包，``maop-enterprise`` 既不在
+    ``maop-orchestrator`` 的依赖里，也不从 PyPI 解析（约束只能写在 README 的
+    「版本兼容地板」节）。而 ``pip install --no-deps``、手工拼 wheel、旧 venv
+    残留都会绕过安装期检查，症状是运行期零散 500（通知列表 TypeError /
+    admin 列表恒空），排查成本极高。这里在 edition 决策完成处 fail fast。
+
+    行为：
+      - 读到版本且 >= 地板 → 通过
+      - 读到版本且 < 地板 → ``RuntimeError``（可用 ``MAOP_SKIP_MAOS_VERSION_CHECK=1``
+        或 test runner 环境降级为 ERROR 日志 —— 测试需要强制 edition 的场景不应
+        被版本地板打断）
+      - 读不到版本 → WARNING（被裁剪的 wheel / editable 元数据缺失），不阻断
+    """
+    if os.getenv(MAOS_VERSION_SKIP_ENV, "").strip().lower() in ("1", "true", "yes"):
+        logger.warning(
+            "[edition] %s set — skipping MAOS version floor check (>=%s)",
+            MAOS_VERSION_SKIP_ENV, MIN_MAOS_VERSION,
+        )
+        return
+
+    installed = get_installed_maos_version()
+    if not installed:
+        logger.warning(
+            "[edition] Cannot determine %s version; skipping floor check (>=%s)",
+            MAOS_DIST_NAME, MIN_MAOS_VERSION,
+        )
+        return
+
+    if _parse_version_tuple(installed) >= _parse_version_tuple(MIN_MAOS_VERSION):
+        return
+
+    msg = (
+        f"{MAOS_DIST_NAME} {installed} is below the version floor "
+        f"{MIN_MAOS_VERSION} required by this MAOP build. "
+        f"Upgrade with: pip install -U '{MAOS_DIST_NAME}>={MIN_MAOS_VERSION}'"
+    )
+    if _in_test_runner():
+        logger.error("[edition] %s (ignored under test runner)", msg)
+        return
+    raise RuntimeError(msg)
 
 
 def _detect_with_license_check(requested: Edition) -> Edition:

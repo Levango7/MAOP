@@ -77,4 +77,13 @@ describe('Router', () => {
     expect(route?.path).toBe('/memory/graph');
     expect(route?.meta?.requiresEnterprise).toBeFalsy();
   });
+
+  // 2026-10-28：通知中心后端依赖 maop.enterprise（个人版不挂载 /api/notifications/*），
+  // 前端若继续无条件暴露，个人版用户会进入一个必然 500 的页面。这两个页面的守卫
+  // 必须与后端 edition gate 同步，否则就是"前端有入口、后端没路由"的静默退化。
+  it('notification pages are enterprise-gated (backend is enterprise-only)', () => {
+    const byName = Object.fromEntries(router.getRoutes().map((r) => [r.name, r]));
+    expect(byName.notifications?.meta?.requiresEnterprise).toBe(true);
+    expect(byName['notification-config']?.meta?.requiresEnterprise).toBe(true);
+  });
 });

@@ -23,6 +23,11 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 from lxml import etree
 
+# 全文件都是企业能力（SAML 加解密、CRL 拉取、后端契约），被测对象在 MAOS 私有仓。
+# 个人版环境在收集阶段显式跳过并计入 skip 数，而不是被 conftest 静默忽略
+# （见 tests/conftest.py 的 `_ENTERPRISE_MODULE_IMPORT_TESTS` 说明）。
+pytest.importorskip("maop.enterprise", reason="企业能力在 maop-enterprise（MAOS）")
+
 # ═══════════════════════════════════════════════════════════════════════
 # Helpers: generate real X.509 cert + RSA key for SAML tests
 # ═══════════════════════════════════════════════════════════════════════

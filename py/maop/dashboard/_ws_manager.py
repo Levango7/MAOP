@@ -29,6 +29,12 @@ _ws_snapshot_ts: float = 0.0
 _WS_SNAPSHOT_TTL = 5.0  # seconds — cache snapshot to avoid redundant DB queries
 _ws_push_task: asyncio.Task | None = None
 
+#: 本 worker 是否真的在跑快照推送循环。多 worker 模式下 lifespan 按
+#: ``MAOP_BACKGROUND_TASKS`` 把它置 False——此时 /ws 仍然可连、可 ping，
+#: 但不会有 snapshot 帧。hello 帧会把这个事实告诉客户端，让它改走轮询，
+#: 而不是等一个永远不会来的推送。
+_ws_push_enabled: bool = True
+
 _WS_SEND_TIMEOUT = 5.0  # OPS-3 fix: cap per-client send time
 
 

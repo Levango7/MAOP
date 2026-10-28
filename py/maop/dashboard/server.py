@@ -149,8 +149,20 @@ async def lifespan(app: FastAPI) -> Any:
     # MAOP_BACKGROUND_TASKS=0 automatically when workers>1; override with
     # MAOP_BACKGROUND_TASKS=1 to force-enable (e.g. a single dedicated worker).
     _bg_enabled = os.environ.get("MAOP_BACKGROUND_TASKS", "1") == "1"
+    _ws_manager._ws_push_enabled = _bg_enabled
     if _bg_enabled:
         _ws_manager._ws_push_task = asyncio.create_task(_ws_manager._ws_push_loop())
+    else:
+        # 显式降级：多 worker 下每个 worker 都推送会造成重复，所以推送被关掉，
+        # 但这并不意味着 /ws 不可用——客户端仍能连接并收到 hello。hello 帧里
+        # 带 push_enabled=false，客户端据此改走轮询；这条日志让运维在启动时就
+        # 知道"没有实时推送"，而不是等用户发现仪表盘不再自更新。
+        logger.warning(
+            "[lifespan] WS snapshot push DISABLED in this worker "
+            "(MAOP_BACKGROUND_TASKS=0, typical for multi-worker). /ws clients "
+            "connect and can ping, but receive no 'snapshot' frames — hello "
+            "reports push_enabled=false."
+        )
 
     # ── Initialize OTel tracing (if enabled) ────────────────────
     try:
