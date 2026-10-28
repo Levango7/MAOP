@@ -97,3 +97,44 @@
 - 领地追加（同一轮 services 拆分运动）：`py/maop/dashboard/services/chat_service.py`
   拆分（1152 行 → 目标 <800），新 `services/chat/` 或等价子包；与 data_service
   拆分同批（ROADMAP 原文"与 chat_service 同批"）。data_service 那刀见 PR #171。
+
+## 领地登记（ZCode session_f62ccbe…，2026-10-28 第三轮：分层收官批）
+
+- **背景**：分层整改阶段1+3 已合入 master（PR #174，125ee6ca）；上批六 PR 全部收口。
+- **进行中（两笔自认在途的销账）**：
+  1. `py/maop/core/security/middleware.py`（1188 行）三块拆分 → 子包
+     （AuthMiddleware / ScopeMiddleware / 速率与 IP 白名单 / 装配四个模块，
+     参照 core/mcp 与 distributed_scheduler 子包先例，导入路径不变）；
+     领地=该文件 + 新建 `py/maop/core/security/middleware/` 包 +
+     `py/scripts/check_file_size.py`（移除最后一条 ALLOWED_OVERSIZE，回到"无豁免"）。
+  2. dashboard lifespan 接线：`core/scheduling/health_service.py` 与
+     `core/coordination/a2a_gateway.py` 上启动/停止钩子（销 KNOWN_ORPHANS 两条
+     "接线在途"）；领地=这两个模块 + `py/maop/dashboard/server.py` 的 lifespan +
+     `py/tests/test_dead_wiring_inventory.py` + 新增 `test_layering_lifespan_wiring.py`。
+- 分支：**`refactor/layering-closeout-v2`**（独立 worktree `F:/Nexus/MAOP-lc2`，
+  自 125ee6ca）。
+- **不碰**：MAOS 仓（领地已释放）；`routers/*_schemas.py` 与 response-model fixtures
+  （他线批次）；其余仓（trae/qoder/workbuddy 战线）。
+
+### ⚠️ 并发观测与血统事故（2026-10-28，双线实录）
+
+- 17:15-17:27 本工作树出现他线 response-model 批次产物（`routers/*_schemas.py` 4 个），
+  该线未登记——如见到本表，请补登记。
+- **事故链（reflog 为证）**：17:17 他线把 `fix(gates): 收口个人版/企业版分层缺口…`
+  （43 文件）提交在 **docs/readme-5.5.0** → 18:34 本会话 `reset --hard origin/master`
+  （以为该分支是纯检出态）**把它孤儿化**（仅存 reflog f02f4b7c）——本会话之过；
+  → 20:21 本会话拆分子包提交因消息文件掉包带了认领文案（内容无误、消息错）；
+  → 20:45 他线把 f02f4b7c cherry-pick 为 `4dbe14d4` 落回 `refactor/layering-closeout`
+  （回收成功，零丢失）。**该混合分支留给回收方处置**（含他线完整批次；
+  本会话不再在上面落新提交）。
+- 教训（将对齐纪律）：**共享工作树上 reset/checkout 前必须 `git status` +
+  `git log -1` 看他线是否有新提交**——reflog 可救但成本极高。
+
+### 已完成（本会话第三轮，v2 分支）
+
+- **middleware.py 1188 → 六文件子包**（`_auth/_scope/_csp/_protection/_setup` + 门面
+  `__init__`），导入路径不变、调用方零改动；AST 机械核对 13 实体逐树等价；
+  `check_file_size.py` ALLOWED_OVERSIZE 移除最后一条 → **归零"无豁免"**。
+- **lifespan 接线**：`server.start_layering_services/shutdown_layering_services`——
+  HealthService 随后台门控自动启停；A2AGateway 由 `MAOP_A2A_GATEWAY=1` 显式开启
+  （默认不占端口）；KNOWN_ORPHANS 两条销账 + 4 例接线测试。

@@ -39,6 +39,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 分层收官批：middleware 子包化 + lifespan 接线（2026-10-28）
+
+- **`core/security/middleware.py` 1188 行 → 六文件子包**：`_auth`（AuthMiddleware
+  + owner-mode helpers + require_admin）/ `_scope`（ScopeMiddleware）/ `_csp`
+  （CSPMiddleware + connect-src 信任审计）/ `_protection`（RateLimit / Audit /
+  IPAllowlist / RequestSizeLimit）/ `_setup`（两个 one-call 装配）+ 门面
+  `__init__`。导入路径与全部公开名不变，调用方零改动；AST 机械核对 13 个
+  搬移实体与原文逐树等价。`check_file_size.py` ALLOWED_OVERSIZE 移除最后一条，
+  全仓文件规模门禁保持**"无豁免"**。
+- **dashboard lifespan 接上阶段1/阶段3 服务**（销 KNOWN_ORPHANS 两条"接线在途"）：
+  - `HealthService` 随后台任务门控自动启停（多 worker 只让单 worker 跑探测循环）；
+  - `A2AGateway` 由 `MAOP_A2A_GATEWAY=1` 显式开启（默认关——门户 HTTP 传输层
+    对外监听属部署决策），起停对称、句柄挂 `app.state`；
+  - 新增 `tests/test_layering_lifespan_wiring.py` 4 例锁定上述约定。
+
 ### 拆分收尾：质量门禁清单同步（PR #172 CI 修复）
 
 - `check_file_size.py` ALLOWED_OVERSIZE 清零 —— 最后一条 distributed_scheduler.py 已拆为
