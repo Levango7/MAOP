@@ -268,6 +268,13 @@
       > 预演后输出目录必须为空、临时根下无残留，不依赖 fake 的 executed 标志）。
 - [ ] T2.3：连续 7 天 nightly 零假红（修复路线），或止损方案与"未复现条件/复现配方"
       台账化（降级路线）。
+      > **2026-10-29 台账 #1**：修复路线观察窗开启。当日用户手动 dispatch 的
+      > Nightly run `40760685796` 成功（flaky-detection 三平台 ×3 轮全过）——
+      > 此前 10-27/10-28 两次失败为**确定性红**（`test_mcp_router_contracts`
+      > KeyError / `test_visual_builder` 未接线契约 / `test_dead_wiring_inventory`
+      > 已接线条目），均已随 PR #174 round-3/#175 修复进 master，与
+      > `TestCallSyncFallback` flaky 无关。本地同日 ×3 复跑该用例族全过
+      > （8 例/轮）。观察起点记作 2026-10-29 02:00 UTC 定时 run。
 
 ## v5.4.0 (minor) — 已发布 2026-10-12（里程碑 M2.2 **首批**）
 
@@ -378,12 +385,57 @@
 | 阶段二 | Month 4–9（2026-09-05 启动，至 2027-03） | 智能增强 | 进行中 | 自演化闭环、多模态记忆、知识图谱推理、Plan 质量学习 |
 | 阶段三 | Month 10–21 | 生态与平台化 | 待启动 | Agent Marketplace、多后端编排器适配、原生 K8s Operator、细粒度成本归因 |
 
-## 长期方向（未排期）
+## 长期方向（2026-10-29 立项章程化，未排期）
 
-- **多后端编排器适配**：支持把 MAOP 编排目标导出为 Temporal / Airflow DAG，便于嵌入企业现有调度体系。
-- **Agent Marketplace**：社区共享 agent 配置与 prompt 模板，带版本与签名校验。（v5.1.0 Skill 市场已实现基础导入/导出，社区共享与签名校验仍待排期。）
-- **细粒度成本归因**：按 agent / phase / model 维度的实时成本归因与预算告警。
-- **原生 K8s Operator**：以 CRD 形式声明 MAOP 编排任务，由 Operator 调度执行。（**未实现 / planned**：`deploy/k8s/operator/` 目前只有规划中的 API 形状——无 kopf/kubernetes-client/watch controller 实现，`ghcr.io/maop/operator` 镜像无构建来源、未构建；结构测试仅断言文件存在，多租户/插件/RLS 均为 skip 占位，详见该目录 README §Status。）
+> 按维护规则 #2 补齐"范围与验收标准"，每条标注**阻碍位置**；待裁决项 TBD。
+
+### M-T3.3 原生 K8s Operator（M0 章程）
+
+- 现状：`deploy/k8s/operator/` 只有规划中的 API 形状——无 kopf/kubernetes-client
+  controller 实现；`ghcr.io/maop/operator` 无构建来源、未构建；
+  `test_k8s_operator.py` 仅断言文件存在性 + 3 个 skip 占位（G-17 结论未变）。
+- M0 范围：kopf operator 骨架（watch `MaopTask` CRD → 拉起 `maop run` 子进程 →
+  回写 status）+ CRD 与 Chart 打包 + operator 镜像 Dockerfile 与 CI 构建腿
+  （build-only，不部署）+ mock k8s 单测/集成测（不依赖真集群）。
+- M0 验收：mock 链路（MaopTask→子进程→status 回写）测试全绿；结构测试从
+  skip 翻为真断言；operator 镜像在 CI 构建成功。**真集群 kind 验证不进 M0**
+  （设为后续里程碑——本机与 runner 均无常驻 K8s，属外部条件）。
+- 阻碍位置：无外部依赖，纯工程量。
+
+### M-X1 Agent Marketplace 签名校验（M0 章程）
+
+- 现状：v5.1.0 Skill 市场只做基础导入/导出；社区共享与签名校验仍待排期。
+- M0 范围：sign/verify 工具链（Ed25519，与 MAOS 激活链同构算法）+ 发布与
+  校验入口（CLI 或 API）+ 威胁模型文档。
+- M0 验收：篡改清单 / 缺失签名两方向判红；构建→签名→校验→拒绝四态冒烟。
+- 阻碍位置：**密钥治理**——生产签发流程需与部署侧确认（与 T1.5 phase 2 产物
+  签名同一条治理链，MAOS 侧已有先例可复用）。
+
+### M-X2 多后端编排器适配（Temporal/Airflow，M0 章程）
+
+- M0 范围：只做 Temporal 一侧（Airflow 另议）：plan/DAG → Temporal workflow
+  定义编译 + 一个可跑的 demo workflow；MAOP 侧 adapter 接口先行定义。
+- M0 验收：demo workflow（3 节点）在 Temporal dev server 上跑通一次。
+- 阻碍位置：**企业侧运行时供给未定**（谁提供生产 Temporal server）——M0 只证明
+  编译与连通，不承诺生产集成。
+
+### M-X3 细粒度成本归因（M0 章程）
+
+- 现状：cost_tracker 已有调用级成本数据；缺按 agent / phase / model 的聚合
+  视图与预算告警落点。
+- M0 范围：三维聚合查询 + dashboard 聚合视图 + 阈值告警接线（复用
+  alert_ingest 通道）。
+- M0 验收：聚合数值与 cost_tracker 原始记录逐条对齐（测试钉死）；越阈告警
+  真实送达。
+- 阻碍位置：无。可随时立项，与阶段二主线无耦合。
+
+### MAOS 侧 B3 音频/视频（跨仓，章程待企业侧）
+
+- 现状：MAOP 侧扩展契约（`core/memory/multimodal_spaces.py` 空间注册表）已
+  交付；MAOS 侧音频（Whisper）/视频（关键帧）实现未交付，跨空间融合检索
+  （B3+）未排期。
+- 阻碍位置：**仓库领地**（`maop/enterprise/*` 归 CommandCodeBot/企业线；MAOS 板
+  有载）+ 模型选型/存储口径属企业侧产品决策。MAOP 侧不含新工作。
 
 ## 维护规则
 
