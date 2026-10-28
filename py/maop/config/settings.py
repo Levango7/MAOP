@@ -19,6 +19,23 @@ from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
+def is_production() -> bool:
+    """``MAOP_ENV=production`` 判定。
+
+    config-drift 门禁要求 env 直读收敛进 settings 模块；中间件等调用方
+    一律走这里，不再自行 ``os.environ.get("MAOP_ENV")``。
+    """
+    return os.environ.get("MAOP_ENV", "").strip().lower() == "production"
+
+
+def trust_proxy_enabled() -> bool:
+    """``MAOP_TRUST_PROXY=1`` 判定（信任 X-Forwarded-For 的开关）。
+
+    同上：env 直读收敛点，调用方走这里以过 config-drift 棘轮。
+    """
+    return os.environ.get("MAOP_TRUST_PROXY", "0") == "1"
+
+
 def _default_auth_enabled() -> bool:
     """默认认证策略（High 安全修复：secure-by-default）。
 

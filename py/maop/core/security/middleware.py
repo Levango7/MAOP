@@ -722,9 +722,10 @@ def _validate_connect_src(connect_src: str, *, production: bool = False) -> None
         ValueError: If ``connect_src`` is empty, or (when production=True)
             when a dangerous token is present.
     """
-    import os
     if production is None:
-        production = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
+        from maop.config.settings import is_production
+
+        production = is_production()
 
     if not connect_src or not connect_src.strip():
         raise ValueError(
@@ -1023,8 +1024,9 @@ class IPAllowlistMiddleware(BaseHTTPMiddleware):
 
         client_ip = request.client.host if request.client else ""
         # Trust-proxy awareness for real client IP.
-        import os
-        if os.environ.get("MAOP_TRUST_PROXY", "0") == "1":
+        from maop.config.settings import trust_proxy_enabled
+
+        if trust_proxy_enabled():
             xff = request.headers.get("x-forwarded-for", "")
             if xff:
                 client_ip = xff.split(",")[0].strip()
@@ -1120,9 +1122,10 @@ def setup_security_middleware(
 
     Call this after creating the app but before adding routes.
     """
-    import os
     if production is None:
-        production = os.environ.get("MAOP_ENV", "").strip().lower() == "production"
+        from maop.config.settings import is_production
+
+        production = is_production()
 
     # 1. Request size limit (cheapest reject, before body parse) — innermost
     if request_size_limit_enabled:
