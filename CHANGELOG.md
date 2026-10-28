@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 宽口径异常：`core/agent/` 模块首批收窄（2026-10-29）
+
+- `core/agent/` 166 处 → 141 处，实收窄 **25 处**，全部属于异常集可静态枚举的形态：
+  YAML/文件读取 4（`(OSError, yaml.YAMLError)`）、`json.loads` 落库回读 3、
+  SQLite CRUD 11（`(OSError, sqlite3.Error[, ValueError, TypeError])`）、
+  标准库探针 5（`ImportError` / `packaging.InvalidVersion ⊂ ValueError` /
+  `get_type_hints` / `importlib + getattr`）、`subprocess.run` 1、pydantic 反序列化 1。
+- 剩余 141 处按 AST 归因登记在 ADR-023 D7：95 处调用未知实现的对象方法、
+  21 处含 `await`、25 处是插件/hook 外部回调与组合 try 体，均不存在可静态证明的异常集。
+- `llm_providers.py` 的 3 处流式兜底**故意保留宽口径**：`try` 体内有 `chunk.get(...)`，
+  上游返回合法 JSON 但结构非对象时会抛 `AttributeError`，收窄会把「产出错误 token」
+  变成「生成器抛异常」。
+- `BROAD_EXCEPT_BASELINE` 1159 → 1134。
+
 ### 前端响应契约：13 个未建模端点结清（2026-10-28）
 
 - 新建 4 个 response-model 模块并逐端点接上 `response_model`：

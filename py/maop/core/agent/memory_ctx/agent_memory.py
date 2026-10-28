@@ -306,7 +306,8 @@ class AgentMemory:
         for row in rows:
             try:
                 changes = json.loads(row["changes"])
-            except Exception:
+            except (ValueError, TypeError, KeyError):
+                # json.JSONDecodeError ⊂ ValueError；row 缺列/类型不符走 TypeError/KeyError
                 changes = {}
             result.append({
                 "id": row["id"],
@@ -347,11 +348,11 @@ class AgentMemory:
         """将数据库行转换为字典。"""
         try:
             content = json.loads(row["content"])
-        except Exception:
+        except (ValueError, TypeError, KeyError):
             content = {"raw": row["content"]}
         try:
             metadata = json.loads(row["metadata"])
-        except Exception:
+        except (ValueError, TypeError, KeyError):
             metadata = {}
         return {
             "id": row["id"],

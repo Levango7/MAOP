@@ -364,7 +364,7 @@ class AgentScanner:
         try:
             with open(cfg_path, "r", encoding="utf-8") as fh:
                 data = yaml.safe_load(fh) or {}
-        except Exception:
+        except (OSError, yaml.YAMLError):
             return result
         agents = data.get("agents") if isinstance(data, dict) else None
         if not isinstance(agents, dict):

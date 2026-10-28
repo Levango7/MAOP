@@ -46,7 +46,7 @@ def _get_maop_version() -> str:
     try:
         from maop import __version__ as MAOP_VERSION
         return MAOP_VERSION
-    except Exception as exc:  # pragma: no cover - import guard
+    except ImportError as exc:  # pragma: no cover - import guard
         logger.warning("could not determine MAOP version: %s", exc)
         return ""
 
@@ -65,7 +65,7 @@ def _parse_version(v: str) -> Any:
         return Version(v)
     except ImportError:  # silent-ok: optional-dep — 可选依赖未安装
         pass
-    except Exception as exc:
+    except (ValueError, TypeError) as exc:
         logger.debug("packaging.version.Version(%r) failed: %s", v, exc)
     # Fallback: tuple of ints, stripping any non-digit suffix per segment.
     parts: list[int] = []

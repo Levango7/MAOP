@@ -30,6 +30,7 @@ Usage::
 from __future__ import annotations
 
 import logging
+import sqlite3
 import threading
 import time
 from enum import Enum
@@ -190,7 +191,7 @@ class AgentCatalog:
         """
         try:
             rows = self._store.load_all()
-        except Exception as exc:
+        except (OSError, sqlite3.Error, ValueError, TypeError) as exc:
             logger.warning("[agent_catalog] failed to load from store: %s", exc)
             return
         loaded = 0
@@ -220,7 +221,7 @@ class AgentCatalog:
         with self._lock:
             try:
                 self._store.upsert(descriptor.to_store_dict())
-            except Exception as exc:
+            except (OSError, sqlite3.Error, TypeError, ValueError) as exc:
                 logger.error("[agent_catalog] persist failed for %s: %s", descriptor.name, exc)
                 raise
             self._agents[descriptor.name] = descriptor
@@ -276,7 +277,7 @@ class AgentCatalog:
             if existed:
                 try:
                     self._store.delete(name)
-                except Exception as exc:
+                except (OSError, sqlite3.Error) as exc:
                     logger.error("[agent_catalog] delete failed for %s: %s", name, exc)
                     raise
                 self._agents.pop(name, None)
@@ -305,7 +306,7 @@ class AgentCatalog:
             })
             try:
                 self._store.update_health(name, healthy, now)
-            except Exception as exc:
+            except (OSError, sqlite3.Error) as exc:
                 logger.error("[agent_catalog] persist health failed for %s: %s", name, exc)
                 raise
             self._agents[name] = updated

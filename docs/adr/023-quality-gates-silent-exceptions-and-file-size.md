@@ -116,6 +116,37 @@
 - **复核条件**：若某处 `try` 体缩小到只剩 import / 单一已知 API，必须收窄并下调基线；
   新增宽口径若不属于上表两类，一律红。
 
+### D7. 分模块推进：`core/agent/` 首批（2026-10-29）
+
+存量不能批量改（D5 的理由），改为**一次一个模块**：先全量归因，只动异常集可静态
+枚举的站点，其余登记。`core/agent/` 166 处 → 141 处，实收窄 **25 处**：
+
+| 类别 | 处数 | 收窄为 | 依据 |
+|---|---|---|---|
+| YAML / 文件读取 | 4 | `(OSError, yaml.YAMLError)` | `open()` + `yaml.safe_load()`，无其它语句；`tool_policy.py` 为此补了模块级 `import yaml` |
+| `json.loads` 落库回读 | 3 | `(ValueError, TypeError, KeyError)` | `json.JSONDecodeError ⊂ ValueError`；`row["col"]` 缺列是 `KeyError` |
+| SQLite CRUD | 11 | `(OSError, sqlite3.Error[, ValueError, TypeError])` | `sqlite_connect` 只在 open 失败时抛 `OSError`，`execute` 抛 `sqlite3.Error`；带 `json.loads`/`model_dump_json` 的站点另加后两项。涉及 `a2a.py`、`hook_manager.py`、`agent_catalog.py`、`agent_registry.py` |
+| 标准库探针 | 5 | `ImportError` / `(ValueError, TypeError)` / `(NameError, TypeError)` / `(ImportError, AttributeError)` | `from maop import __version__`、`packaging.Version()`（`InvalidVersion ⊂ ValueError`）、`get_type_hints()`、`importlib.import_module()` + `getattr()` |
+| 子进程 | 1 | `(OSError, subprocess.SubprocessError)` | `git status` 的 `subprocess.run(..., timeout=5)`，`TimeoutExpired ⊂ SubprocessError` |
+| pydantic 反序列化 | 1 | `(ValueError, TypeError)` | `ValidationError ⊂ ValueError` |
+
+**剩余 141 处的归因**（按 AST 分类实测）：
+
+| 类别 | 处数 | 不可收窄的理由 |
+|---|---|---|
+| `unknown_call` | 95 | `try` 体调用的是 `self._store` / `self._catalog` / `adapter.health_check()` / `self._run_async(...)` 等**未知实现**的对象方法，异常集取决于运行时注入的实现，静态无法证明 |
+| `has_await` | 21 | `await` 未知协程（`websockets.connect`、`self._ws.close`、`client.stream`、LLM 分解回调），协程可抛任意异常 |
+| 其余 | 25 | 插件 / hook 回调（`init_fn(config)`、`hook(...)`、`callback(event)`）——外部代码，必须宽口径；以及 `_yaml`/`ImageStore`/`ConfigLoader` 构造这类组合 try 体 |
+
+**特别注意**：`llm_providers.py` 的 3 处流式兜底**故意不收窄**为 `httpx.HTTPError` ——
+`try` 体内还有 `chunk.get(...)`，上游返回合法 JSON 但结构不是对象时会抛
+`AttributeError`；收窄会让畸形响应从「产出错误 token」变成「生成器直接抛异常」，
+属于行为变更而非清理。
+
+**教训**：`tests/test_tool_manager.py::test_packaging_parse_error` 原本用
+`Exception("parse boom")` 模拟 `Version()` 失败，收窄后该用例失败 —— 它断言的其实是
+「宽口径」，不是真实异常类型。已改为 `InvalidVersion`（`ValueError` 子类）。
+
 ## 影响
 
 - 新增：`scripts/check_silent_exceptions.py`、`scripts/check_file_size.py`、

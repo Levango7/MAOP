@@ -377,9 +377,12 @@ class TestParseVersion:
         assert result == (1, 2, 3)
 
     def test_packaging_parse_error(self):
-        """Cover parse exception fallback (67-68) → tuple path (70-79)."""
-        # Force Version() to raise by mocking the import
-        with patch("packaging.version.Version", side_effect=Exception("parse boom")):
+        """Cover parse exception fallback → tuple path."""
+        # 真实 packaging 在版本串非法时抛 InvalidVersion（ValueError 子类），
+        # 不再是任意 Exception —— `_parse_version` 已收窄为 (ValueError, TypeError)。
+        from packaging.version import InvalidVersion
+
+        with patch("packaging.version.Version", side_effect=InvalidVersion("parse boom")):
             result = _parse_version("1.2.3")
         assert result == (1, 2, 3)
 

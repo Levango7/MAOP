@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -120,7 +121,7 @@ class A2AManager:
                 conn.executescript(_A2A_DDL)
                 conn.commit()
             self._load_from_db()
-        except Exception as exc:
+        except (ImportError, OSError, sqlite3.Error) as exc:
             logger.warning("[a2a] DB init failed, using in-memory only: %s", exc)
             self._db_path = None
 
@@ -135,7 +136,7 @@ class A2AManager:
                     self._cards[row[0]] = A2ACard(**json.loads(row[1]))
                 for row in conn.execute("SELECT task_id, task_json FROM a2a_tasks"):
                     self._tasks[row[0]] = A2ATaskState(**json.loads(row[1]))
-        except Exception as exc:
+        except (ImportError, OSError, sqlite3.Error, ValueError, TypeError) as exc:
             logger.warning("[a2a] DB load failed: %s", exc)
 
     def _persist_card(self, card: A2ACard) -> None:
@@ -150,7 +151,7 @@ class A2AManager:
                     (card.name, card.model_dump_json()),
                 )
                 conn.commit()
-        except Exception as exc:
+        except (ImportError, OSError, sqlite3.Error, ValueError, TypeError) as exc:
             logger.warning("[a2a] Card persist failed: %s", exc)
 
     def _persist_task(self, task: A2ATaskState) -> None:
@@ -165,7 +166,7 @@ class A2AManager:
                     (task.task_id, task.model_dump_json()),
                 )
                 conn.commit()
-        except Exception as exc:
+        except (ImportError, OSError, sqlite3.Error, ValueError, TypeError) as exc:
             logger.warning("[a2a] Task persist failed: %s", exc)
 
     def register_card(self, card: A2ACard) -> None:

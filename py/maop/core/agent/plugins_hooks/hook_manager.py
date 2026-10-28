@@ -32,6 +32,7 @@ import contextlib
 import json
 import logging
 import os
+import sqlite3
 import time
 import uuid
 from collections.abc import Callable
@@ -281,7 +282,7 @@ class HookManager:
                 rows = conn.execute(
                     "SELECT id, event, callback_path FROM hooks WHERE callback_path != ''"
                 ).fetchall()
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[hook] Reload: failed to read persisted callbacks: %s", exc)
             return
 
@@ -568,7 +569,7 @@ class HookManager:
                 rows = conn.execute(
                     "SELECT hook_id, MAX(created_at) AS last_at FROM hook_logs GROUP BY hook_id"
                 ).fetchall()
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[hook] Failed to read last-triggered map: %s", exc)
             return {}
         return {r["hook_id"]: r["last_at"] for r in rows if r["last_at"]}
@@ -658,7 +659,7 @@ class HookManager:
         try:
             raw = path.read_text(encoding="utf-8")
             data = _yaml.safe_load(raw) or {}
-        except Exception as exc:
+        except (OSError, _yaml.YAMLError) as exc:
             logger.error("[hook] Failed to load YAML: %s", exc)
             return 0
 
@@ -705,7 +706,7 @@ class HookManager:
             import importlib
             mod = importlib.import_module(parts[0])
             return cast(Callable[..., Any] | None, getattr(mod, parts[1]))
-        except Exception as exc:
+        except (ImportError, AttributeError) as exc:
             logger.warning(
                 "[hook_manager] Failed to resolve callback '%s', skipping hook: %s",
                 dotted_path, exc, exc_info=True,
@@ -772,7 +773,7 @@ class HookManager:
                      1 if result.success else 0, result.error,
                      result.duration_ms, now, result.response_code),
                 )
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning(
                 "[hook_manager] Failed to insert hook log for %s, continuing: %s",
                 result.hook_id, exc, exc_info=True,
