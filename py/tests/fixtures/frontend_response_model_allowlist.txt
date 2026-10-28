@@ -4,15 +4,11 @@
 # any new frontend-called endpoint that is missing from this file.
 # Format: METHOD PATH (path parameters normalized to {})
 #
-# 2026-10-28：下列 13 条来自 share / agent-versions / credential-vault /
-# long-running-tasks 四个路由（10-06 ~ 10-28 新增），端点先落地、response_model
-# 未跟上。此前本文件在个人版环境被 conftest 的子串忽略、从不执行，所以这 13 条
-# 一直没人登记；现在补登记为**显式债务**（不是修复），RATCHET_CAP 同步 +13。
-# 给这些端点补上 response_model 后，删行并把 CAP 改回 75 以下。
-GET /api/agent-versions
-POST /api/agent-versions/{}/activate
-POST /api/agent-versions/{}/canary
-POST /api/agent-versions/{}/rollback
+# 2026-10-28：share / agent-versions / credential-vault / long-running-tasks
+# 四个路由的 13 条债务已结清——12 条补上 response_model（各自的 *_schemas.py），
+# 1 条 SSE（GET /api/long-running-tasks/{}/progress）按本目录政策迁入
+# frontend_non_json_endpoints.txt。RATCHET_CAP 由 88 回到 75。
+
 GET /api/agent/upgrade
 POST /api/agent/upgrade
 GET /api/alerts
@@ -35,10 +31,6 @@ GET /api/cost/budget
 PUT /api/cost/budget
 GET /api/cost/entries
 GET /api/cost/summary
-GET /api/credential-vault/credentials
-POST /api/credential-vault/credentials
-DELETE /api/credential-vault/credentials/{}
-POST /api/credential-vault/credentials/{}/rotate
 POST /api/dag/auto-split
 POST /api/dag/execute
 POST /api/debate/config
@@ -62,9 +54,6 @@ GET /api/info/config
 GET /api/live
 GET /api/logs
 GET /api/logs/analysis
-GET /api/long-running-tasks
-POST /api/long-running-tasks/{}/cancel
-GET /api/long-running-tasks/{}/progress
 GET /api/memory/search
 GET /api/memory/stats
 POST /api/memory/store
@@ -89,8 +78,6 @@ POST /api/scheduling/failure-stats/reset
 GET /api/security/config
 GET /api/sessions
 POST /api/sessions/{}/rerun
-POST /api/share
-GET /api/share/{}
 GET /api/skills
 GET /api/system/diagnostics
 GET /api/system/resources

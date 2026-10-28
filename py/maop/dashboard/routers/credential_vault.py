@@ -22,6 +22,12 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.credential_vault_schemas import (
+    CredentialCreateEnvelope,
+    CredentialDeleteEnvelope,
+    CredentialListEnvelope,
+    CredentialRotateEnvelope,
+)
 
 # ── Service layer ──────────────────────────────────────────────────
 from maop.dashboard.services import credential_service
@@ -61,7 +67,7 @@ class CreateCredentialRequest(BaseModel):
 
 
 # ── 端点 ──────────────────────────────────────────────────────────
-@router.get("/api/credential-vault/credentials")
+@router.get("/api/credential-vault/credentials", response_model=CredentialListEnvelope)
 @handle_api_errors(
     "List credentials",
     error_value={"status": "error", "credentials": [], "count": 0, "error": "List failed"},
@@ -92,7 +98,7 @@ async def api_get_credential(credential_id: str, request: Request) -> dict[str, 
     return {"status": "ok", "credential": cred}
 
 
-@router.post("/api/credential-vault/credentials")
+@router.post("/api/credential-vault/credentials", response_model=CredentialCreateEnvelope)
 @handle_api_errors(
     "Create credential",
     error_value={"status": "error", "error": "Create failed"},
@@ -123,7 +129,7 @@ async def api_create_credential(
     return {"status": "ok", "credential_id": cred_id}
 
 
-@router.delete("/api/credential-vault/credentials/{credential_id}")
+@router.delete("/api/credential-vault/credentials/{credential_id}", response_model=CredentialDeleteEnvelope)
 @handle_api_errors(
     "Delete credential",
     error_value={"status": "error", "error": "Delete failed"},
@@ -137,7 +143,10 @@ async def api_delete_credential(credential_id: str, request: Request) -> dict[st
     return {"status": "ok", "deleted": credential_id}
 
 
-@router.post("/api/credential-vault/credentials/{credential_id}/rotate")
+@router.post(
+    "/api/credential-vault/credentials/{credential_id}/rotate",
+    response_model=CredentialRotateEnvelope,
+)
 @handle_api_errors(
     "Rotate credential",
     error_value={"status": "error", "error": "Rotate failed"},

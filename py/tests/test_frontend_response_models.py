@@ -67,13 +67,11 @@ URL_EXCEPTIONS = FIXTURES / "frontend_url_reference_exceptions.txt"
 # stats, knowledge-graph). They are burned down next.
 # （2026-10-28 校：上面那次 75 -> 82 只改了注释，常量与 allowlist 都停在 75 条 ——
 #  同一件事写了两份数字、其中一份没落地。现在起只认常量与 allowlist 相等这一条事实。）
-# 2026-10-28, 75 -> 88：本文件此前被 conftest 的子串忽略规则挡在个人版环境之外
-# （正文里出现 "maop.enterprise" 字样），于是这四个新路由（share /
-# agent-versions / credential-vault / long-running-tasks，10-06 ~ 10-28 新增）
-# 加进来时**没有任何门禁执行过**，13 个未建模端点一直没人登记。现在补登记为显式
-# 债务并同步抬高上限 —— 这是"记录"而非"修复"：给这 13 个端点补上 response_model
-# 后应删行并把 CAP 降回去。
-RATCHET_CAP = 88
+# 2026-10-28, 88 -> 75：上一条登记的 13 条已全部结清 —— 12 条补上 response_model
+# （agent-versions / credential-vault / long-running-tasks / share 各自新建
+# *_schemas.py），1 条 SSE（GET /api/long-running-tasks/{}/progress）按政策从
+# allowlist 迁入 fixtures/frontend_non_json_endpoints.txt。上限回到评估时的 75。
+RATCHET_CAP = 75
 
 _QUOTES = {"`": "`", "'": "'", '"': '"'}
 _CALL_HEAD_RE = re.compile(

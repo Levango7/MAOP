@@ -39,6 +39,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 前端响应契约：13 个未建模端点结清（2026-10-28）
+
+- 新建 4 个 response-model 模块并逐端点接上 `response_model`：
+  `agent_versions_schemas.py`（`AgentVersionView`/`CanaryView`/`VersionListMeta` +
+  4 个 envelope）、`credential_vault_schemas.py`（复用领域模型 `CredentialSummary`）、
+  `long_running_task_schemas.py`（复用领域模型 `LongRunningTask`）、
+  `share_schemas.py`（`ShareSummary` 13 键对齐 `run_service._summarize`）。
+- `GET /api/long-running-tasks/{id}/progress` 返回 `StreamingResponse`
+  (`text/event-stream`)，套 JSON `response_model` 会造出假契约，按既有政策迁入
+  `fixtures/frontend_non_json_endpoints.txt`（该文件每条都会被校验"仍指向真实挂载
+  且确实无模型"）。
+- `fixtures/frontend_response_model_allowlist.txt` 删 13 行，`RATCHET_CAP` 88 → 75
+  回到评估时的原始上限。所有 envelope 的 `status`/`error` 字段带默认值，因为
+  `handle_api_errors` 的 `error_value` 兜底 dict 同样会被 `response_model` 校验。
+- 逐键核对过 FastAPI 会在运行时**过滤**未声明字段（`share_service._summarize`、
+  `_version_row_to_dict`、`_canary_row_to_dict`、`CredentialSummary`），127 → 154 例
+  回归无字段丢失。
+
 ### 宽口径异常登记与基线校准（2026-10-28，`refactor/layering-closeout`）
 
 - **实收窄 5 处**：`distributed_scheduler/_scheduler.py` 顶部两个可选依赖守卫改

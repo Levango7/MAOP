@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.share_schemas import ShareCreateEnvelope, ShareEnvelope
 from maop.dashboard.services import share_service
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ class CreateShareRequest(BaseModel):
     )
 
 
-@router.post("")
+@router.post("", response_model=ShareCreateEnvelope)
 @handle_api_errors(
     "Create share",
     error_value={"status": "error", "error": "Create failed"},
@@ -82,7 +83,7 @@ async def revoke_share(token: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "revoked": token}
 
 
-@router.get("/{token}")
+@router.get("/{token}", response_model=ShareEnvelope)
 @handle_api_errors(
     "Get share",
     error_value={"status": "error", "share": None, "error": "Not found"},
