@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 分层收官批 第二刀：黑板→WS 桥接线（问题#9 收口，2026-10-29）
+
+- **`dashboard.ws_blackboard_bridge` 接入 lifespan**（`start_layering_services`）：
+  黑板写入事件实时推 `/ws`（事件驱动路径，与 `_ws_push_loop` 周期快照互补），
+  随后台任务门控启停（多 worker 下 N 条桥无新信息量）；`KNOWN_ORPHANS`
+  对应条目销账；接线测试扩到 6 例。至此分层计划"九大问题"表全部收口。
+
 ### 分层收官批：middleware 子包化 + lifespan 接线（2026-10-28）
 
 - **`core/security/middleware.py` 1188 行 → 六文件子包**：`_auth`（AuthMiddleware

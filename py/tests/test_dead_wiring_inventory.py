@@ -150,10 +150,9 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.dashboard.provider": ("unwired", "dashboard 旧 provider 入口（v4.0.0 起 create_app 已废弃）"),
     "maop.dashboard.routers.error_handler": ("unwired", "路由层错误处理未挂到 app"),
     "maop.dashboard.static": ("unwired", "静态文件挂载未接入 server.py"),
-    "maop.dashboard.ws_blackboard_bridge": (
-        "unwired",
-        "黑板写入→WS 推送的桥，lifespan 未启动它（模块 docstring 已同步改为'需显式启动'）",
-    ),
+    # 2026-10-29 移出清单：ws_blackboard_bridge 已由 lifespan 接线
+    # （server.start_layering_services，随后台门控启停；见
+    # tests/test_layering_lifespan_wiring.py 的桥启停两例）。
     "maop.dashboard.ws_dag": ("unwired", "DAG WebSocket 未挂到 app"),
     "maop.delegate.doc_pipeline_adapter": ("unwired", "doc-pipeline 适配器未接线"),
     "maop.maop_execute": ("unwired", "全仓零生产调用方（权限门已改由 dispatch_gate 承担）"),

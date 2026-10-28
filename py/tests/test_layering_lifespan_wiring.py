@@ -1,14 +1,16 @@
-"""分层服务 lifespan 接线测试（阶段1 HealthService / 阶段3 A2AGateway）。
+"""分层服务 lifespan 接线测试（阶段1 HealthService / 阶段3 A2AGateway / 问题#9 黑板桥）。
 
 驱动对象是 ``server.start_layering_services`` / ``shutdown_layering_services``——
 lifespan 的起停路径之所以拆成独立函数，正是为了让本文件直接驱动它们，
 不起整套 lifespan 的副作用（WS 推送、备份调度、MCP 播种、多模态预热）。
 
-四个判据（对应接线的四条约定）：
+六个判据（对应接线的六条约定）：
 1. ``bg_enabled=False`` → 探测循环不启动（多 worker 门控，避免 N 份循环）；
 2. ``bg_enabled=True`` → HealthService 真启动，shutdown 后停机（对称）；
 3. ``MAOP_A2A_GATEWAY`` 缺省 → 门户不构造（默认不占端口——部署决策）；
-4. ``MAOP_A2A_GATEWAY=1`` → 门户构造且 started，shutdown 后 started=False。
+4. ``MAOP_A2A_GATEWAY=1`` → 门户构造且 started，shutdown 后 started=False；
+5. ``bg_enabled=False`` → 黑板→WS 桥不启动（与 WS 推送同门控）；
+6. ``bg_enabled=True`` → 桥启动（订阅生效），shutdown 后 running=False。
 """
 
 from __future__ import annotations
@@ -65,3 +67,26 @@ async def test_gateway_constructed_and_started_when_enabled(monkeypatch):
 
     await server.shutdown_layering_services(app)
     assert gw.started is False
+
+
+async def test_bb_bridge_not_started_when_bg_disabled(monkeypatch):
+    """多 worker 门控：bg_enabled=False 时黑板→WS 桥不启动。"""
+    monkeypatch.delenv("MAOP_A2A_GATEWAY", raising=False)
+    app = _app()
+    await server.start_layering_services(app, bg_enabled=False)
+    assert app.state.ws_blackboard_bridge is None
+
+
+async def test_bb_bridge_starts_and_stops_when_bg_enabled(monkeypatch):
+    """bg_enabled=True → 桥启动（订阅生效）；shutdown 后停止且幂等。"""
+    monkeypatch.delenv("MAOP_A2A_GATEWAY", raising=False)
+    app = _app()
+    await server.start_layering_services(app, bg_enabled=True)
+    bridge = app.state.ws_blackboard_bridge
+    assert bridge is not None, "bg_enabled=True 时黑板桥必须启动"
+    assert bridge._running is True
+
+    await server.shutdown_layering_services(app)
+    assert bridge._running is False
+    # 再关一次：全是幂等路径，不应抛
+    await server.shutdown_layering_services(app)

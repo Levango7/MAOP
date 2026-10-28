@@ -138,3 +138,14 @@
 - **lifespan 接线**：`server.start_layering_services/shutdown_layering_services`——
   HealthService 随后台门控自动启停；A2AGateway 由 `MAOP_A2A_GATEWAY=1` 显式开启
   （默认不占端口）；KNOWN_ORPHANS 两条销账 + 4 例接线测试。
+
+## 领地登记（ZCode session_f62ccbe…，2026-10-29 第四轮：问题#9 黑板→WS 桥接线）
+
+- **进行中**：分层计划"九大问题"表最后一项 —— `dashboard/ws_blackboard_bridge.py`
+  接入 `start_layering_services`（黑板写入→WS 实时推送，随后台门控启停）。
+  领地=`py/maop/dashboard/server.py` 的接线两函数 + `py/tests/test_dead_wiring_inventory.py`
+  （销条目）+ `py/tests/test_layering_lifespan_wiring.py`（扩两例）+ CHANGELOG。
+  分支 `feat/blackboard-ws-wiring`，worktree `F:/Nexus/MAOP-bb`。
+- **不碰**：他线的宽口径异常收窄批次（ADR-023 D8 长跑批，走 core/** 各模块）；
+  `routers/*_schemas.py` 面。**他线注意**：`ws_blackboard_bridge.py` 内部两处
+  `except Exception` 属该批候选，如你方先行收窄请在本表回一行，我 rebase 跟随。

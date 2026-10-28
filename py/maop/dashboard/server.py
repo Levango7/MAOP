@@ -147,11 +147,16 @@ async def start_layering_services(app: FastAPI, *, bg_enabled: bool) -> None:
       HTTP 传输层对外监听属部署决策）。开启时门户对象开始生命周期管理；
       传输层/黑板桥的注入由部署侧组合（本接线只保证 manager 就绪与
       start/stop 对称）。关：``app.state.a2a_gateway`` 保持 None。
+    - **阶段6 协作层问题#9 BlackboardWSBridge**：订阅黑板写入事件并实时推
+      ``/ws``（事件驱动路径，与 ``_ws_push_loop`` 的周期快照互补）。与
+      WS 推送同门控（``bg_enabled``）——多 worker 下每条桥会把自己 worker
+      的连接池广播一遍，N 份桥没有新信息量。
 
-    失败一律降级为 warning：这两个服务是增强面，不是仪表板启动依赖。
+    失败一律降级为 warning：这些服务是增强面，不是仪表板启动依赖。
     """
     app.state.health_service = None
     app.state.a2a_gateway = None
+    app.state.ws_blackboard_bridge = None
 
     if bg_enabled:
         try:
@@ -178,9 +183,27 @@ async def start_layering_services(app: FastAPI, *, bg_enabled: bool) -> None:
         except Exception as exc:
             logger.warning("[lifespan] A2A gateway start failed: %s", exc)
 
+    if bg_enabled:
+        try:
+            from maop.core.reliability.blackboard import get_blackboard
+            from maop.dashboard.ws_blackboard_bridge import BlackboardWSBridge
+
+            _bb_bridge = BlackboardWSBridge(get_blackboard())
+            await _bb_bridge.start()
+            app.state.ws_blackboard_bridge = _bb_bridge
+            logger.info("[lifespan] Blackboard WS bridge started")
+        except Exception as exc:
+            logger.warning("[lifespan] Blackboard WS bridge start failed: %s", exc)
+
 
 async def shutdown_layering_services(app: FastAPI) -> None:
-    """与 ``start_layering_services`` 对称的关停（先门户后探测，各自幂等）。"""
+    """与 ``start_layering_services`` 对称的关停（逆序停止，各自幂等）。"""
+    _bb_bridge = getattr(app.state, "ws_blackboard_bridge", None)
+    if _bb_bridge is not None:
+        try:
+            await _bb_bridge.stop()
+        except Exception as exc:
+            logger.warning("[shutdown] Blackboard WS bridge stop failed: %s", exc)
     _gateway = getattr(app.state, "a2a_gateway", None)
     if _gateway is not None:
         try:
