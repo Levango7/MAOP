@@ -97,3 +97,21 @@
 - 领地追加（同一轮 services 拆分运动）：`py/maop/dashboard/services/chat_service.py`
   拆分（1152 行 → 目标 <800），新 `services/chat/` 或等价子包；与 data_service
   拆分同批（ROADMAP 原文"与 chat_service 同批"）。data_service 那刀见 PR #171。
+
+## 领地登记（ZCode session_f62ccbe…，2026-10-28 第三轮：分层收官批）
+
+- **背景**：分层整改阶段1+3 已合入 master（PR #174，125ee6ca）；上批六 PR 全部收口，
+  MAOP 仓当前无其他在途线（trae/qoder/workbuddy 分别在 NexusSky/corps/OpsMesh 作战，
+  本仓无外线竞争——已核 AGENT-COORD 全表与近 48h 提交）。
+- **进行中（两笔自认在途的销账）**：
+  1. `py/maop/core/security/middleware.py`（1188 行）三块拆分 → 子包
+     （AuthMiddleware / ScopeMiddleware / 速率与 IP 白名单 / 装配四个模块，
+     参照 core/mcp 与 distributed_scheduler 子包先例，导入路径不变）；
+     领地=该文件 + 新建 `py/maop/core/security/middleware/` 包 +
+     `py/scripts/check_file_size.py`（移除最后一条 ALLOWED_OVERSIZE，回到"无豁免"）。
+  2. dashboard lifespan 接线：`core/scheduling/health_service.py` 与
+     `core/coordination/a2a_gateway.py` 上启动/停止钩子（销 KNOWN_ORPHANS 两条
+     "接线在途"）；领地=这两个模块 + `py/maop/dashboard/app.py`（或等价 lifespan 处）+
+     `py/tests/test_dead_wiring_inventory.py` + 新增集成测试。
+- 分支：`refactor/layering-closeout`（主工作树）。
+- **不碰**：MAOS 仓（领地已释放，等下一批任务）；其余仓（trae/qoder/workbuddy 战线）。
