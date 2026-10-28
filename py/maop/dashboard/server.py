@@ -131,6 +131,70 @@ async def drain_cancelled(*tasks: asyncio.Task | None) -> int:
     return len(pending)
 
 
+# ── 分层服务起停（PLAN_SCHEDULING_LAYERING.md 阶段1/阶段3 收口）─────
+# 拆成独立函数（而非内联进 lifespan）的两个理由与 drain_cancelled 相同：
+# 起停路径要能被测试直接驱动（不起整套 lifespan 副作用），以及每条
+# try/except 都让"吞异常"基线的可读性更差——这里集中一次讲清。
+
+
+async def start_layering_services(app: FastAPI, *, bg_enabled: bool) -> None:
+    """启动阶段性服务并把句柄挂到 ``app.state``（幂等性由服务自身保证）。
+
+    - **阶段1 HealthService**：探测循环读 AgentCatalog 并回写健康标志。
+      与 backup/logrotate 同门控（``bg_enabled``）——多 worker 下 N 份
+      探测循环只是放大对被探测端点的压力，不增加信息量。
+    - **阶段3 A2AGateway**：``MAOP_A2A_GATEWAY=1`` 才构造（默认关——门户
+      HTTP 传输层对外监听属部署决策）。开启时门户对象开始生命周期管理；
+      传输层/黑板桥的注入由部署侧组合（本接线只保证 manager 就绪与
+      start/stop 对称）。关：``app.state.a2a_gateway`` 保持 None。
+
+    失败一律降级为 warning：这两个服务是增强面，不是仪表板启动依赖。
+    """
+    app.state.health_service = None
+    app.state.a2a_gateway = None
+
+    if bg_enabled:
+        try:
+            from maop.core.scheduling.health_service import HealthService
+
+            _health_service = HealthService()
+            await _health_service.start()
+            app.state.health_service = _health_service
+            logger.info("[lifespan] Health service auto-started")
+        except Exception as exc:
+            logger.warning("[lifespan] Health service start failed: %s", exc)
+
+    from maop.config.settings import a2a_gateway_enabled
+
+    if a2a_gateway_enabled():
+        try:
+            from maop.core.agent.delegation.a2a import A2AManager
+            from maop.core.coordination.a2a_gateway import A2AGateway
+
+            _gateway = A2AGateway(manager=A2AManager(root_dir=str(MAOP_ROOT)))
+            await _gateway.start()
+            app.state.a2a_gateway = _gateway
+            logger.info("[lifespan] A2A gateway started (MAOP_A2A_GATEWAY=1)")
+        except Exception as exc:
+            logger.warning("[lifespan] A2A gateway start failed: %s", exc)
+
+
+async def shutdown_layering_services(app: FastAPI) -> None:
+    """与 ``start_layering_services`` 对称的关停（先门户后探测，各自幂等）。"""
+    _gateway = getattr(app.state, "a2a_gateway", None)
+    if _gateway is not None:
+        try:
+            await _gateway.stop()
+        except Exception as exc:
+            logger.warning("[shutdown] A2A gateway stop failed: %s", exc)
+    _health_service = getattr(app.state, "health_service", None)
+    if _health_service is not None:
+        try:
+            await _health_service.stop()
+        except Exception as exc:
+            logger.warning("[shutdown] Health service stop failed: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Any:
     if _auth_mod._auth_enabled:
@@ -246,9 +310,15 @@ async def lifespan(app: FastAPI) -> Any:
 
         app.state.mcp_autoconnect_task = asyncio.create_task(_mcp_auto_connect())
 
+    # ── 分层服务（阶段1 HealthService / 阶段3 A2AGateway）──────
+    # 放在最后：它们只依赖 app.state 与自身单例，不与其他启动段耦合。
+    await start_layering_services(app, bg_enabled=_bg_enabled)
+
     try:
         yield
     finally:
+        # 先停分层服务（对称起停），再走既有的任务/调度器清理序。
+        await shutdown_layering_services(app)
         # 关停期要取消的后台任务统一交给 drain_cancelled：每多一处
         # ``with suppress(asyncio.CancelledError)`` 都是给"吞异常"基线加一笔，
         # 而这个 ratchet 只允许减少。

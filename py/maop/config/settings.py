@@ -36,6 +36,15 @@ def trust_proxy_enabled() -> bool:
     return os.environ.get("MAOP_TRUST_PROXY", "0") == "1"
 
 
+def a2a_gateway_enabled() -> bool:
+    """``MAOP_A2A_GATEWAY=1`` 判定（阶段3 A2A 门户在 dashboard 生命周期内的开关）。
+
+    默认关：门户的 HTTP 传输层会对外监听，是否打开是**部署决策**，不该由
+    升级默认值替运维做。env 直读收敛点，见 config-drift 门禁口径。
+    """
+    return os.environ.get("MAOP_A2A_GATEWAY", "0") == "1"
+
+
 def _default_auth_enabled() -> bool:
     """默认认证策略（High 安全修复：secure-by-default）。
 
