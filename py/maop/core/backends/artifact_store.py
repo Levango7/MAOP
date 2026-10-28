@@ -23,6 +23,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -167,8 +168,10 @@ class ArtifactStore:
                     (version_id, name, version, content_hash, size, tag,
                      json.dumps(metadata or {}), str(blob_file), now),
                 )
-            except Exception:
-                # DB INSERT 失败时清理已写入的 blob 文件，避免孤儿文件
+            except (TypeError, ValueError, sqlite3.Error):
+                # conn.execute 走 sqlite3；参数里的 json.dumps(metadata) 在 metadata
+                # 含不可序列化对象时抛 TypeError。DB 失败时清理已写入的 blob 文件，
+                # 避免孤儿文件。
                 with contextlib.suppress(Exception):
                     blob_file.unlink(missing_ok=True)
                 raise

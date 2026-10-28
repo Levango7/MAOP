@@ -247,7 +247,7 @@ class S3BackupBackend:
                 try:
                     local_path.unlink(missing_ok=True)
                     logger.debug("[backup] 已删除本地副本 %s", local_path)
-                except Exception as exc:
+                except OSError as exc:
                     logger.warning("[backup] 删除本地副本失败 %s: %s", local_path, exc)
 
             return True
@@ -395,7 +395,7 @@ class DbBackup:
                                 "[backup] %s wal_checkpoint(TRUNCATE) -> %s",
                                 db_name, row,
                             )
-                        except Exception as cp_exc:
+                        except (OSError, sqlite3.Error) as cp_exc:
                             logger.warning(
                                 "[backup] %s wal_checkpoint failed (continuing): %s",
                                 db_name, cp_exc,
@@ -483,7 +483,7 @@ class DbBackup:
                         f.unlink(missing_ok=True)
                         removed += 1
                         logger.debug("[backup] Removed orphan/old backup: %s", f.name)
-                    except Exception as exc:
+                    except OSError as exc:
                         logger.warning("[backup] Failed to remove %s: %s", f, exc)
 
             # Also clean manifest entries beyond retention

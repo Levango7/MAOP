@@ -174,7 +174,7 @@ class MessageQueue:
             with self._connect() as conn:
                 conn.executescript(_QUEUE_DDL)
             self._initialized = True
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("Failed to initialize message queue DB: %s", exc)
 
     # ── Enqueue ───────────────────────────────────────────────
@@ -462,7 +462,7 @@ class MessageQueue:
                         (msg_id, consumer_id, now),
                     )
             return True
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[mq] ACK failed: %s", exc)
             return False
 
@@ -626,7 +626,8 @@ class MessageQueue:
                     "WHERE status = 'processing' GROUP BY consumer_group"
                 )
                 by_cg = {row["consumer_group"]: row["cnt"] for row in cur.fetchall()}
-        except Exception as exc:
+        except (OSError, sqlite3.Error, TypeError, KeyError) as exc:
+            # TypeError/KeyError: fetchone() 返回 None 或缺列时，row["cnt"] 取值失败
             logger.warning("[mq] stats() batch query failed: %s", exc, exc_info=True)
 
         # H8 修复：更新队列待处理消息数指标
@@ -634,7 +635,7 @@ class MessageQueue:
             from maop.core.monitoring.monitoring import MAOP_QUEUE_PENDING
 
             MAOP_QUEUE_PENDING.set(pending)
-        except Exception:
+        except (ImportError, AttributeError):
             # 指标更新失败不应影响队列统计
             logger.debug("set MAOP_QUEUE_PENDING metric failed", exc_info=True)
 
@@ -663,7 +664,8 @@ class MessageQueue:
                 cursor = conn.execute(sql, params)
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as exc:
+        except (OSError, sqlite3.Error, TypeError) as exc:
+            # TypeError: 传非 SELECT 语句时 cursor.description 为 None，列表推导失败
             logger.warning("[mq] Query failed (sql=%s): %s", sql, exc, exc_info=True)
             if raise_on_error:
                 raise
@@ -692,7 +694,7 @@ class MessageQueue:
                     (cutoff,),
                 )
                 return cast(int, cursor.rowcount)
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[mq] Purge failed: %s", exc)
             return 0
 
@@ -709,7 +711,7 @@ class MessageQueue:
                 if removed > 0:
                     logger.info("[mq] Cleaned up %d dead letters older than %.0fs", removed, older_than_s)
                 return cast(int, removed)
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[mq] Dead letter cleanup failed: %s", exc)
             return 0
 

@@ -27,6 +27,7 @@ Usage::
 from __future__ import annotations
 
 import logging
+import sqlite3
 import time
 import uuid
 from collections.abc import Callable
@@ -191,7 +192,7 @@ class SelfHealEngine:
                 with sqlite_connect(db_path) as conn:
                     conn.execute("SELECT 1")
                 return True
-            except Exception as e:
+            except (OSError, sqlite3.Error) as e:
                 logger.debug("ignored: %s", e, exc_info=True)
                 return False
         if verify == "cache_accessible":

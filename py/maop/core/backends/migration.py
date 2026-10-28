@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import sqlite3
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -208,10 +209,10 @@ class MigrationManager:
             try:
                 for stmt in statements:
                     conn.execute(stmt)
-            except Exception as exc:
+            except sqlite3.Error as exc:
                 try:
                     conn.execute("ROLLBACK")
-                except Exception:  # silent-ok: best-effort-cleanup — 清理动作 best-effort，原错误已重抛或另行告警
+                except sqlite3.Error:  # silent-ok: best-effort-cleanup — 清理动作 best-effort，原错误已重抛或另行告警
                     pass
                 raise RuntimeError(
                     f"Migration v{migration.version} failed during execution, rolled back: {exc}"
@@ -244,10 +245,10 @@ class MigrationManager:
             try:
                 for stmt in statements:
                     conn.execute(stmt)
-            except Exception as exc:
+            except sqlite3.Error as exc:
                 try:
                     conn.execute("ROLLBACK")
-                except Exception:  # silent-ok: best-effort-cleanup — 清理动作 best-effort，原错误已重抛或另行告警
+                except sqlite3.Error:  # silent-ok: best-effort-cleanup — 清理动作 best-effort，原错误已重抛或另行告警
                     pass
                 raise RuntimeError(
                     f"Rollback of migration v{migration.version} failed, rolled back: {exc}"

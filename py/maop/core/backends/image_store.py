@@ -23,6 +23,7 @@ import base64
 import contextlib
 import hashlib
 import logging
+import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -146,7 +147,8 @@ class ImageStore:
                     (img_id, session_id, safe_filename, content_type, len(data),
                      0, 0, checksum, now, str(file_path)),
                 )
-        except Exception:
+        except (TypeError, sqlite3.Error):
+            # len(data) 对非 Sized 入参抛 TypeError；其余为 sqlite3 写库失败。
             # DB INSERT 失败时清理已写入的磁盘文件，避免孤儿文件
             with contextlib.suppress(Exception):
                 file_path.unlink(missing_ok=True)

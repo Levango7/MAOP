@@ -80,9 +80,11 @@ SUPPRESS_BASELINE = 46
 #: ``core/agent/`` 模块分模块收窄 25 处（yaml/文件读取、json 回读、sqlite CRUD、
 #: 标准库探针），该模块剩余 141 处的归因见 ADR-023 D7。同日第四轮：1134 → 1132，
 #: ``core/scheduling/`` 收窄 2 处（json.dumps 兜底、删掉一处只会 ``return None``
-#: 的死 try）。登记条目一旦 try 体缩小到
+#: 的死 try）。第五轮：1132 → 1090，``memory/`` 14 处、``core/backends/`` 15 处、
+#: ``core/reliability/`` 13 处（sqlite CRUD、unlink、import 探针、prometheus 指标），
+#: 三个模块的不可收窄归因见 ADR-023 D9。登记条目一旦 try 体缩小到
 #: 只剩 import 或单一已知 API，必须收窄并下调本基线。
-BROAD_EXCEPT_BASELINE = 1132
+BROAD_EXCEPT_BASELINE = 1090
 
 
 def _iter_py_files() -> Iterator[pathlib.Path]:

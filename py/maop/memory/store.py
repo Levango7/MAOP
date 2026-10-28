@@ -107,9 +107,9 @@ class MemoryStore(SearchMixin):
         except sqlite3.Error as exc:
             # B25: 改为具体异常类型
             logger.warning("Failed to initialize memory DB: %s", exc)
-        except Exception as exc:
-            # B25: 兜底
-            logger.warning("Failed to initialize memory DB (non-SQLite error): %s", exc, exc_info=True)
+        except OSError as exc:
+            # 建库路径不可写 / 磁盘 IO 故障：sqlite3.Error 之外的唯一现实来源
+            logger.warning("Failed to initialize memory DB (IO error): %s", exc, exc_info=True)
 
     def _init_bloom(self):
         """Initialize bloom filter with existing entry IDs for fast dedup.
@@ -207,9 +207,9 @@ class MemoryStore(SearchMixin):
             # B25: 改为具体异常类型，sqlite3.Error 覆盖 IntegrityError/OperationalError 等
             logger.warning("[mem] Store failed: %s", exc)
             return None
-        except Exception as exc:
-            # B25: 兜底——非 SQLite 错误（如编码/序列化）也记录 warning
-            logger.warning("[mem] Store failed (non-SQLite error): %s", exc, exc_info=True)
+        except OSError as exc:
+            # 建库路径不可写 / 磁盘 IO 故障：sqlite3.Error 之外的唯一现实来源
+            logger.warning("[mem] Store failed (IO error): %s", exc, exc_info=True)
             return None
 
         # Add to bloom filter for future dedup
@@ -303,7 +303,7 @@ class MemoryStore(SearchMixin):
                 cursor = conn.execute(sql, params)
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[mem] Query failed: %s", exc)
             return []
 
@@ -414,7 +414,7 @@ class MemoryStore(SearchMixin):
                      step.tool_name, step.tool_input, step.tool_output,
                      step.duration_ms, step.exit_code, step.timestamp),
                 )
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[mem] Trajectory store failed: %s", exc)
         return step.id
 

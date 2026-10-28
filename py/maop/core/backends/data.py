@@ -190,7 +190,7 @@ class MaopDatabase:
             self._initialized = True
             logger.info("Database initialized at %s", self._path)
             return True
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("Failed to initialize database: %s", exc)
             return False
 
@@ -230,7 +230,8 @@ class MaopDatabase:
             logger.error("Execute failed (non-recoverable DB error): %s", exc)
             raise
         except Exception as exc:
-            # 编程错误（TypeError / ValueError 等）或其他未知异常：不可恢复。
+            # 兜底：try 体含 dict(zip(...)) 等非 DB 操作，TypeError/ValueError 也在预期内。
+            # 保留宽口径是为了 log-then-reraise 的可观测性，异常集不可静态穷举。
             logger.error("Execute failed (unexpected error): %s", exc)
             raise
 
@@ -337,6 +338,7 @@ class MaopDatabase:
             logger.error("save_checkpoint failed (non-recoverable): %s", exc)
             raise
         except Exception as exc:
+            # 同上：log-then-reraise 兜底，保留宽口径以便观测非 DB 异常。
             logger.error("save_checkpoint failed for agent=%s task=%s: %s", agent, task, exc)
             raise
 
@@ -559,7 +561,7 @@ class MaopDatabase:
             with self._connect() as conn:
                 conn.execute(ddl)
             return True
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("FTS5 init failed: %s", exc)
             return False
 
@@ -615,7 +617,7 @@ class MaopDatabase:
                     cursor = conn.execute(sql, (query, limit))
                     columns = [desc[0] for desc in cursor.description]
                     return [dict(zip(columns, row)) for row in cursor.fetchall()]
-            except Exception as exc:
+            except (OSError, sqlite3.Error) as exc:
                 logger.warning("FTS5 highlight search failed, trying plain: %s", exc)
 
         # Plain search without highlight
@@ -629,7 +631,7 @@ class MaopDatabase:
                 cursor = conn.execute(sql, (query, limit))
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("FTS5 search failed: %s", exc)
             return []
 
@@ -645,6 +647,6 @@ class MaopDatabase:
             with self._connect() as conn:
                 conn.execute(f"INSERT INTO {fts_name}({fts_name}) VALUES('rebuild')")  # nosec B608 — 表名经 validate_identifier，派生名来自受控表名（已人工核）
             return True
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("FTS5 rebuild failed: %s", exc)
             return False

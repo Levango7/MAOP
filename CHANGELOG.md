@@ -39,6 +39,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 宽口径异常：`memory/` + `core/backends/` + `core/reliability/` 模块第三批（2026-10-29）
+
+- 三模块合计收窄 **42 处**（`memory/` 64→50、`core/backends/` 59→44、
+  `core/reliability/` 95→82），全部属于异常集可静态枚举的形态：
+  `(OSError, sqlite3.Error)` 的 SQLite 读写（`memory/store.py` 4、`vector_search.py` 6、
+  `manager_mixin.py` 3、`facade.py` 1；`backends/data.py` 5 含 FTS5 四件套、
+  `db_backup.py` 3、`migration.py` 4、`db_utils.py` 1；`reliability/message_queue.py` 7、
+  `circuit_breaker.py` 3）、纯文件 `unlink` → `OSError`（`db_backup.py` 2、
+  `change_tracker.py` 1、`log_rotate.py` 1）、prometheus 指标 → `(ImportError, AttributeError)`。
+- 三处非 DB 参数错误按实际抛点补入异常集：`artifact_store.py` / `image_store.py` 的
+  `json.dumps`/`len()` → `(TypeError, ValueError, sqlite3.Error)`、`(TypeError, sqlite3.Error)`。
+- **主动回滚 2 处**：`data.py::_execute` / `save_checkpoint` 原拟收窄为 `OSError`，复核发现
+  `try` 体含 `dict(zip(columns, row))`，非 SELECT 语句时 `cursor.description` 为 `None`
+  会抛 `TypeError`，且这两处是 log-then-reraise 兜底 —— 恢复宽口径并补注释。
+- 故意保留宽口径的三类形态（`data.py::_connect`/`db_utils.py::connection` 的 `yield conn`
+  会把调用方 `with` 体内任意异常带进 `except`；`backends_distributed.py::transport.close()`
+  等第三方 `Any` 句柄）登记理由见 ADR-023 D9。
+- `BROAD_EXCEPT_BASELINE` 1132 → 1090。
+
 ### 宽口径异常：`core/scheduling/` 模块第二批（2026-10-29）
 
 - `core/scheduling/` 31 处 → 29 处，可静态证明的只有 2 处：

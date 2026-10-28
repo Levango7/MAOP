@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import sqlite3
 import time
 import uuid
 from datetime import datetime, timezone
@@ -241,7 +242,7 @@ class MemoryManagerMixin:
                 cursor = conn.execute(sql, params)
                 cols = [d[0] for d in cursor.description] if cursor.description else []
                 rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[memory_manager] query_episodic failed: %s", exc)
             return []
 
@@ -348,7 +349,8 @@ class MemoryManagerMixin:
                     self._memory_entries_cols = [d[0] for d in conn.execute(
                         "SELECT * FROM memory_entries LIMIT 0").description]
                 return dict(zip(self._memory_entries_cols, row))
-        except Exception as exc:
+        except (OSError, sqlite3.Error, TypeError) as exc:
+            # TypeError: 该表无列（LIMIT 0 的 description 为 None）
             logger.warning("[memory_manager] short_term_get failed: %s", exc)
             return None
 
@@ -494,7 +496,7 @@ class MemoryManagerMixin:
                         "DELETE FROM memory_entries WHERE id = ?", (entry_id,)
                     )
                     return cur.rowcount > 0
-            except Exception as exc:
+            except (OSError, sqlite3.Error) as exc:
                 logger.warning("[memory_manager] delete short_term failed: %s", exc)
                 return False
         if normalized == "long_term":

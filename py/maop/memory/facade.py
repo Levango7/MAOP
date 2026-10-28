@@ -44,6 +44,7 @@ MAOP 同时存在两套三层记忆实现（详见 ``unified.py`` 文档）。�
 from __future__ import annotations
 
 import logging
+import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -653,7 +654,7 @@ class MemoryFacade:
                 )
                 if cur.rowcount > 0:
                     deleted = True
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[memory_facade] delete short_term failed: %s", exc)
             return False
         return deleted

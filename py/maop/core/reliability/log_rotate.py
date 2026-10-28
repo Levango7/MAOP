@@ -145,7 +145,7 @@ def _cleanup_old_rotations(
                 try:
                     f.unlink()
                     logger.info("Deleted old rotation: %s", f.name)
-                except Exception as exc:
+                except OSError as exc:
                     logger.warning("Failed to delete %s: %s", f.name, exc)
                     continue
             deleted.append(f.name)

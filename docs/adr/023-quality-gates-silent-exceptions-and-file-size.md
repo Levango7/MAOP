@@ -169,6 +169,40 @@
 异常集由运行时实现决定，静态分析只能证明「不该收窄」。这也说明按模块推进比按类别
 推进更可靠：两类形态在各模块的占比差异很大。
 
+### D9. 分模块推进：`memory/` + `core/backends/` + `core/reliability/`（2026-10-29）
+
+三批合计收窄 **42 处**（1132 → 1090）。这三个模块自己 `import sqlite3` 的比例高，
+可收窄率明显高于调度层。
+
+| 模块 | 总数 → 剩余 | 收窄 | 主要形态 |
+|---|---|---|---|
+| `memory/` | 64 → 50 | 14 | `store.py` 4（init / 落库 / 查询）、`vector_search.py` 6（索引读写）、`manager_mixin.py` 3、`facade.py` 1 |
+| `core/backends/` | 59 → 44 | 15 | `data.py` 5（FTS5 四件套 + init）、`db_backup.py` 3（`unlink`×2 + WAL checkpoint）、`migration.py` 4（execute + ROLLBACK）、`db_utils.py` 1、`artifact_store.py` 1、`image_store.py` 1 |
+| `core/reliability/` | 95 → 82 | 13 | `message_queue.py` 7（DDL / ACK / stats / query / purge / dead-letter）、`circuit_breaker.py` 3（failover 持久化与事件查询）、`change_tracker.py` 1、`log_rotate.py` 1、`self_heal.py` 1 |
+
+**收窄类型**：
+- `(OSError, sqlite3.Error)` —— `sqlite_connect`/`_connect` + `execute*` 的标准组合；`sqlite_connect` 在建连失败时抛 `OSError`，`execute` 抛 `sqlite3.Error` 及其子类
+- `OSError` —— 纯文件操作（`path.unlink()`）
+- `(ImportError, AttributeError)` —— prometheus 指标导入 + `Gauge.set`
+- `(ValueError, TypeError)` / `(NameError, TypeError)` —— `json.dumps`、`get_type_hints`
+
+**故意保留宽口径的 3 类**（新增登记，不计入收窄）：
+
+| 形态 | 站点 | 理由 |
+|---|---|---|
+| log-then-reraise 兜底 | `data.py::_execute` / `_query` / `save_checkpoint`、`message_queue.py::enqueue` | `try` 体除 DB 调用外还有 `dict(zip(columns, row))` —— `cursor.description` 为 `None`（非 SELECT 语句）时抛 `TypeError`；收窄会让「记录后重抛」退化成「无日志抛出」，损失可观测性 |
+| `yield conn` 的连接管理器 | `data.py::_connect`、`db_utils.py::connection` | `yield` 会把调用方 `with` 体内的**任意**异常带进 `except`，异常集由调用方决定，静态不可枚举 |
+| 第三方句柄 | `backends_distributed.py::transport.close()`、`backends_redis.py`/`backends_vault.py` 的 `self._client.*` | 类型注解是 `Any`，异常集取决于注入的 etcd/redis/hvac 客户端 |
+
+**一个被 AST 分类器误判的坑**：`close` / `execute` / `commit` 这些名字既可能是 sqlite
+方法，也可能是第三方客户端方法。`backends_distributed.py:427` 的 `transport.close()`
+被判成「可收窄」，实际是 etcd 的 transport —— 这类必须人工核对接收者类型，不能只看
+方法名。
+
+**统计口径提醒**：`_json_dumps`（D8）这类「`default=str` 已兜住多数对象」的站点，
+`RecursionError` 必须显式列入，因为它是 `RuntimeError` 的子类而不在 `Exception` 的
+常规假设里 —— 若省略，深层嵌套对象会从「降级为 str」变成「抛异常」。
+
 ## 影响
 
 - 新增：`scripts/check_silent_exceptions.py`、`scripts/check_file_size.py`、

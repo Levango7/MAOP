@@ -157,7 +157,7 @@ class VectorSearch:
                 ).fetchone()
                 if row:
                     existing = row["text_hash"]
-            except Exception as exc:
+            except (sqlite3.Error, KeyError, IndexError) as exc:
                 logger.warning(
                     "vector_search: 读取已存在向量 text_hash 失败，按不存在处理，异常: %s",
                     exc, exc_info=True,
@@ -193,7 +193,7 @@ class VectorSearch:
             except sqlite3.OperationalError:
                 # 表不存在或数据库结构异常，按空集处理
                 already = set()
-            except Exception:
+            except sqlite3.Error:
                 logger.warning("vector_search.index_all: 读取已索引 ID 列表失败", exc_info=True)
                 raise
 
@@ -209,7 +209,7 @@ class VectorSearch:
             except sqlite3.OperationalError:
                 # 表不存在或数据库结构异常，返回 0
                 return 0
-            except Exception:
+            except sqlite3.Error:
                 logger.warning("vector_search.index_all: 读取 memory_entries 失败", exc_info=True)
                 raise
 
@@ -265,7 +265,7 @@ class VectorSearch:
             except sqlite3.OperationalError:
                 # 表不存在或数据库结构异常，返回空结果
                 return []
-            except Exception:
+            except sqlite3.Error:
                 logger.warning("vector_search.search: 读取向量数据失败", exc_info=True)
                 raise
 
@@ -303,7 +303,7 @@ class VectorSearch:
                     return f"{row['task']}: {row['content']}"
             except sqlite3.OperationalError:
                 logger.warning("vector_search._get_entry_text: memory_entries 表不存在或结构异常", exc_info=True)
-            except Exception:
+            except sqlite3.Error:
                 logger.warning("vector_search._get_entry_text: 读取记忆条目文本失败，已忽略并返回空", exc_info=True)
                 raise
         return ""
@@ -320,7 +320,7 @@ class VectorSearch:
                 # 表不存在或数据库结构异常
                 total = 0
                 last_log = None
-            except Exception:
+            except sqlite3.Error:
                 logger.warning("vector_search.stats: 读取统计信息失败", exc_info=True)
                 raise
 
