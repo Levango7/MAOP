@@ -1,11 +1,14 @@
-"""Coverage tests for hook + protocol routers — all POST/GET endpoints.
+"""Coverage tests for the protocol router — all POST/GET endpoints.
 
 Uses isolated MAOP_ROOT + admin role injection + mocked managers.
+
+（原 hook 段已随 ``routers/hook.py`` 的删除同步移除：单数 ``/api/hook/*``
+协议并入复数 ``/api/hooks``，前端全量迁移；对应覆盖见 hooks 相关测试。）
 """
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -24,166 +27,6 @@ def _make_app(*routers) -> TestClient:
     for r in routers:
         app.include_router(r)
     return TestClient(app)
-
-
-# ── Hook ─────────────────────────────────────────────────────────────
-
-@pytest.fixture
-def hook_env(tmp_path, monkeypatch):
-    monkeypatch.setattr("maop.dashboard.routers.hook.MAOP_ROOT", tmp_path)
-    import maop.dashboard.routers.hook as hook_mod
-    hook_mod._hook_mgr = None
-
-    mock_mgr = MagicMock()
-    mock_mgr.register = MagicMock(return_value=SimpleNamespace(
-        model_dump=lambda: {"id": "h1", "event": "on_complete"}
-    ))
-    mock_mgr.unregister = MagicMock(return_value=True)
-    mock_mgr.enable = MagicMock(return_value=True)
-    mock_mgr.disable = MagicMock(return_value=True)
-    mock_mgr.list_hooks = MagicMock(return_value=[
-        SimpleNamespace(model_dump=lambda: {"id": "h1", "event": "on_complete"})
-    ])
-    mock_mgr.get_hook = MagicMock(return_value=SimpleNamespace(
-        model_dump=lambda: {"id": "h1", "event": "on_complete"}
-    ))
-    mock_mgr.trigger = AsyncMock(return_value=[
-        SimpleNamespace(model_dump=lambda: {"ok": True})
-    ])
-    mock_mgr.get_logs = MagicMock(return_value=[{"ts": "2026-01-01", "event": "on_complete"}])
-
-    monkeypatch.setattr("maop.dashboard.routers.hook._get_hook_mgr", lambda: mock_mgr)
-    return mock_mgr
-
-
-@pytest.fixture
-def hook_client(hook_env):
-    from maop.dashboard.routers.hook import router
-    return _make_app(router)
-
-
-class TestHookRegister:
-    def test_missing_event(self, hook_client):
-        resp = hook_client.post("/api/hook/register", json={})
-        assert resp.status_code == 400
-
-    def test_missing_url_and_callback(self, hook_client):
-        resp = hook_client.post("/api/hook/register", json={"event": "on_complete"})
-        assert resp.status_code == 400
-
-    def test_happy_with_url(self, hook_client):
-        resp = hook_client.post(
-            "/api/hook/register",
-            json={"event": "on_complete", "url": "http://example.com"},
-        )
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
-
-    def test_happy_with_callback(self, hook_client):
-        resp = hook_client.post(
-            "/api/hook/register",
-            json={"event": "on_complete", "callback": "some_func"},
-        )
-        assert resp.status_code == 200
-
-
-class TestHookUnregister:
-    def test_missing_id(self, hook_client):
-        resp = hook_client.post("/api/hook/unregister", json={})
-        assert resp.status_code == 400
-
-    def test_happy(self, hook_client):
-        resp = hook_client.post("/api/hook/unregister", json={"id": "h1"})
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
-
-    def test_not_found(self, hook_env, hook_client):
-        hook_env.unregister.return_value = False
-        resp = hook_client.post("/api/hook/unregister", json={"id": "nonexistent"})
-        # R8 fix: 资源未找到应返回 404，而非 200 + status=not_found。
-        assert resp.status_code == 404
-
-
-class TestHookEnable:
-    def test_missing_id(self, hook_client):
-        resp = hook_client.post("/api/hook/enable", json={})
-        assert resp.status_code == 400
-
-    def test_happy(self, hook_client):
-        resp = hook_client.post("/api/hook/enable", json={"id": "h1"})
-        assert resp.status_code == 200
-
-    def test_not_found(self, hook_env, hook_client):
-        hook_env.enable.return_value = False
-        resp = hook_client.post("/api/hook/enable", json={"id": "nonexistent"})
-        # R8 fix: 资源未找到应返回 404，而非 200 + status=not_found。
-        assert resp.status_code == 404
-
-
-class TestHookDisable:
-    def test_missing_id(self, hook_client):
-        resp = hook_client.post("/api/hook/disable", json={})
-        assert resp.status_code == 400
-
-    def test_happy(self, hook_client):
-        resp = hook_client.post("/api/hook/disable", json={"id": "h1"})
-        assert resp.status_code == 200
-
-
-class TestHookList:
-    def test_list_all(self, hook_client):
-        resp = hook_client.get("/api/hook/list")
-        assert resp.status_code == 200
-        assert resp.json()["count"] >= 1
-
-    def test_list_with_event(self, hook_client):
-        resp = hook_client.get("/api/hook/list?event=on_complete")
-        assert resp.status_code == 200
-
-
-class TestHookGet:
-    def test_missing_id(self, hook_client):
-        resp = hook_client.get("/api/hook/get")
-        assert resp.status_code == 400
-
-    def test_happy(self, hook_client):
-        resp = hook_client.get("/api/hook/get?hook_id=h1")
-        assert resp.status_code == 200
-
-    def test_not_found(self, hook_env, hook_client):
-        hook_env.get_hook.return_value = None
-        resp = hook_client.get("/api/hook/get?hook_id=nonexistent")
-        assert resp.status_code == 404
-
-
-class TestHookTrigger:
-    def test_missing_event(self, hook_client):
-        resp = hook_client.post("/api/hook/trigger", json={})
-        assert resp.status_code == 400
-
-    def test_happy(self, hook_client):
-        resp = hook_client.post(
-            "/api/hook/trigger",
-            json={"event": "on_complete", "data": {"x": 1}},
-        )
-        assert resp.status_code == 200
-
-
-class TestHookLogs:
-    def test_logs(self, hook_client):
-        resp = hook_client.get("/api/hook/logs")
-        assert resp.status_code == 200
-
-    def test_logs_with_event(self, hook_client):
-        resp = hook_client.get("/api/hook/logs?event=on_complete")
-        assert resp.status_code == 200
-
-
-class TestHookEvents:
-    def test_events(self, hook_client):
-        resp = hook_client.get("/api/hook/events")
-        assert resp.status_code == 200
-        assert resp.json()["count"] >= 1
 
 
 # ── Protocol ─────────────────────────────────────────────────────────

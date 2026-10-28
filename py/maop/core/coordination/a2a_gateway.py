@@ -76,7 +76,7 @@ class A2AGateway:
 
     async def start(
         self,
-        host: str = "0.0.0.0",
+        host: str = "0.0.0.0",  # nosec B104 — 节点间 A2A 通信需对外监听（同 a2a_transport_server），部署侧用网络策略收敛
         port: int = 9090,
         agent_card_url: str = "",
     ) -> None:

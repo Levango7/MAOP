@@ -47,6 +47,9 @@ NOSEC_INVENTORY: frozenset[str] = frozenset({
     "maop/core/backends/data.py:B608:6",
     "maop/core/backends/image_store.py:B608:2",
     "maop/core/backends/kv_store.py:B608:1",
+    # 2026-10-28 a2a_gateway：A2A 统一门户 start() 的默认监听地址，
+    # 与 a2a_transport_server 同语义——节点间通信需对外监听，部署侧用网络策略收敛。
+    "maop/core/coordination/a2a_gateway.py:B104:1",
     "maop/core/coordination/a2a_transport_server.py:B104:1",
     "maop/core/cost_tracker.py:B608:1",
     "maop/core/mcp/mcp_hub_ops.py:B608:1",
