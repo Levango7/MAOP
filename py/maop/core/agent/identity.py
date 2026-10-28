@@ -45,6 +45,9 @@ CREATE INDEX IF NOT EXISTS idx_agent_identity_name
     ON agent_identity(agent_name);
 """
 
+# 注：查询/删除的 SQL 一律以内联字面量 + `?` 参数绑定的形态写在
+# execute 调用处（无模块级 SQL 变量、无字符串拼接，静态扫描可直读）。
+
 
 class AgentIdentity:
     """Agent 联邦身份映射表.
@@ -107,25 +110,31 @@ class AgentIdentity:
 
     def get_by_card_id(self, card_id: str) -> list[dict[str, Any]]:
         """按 card_id 查询所有关联的 (agent_name, worker_id)。"""
-        return self._query("card_id = ?", (card_id,))
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT agent_name, card_id, worker_id, source, registered_at,"
+                " updated_at FROM agent_identity WHERE card_id = ?",
+                (card_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     def get_by_worker_id(self, worker_id: str) -> list[dict[str, Any]]:
         """按 worker_id 查询所有关联的 (agent_name, card_id)。"""
-        return self._query("worker_id = ?", (worker_id,))
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT agent_name, card_id, worker_id, source, registered_at,"
+                " updated_at FROM agent_identity WHERE worker_id = ?",
+                (worker_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
 
     def get_by_agent_name(self, agent_name: str) -> list[dict[str, Any]]:
         """按 agent_name 查询所有关联的 (card_id, worker_id)。"""
-        return self._query("agent_name = ?", (agent_name,))
-
-    def _query(self, where: str, params: tuple[Any, ...]) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
-                f"""
-                SELECT agent_name, card_id, worker_id, source, registered_at, updated_at
-                FROM agent_identity
-                WHERE {where}
-                """,
-                params,
+                "SELECT agent_name, card_id, worker_id, source, registered_at,"
+                " updated_at FROM agent_identity WHERE agent_name = ?",
+                (agent_name,),
             ).fetchall()
         return [dict(r) for r in rows]
 
@@ -142,20 +151,28 @@ class AgentIdentity:
 
         若 card_id/worker_id 均为空，则移除该 agent_name 下所有映射。
         """
-        clauses = ["agent_name = ?"]
-        params: list[Any] = [agent_name]
-        if card_id is not None:
-            clauses.append("card_id = ?")
-            params.append(card_id)
-        if worker_id is not None:
-            clauses.append("worker_id = ?")
-            params.append(worker_id)
-
         with self._connect() as conn:
-            cursor = conn.execute(
-                f"DELETE FROM agent_identity WHERE {' AND '.join(clauses)}",
-                tuple(params),
-            )
+            if card_id is not None and worker_id is not None:
+                cursor = conn.execute(
+                    "DELETE FROM agent_identity WHERE agent_name = ?"
+                    " AND card_id = ? AND worker_id = ?",
+                    (agent_name, card_id, worker_id),
+                )
+            elif card_id is not None:
+                cursor = conn.execute(
+                    "DELETE FROM agent_identity WHERE agent_name = ? AND card_id = ?",
+                    (agent_name, card_id),
+                )
+            elif worker_id is not None:
+                cursor = conn.execute(
+                    "DELETE FROM agent_identity WHERE agent_name = ? AND worker_id = ?",
+                    (agent_name, worker_id),
+                )
+            else:
+                cursor = conn.execute(
+                    "DELETE FROM agent_identity WHERE agent_name = ?",
+                    (agent_name,),
+                )
             return cursor.rowcount or 0
 
     # ── 便捷：单值解析 ────────────────────────────────────────────
