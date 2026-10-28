@@ -147,6 +147,28 @@
 `Exception("parse boom")` 模拟 `Version()` 失败，收窄后该用例失败 —— 它断言的其实是
 「宽口径」，不是真实异常类型。已改为 `InvalidVersion`（`ValueError` 子类）。
 
+### D8. 分模块推进：`core/scheduling/` 第二批（2026-10-29）
+
+31 处 → 29 处，可静态证明的只有 2 处（这个模块的比例明显低于 `core/agent/`）：
+
+| 站点 | 处理 | 依据 |
+|---|---|---|
+| `distributed_scheduler/_models.py::_json_dumps` | `(TypeError, ValueError, RecursionError)` | `json.dumps(..., default=str)` 已由 `default` 兜住绝大多数对象，剩下的是循环引用（`ValueError`）、键类型非法（`TypeError`）、超深嵌套（`RecursionError`） |
+| `supervisor_status.py::_routing_key_conflict` | **删掉 try/except**，只留 `return None` | `try` 体只有 `return None`，不可能抛异常，是重构残留的死兜底 |
+
+**剩余 29 处的归因**：
+
+| 类别 | 处数 | 代表站点与不可收窄的理由 |
+|---|---|---|
+| `has_await` | 13 | `health_service` 的 4 个探测协程（已登记 D6）、`supervisor_patrol`/`supervisor_health` 的 `asyncio.wait_for(self._ping(...))`、`task_splitter` 的 `provider.chat`、`_failure.py` 的 `detect_failures`、`distributed_checkpoint_coordinator` 的分层检查点写入 |
+| `unknown_call` | 13 | `self._redis.xrange/xadd/xgroup_create/delete`（`_redis: Any` 是注入的协议对象，模块本身不 `import redis`，写 `except redis.RedisError` 会在未装时变 `NameError`）、`self._registry.*` / `self._failure_detector.*` / `self._detector.get_agent_health`、prometheus `gauge.set` / `counter.inc`、`logger.warning` 组合体 |
+| 事件发布 | 3 | `failure_detector` 与 `supervisor_status` 的 `Event(...)` + `publish`/`ensure_future`，异常集取决于 `event_bus` 实现；`task_splitter` 的 `LLMProviderFactory` 解析链同理 |
+
+**一个反直觉的结论**：`core/scheduling/` 的宽口径密度高但可收窄率极低（6.5% vs
+`core/agent/` 的 15%），原因是这一层几乎全部是「调用注入的 registry/redis/detector」——
+异常集由运行时实现决定，静态分析只能证明「不该收窄」。这也说明按模块推进比按类别
+推进更可靠：两类形态在各模块的占比差异很大。
+
 ## 影响
 
 - 新增：`scripts/check_silent_exceptions.py`、`scripts/check_file_size.py`、

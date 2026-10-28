@@ -30,8 +30,8 @@ publish（仅 tag push `v*`；2026-10-06 才补上 tag 触发，见 §3 第 3 �
   - `py/scripts/check_silent_exceptions.py`：静默 `except … pass/continue/...` 必须有
     `# silent-ok: <闭集类别> — <理由>`（或按 ADR-018 记日志）；存量 81 条+47 处
     `contextlib.suppress` 进基线，**双向棘轮**（新增红、基线条目失效也红，只许减）。
-    同一脚本还管**宽口径异常**（ADR-023 D5/D6/D7）：裸 `except:` 一律硬失败；`except Exception`
-    / `except BaseException` 共 1134 处进双向棘轮，新增即红、收窄后必须下调。
+    同一脚本还管**宽口径异常**（ADR-023 D5/D6/D7/D8）：裸 `except:` 一律硬失败；`except Exception`
+    / `except BaseException` 共 1132 处进双向棘轮，新增即红、收窄后必须下调。
   - `py/scripts/check_file_size.py`：单文件 800 行上限，`migrations/` 整体豁免，
     存量 7 个文件 allowlist 带拆分排期、双向一致（拆完必须移除条目）。
   两侧的守卫在 `py/tests/test_quality_gates.py`（变异自证 + 双向一致性 + ci.yml 接线断言）。

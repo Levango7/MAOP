@@ -78,9 +78,11 @@ SUPPRESS_BASELINE = 46
 #: 针对 ``refactor/layering-closeout`` 新增的健康探测/A2A/middleware 代码：5 处实
 #: 收窄、16 处登记为「必须宽口径」。2026-10-29 第三轮：1159 → 1134，
 #: ``core/agent/`` 模块分模块收窄 25 处（yaml/文件读取、json 回读、sqlite CRUD、
-#: 标准库探针），该模块剩余 141 处的归因见 ADR-023 D7。登记条目一旦 try 体缩小到
+#: 标准库探针），该模块剩余 141 处的归因见 ADR-023 D7。同日第四轮：1134 → 1132，
+#: ``core/scheduling/`` 收窄 2 处（json.dumps 兜底、删掉一处只会 ``return None``
+#: 的死 try）。登记条目一旦 try 体缩小到
 #: 只剩 import 或单一已知 API，必须收窄并下调本基线。
-BROAD_EXCEPT_BASELINE = 1134
+BROAD_EXCEPT_BASELINE = 1132
 
 
 def _iter_py_files() -> Iterator[pathlib.Path]:

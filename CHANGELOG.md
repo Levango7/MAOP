@@ -39,6 +39,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 宽口径异常：`core/scheduling/` 模块第二批（2026-10-29）
+
+- `core/scheduling/` 31 处 → 29 处，可静态证明的只有 2 处：
+  `_models.py::_json_dumps` 收窄为 `(TypeError, ValueError, RecursionError)`（`default=str`
+  已兜住绝大多数对象，剩下循环引用/键类型/超深嵌套）；`supervisor_status.py::_routing_key_conflict`
+  删掉只会 `return None` 的死兜底。
+- 剩余 29 处归因见 ADR-023 D8：13 处含 `await` 未知协程（含已登记的 `health_service`
+  4 个探测）、13 处调用注入的 `_redis` / `_registry` / `_detector` / prometheus 句柄
+  （`_redis: Any` 不 `import redis`，收窄会在未装时变 `NameError`）、3 处事件发布。
+- 可收窄率 6.5%，明显低于 `core/agent/` 的 15% —— 调度层几乎全是「调用注入实现」，
+  静态分析只能证明「不该收窄」。
+- `BROAD_EXCEPT_BASELINE` 1134 → 1132。
+
 ### 宽口径异常：`core/agent/` 模块首批收窄（2026-10-29）
 
 - `core/agent/` 166 处 → 141 处，实收窄 **25 处**，全部属于异常集可静态枚举的形态：
