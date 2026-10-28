@@ -84,6 +84,38 @@
 - **不做**：不批量改剩余 1142 处。逐处收窄需要知道每个站点的**预期异常集**，批量
   替换会把真正的宽口径兜底变成漏兜。剩余存量按模块随重构逐步收窄，每收一次降一次基线。
 
+### D6. 合法宽口径的登记与基线校准（2026-10-28 追加，针对 `refactor/layering-closeout`）
+
+该分支新增的「健康探测 / A2A 网关 / middleware 三块拆分」等代码带来一批宽口径
+`except Exception`，门禁随之判红（1142 → 1159）。逐处复核后的处置分两类：
+
+**（一）实收窄 5 处**（异常集可枚举，语义不变）：
+
+| 站点 | 原 try 体 | 收窄为 | 依据 |
+|---|---|---|---|
+| `distributed_scheduler/_scheduler.py` 顶部两个可选依赖守卫 | 只有 `from ... import X` | `except ImportError` | try 体无其它语句 |
+| `health_service.py` `_cli_ping` 的 `subprocess.run` 兜底 | `subprocess.run([cli_path, "--version"], ...)` | `(OSError, ValueError, subprocess.SubprocessError)` | 上一分支已捕 `TimeoutExpired`/`FileNotFoundError`；`run()` 的剩余异常集就是这三个 |
+| `health_service.py` `_tcp_ping` 的 `wait_closed()` | `await writer.wait_closed()` | `(OSError, RuntimeError)` | 关闭回执只会抛连接类 `OSError` 或「事件循环已关闭」`RuntimeError` |
+| `ws_dag.py` `_log_task_exc` 回调用 `t.exception()` | `t.exception()`（`t.cancelled()` 已先判） | `asyncio.InvalidStateError` | 任务已取消时抛的是 `CancelledError`（`BaseException` 子类，原宽口径根本抓不到），能抓到的只有未完成时的 `InvalidStateError` |
+
+**（二）登记为合法宽口径 16 处**（无法静态枚举异常集，必须宽口径；逐条判据）：
+
+| 文件 | 处数 | 判据 |
+|---|---|---|
+| `core/scheduling/health_service.py` | 5 | 4 处是 `await` 探测协程（`probe_all_enabled` / `wait_for(to_thread(_cli_ping))` / `_http_ping` / `_tcp_ping`）——协程可抛任意异常，且探测循环**必须**不因单节点异常退出；1 处 `catalog.update_health()` 是未知对象的持久化方法（DB 驱动异常集不可枚举） |
+| `core/coordination/a2a_gateway.py` | 5 | 4 处是 `await bridge/server.start()|stop()`（第三方传输实现的 lifeycle 钩子），1 处 `await client.send(...)` 需要把任意失败转成 A2A 协议错误响应 |
+| `core/security/middleware/_auth.py` | 3 | 2 处认证链同时含 `await call_next()` 与 `auth_checker.validate()` 等未知对象方法，且必须把失败落成 500 而非让中间件崩溃；1 处 `mgr.record_usage()` 是用量记录 best-effort |
+| `core/security/middleware/_protection.py` | 2 | 1 处 `import redis` + `Redis.from_url` + `ping`（redis 可能未安装，写 `except redis.RedisError` 会在未导入时 `NameError`），1 处 `self._redis_check()` 失败需降级到内存限流 |
+| `delegate/dispatch_core.py` | 1 | 健康门禁（`AgentCatalog.default()` + `get_failure_detector()` + `get_weight()`）是**显式 non-blocking**：门禁自身不可用不得阻断派发 |
+
+- **基线校准**：`BROAD_EXCEPT_BASELINE` 1142 → 1159，双向仍然成立（再新增仍红，
+  再收窄则须下调）。校准依据就是上表：1142（本分支之前）+ 16（登记）+ 1（并发改动）= 1159。
+- **为什么不加 `# broad-except-ok:` 标记**：silent 标记解决的是「处理器里没有任何痕迹」，
+  需要逐点注释；宽口径的两类合法形态（`await` 未知协程、第三方库未知异常集）是**判据**
+  而非逐点理由，用一张登记表更适合复核；且逐点标记会与本分支在途改动频繁冲突。
+- **复核条件**：若某处 `try` 体缩小到只剩 import / 单一已知 API，必须收窄并下调基线；
+  新增宽口径若不属于上表两类，一律红。
+
 ## 影响
 
 - 新增：`scripts/check_silent_exceptions.py`、`scripts/check_file_size.py`、

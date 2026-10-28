@@ -278,7 +278,10 @@ class HealthService:
         except (subprocess.TimeoutExpired, FileNotFoundError):
             latency_ms = int((time.monotonic() - start) * 1000)
             return (False, latency_ms)
-        except Exception:
+        except (OSError, ValueError, subprocess.SubprocessError):
+            # 与上一分支同处置，但保留可区分的异常集：CLI 缺失/不可执行是 OSError，
+            # creationflags 等参数不合法是 ValueError，其余 subprocess 故障是
+            # SubprocessError。原来的 ``except Exception`` 会连编程错误一起吞掉。
             latency_ms = int((time.monotonic() - start) * 1000)
             return (False, latency_ms)
 
@@ -301,7 +304,9 @@ class HealthService:
         writer.close()
         try:
             await writer.wait_closed()
-        except Exception:
+        except (OSError, RuntimeError):
+            # wait_closed 实际只抛 OSError（连接被重置/管道断裂）与 RuntimeError
+            # （事件循环已关闭）；收窄后不再吞掉不相关的编程错误。
             pass  # silent-ok: best-effort-cleanup — writer 已 close，关闭回执失败不影响探测结果
         latency_ms = int((time.monotonic() - start) * 1000)
         return (True, latency_ms)

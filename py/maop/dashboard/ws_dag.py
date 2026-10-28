@@ -133,7 +133,7 @@ def _cleanup_dag_ws(
             exc = t.exception()
             if exc is not None:
                 logger.exception("[dag-ws] background task failed: %r", exc)
-        except Exception:  # pragma: no cover — defensive
+        except asyncio.InvalidStateError:  # pragma: no cover — defensive
             pass  # silent-ok: defensive-probe — 异常日志回调自身失败不再外抛
 
     for task in (heartbeat_task, push_task):

@@ -39,10 +39,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 宽口径异常登记与基线校准（2026-10-28，`refactor/layering-closeout`）
+
+- **实收窄 5 处**：`distributed_scheduler/_scheduler.py` 顶部两个可选依赖守卫改
+  `except ImportError`；`health_service.py` 的 `subprocess.run` 兜底收窄为
+  `(OSError, ValueError, subprocess.SubprocessError)`、`wait_closed()` 收窄为
+  `(OSError, RuntimeError)`；`ws_dag.py` 任务回调的 `t.exception()` 收窄为
+  `asyncio.InvalidStateError`（任务已取消时抛的是 `CancelledError`，原宽口径本就没抓到）。
+- **登记为合法宽口径 16 处**（ADR-023 D6 逐条判据）：健康探测的 4 个 `await` 调用、
+  A2A 网关的 `bridge/server.start()|stop()` 与 `client.send()`、middleware 认证链与用量记录、
+  redis 可选依赖探测与限流降级、派发健康门禁（显式 non-blocking）。这些站点的 `try` 体
+  含 `await` 未知协程或第三方库未知异常集，不存在可静态证明的异常集。
+- **基线校准**：`BROAD_EXCEPT_BASELINE` 1142 → 1159，双向棘轮语义不变（再新增仍红，
+  再收窄须下调）；复核条件见 ADR-023 D6。
+
 ### 阶段三：异常收敛 / 租户权威归属 / WS 推送降级显式化（2026-10-28）
 
 - **宽口径异常进入门禁**（ADR-023 D5）：`check_silent_exceptions.py` 新增裸 `except:`
-  硬失败 + `except Exception`/`except BaseException` 双向棘轮（`BROAD_EXCEPT_BASELINE=1142`）。
+  硬失败 + `except Exception`/`except BaseException` 双向棘轮（`BROAD_EXCEPT_BASELINE`，
+  本轮为 1142，后经 D6 校准至 1159）。
   实测存量 1156 处宽口径 + 2 处裸 `except:`。本轮实收窄 **14 处**——所有「`try` 体只有
   `import`」的可选依赖守卫改 `except ImportError`（`mcp_hub_metrics` / `mcp_cache` /
   `mcp_concurrency` / `agent_scanner` / `multimodal` 等），零语义风险；剩余 1142 处按模块

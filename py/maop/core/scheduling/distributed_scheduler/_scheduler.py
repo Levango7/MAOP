@@ -41,12 +41,12 @@ from maop.core.scheduling.worker_pool import WorkerRegistry
 
 try:  # AgentIdentity 联邦映射（阶段1：身份与健康）
     from maop.core.agent.identity import get_agent_identity
-except Exception:  # pragma: no cover - 导入失败不应阻塞调度器
+except ImportError:  # pragma: no cover - 导入失败不应阻塞调度器
     get_agent_identity = None  # type: ignore[assignment]
 
 try:  # AgentCatalog 健康标志（阶段1：身份与健康）
     from maop.core.agent.registry.agent_catalog import AgentCatalog
-except Exception:  # pragma: no cover - 导入失败不应阻塞调度器
+except ImportError:  # pragma: no cover - 导入失败不应阻塞调度器
     AgentCatalog = None  # type: ignore[assignment,misc]
 
 if TYPE_CHECKING:
