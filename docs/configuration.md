@@ -486,7 +486,7 @@
 ### 已隔离
 
 请求侧的租户身份来自 **JWT claim** → 认证中间件写入 `request.state.tenant_id`
-（`py/maop/core/security/middleware.py`）。读它的入口已收口到**唯一实现**
+（`py/maop/core/security/middleware/_auth.py`）。读它的入口已收口到**唯一实现**
 `py/maop/core/tenant/context.py`：
 
 - `tenant_id_from_request(request)` —— 软读，缺省空串（单租户/个人版）；
@@ -619,7 +619,7 @@ CLI run / dashboard DAG / chat 流式回退三个入口共享同一次检查。�
 **按拒绝处理**（fail-closed，退出码 126）。所以顺序不能反：先开关、后加规则 = 立即停摆。
 
 规则只有运营入口，没有 CLI —— dashboard API（需 admin/superadmin 角色，见
-`py/maop/core/security/middleware.py` 的 `require_admin()`）：
+`py/maop/core/security/middleware/_auth.py` 的 `require_admin()`）：
 
 ```bash
 curl -X POST http://<host>/api/permission/rules \
