@@ -258,7 +258,7 @@ async def set_quota(
     return {"status": "ok", "quota": quota}
 
 
-@router.get("/{tenant_id}", include_in_schema=False, deprecated=True)
+@router.get("/{tenant_id}", deprecated=True)
 @handle_api_errors
 async def list_quotas(
     tenant_id: str, request: Request,
@@ -274,7 +274,7 @@ async def list_quotas(
     }
 
 
-@router.get("/{tenant_id}/{resource}", include_in_schema=False, deprecated=True)
+@router.get("/{tenant_id}/{resource}", deprecated=True)
 @handle_api_errors
 async def get_quota(
     tenant_id: str, resource: str, request: Request,
@@ -291,7 +291,7 @@ async def get_quota(
     return {"status": "ok", "quota": quota}
 
 
-@router.put("/{tenant_id}/{resource}", include_in_schema=False, deprecated=True)
+@router.put("/{tenant_id}/{resource}", deprecated=True)
 @handle_api_errors
 async def update_quota(
     tenant_id: str, resource: str,
@@ -314,7 +314,7 @@ async def update_quota(
     return {"status": "ok", "quota": quota}
 
 
-@router.delete("/{tenant_id}/{resource}", include_in_schema=False, deprecated=True)
+@router.delete("/{tenant_id}/{resource}", deprecated=True)
 @handle_api_errors
 async def delete_quota(
     tenant_id: str, resource: str, request: Request,
@@ -332,7 +332,7 @@ async def delete_quota(
 # ── 使用量端点(三段路径,不与二段冲突) ────────────────────────────
 
 
-@router.get("/{tenant_id}/{resource}/usage", include_in_schema=False, deprecated=True)
+@router.get("/{tenant_id}/{resource}/usage", deprecated=True)
 @handle_api_errors
 async def get_usage(
     tenant_id: str, resource: str, request: Request,
@@ -344,7 +344,7 @@ async def get_usage(
     return {"status": "ok", "usage": usage}
 
 
-@router.post("/{tenant_id}/{resource}/usage", include_in_schema=False, deprecated=True)
+@router.post("/{tenant_id}/{resource}/usage", deprecated=True)
 @handle_api_errors
 async def update_usage(
     tenant_id: str, resource: str,
@@ -359,7 +359,7 @@ async def update_usage(
     return {"status": "ok", "used": used}
 
 
-@router.put("/{tenant_id}/{resource}/usage", include_in_schema=False, deprecated=True)
+@router.put("/{tenant_id}/{resource}/usage", deprecated=True)
 @handle_api_errors
 async def set_usage(
     tenant_id: str, resource: str,
@@ -374,7 +374,7 @@ async def set_usage(
     return {"status": "ok", "used": used}
 
 
-@router.post("/{tenant_id}/{resource}/reset-usage", include_in_schema=False, deprecated=True)
+@router.post("/{tenant_id}/{resource}/reset-usage", deprecated=True)
 @handle_api_errors
 async def reset_usage(
     tenant_id: str, resource: str, request: Request,
@@ -389,7 +389,7 @@ async def reset_usage(
 # ── 配额检查端点 ──────────────────────────────────────────────────
 
 
-@router.post("/{tenant_id}/{resource}/check", include_in_schema=False, deprecated=True)
+@router.post("/{tenant_id}/{resource}/check", deprecated=True)
 @handle_api_errors
 async def check_quota(
     tenant_id: str, resource: str,
@@ -402,7 +402,7 @@ async def check_quota(
     return {"status": "ok", "result": result}
 
 
-@router.post("/{tenant_id}/{resource}/consume", include_in_schema=False, deprecated=True)
+@router.post("/{tenant_id}/{resource}/consume", deprecated=True)
 @handle_api_errors
 async def consume_quota(
     tenant_id: str, resource: str,

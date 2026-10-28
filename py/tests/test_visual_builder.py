@@ -230,7 +230,10 @@ def test_hints_with_no_data_are_structurally_complete() -> None:
     assert out["suggestions"] == []
     assert out["top_waste_agent"] == ""
     assert out["budget_remaining_pct"] == 100.0
-    assert out["cache_hit_rate"] is None, "TODO 未接线：必须是显式 None，不能编造命中率"
+    # 2026-10-28 契约更新：cache_hit_rate 已接 SemanticCache.stats()（089897a 消除
+    # TODO）。空缓存是**真实值 0.0**（hits/(hits+misses) 分母为 0 时返回 0.0），
+    # 不再是未接线期的 None；结构的完整性由其余三键继续把守。
+    assert out["cache_hit_rate"] == 0.0, "必须是真实统计值，不能是 None 或编造值"
 
 
 def test_top_spender_agent_gets_a_downgrade_suggestion_with_60pct_estimate() -> None:

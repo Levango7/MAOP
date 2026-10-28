@@ -111,14 +111,11 @@ async def disconnect_server(server_name: str, request: Request) -> dict[str, Any
     return await plugin_service.disconnect_server(server_name)
 
 
-@router.get("", response_model=ServerListEnvelope)
-@handle_api_errors
-async def mcp_root(request: Request) -> dict[str, Any]:
-    """GET /api/mcp — 聚合返回 servers 列表与计数，供前端 Tools.vue 根路径调用。"""
-    require_admin(request)
-    result = plugin_service.list_servers()
-    return {"status": "ok", **result}
-
+# 注：``GET /api/mcp``（根）由 ``routers/data.py`` 的 combined 端点提供
+# （McpCombinedEnvelope，Tools.vue 消费其 server_count/tool_count 形状）。
+# 2026-10-28 移除本文件一度重复添加的同路径根端点 —— 双注册时先挂载的
+# data 路由器遮蔽后者（在测试夹具的相反顺序下则反向遮蔽），行为随挂载
+# 顺序漂移；单一所有者消除歧义。
 
 @router.get("/servers", response_model=ServerListEnvelope)
 @handle_api_errors
