@@ -61,6 +61,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   随后台任务门控启停（多 worker 下 N 条桥无新信息量）；`KNOWN_ORPHANS`
   对应条目销账；接线测试扩到 6 例。至此分层计划"九大问题"表全部收口。
 
+### 企业版棘轮 31 → 14：tenant / rbac / quotas 17 条端点建模（2026-10-30）
+
+- 三条在仓内企业路由（`FeatureFlag` 门控，不装企业包也能导入）补上
+  `response_model`：tenant 5 / rbac 5 / quotas 7。新增
+  `routers/{tenant,rbac,quotas}_schemas.py` 作为**线缆形状镜像**——企业包在纯净
+  CI 检出里不存在，直接复用它的模型会让 router 不可导入、OpenAPI 反而没有类型。
+- 棘轮：`enterprise_response_model_allowlist.txt` 31 → 14，`RATCHET_CAP` 同步。
+  剩下的 14 条全在 sso / n8n / licenses：那三个 router 模块级导入商业 overlay，
+  改动需要 MAOS 侧提交 + 重签完整性清单，单列一批而不是留着当尾巴。
+- 新增 `tests/test_enterprise_router_contracts.py`（21 例）：
+  - OpenAPI 类型 + "已建模却仍在 allowlist"双向守卫；
+  - 17 条端点**真跑**，逐键比对信封与条目；
+  - **生产端对账**：服务层（真代码）返回的键 vs 镜像模型 —— `response_model`
+    会把未声明的键静默丢掉，只看线缆断言发现不了这种漂移；
+  - 反向守卫：服务少给必填键必须是 500，不许用默认值把空值说成数据；
+  - 装了企业包时逐字段对账镜像模型（纯净 CI 下显式跳过这一条，其余照跑）。
+- 替身边界写清：管理器与枚举用替身（overlay 在 CI 装不上），服务层、路由层、
+  `response_model` 全是真代码；DB 指向 `tmp_path`，不写脏开发机 `data/maop.db`。
+  同一 router 里前端没在调用的 CRUD 端点保持原样，不借这一批顺手改契约。
+- 变异反证 4 例（去掉 response_model / 服务多吐一个键 / 必填键加默认值 /
+  allowlist 回填已建模行）全红，文件按 SHA256 逐字节复原。
+- 验证：新契约 21 例 + 棘轮 7 例绿；纯净 CI 复刻（硬拦 overlay）26 passed /
+  1 skipped；存量 enterprise 相关 115 例 + router smoke 576 例无回归；ruff 0 条。
+
 ### 分层收官批：middleware 子包化 + lifespan 接线（2026-10-28）
 
 - **`core/security/middleware.py` 1188 行 → 六文件子包**：`_auth`（AuthMiddleware
