@@ -459,6 +459,8 @@ class CostTracker:
         actual_tokens_in: int = 0,
         actual_tokens_out: int = 0,
         estimated_cost: float = 0.0,
+        agent: str = "",
+        phase: str = "",
     ) -> dict[str, Any]:
         """Post-execution cost reconciliation.
 
@@ -468,7 +470,11 @@ class CostTracker:
         This method provides API compatibility with the legacy
         ``maop.model.budget.BudgetGuard.record_actual_cost`` so that
         ``maop_loop`` can use ``CostTracker`` as the single source of
-        truth for cost data (P2-1: 成本双写统一).
+        truth for cost data (P2-1: 成本双写统一)。
+
+        ``agent`` / ``phase``（2026-10-29，M-X3 归属）：写入归属维度，供
+        ``core.cost_attribution`` 按 agent/phase 聚合；空值不写 phase 元数据
+        （聚合侧记 unattributed），旧调用方零改动。
         """
         # Calculate actual cost from the pricing table; fall back to
         # the caller's estimate when the model is not in the table.
@@ -476,15 +482,20 @@ class CostTracker:
         if actual_cost == 0.0:
             actual_cost = estimated_cost
 
+        metadata: dict[str, Any] = {
+            "trace_id": trace_id,
+            "provider": provider,
+            "estimated_cost": estimated_cost,
+        }
+        if phase:
+            metadata["phase"] = phase
+
         self.record(
+            agent=agent,
             model=model,
             prompt_tokens=actual_tokens_in,
             completion_tokens=actual_tokens_out,
-            metadata={
-                "trace_id": trace_id,
-                "provider": provider,
-                "estimated_cost": estimated_cost,
-            },
+            metadata=metadata,
         )
 
         discrepancy = round(actual_cost - estimated_cost, 6)

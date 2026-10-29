@@ -167,3 +167,15 @@
   否则 `app-icon-registry.test.js` 会红。新文案必须同时落 en/zh，
   否则 `i18n-coverage.test.js` 会红。三条都是本次新加的，**改前端前先看这三条**。
 - **不碰**：`py/**`、`.github/**`、`routers/*_schemas.py`、MAOS 仓。
+## 领地登记（ZCode session_f62ccbe…，2026-10-29 第五轮：M-X3 成本归因 M0）
+
+- **进行中**：ROADMAP「M-X3 细粒度成本归因」M0 后端切片（章程见 #177）。
+  领地=新建 `py/maop/core/cost_attribution.py` + `py/maop/core/cost_tracker.py`
+  的 `record_actual_cost` 可选参数（加 `agent`/`phase`，向后兼容）+ 
+  `py/maop/maop_loop_phases.py` 对账调用点（补归属）+ 新测试 + CHANGELOG。
+  分支 `feat/cost-attribution-m0`，worktree `F:/Nexus/MAOP-cost`。
+- **顺延说明**：dashboard 端点/视图切片不本批做（`routers/` 面正处他线
+  response-model 批次）；待其落地后立第二小批。
+- **他线注意**：若宽口径异常收窄批排到 `core/cost_tracker.py` /
+  `maop_loop_phases.py`，两文件本批各有 1 处调用点新增（无 except 改动），
+  冲突面小；先动者在本表回一行。
