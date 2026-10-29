@@ -420,6 +420,9 @@ class PhasesMixin:
                 trace_id=trace_id, model=model_name, provider=provider,
                 actual_tokens_in=est_tokens_in, actual_tokens_out=est_tokens_out,
                 estimated_cost=estimated_cost,
+                # M-X3 归属：成本条目带上 agent 与执行阶段，供三维成本归因聚合；
+                # 此前这两维在账面上是空的（聚合侧只能记 unattributed）。
+                agent=exec_result.agent or "", phase="execute",
             )
             record_run_event(
                 trace_id, "run.cost", agent=exec_result.agent or "",
