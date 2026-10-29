@@ -28,7 +28,7 @@ export const nav = [
   { section: 'nav.group.run' },
   { to: '/run', label: 'nav.run', icon: 'play', subtitle: 'nav.run.subtitle', matchPaths: ['/control', '/chat'] },
   { to: '/run/agents', label: 'nav.dispatch', icon: 'route', subtitle: 'nav.dispatch.subtitle', matchPaths: ['/agents'] },
-  { to: '/run/workflow', label: 'nav.workflow', icon: 'git-branch', subtitle: 'nav.workflow.subtitle', matchPaths: ['/workflow-editor'] },
+  { to: '/run/workflow', label: 'nav.workflow', icon: 'layers', subtitle: 'nav.workflow.subtitle', matchPaths: ['/workflow-editor'] },
 
   // ── 记忆 ─────────────────────────────────────────────────────
   { section: 'nav.group.memory' },
@@ -41,15 +41,15 @@ export const nav = [
   { to: '/capability/agents', label: 'nav.agents', icon: 'bot', subtitle: 'nav.agents.subtitle' },
   { to: '/capability/skills', label: 'nav.skills', icon: 'beaker', subtitle: 'nav.skills.subtitle', matchPaths: ['/tools', '/skill-editor'] },
   { to: '/capability/market', label: 'nav.skillMarket', icon: 'archive', subtitle: 'nav.skillMarket.subtitle', matchPaths: ['/skill-market'] },
-  { to: '/capability/models', label: 'nav.models', icon: 'gauge', subtitle: 'nav.models.subtitle', matchPaths: ['/models'] },
+  { to: '/capability/models', label: 'nav.models', icon: 'database', subtitle: 'nav.models.subtitle', matchPaths: ['/models'] },
   { to: '/capability/evolve', label: 'nav.evolve', icon: 'sparkles', subtitle: 'nav.evolve.subtitle', matchPaths: ['/evolve', '/evolution-history'] },
   // ── 能力扩展：工具/插件/代理编排 ──
   { to: '/capability/mcp', label: 'nav.mcp', icon: 'plug', subtitle: 'nav.mcp.subtitle' },
   { to: '/capability/plugins', label: 'nav.plugins', icon: 'box', subtitle: 'nav.plugins.subtitle' },
-  { to: '/capability/subagents', label: 'nav.subagents', icon: 'bot', subtitle: 'nav.subagents.subtitle' },
-  { to: '/capability/routing', label: 'nav.routing', icon: 'route', subtitle: 'nav.routing.subtitle' },
+  { to: '/capability/subagents', label: 'nav.subagents', icon: 'cpu', subtitle: 'nav.subagents.subtitle' },
+  { to: '/capability/routing', label: 'nav.routing', icon: 'filter', subtitle: 'nav.routing.subtitle' },
   { to: '/capability/scheduling', label: 'nav.scheduling', icon: 'clock', subtitle: 'nav.scheduling.subtitle' },
-  { to: '/capability/protocols', label: 'nav.protocols', icon: 'share2', subtitle: 'nav.protocols.subtitle' },
+  { to: '/capability/protocols', label: 'nav.protocols', icon: 'radio', subtitle: 'nav.protocols.subtitle' },
   { to: '/capability/worktrees', label: 'nav.worktrees', icon: 'git-compare', subtitle: 'nav.worktrees.subtitle' },
   { to: '/capability/agent-proxy', label: 'nav.agentProxy', icon: 'arrow-left-right', subtitle: 'nav.agentProxy.subtitle' },
   // ── 2026-10-29 补齐：以下 4 个页面此前只有路由、没有导航入口 ──
@@ -72,8 +72,8 @@ export const nav = [
 
   // ── 运维 ─────────────────────────────────────────────────────
   { section: 'nav.group.operate' },
-  { to: '/operate', label: 'nav.monitor', icon: 'activity', subtitle: 'nav.monitor.subtitle' },
-  { to: '/operate/logs', label: 'nav.logs', icon: 'scroll', subtitle: 'nav.logs.subtitle' },
+  { to: '/operate', label: 'nav.monitor', icon: 'heart-pulse', subtitle: 'nav.monitor.subtitle' },
+  { to: '/operate/logs', label: 'nav.logs', icon: 'file-text', subtitle: 'nav.logs.subtitle' },
   { to: '/operate/tracing', label: 'nav.observability', icon: 'zap', subtitle: 'nav.observability.subtitle', matchPaths: ['/observability'] },
   { to: '/operate/cost', label: 'nav.cost', icon: 'dollar', subtitle: 'nav.cost.subtitle' },
   // ── 运维扩展：协作/告警/集成 ──
@@ -89,24 +89,24 @@ export const nav = [
 
   // ── 反馈（IA 新增组：用户反馈评价）────────────────────────────
   { section: 'nav.group.feedback' },
-  { to: '/feedback', label: 'nav.feedback', icon: 'message-square', subtitle: 'nav.feedback.subtitle' },
+  { to: '/feedback', label: 'nav.feedback', icon: 'star', subtitle: 'nav.feedback.subtitle' },
 
   // ── 管理（企业版；个人版整组隐藏）─────────────────────────────
   { section: 'nav.group.admin', enterprise: true },
   { to: '/users', label: 'nav.users', icon: 'user', subtitle: 'nav.users.subtitle', enterprise: true },
-  { to: '/audit', label: 'nav.audit', icon: 'clipboard', subtitle: 'nav.audit.subtitle', enterprise: true },
+  { to: '/audit', label: 'nav.audit', icon: 'history', subtitle: 'nav.audit.subtitle', enterprise: true },
   { to: '/rbac', label: 'nav.rbac', icon: 'shield', subtitle: 'nav.rbac.subtitle', enterprise: true },
   { to: '/tenants', label: 'nav.tenants', icon: 'building', subtitle: 'nav.tenants.subtitle', enterprise: true },
   { to: '/quotas', label: 'nav.quotas', icon: 'gauge', subtitle: 'nav.quotas.subtitle', enterprise: true },
-  { to: '/apikeys', label: 'nav.apikeys', icon: 'link', subtitle: 'nav.apikeys.subtitle', enterprise: true },
-  { to: '/sso', label: 'nav.sso', icon: 'plug', subtitle: 'nav.sso.subtitle', enterprise: true },
-  { to: '/licenses', label: 'nav.licenses', icon: 'shield', subtitle: 'nav.licenses.subtitle', enterprise: true },
+  { to: '/apikeys', label: 'nav.apikeys', icon: 'lock', subtitle: 'nav.apikeys.subtitle', enterprise: true },
+  { to: '/sso', label: 'nav.sso', icon: 'log-in', subtitle: 'nav.sso.subtitle', enterprise: true },
+  { to: '/licenses', label: 'nav.licenses', icon: 'check-circle', subtitle: 'nav.licenses.subtitle', enterprise: true },
 
   // ── 设置（TopBar 齿轮直达；侧边栏保留入口方便直达）────────────
   { section: 'nav.group.system' },
   { to: '/settings', label: 'nav.settings', icon: 'gear', subtitle: 'nav.settings.subtitle' },
-  { to: '/notifications', label: 'nav.notifications', icon: 'message-square', subtitle: 'nav.notifications.subtitle' },
-  { to: '/notifications/config', label: 'nav.notificationConfig', icon: 'gear', subtitle: 'nav.notificationConfig.subtitle' },
+  { to: '/notifications', label: 'nav.notifications', icon: 'inbox', subtitle: 'nav.notifications.subtitle' },
+  { to: '/notifications/config', label: 'nav.notificationConfig', icon: 'wrench', subtitle: 'nav.notificationConfig.subtitle' },
   { to: '/docs', label: 'nav.docs', icon: 'book-open', subtitle: 'nav.docs.subtitle' },
 ];
 

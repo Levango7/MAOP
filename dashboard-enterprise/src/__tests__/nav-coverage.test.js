@@ -40,8 +40,7 @@ function parseRoutes() {
   return routes;
 }
 
-/** 从 nav.js 取出所有入口路径：to 与 matchPaths（旧路由别名）。 */
-function parseNavTargets() {
+/** 从 nav.js 取出所有入口路径：to 与 matchPaths（旧路由别名）。 */function parseNavTargets() {
   const text = fs.readFileSync(NAV, 'utf-8');
   const targets = new Set();
   for (const m of text.matchAll(/to:\s*'([^']+)'/g)) targets.add(m[1]);
@@ -104,6 +103,31 @@ describe('nav coverage', () => {
     ).toEqual([]);
   });
 
+  it('every nav entry uses a distinct icon', () => {
+    // 2026-10-29 用户反馈："左侧任务栏存在图标未去重，AI 味道严重，有些菜单选项的
+    // 图标和其他菜单选项的图标重合了"。实测 51 个入口只用了 37 个图标，
+    // 14 处重合（message-square 用了 3 次，scroll/route/git-branch/bot/gauge/
+    // plug/share2/activity/clipboard/link/shield/gear 各 2 次）。
+    // 去重后 51 个入口 51 个图标。这条用例防止新增菜单时又随手复用图标。
+    const text = fs.readFileSync(NAV, 'utf-8');
+    const byIcon = new Map();
+    for (const line of text.split('\n')) {
+      const to = line.match(/to:\s*'([^']+)'/);
+      const icon = line.match(/icon:\s*'([^']+)'/);
+      if (!to || !icon) continue;
+      if (!byIcon.has(icon[1])) byIcon.set(icon[1], []);
+      byIcon.get(icon[1]).push(to[1]);
+    }
+    const dupes = [...byIcon.entries()]
+      .filter(([, routes]) => routes.length > 1)
+      .map(([icon, routes]) => `${icon} x${routes.length}: ${routes.join(', ')}`);
+
+    expect(
+      dupes,
+      `侧边栏图标重复会让每个菜单看起来都一样：\n  ${dupes.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
   it('has no dangling nav entry pointing at a nonexistent route', () => {
     const paths = new Set(parseRoutes().map((r) => r.path));
     const dangling = [...parseNavTargets()].filter((t) => !paths.has(t));
@@ -114,6 +138,12 @@ describe('nav coverage', () => {
     // 防止正则失效导致上面两个用例空转变绿 —— 这类守卫最容易死在"永远为真"上
     expect(parseRoutes().length).toBeGreaterThan(60);
     expect(parseNavTargets().size).toBeGreaterThan(50);
+    // 图标去重用例也要真有 50+ 条带图标的项，否则它同样是空转
+    const text = fs.readFileSync(NAV, 'utf-8');
+    const withIcon = text
+      .split('\n')
+      .filter((l) => /to:\s*'/.test(l) && /icon:\s*'/.test(l));
+    expect(withIcon.length).toBeGreaterThan(45);
   });
 
   it('every exempt path still exists as a route', () => {
