@@ -391,16 +391,20 @@
 
 ### M-T3.3 原生 K8s Operator（M0 章程）
 
-- 现状：`deploy/k8s/operator/` 只有规划中的 API 形状——无 kopf/kubernetes-client
-  controller 实现；`ghcr.io/maop/operator` 无构建来源、未构建；
-  `test_k8s_operator.py` 仅断言文件存在性 + 3 个 skip 占位（G-17 结论未变）。
-- M0 范围：kopf operator 骨架（watch `MaopTask` CRD → 拉起 `maop run` 子进程 →
-  回写 status）+ CRD 与 Chart 打包 + operator 镜像 Dockerfile 与 CI 构建腿
-  （build-only，不部署）+ mock k8s 单测/集成测（不依赖真集群）。
-- M0 验收：mock 链路（MaopTask→子进程→status 回写）测试全绿；结构测试从
-  skip 翻为真断言；operator 镜像在 CI 构建成功。**真集群 kind 验证不进 M0**
-  （设为后续里程碑——本机与 runner 均无常驻 K8s，属外部条件）。
-- 阻碍位置：无外部依赖，纯工程量。
+- 现状（2026-10-30 更新）：**M0 第一刀已交付**——controller 骨架
+  `py/maop/operator/`（spec 校验/状态机/注入式 controller/kopf 薄层）+
+  `deploy/k8s/operator/Dockerfile`（解决镜像无构建来源）+ CI build-only 腿 +
+  `tests/test_operator_m0.py` 15 例（mock 链路全绿；`test_spec_matches_crd_schema`
+  与 CRD YAML 机器对齐）。结构断言现状修正：既有测试并非"仅文件存在性"——
+  2026-09-28 起已有分层套件（28 passed/8 skipped 当时），skip 为缺
+  helm/kubectl/集群的环境条件，multi-tenant/plugin/RLS 占位属 planned 特性。
+- M0 余量：CI 镜像构建腿首跑确认（合并后 master push 触发）；`spec.agent` →
+  MaopAgent CR 解析、turn 预算、配额/多租户 = 后续里程碑。
+- M0 验收：mock 链路（MaopTask→子进程→status 回写）测试全绿 ✅；结构对齐
+  哨兵上线 ✅；operator 镜像在 CI 构建成功 ⏳（合并后验证）。
+  **真集群 kind 验证不进 M0**（外部条件）。
+- 阻碍位置：无外部依赖，纯工程量。已知本地环境干扰：可达其他项目的 kind
+  集群时既有集成用例会误连（详见 CHANGELOG 2026-10-30 条目）。
 
 ### M-X1 Agent Marketplace 签名校验（M0 章程）
 
