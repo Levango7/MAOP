@@ -160,6 +160,20 @@ CI 里这条门禁正处于"被连坐跳过"状态，所以没人看见。**已�
 - `test_enterprise_integration.py::TestSAMLIntegration::test_saml_handler_parses_real_signed_response`
   也 `from maop.enterprise.saml_handler import ...`，上一笔只给同类另外两条加了守卫
   （它在按文件跑的复扫里被 `xmlsec` 的 importorskip 顺带跳过，整轮跑才暴露）。补齐。
+### M-X3 细粒度成本归因 M0（后端，2026-10-29）
+
+- **`core/cost_attribution.py`（新）**：按 agent / phase / model 三维聚合
+  （`attribution_summary`，复用 `CostTracker.get_entries`，与原始记录逐条同源）
+  + 预算阈值告警（`check_budget_thresholds` / `emit_budget_alerts`，经
+  `alert_ingest` 通道以 Alertmanager 形状落库，receiver=`cost-attribution`，
+  重复上报按 fingerprint 去重）。phase 缺失显式记 `unattributed` 桶，不摊相位。
+- **归属修线**：`CostTracker.record_actual_cost` 增可选 `agent` / `phase`
+  （旧调用方零改动）；maop_loop 的执行期对账点开始写入 `agent` + `phase="execute"`
+  —— 此前成本条目的 agent/phase 两维在账面上是空的。
+- 测试 `tests/test_cost_attribution.py` 6 例：聚合与手算子集逐条对齐 / 未归属桶 /
+  归属接线（含旧调用零破坏）/ 未配置不告警 / 严重度分档 / 告警落库与去重。
+- **M0 边界**（章程见 ROADMAP「M-X3」）：本条含聚合与告警；dashboard 端点/视图
+  切片因 routers 面在他线 response-model 批次中，顺延为下一小批。
 
 ### 分层收官批 第二刀：黑板→WS 桥接线（问题#9 收口，2026-10-29）
 

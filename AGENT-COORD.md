@@ -180,3 +180,32 @@
     棘轮 allowlist 31 → 14。未推送。
 - **不碰**：`py/maop/dashboard/server.py` 与 lifespan 接线面（ZCode 第四轮）、
   `core/**` 宽口径异常收窄批（ADR-023 D8）、`dashboard-enterprise/src/**`。
+## 领地登记（Examples 会话，2026-10-29：前端可达性 + 三类静默失败守卫）
+
+- **进行中**：`dashboard-enterprise/src/**` 内三个文件 —— `nav.js`（补导航入口）、
+  `i18n/index.js`（同步词条）、`components/AppIcon.vue`（补图标定义），
+  外加 `src/__tests__/` 三个新守卫。分支 `feat/nav-entries`，worktree
+  `F:/Nexus/MAOP-nav`，**PR #178**。
+- **在修什么**：三类「测试全绿但用户看到空白/原始 key」的静默失败。
+  1. `AppIcon` 的 `ICONS[name] || ''` —— 14 个名字被引用却未定义，静默渲染为空；
+  2. router 有 component 但全仓无任何 `to=`/`push()`/`href=` 指向 —— 7 个页面
+     （agent-versions / credential-vault / long-running-tasks / examples /
+     agent-registry / agent-billing / agent-gateway）除手输 URL 外不可达；
+  3. `t()` 找不到 key 时返回 key 原文 —— 实测 2975 个引用全部命中，无缺失。
+- **他线若要在前端加页面**：新路由必须同时落 `nav.js` 入口（或 `matchPaths`），
+  否则 `nav-coverage.test.js` 会红。新图标名必须落 `AppIcon.vue` 的 `ICONS`，
+  否则 `app-icon-registry.test.js` 会红。新文案必须同时落 en/zh，
+  否则 `i18n-coverage.test.js` 会红。三条都是本次新加的，**改前端前先看这三条**。
+- **不碰**：`py/**`、`.github/**`、`routers/*_schemas.py`、MAOS 仓。
+## 领地登记（ZCode session_f62ccbe…，2026-10-29 第五轮：M-X3 成本归因 M0）
+
+- **进行中**：ROADMAP「M-X3 细粒度成本归因」M0 后端切片（章程见 #177）。
+  领地=新建 `py/maop/core/cost_attribution.py` + `py/maop/core/cost_tracker.py`
+  的 `record_actual_cost` 可选参数（加 `agent`/`phase`，向后兼容）+ 
+  `py/maop/maop_loop_phases.py` 对账调用点（补归属）+ 新测试 + CHANGELOG。
+  分支 `feat/cost-attribution-m0`，worktree `F:/Nexus/MAOP-cost`。
+- **顺延说明**：dashboard 端点/视图切片不本批做（`routers/` 面正处他线
+  response-model 批次）；待其落地后立第二小批。
+- **他线注意**：若宽口径异常收窄批排到 `core/cost_tracker.py` /
+  `maop_loop_phases.py`，两文件本批各有 1 处调用点新增（无 except 改动），
+  冲突面小；先动者在本表回一行。
