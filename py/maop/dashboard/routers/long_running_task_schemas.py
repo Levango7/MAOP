@@ -9,6 +9,8 @@
 ``Response`` 实例，FastAPI 就完全不执行 response_model —— 给它挂模型等于挂一个
 永不生效的假守卫。该端点记在
 ``tests/fixtures/frontend_non_json_endpoints.txt`` 里，由那条豁免账看着。
+
+信封的 ``status`` 一律默认 ``"error"``（与 agent_catalog_schemas 同口径）：处理器漏写 status 时，缺省值不能替它宣称成功。
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from maop.core.agent.router.long_running_task import LongRunningTask
 class LongRunningTaskListEnvelope(BaseModel):
     """GET /api/long-running-tasks 响应（pending / running）。"""
 
-    status: str = "ok"
+    status: str = "error"
     count: int = 0
     tasks: list[LongRunningTask] = Field(default_factory=list)
 
@@ -29,7 +31,7 @@ class LongRunningTaskListEnvelope(BaseModel):
 class LongRunningTaskCancelEnvelope(BaseModel):
     """POST /api/long-running-tasks/{task_id}/cancel 响应。"""
 
-    status: str = "ok"
+    status: str = "error"
     task_id: str = ""
 
 

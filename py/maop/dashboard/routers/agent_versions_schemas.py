@@ -12,6 +12,8 @@ SQLite 里的原始 TEXT。
 
 这几条路由用的是不带 ``error_value=`` 的 ``@handle_api_errors``：异常分支返回
 JSONResponse（ErrorSchema），不经过 response_model，所以模型只描述成功形状。
+
+信封的 ``status`` 一律默认 ``"error"``（与 agent_catalog_schemas 同口径）：处理器漏写 status 时，缺省值不能替它宣称成功。
 """
 
 from __future__ import annotations
@@ -49,7 +51,7 @@ class PageMeta(BaseModel):
 class VersionListEnvelope(BaseModel):
     """GET /api/agent-versions 响应。"""
 
-    status: str = "ok"
+    status: str = "error"
     data: list[VersionItem] = Field(default_factory=list)
     meta: PageMeta = Field(default_factory=PageMeta)
 
@@ -57,7 +59,7 @@ class VersionListEnvelope(BaseModel):
 class VersionActivateEnvelope(BaseModel):
     """POST /api/agent-versions/{version_id}/activate 响应。"""
 
-    status: str = "ok"
+    status: str = "error"
     data: VersionItem
 
 
@@ -72,7 +74,7 @@ class RollbackMeta(BaseModel):
 class VersionRollbackEnvelope(BaseModel):
     """POST /api/agent-versions/{version_id}/rollback 响应。"""
 
-    status: str = "ok"
+    status: str = "error"
     data: VersionItem
     meta: RollbackMeta
 
@@ -95,7 +97,7 @@ class CanaryItem(BaseModel):
 class CanaryConfigEnvelope(BaseModel):
     """POST /api/agent-versions/{version_id}/canary 响应。"""
 
-    status: str = "ok"
+    status: str = "error"
     data: CanaryItem
 
 
