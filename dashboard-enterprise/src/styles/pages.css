@@ -188,7 +188,9 @@
 .dispatch-card:hover, .role-card:hover, .tenant-card:hover, .skill-card:hover,
 .entry-card:hover, .layer-card:hover, .resource-item:hover, .agent-row:hover,
 .grant-row:hover, .session-item:hover, .route-card:hover {
-  border-color: var(--border-strong);
+  /* 2026-10-29: 卡片常态已用 --border-card(#4a4f59)，与 --border-strong(#4e545f)
+   * 太近，hover 会看不出反应。改用卡片专用 hover 色。 */
+  border-color: var(--border-card-hover);
 }
 .session-item.active { background: var(--brand-soft); border-color: var(--brand); }
 
@@ -991,7 +993,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   border-radius: var(--r-lg); padding: var(--sp-4); box-shadow: var(--shadow-surface);
   transition: border-color var(--motion) var(--ease);
 }
-.scanned-card:hover { border-color: var(--border-strong); }
+.scanned-card:hover { border-color: var(--border-card-hover); }
 .scanned-top { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
 .scanned-avatar { width: 38px; height: 38px; border-radius: var(--r-full); flex-shrink: 0; display: grid; place-items: center; color: var(--brand-contrast); font-weight: 700; }
 .scanned-avatar.available { background: var(--success); }

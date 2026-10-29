@@ -81,6 +81,22 @@ describe('card contrast', () => {
           `低于 ${t.minSurface}:1`,
       ).toBeGreaterThanOrEqual(t.minSurface);
     });
+
+    it(`${t.name}: hover border is perceptibly different from resting border`, () => {
+      // 2026-10-29 实测踩到：--border-card(#4a4f59) 与 --border-strong(#4e545f)
+      // 亮度几乎相同，而卡片 hover 原来指向 --border-strong —— 结果是 hover
+      // 完全没有视觉反馈。这条断言要求两者至少差 1.2:1。
+      const css = fs.readFileSync(path.join(STYLES, t.file), 'utf-8');
+      const rest = readVar(css, 'border-card');
+      const hover = readVar(css, 'border-card-hover');
+      const ratio = contrast(rest, hover);
+
+      expect(
+        ratio,
+        `${t.name} 主题：卡片常态描边 ${rest} 与 hover 描边 ${hover} 只差 ${ratio.toFixed(2)}:1，` +
+          `hover 会看起来没有反应`,
+      ).toBeGreaterThanOrEqual(1.2);
+    });
   }
 
   it('computes the known baseline ratios (guards the formula itself)', () => {

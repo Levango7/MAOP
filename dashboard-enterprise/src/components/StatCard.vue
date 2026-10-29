@@ -88,8 +88,9 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
   position: relative;
 }
-/* JB 精修: hover 只改描边, 不要"飘浮"(translateY/shadow-pop 是模板感来源) */
-.stat:hover { border-color: var(--border-strong); }
+/* JB 精修: hover 只改描边, 不要"飘浮"(translateY/shadow-pop 是模板感来源)。
+ * 2026-10-29: 改用 --border-card-hover，理由见 Card.vue 同名注释。 */
+.stat:hover { border-color: var(--border-card-hover); }
 .stat.is-accent { border-left: 3px solid var(--accent); }
 .stat.is-accent::after {
   content: "";

@@ -17,6 +17,9 @@
   /* 2026-10-29 卡片专用描边：--border 在 #fff 上只有 1.43:1（--bg 与 --surface
    * 的明度差也只有 1.11:1），三者叠加用户看不出卡片边界。提到 #c2c8d4 → 1.68:1。 */
   --border-card: #c2c8d4;
+  /* 卡片 hover 专用：--border-strong (#b9bfcc) 与 --border-card (#c2c8d4) 亮度
+   * 太近，hover 几乎看不出变化。 #aab2c0 → on #fff 2.13:1。 */
+  --border-card-hover: #aab2c0;
   --border-strong: #b9bfcc;
   --text: #1d2129;
   --text2: #4e5566;

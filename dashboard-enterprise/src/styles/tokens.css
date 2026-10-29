@@ -25,6 +25,10 @@
    * 只给卡片类用，不动 --border 全局值——注释里说过的理由仍成立：
    * 容器描边整体提到 3:1 会让界面"方框化"，破坏 JetBrains 式细描边分层。 */
   --border-card: #4a4f59;
+  /* 卡片 hover 专用：--border-strong (#4e545f) 与 --border-card (#4a4f59) 亮度
+   * 几乎相同，若 hover 仍指向 --border-strong，卡片 hover 会**看起来没有反应**。
+   * #5f656f → on --surface 2.44:1，与常态 1.89:1 拉开可感知的差。 */
+  --border-card-hover: #5f656f;
   --text: #e8eaf0;
   --text2: #adb4c2;
   --text3: #7c8595;  /* legacy alias — 语义等价于 --text-faint, 新代码应使用 --text-faint */
