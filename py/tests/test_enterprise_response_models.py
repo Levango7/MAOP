@@ -8,8 +8,10 @@ dict with no line anywhere, and the personal gate reported a clean burn-down.
 
 Measured, not estimated: the enterprise app exposes 74 METHOD/PATH pairs, 32 of
 them referenced by the dashboard, 0 typed. One is exempted as non-JSON (SAML SP
-metadata comes back as ``application/xml``), leaving the 31 lines in
-``fixtures/enterprise_response_model_allowlist.txt``.
+metadata comes back as ``application/xml``). 17 of the remaining 31 were modelled
+on 2026-10-30 (tenant / rbac / quotas), leaving 14 lines in
+``fixtures/enterprise_response_model_allowlist.txt``; those 14 all sit in the
+three routers that cannot be imported without the commercial overlay.
 
 Three routers cannot be imported at all in a clean CI checkout: they pull the
 commercial overlay in at module level, and that overlay ships in a second
@@ -55,7 +57,8 @@ NON_JSON = FIXTURES / "frontend_non_json_endpoints.txt"
 PERSONAL_ALLOWLIST = FIXTURES / "frontend_response_model_allowlist.txt"
 
 # Starting ceiling, measured 2026-10-24 — this list may only shrink.
-RATCHET_CAP = 31
+# 2026-10-30: 31 → 14 after the tenant / rbac / quotas batch.
+RATCHET_CAP = 14
 
 
 def _routes() -> dict[tuple[str, str], dict]:

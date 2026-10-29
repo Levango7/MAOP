@@ -30,6 +30,13 @@ from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
 from maop.core.tenant.context import tenant_id_from_request
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.rbac_schemas import (
+    GrantEnvelope,
+    GrantListEnvelope,
+    PermissionListEnvelope,
+    RevokeEnvelope,
+    RoleListEnvelope,
+)
 
 # ── Service layer ──────────────────────────────────────────────────
 from maop.dashboard.services import rbac_service
@@ -79,7 +86,7 @@ def _is_admin(request: Request) -> bool:
 # ── Endpoints ─────────────────────────────────────────────────────
 
 
-@router.get("/grants")
+@router.get("/grants", response_model=GrantListEnvelope)
 @handle_api_errors
 async def list_grants(
     request: Request,
@@ -112,7 +119,7 @@ async def list_grants(
     }
 
 
-@router.post("/grant")
+@router.post("/grant", response_model=GrantEnvelope)
 @handle_api_errors
 async def grant_role(body: GrantRequest, request: Request) -> dict[str, Any]:
     """Grant a role to a user. Requires admin."""
@@ -144,7 +151,7 @@ async def grant_role(body: GrantRequest, request: Request) -> dict[str, Any]:
     return {"status": "ok", "grant": grant.model_dump()}
 
 
-@router.post("/revoke")
+@router.post("/revoke", response_model=RevokeEnvelope)
 @handle_api_errors
 async def revoke_role(body: RevokeRequest, request: Request) -> dict[str, Any]:
     """Revoke a role from a user. Requires admin."""
@@ -175,7 +182,7 @@ async def revoke_role(body: RevokeRequest, request: Request) -> dict[str, Any]:
     return {"status": "ok", "revoked": revoked}
 
 
-@router.get("/roles")
+@router.get("/roles", response_model=RoleListEnvelope)
 @handle_api_errors
 async def list_roles(request: Request) -> dict[str, Any]:
     """List all available roles and their permissions."""
@@ -200,7 +207,7 @@ async def list_roles(request: Request) -> dict[str, Any]:
     return {"status": "ok", "roles": roles_info}
 
 
-@router.get("/permissions")
+@router.get("/permissions", response_model=PermissionListEnvelope)
 @handle_api_errors
 async def list_permissions(request: Request) -> dict[str, Any]:
     """List all available permissions and the current user's grants."""

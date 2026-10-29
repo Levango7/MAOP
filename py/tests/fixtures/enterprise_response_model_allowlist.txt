@@ -7,36 +7,25 @@
 # Burn-down list for tests/test_enterprise_response_models.py: delete a line
 # when the endpoint declares a response_model. The gate fails in both
 # directions (new gap, stale line) and the count below may only shrink.
+#
+# 2026-10-30: 31 → 14. The 17 tenant / rbac / quotas lines are modelled in
+# routers/{tenant,rbac,quotas}_schemas.py. The 14 left all live in the three
+# routers that import the commercial overlay at module level (sso / n8n /
+# licenses): they need a MAOS-side change plus a re-signed integrity manifest,
+# so they are a separate batch, not a forgotten tail.
 # Format: METHOD PATH
 
 DELETE /api/sso/providers/{}
-DELETE /api/tenant/{}
 GET /api/licenses/list
 GET /api/licenses/{}
 GET /api/n8n/executions/{}
 GET /api/n8n/health
 GET /api/n8n/workflows
-GET /api/quotas/history
-GET /api/quotas/overview
-GET /api/quotas/{}/alerts
-GET /api/quotas/{}/trend
-GET /api/quotas/{}/usage
-GET /api/rbac/grants
-GET /api/rbac/permissions
-GET /api/rbac/roles
 GET /api/sso/providers
-GET /api/tenant/list
 POST /api/licenses/create
 POST /api/licenses/{}/renew
 POST /api/licenses/{}/revoke
 POST /api/n8n/workflows/{}/trigger
-POST /api/quotas/alerts/{}/resolve
-POST /api/quotas/{}/{}
-POST /api/rbac/grant
-POST /api/rbac/revoke
 POST /api/sso/providers
 POST /api/sso/providers/{}/test
-POST /api/tenant/create
-POST /api/tenant/{}/activate
-POST /api/tenant/{}/suspend
 PUT /api/sso/providers/{}
