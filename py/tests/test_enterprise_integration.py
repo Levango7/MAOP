@@ -174,6 +174,7 @@ class TestSAMLIntegration:
         # xmlsec 是验签的硬性依赖（fail-closed）；未安装或加密后端不可用
         # （如 Windows + CPython 3.14 的 xmlsec 1.3.x 轮子）时跳过。
         pytest.importorskip("xmlsec", reason="requires xmlsec for signature verification")
+        pytest.importorskip("maop.enterprise.saml_handler")
         from maop.enterprise.saml_handler import SAMLHandler
         from maop.enterprise.sso import SSOConfig
 
