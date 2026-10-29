@@ -52,6 +52,14 @@ export const nav = [
   { to: '/capability/protocols', label: 'nav.protocols', icon: 'share2', subtitle: 'nav.protocols.subtitle' },
   { to: '/capability/worktrees', label: 'nav.worktrees', icon: 'git-compare', subtitle: 'nav.worktrees.subtitle' },
   { to: '/capability/agent-proxy', label: 'nav.agentProxy', icon: 'arrow-left-right', subtitle: 'nav.agentProxy.subtitle' },
+  // ── 2026-10-29 补齐：以下 4 个页面此前只有路由、没有导航入口 ──
+  // 实测 `git grep "capability/examples"` 只命中 router/index.js 本身，
+  // 全仓没有任何 router-link / router.push 指向它们 —— 除了手输 URL，
+  // 用户永远到不了。这几页是 5.5.0 新增能力，不可达等于没交付。
+  { to: '/capability/agent-versions', label: 'nav.agentVersions', icon: 'git-branch', subtitle: 'nav.agentVersions.subtitle' },
+  { to: '/capability/credential-vault', label: 'nav.credentialVault', icon: 'key', subtitle: 'nav.credentialVault.subtitle' },
+  { to: '/capability/long-running-tasks', label: 'nav.longRunningTasks', icon: 'timer', subtitle: 'nav.longRunningTasks.subtitle' },
+  { to: '/capability/examples', label: 'nav.examples', icon: 'file', subtitle: 'nav.examples.subtitle' },
 
   // ── 运维 ─────────────────────────────────────────────────────
   { section: 'nav.group.operate' },
