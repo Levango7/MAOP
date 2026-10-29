@@ -50,6 +50,10 @@ def manager(tmp_path: Any) -> RelayPlatformManager:
 @pytest.fixture
 def app_with_router(manager: RelayPlatformManager) -> FastAPI:
     """带中转平台路由的 FastAPI 测试应用。"""
+    # relay_platform 路由 → integration_service → 模块级导入 maop.enterprise.n8n；
+    # 企业包缺席时这 8 条 API 用例无法成立，显式 skip（服务层 24 条不受影响，
+    # 不该被 collect_ignore 连同文件一起吞掉）。
+    pytest.importorskip("maop.dashboard.routers.relay_platform")
     from maop.dashboard.routers.relay_platform import router as relay_router
 
     app = FastAPI()
@@ -74,6 +78,7 @@ def client(app_with_router: FastAPI) -> TestClient:
 @pytest.fixture
 def client_non_admin(manager: RelayPlatformManager) -> TestClient:
     """鉴权角色为普通用户的测试客户端（写端点应被 require_admin 拒绝）。"""
+    pytest.importorskip("maop.dashboard.routers.relay_platform")
     from maop.dashboard.routers.relay_platform import router as relay_router
 
     app = FastAPI()

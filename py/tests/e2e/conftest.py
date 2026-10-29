@@ -26,27 +26,17 @@ import pytest
 
 # ── 1. 企业版可选性守卫 ────────────────────────────────────────────
 # maop.enterprise 由独立的 maop-enterprise 包（MAOS 私有仓库）通过同命名空间
-# 注入。本地装了、CI 没有，故需条件跳过。逻辑与 tests/conftest.py 一致。
-_ENTERPRISE_MARKERS = ("maop.enterprise", "maop-enterprise")
-_ENTERPRISE_INDIRECT: tuple[str, ...] = ()
+# 注入。本地装了、CI 没有，故需条件跳过。判据与 tests/conftest.py 共用同一份
+# （tests/_overlay_rule.py）：按 AST 找模块级直接 import —— 子串匹配会把只在
+# 注释/文档串里提到企业包的文件也一并跳过。
+_rule_file = Path(__file__).resolve().parent.parent / "_overlay_rule.py"
+_rule_spec = importlib.util.spec_from_file_location("_maop_overlay_rule", _rule_file)
+assert _rule_spec is not None and _rule_spec.loader is not None
+_overlay_rule = importlib.util.module_from_spec(_rule_spec)
+_rule_spec.loader.exec_module(_overlay_rule)
 
-try:
-    _ent_spec = importlib.util.find_spec("maop.enterprise")
-except (ImportError, ValueError):  # ModuleNotFoundError 是 ImportError 子类
-    _ent_spec = None
-
-if _ent_spec is None:
-    _e2e_root = Path(__file__).resolve().parent
-    _ignored = {
-        str(p.relative_to(_e2e_root))
-        for p in _e2e_root.rglob("test_*.py")
-        if any(
-            m in p.read_text(encoding="utf-8", errors="ignore")
-            for m in _ENTERPRISE_MARKERS
-        )
-    }
-    _ignored.update(_ENTERPRISE_INDIRECT)
-    collect_ignore = sorted(_ignored)
+if not _overlay_rule.enterprise_available():
+    collect_ignore = _overlay_rule.collection_ignores(Path(__file__).resolve().parent)
 
 
 # ── 2. evolution fixture（原定义在 tests/conftest.py，confcutdir 下不可见）──

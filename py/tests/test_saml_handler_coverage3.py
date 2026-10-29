@@ -12,6 +12,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# 全部用例都走企业版 SAML handler；企业包缺席时 33 条全红，故模块级显式 skip。
+pytest.importorskip("maop.enterprise.saml_handler")
+
 # ── Helpers ─────────────────────────────────────────────────────────
 
 

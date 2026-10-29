@@ -39,6 +39,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 纯净 CI 的收集跳过判据改按 AST —— 20 个测试文件此前从未运行过（2026-10-30）
+
+`tests/conftest.py` 与 `tests/e2e/conftest.py` 用「文件文本里出现过 `maop.enterprise`
+字样」推断「该文件需要企业包」，无 MAOS 的检出据此 `collect_ignore` 丢弃 **37** 个测试
+文件。`collect_ignore` 在报告里不留任何痕迹：452 个测试文件的仓库，"全部通过"与"从未
+运行"的输出一模一样。
+
+模拟纯净环境（`sys.meta_path` 挡住 `maop.enterprise`）逐文件实测：
+
+| | 文件数 | 判据 |
+|---|---|---|
+| 真不可收集 | 17 | 模块级 `import maop.enterprise*`，且未被 `try` 包裹 |
+| 本可运行却被连坐 | 20 | 字样只出现在注释 / 文档串 / `importorskip` / mock 目标里 |
+
+被连坐的 20 个里包含 **response_model 棘轮本体** `test_frontend_response_models.py`
+——P1-b 以来"前端在用的端点必须声明 response_model"这条门禁，从未在 CI 上执行过一次。
+
+改动：
+
+- 新增 `tests/_overlay_rule.py`：判据只看模块级、未被 `try` 包裹的 import；函数内的惰性
+  import、`importorskip`、注释都不算（那是运行期依赖，应由用例自己显式 skip）。两个
+  conftest 共用这一份（原先各抄一遍子串规则），`_ENTERPRISE_MARKERS` /
+  `_ENTERPRISE_INDIRECT` 随之删除。
+- 新增 `tests/test_overlay_collection_rule.py`：判据的门禁。6 条「只提及 ⇒ 不得丢弃」
+  反例 + 5 条「模块级 import ⇒ 必须丢弃」正例 + 真实树上的钉（棘轮必须仍在收集面内、
+  4 个不可导入文件必须仍在豁免面内）+ 独立复核（被丢弃的每个文件都要真能解析出模块级
+  import）+ 非空哨兵（判据空转即红）。
+- 10 个测试文件把运行期依赖改成显式 skip，范围取最小：整份需要 → 模块级 `importorskip`；
+  只有一个类需要 → 类内 autouse fixture；个别用例需要 → 用例内 `importorskip`。同文件
+  其余用例照常跑（`test_relay_platform` 24 跑 8 跳、`test_mem_vector_otel_saml_coverage`
+  61 跑 18 跳、`test_router_misc_coverage` 57 跑 2 跳）。
+- `test_the_gate_file_stays_collectible` 从「文件里不许出现该字样」改成「不许有模块级
+  import」——前者是旧规则的产物，会禁掉合法注释。
+
+顺带修掉两处正因"从未跑过"而藏着的缺口：
+
+- `set_edition(ENTERPRISE)` 的「企业包未安装」分支只说 refused without the enterprise
+  package + valid license，不给动作；`test_edition_bypass_guard` 断言报错要点名
+  `MAOP_LICENSE_KEY`，而该断言只在装有 MAOS 的开发机上成立。现在两条分支都指向
+  `maop-enterprise` + `MAOP_LICENSE_KEY`（或 `data/license.key`），断言不再随环境分叉。
+- 4 个文件里留着 `# enterprise installed (maop-enterprise wheel): guard removed`——子串
+  规则替它们兜住了红，于是有人把诚实的 skip 直接删掉了。已复原；skip 的可见性本来就是
+  ci.yml H4 注释想要的东西（"报告中显式统计跳过数"）。
+
+**验证**（载体：Windows / Python 3.14，`sys.meta_path` 挡住企业包）：
+逐文件跑那 37 个 ⇒ 17 收集错误（仍被丢弃，符合预期）· 5 整文件显式 skip · 15 正常运行，其中
+`test_frontend_response_models` 10 passed/1 skipped、`test_router_system` 63 passed/1 skipped、
+`test_mem_vector_otel_saml_coverage` 61 passed/18 skipped、`test_relay_platform` 24 passed/8 skipped、
+`test_router_misc_coverage` 57 passed/2 skipped。新判据自身的 14 例门禁在同一载体下全绿，
+ruff 干净。
+
+整轮复刻 CI 的 unit job（`pytest tests/ --ignore=tests/contract -m "not slow and not serial"
+--timeout=60 -n 2`，同一阻断载体）：改动前在同一基线上是 **3 failed / 10580 passed / 130 skipped**，
+三条红分别是棘轮 13 缺口、config-drift 缺 `MAOP_A2A_GATEWAY` 文档、SAML 用例缺守卫；
+本批收口后 **10608 passed / 131 skipped / 1 xfailed，rc=0（20:40）**。
+e2e 那一腿用 `--confcutdir=tests/e2e` 在同样载体下收集 72 例 0 错（此前该腿把
+`test_delete_operations.py` 整文件静默丢弃）。
+
+遗留一条记账：`test_env_example_drift` 恢复运行后单条用例 51.9s（全树 AST 扫描），
+逼近 CI 的 `--timeout=60`，暂不动、先记录。
+
+**变异反证**（11 个，逐个还原后按 SHA256 回证逐字节相等；基线 40 passed）：
+
+| 变异 | 结果 |
+|---|---|
+| 判据退回子串匹配 | 8 failed |
+| 判据恒 False（自我失明） | 6 failed |
+| 判据只看 `import` 不看 `from-import` | 3 failed |
+| try 保护的 import 也算不可导入 | 1 failed |
+| conftest 的丢弃清单清空 | 收集错误 17 条（保留时 0 条） |
+| 降级信封不声明 `error` | 1 failed |
+| ShareSummary 漏 `cost`（生产者键） | 2 failed |
+| 列清单加一列而模型没跟上 | 6 failed |
+| 给 SSE 路由挂 response_model | 1 failed |
+| 删掉 SSE 的豁免账条目 | 1 failed |
+
+第 4 行有个教训值得记下：第一次写的"去掉 try 豁免"变异（删掉 `if not isinstance(node, ast.Try)`）
+**跑完全绿** —— 因为删掉过滤后 `_imports_overlay(Try 节点)` 本来也返回 False，那是个语义空变异，
+不是守卫没牙。改成"真的下降进 try 体内判"才转红。与既有口径"变异必须编得过"同源：
+一个改完行为等价的变异只能证明变异者写错了。
+
+### 棘轮第一次真跑就抓到的 13 条缺口：12 条建模 + 1 条如实豁免（2026-10-30）
+
+上一笔把收集判据改成按 AST 之后，`test_frontend_response_models.py` 第一次在当前
+master 口径下跑起来，当场点名 **13 条前端在调用、却没有 response_model 的端点**：
+credential-vault 4、agent-versions 4、long-running-tasks 3、share 2。
+
+这些不是本批引入的：用 `git archive 15510ae1` 导出 master 自己的快照现跑，同样红
+（带企业包、不带企业包各跑一次都红），是最近 10 笔合并带进来的 —— 它们合进去的时候
+CI 里这条门禁正处于"被连坐跳过"状态，所以没人看见。**已用 master 快照复现，与本批改动
+无因果关系**，只是本批让它第一次真的执行。
+
+- 12 条建模，按域新增 4 个 schema 模块并挂 `response_model`：
+  `credential_vault_schemas.py`（列表复用领域模型 `CredentialSummary`，不另抄 11 字段）、
+  `share_schemas.py`（`ShareSummary` 逐键对齐 `run_service._summarize`，
+  `started_at/updated_at` 保留 `float | str` 因为无事件时代码回落 `""`）、
+  `agent_versions_schemas.py`（列表 meta=`{total,page,page_size}` 与回滚
+  meta=`{rolled_back_from,rolled_back_to,reason}` 是两种形状，各一个模型）、
+  `long_running_task_schemas.py`（任务体复用 `LongRunningTask`）。
+- `GET /api/long-running-tasks/{id}/progress` **不建模**：它返回 `StreamingResponse`
+  （SSE），而路由一旦返回 `Response` 实例，FastAPI 就完全不执行 `response_model` ——
+  挂上去只会让棘轮以为这条已经建好模。改记入
+  `tests/fixtures/frontend_non_json_endpoints.txt`，并由
+  `test_progress_route_has_no_effective_response_model` 钉住"没有 Pydantic 模型在描述它"
+  **且** OpenAPI 里这条 200 确实没有 JSON 形状（后者是棘轮据以判"未建模"的观测量）。
+- 契约测试 26 例（`test_vault_share_router_contracts.py` 14 + 
+  `test_versions_tasks_router_contracts.py` 12）。判据一律对着**生产者**而不是手抄字段：
+  版本/灰度模型的字段必须等于 `_AGENT_VERSION_COLUMNS` / `_CANARY_COLUMNS`，
+  `ShareSummary` 必须等于 `_summarize` 实际吐出的键，任务条目必须等于
+  `LongRunningTask.model_fields` —— 生产者加字段而模型没跟上时，这里红，而不是在网络上
+  静默少一个键。降级分支（`error_value=`）也走 HTTP 实测：`error` 键不能被判型过滤掉，
+  成功侧的键必须带默认值，否则兜底路径自己变 500。
+
+顺带修掉同批被叫醒的两条存量红：
+
+- `test_env_example_drift` 报 `MAOP_A2A_GATEWAY` 被代码读取（`config/settings.py:45`）
+  却没写进 `.env.example` —— 同样在 master 快照上复现。已补进文档并写明"默认关是
+  部署决策"。
+- `test_enterprise_integration.py::TestSAMLIntegration::test_saml_handler_parses_real_signed_response`
+  也 `from maop.enterprise.saml_handler import ...`，上一笔只给同类另外两条加了守卫
+  （它在按文件跑的复扫里被 `xmlsec` 的 importorskip 顺带跳过，整轮跑才暴露）。补齐。
 ### M-X3 细粒度成本归因 M0（后端，2026-10-29）
 
 - **`core/cost_attribution.py`（新）**：按 agent / phase / model 三维聚合
@@ -51,8 +172,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   —— 此前成本条目的 agent/phase 两维在账面上是空的。
 - 测试 `tests/test_cost_attribution.py` 6 例：聚合与手算子集逐条对齐 / 未归属桶 /
   归属接线（含旧调用零破坏）/ 未配置不告警 / 严重度分档 / 告警落库与去重。
-- **M0 边界**（章程见 ROADMAP「M-X3」）：本条含聚合与告警；dashboard 端点/视图
-  切片因 routers 面在他线 response-model 批次中，顺延为下一小批。
+- **端点切片（2026-10-30 补，routers 面他线批次已落库）**：
+  - `routers/cost_attribution.py`：`GET /api/cost-attribution`（admin-only 三维
+    聚合，start_date/end_date 窗口）+ `POST /api/cost-attribution/check-budget`
+    （**只查不落库**的越阈检查；入库走 `emit_budget_alerts`，由调度/CLI 触发）；
+  - `routers/cost_attribution_schemas.py`：响应模型（`DimensionBucket` 三键与
+    单元对齐断言同源）；`_register_routes` 注册；死接线条目随之移除；
+  - 端点契约测试 `tests/test_cost_attribution_endpoint.py` 5 例（含 admin-only
+    403 两例、check-budget 不落库断言、窗口过滤）。
+- **M0 余量**：前端视图属 dashboard-enterprise 前端线领地（板记已委托，
+  数据源即本端点）。
 
 ### 分层收官批 第二刀：黑板→WS 桥接线（问题#9 收口，2026-10-29）
 
