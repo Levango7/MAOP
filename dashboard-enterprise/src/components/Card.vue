@@ -60,8 +60,10 @@ const mbStyle = computed(() => {
   transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease),
     box-shadow var(--motion) var(--ease);
 }
-/* hover 只加深描边, 不再上浮/投影 — "静止感"是工具感与模板感的分水岭 */
-.card:hover { border-color: var(--border-strong); }
+/* hover 只加深描边, 不再上浮/投影 — "静止感"是工具感与模板感的分水岭。
+ * 2026-10-29: 指向 --border-card-hover 而非 --border-strong —— 后者的 #4e545f
+ * 与常态 #4a4f59 亮度几乎相同，会让 hover 看起来没有反应。 */
+.card:hover { border-color: var(--border-card-hover); }
 .card--clickable { cursor: pointer; }
 .card--clickable:hover { border-color: var(--brand); background: var(--surface-2); }
 .card--clickable:active { transform: scale(0.99); }

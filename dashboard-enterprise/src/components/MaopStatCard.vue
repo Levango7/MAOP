@@ -71,9 +71,10 @@ const isDown = computed(() => props.trend !== null && props.trend !== undefined 
   transition: border-color var(--motion-normal) var(--ease), box-shadow var(--motion-normal) var(--ease);
 }
 
-/* 悬浮: 仅描边加深, 不抬升不阴影 —— 与 StatCard 一致 */
+/* 悬浮: 仅描边加深, 不抬升不阴影 —— 与 StatCard 一致。
+ * 2026-10-29: 改用 --border-card-hover，理由见 Card.vue 同名注释。 */
 .maop-stat:hover {
-  border-color: var(--border-strong);
+  border-color: var(--border-card-hover);
 }
 
 /* 标题行: 标题 + 单位 */
