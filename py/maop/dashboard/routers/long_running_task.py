@@ -29,6 +29,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.long_running_task_schemas import (
+    LongRunningTaskCancelEnvelope,
+    LongRunningTaskListEnvelope,
+)
 from maop.dashboard.services import session_service
 
 logger = logging.getLogger(__name__)
@@ -86,7 +90,7 @@ async def submit_long_running_task(
     return {"status": "ok", "task_id": task_id}
 
 
-@router.get("")
+@router.get("", response_model=LongRunningTaskListEnvelope)
 @handle_api_errors
 async def list_active_long_running_tasks() -> dict[str, Any]:
     """列出所有活跃长任务（pending / running）."""
@@ -112,7 +116,7 @@ async def get_long_running_task(task_id: str) -> dict[str, Any]:
     return {"status": "ok", "task": task}
 
 
-@router.post("/{task_id}/cancel")
+@router.post("/{task_id}/cancel", response_model=LongRunningTaskCancelEnvelope)
 @handle_api_errors
 async def cancel_long_running_task(task_id: str) -> dict[str, Any]:
     """取消长任务.
