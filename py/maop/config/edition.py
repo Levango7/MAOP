@@ -347,8 +347,9 @@ def _ensure_enterprise_activation_allowed() -> None:
             )
     except ImportError:
         raise RuntimeError(
-            "SECURITY: set_edition(ENTERPRISE) refused without the "
-            "enterprise package + valid license."
+            "SECURITY: set_edition(ENTERPRISE) refused: the enterprise package "
+            "(maop-enterprise) is not installed. Install it and activate with "
+            "MAOP_LICENSE_KEY (or data/license.key)."
         )
 
 
