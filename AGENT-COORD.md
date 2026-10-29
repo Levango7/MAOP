@@ -167,3 +167,24 @@
   否则 `app-icon-registry.test.js` 会红。新文案必须同时落 en/zh，
   否则 `i18n-coverage.test.js` 会红。三条都是本次新加的，**改前端前先看这三条**。
 - **不碰**：`py/**`、`.github/**`、`routers/*_schemas.py`、MAOS 仓。
+
+## 领地登记（Examples 会话，2026-10-29 第二轮：图标去重 + 卡片边界）
+
+- **进行中**：`dashboard-enterprise/src/**` 内 —— `nav.js`（14 处图标换新）、
+  `components/AppIcon.vue`（新增 `log-in`）、`components/{Card,StatCard,MaopStatCard}.vue`、
+  `styles/{tokens,themes,pages}.css`。分支 `fix/frontend-polish`，
+  worktree `F:/Nexus/MAOP-nav`，**stacked 在 #178 之上**（#178 合并后自动指向 master）。
+- **在修什么**（都是用户直接反馈的视觉问题）：
+  1. 侧边栏图标重复 —— 实测 51 个入口只用了 37 个不同图标，14 处重合
+     （`message-square` 用了 3 次）。去重后 51:51。新守卫在
+     `nav-coverage.test.js` 的「every nav entry uses a distinct icon」。
+  2. 卡片与底布边界不清 —— 实测描边 1.49:1、卡片底与页面底明度差 1.09:1，
+     两者都低于可辨识阈值，而原注释写的是"层级由 1px 描边 + 明度差承担"。
+     新增 `--border-card`（1.89:1）与 `--shadow-surface`，守卫在
+     `card-contrast.test.js`（实算 WCAG 对比度）。
+- **他线若要在前端加菜单**：新入口必须用**未被占用**的图标，否则
+  `nav-coverage.test.js` 会红。可用清单 = `AppIcon.vue` 的 `ICONS` 减去
+  `nav.js` 已用的 51 个。
+- **注意 `--shadow-card` 是浮层语义**（CoachMarks 遮罩 / NodeDetailPanel 抽屉在用），
+  页面内卡片请用 `--shadow-surface`，别混。
+- **不碰**：`py/**`、`.github/**`、`routers/*_schemas.py`、MAOS 仓。
