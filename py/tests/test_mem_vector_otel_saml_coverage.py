@@ -489,6 +489,11 @@ class TestOtel:
 # ── SAML Handler ────────────────────────────────────────────────────
 
 class TestSamlHandler:
+    @pytest.fixture(autouse=True)
+    def _require_overlay(self):
+        """企业包缺席时这 18 条用例无从成立；同文件其余 61 条照常跑。"""
+        pytest.importorskip("maop.enterprise.saml_handler")
+
     def test_init(self):
         from maop.enterprise.saml_handler import SAMLHandler
         from maop.enterprise.sso import SSOConfig

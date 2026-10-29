@@ -202,6 +202,7 @@ class TestSAMLIntegration:
 
     def test_saml_handler_rejects_tampered_response(self, idp_cert):
         """Tampering with the response should cause signature verification failure."""
+        pytest.importorskip("maop.enterprise.saml_handler")
         from maop.enterprise.saml_handler import SAMLHandler
         from maop.enterprise.sso import SSOConfig, SSOError
 
@@ -230,6 +231,7 @@ class TestSAMLIntegration:
 
     def test_saml_response_with_wrong_audience_rejected(self, idp_cert):
         """Response with wrong audience should be rejected."""
+        pytest.importorskip("maop.enterprise.saml_handler")
         from maop.enterprise.saml_handler import SAMLHandler
         from maop.enterprise.sso import SSOConfig, SSOError
 

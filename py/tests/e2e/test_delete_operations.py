@@ -27,6 +27,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# 每个用例都在 patch maop.enterprise.pg_persist 的内部函数，企业包缺席时收集之后
+# 必然全红。模块级显式 skip：报告里能看到这条 skip，而不是被 collect_ignore 连文件
+# 一起吞掉（那样这些用例在任何环境下都没跑过）。
+pytest.importorskip("maop.enterprise.pg_persist")
+
 # -- Fixtures -------------------------------------------------------
 
 
