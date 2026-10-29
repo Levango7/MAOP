@@ -86,14 +86,8 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     # "孤儿导入了它" 也算作有生产导入方，而它唯一的导入方 visual_builder 自己就在下面（孤儿→孤儿链）。
     # 按真实可达性它到不了运行时；要改判据就得先求不动点，会一次性掀出全仓一批同形态模块，
     # 所以这里保留工具现有口径，把缺陷与影响面单独转交（见 CHANGELOG 2026-10-17 条目）。
-    "maop.core.cost_attribution": (
-        "unwired",
-        (
-            "M-X3 成本归因 M0 后端（聚合+阈值告警）已交付并有专属测试；"
-            "dashboard 端点/视图切片顺延（routers 面在他线 response-model 批次），"
-            "接线后从本清单移除 —— 见 ROADMAP「M-X3」"
-        ),
-    ),
+    # 2026-10-30 注：maop.core.cost_attribution 的临时登记已移除——端点切片
+    # （routers/cost_attribution.py）上线后有了生产导入方。
     "maop.core.evolution.prompt_version": ("unwired", "prompt 版本链未接入演化闭环的回滚路径"),
     "maop.core.evolution.regression": ("unwired", "Persona 回归未接入演化闭环"),
     "maop.core.marketplace.key_management": ("unwired", "marketplace 密钥管理未接线"),

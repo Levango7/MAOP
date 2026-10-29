@@ -179,3 +179,15 @@
 - **他线注意**：若宽口径异常收窄批排到 `core/cost_tracker.py` /
   `maop_loop_phases.py`，两文件本批各有 1 处调用点新增（无 except 改动），
   冲突面小；先动者在本表回一行。
+
+## 领地登记（ZCode session_f62ccbe…，2026-10-30 第六轮：M-X3 端点切片）
+
+- **进行中**：M-X3 第二小批 —— `routers/cost_attribution.py`（GET 聚合 +
+  POST check-budget，admin-only）+ `routers/cost_attribution_schemas.py`
+  （响应模型）+ `_register_routes` 注册 + 死接线条目移除 + 契约测试 5 例。
+  分支 `feat/cost-attribution-endpoint`（**堆叠在 `feat/cost-attribution-m0` 上**，
+  后者 PR #179 在 CI 排队；合并后本分支 retarget master），worktree
+  `F:/Nexus/MAOP-cost2`。
+- **前端视图委托**：dashboard-enterprise 的成本归因视图属前端线领地
+  （Examples 会话/kilo），数据源即本端点（`GET /api/cost-attribution`）；
+  本会话不碰 `dashboard-enterprise/src/**`。
