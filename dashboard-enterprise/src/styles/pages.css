@@ -10,8 +10,13 @@
  *
  * Visual language mirrors components/Card.vue:
  *   background: var(--card-sheen), var(--surface);
- *   border: 1px solid var(--border); radius var(--r-lg); shadow-sm;
+ *   border: 1px solid var(--border-card); radius var(--r-lg); shadow-surface;
  *   top hairline via ::before (var(--card-hairline)).
+ *   2026-10-29: 描边与阴影改用页面内卡片专用 token（--border-card / --shadow-surface），
+ *   因为 --border 在 --surface 上只有 1.49:1、--surface 与 --bg 明度差只有
+ *   1.09:1，用户反馈"card 和底布界限区别不够明显"。
+ *   注意 --shadow-card 是**浮层**语义（CoachMarks 遮罩 / NodeDetailPanel 在用），
+ *   页面内卡片不要用它。
  * ========================================================================= */
 
 /* ── Section rhythm ──────────────────────────────────────────────────────
@@ -167,9 +172,9 @@
 .entry-body, .result-body, .entry-card .entry-body {
   position: relative;
   background: var(--card-sheen), var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-surface);
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease);
 }
 .dispatch-card::before, .role-card::before, .tenant-card::before,
@@ -545,8 +550,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .chat-main {
   flex: 1; min-width: 0;
   display: flex; flex-direction: column; min-height: 0;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm);
+  background: var(--surface); border: 1px solid var(--border-card); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-surface);
   position: relative;
   overflow: hidden;
 }
@@ -666,8 +671,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 
 .session-sidebar {
   display: flex; flex-direction: column; gap: var(--sp-3); min-height: 0;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
-  padding: var(--sp-4); box-shadow: var(--shadow-sm);
+  background: var(--surface); border: 1px solid var(--border-card); border-radius: var(--r-lg);
+  padding: var(--sp-4); box-shadow: var(--shadow-surface);
   overflow: hidden;
   margin-bottom: 0; /* override global sp-4 margin — flex stretch handles height */
 }
@@ -982,8 +987,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 /* Scanned-local-agents grid */
 .scanned-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .scanned-card {
-  background: var(--card-sheen), var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-lg); padding: var(--sp-4); box-shadow: var(--shadow-sm);
+  background: var(--card-sheen), var(--surface); border: 1px solid var(--border-card);
+  border-radius: var(--r-lg); padding: var(--sp-4); box-shadow: var(--shadow-surface);
   transition: border-color var(--motion) var(--ease);
 }
 .scanned-card:hover { border-color: var(--border-strong); }
@@ -1125,8 +1130,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 }
 .analysis-card {
   position: relative; background: var(--card-sheen), var(--surface);
-  border: 1px solid var(--border); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm); padding: var(--sp-5);
+  border: 1px solid var(--border-card); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-surface); padding: var(--sp-5);
 }
 /* Log output list */
 .log-list {
@@ -1271,8 +1276,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .maint-card {
   display: flex; flex-direction: column; gap: var(--sp-2); text-align: left;
   padding: var(--sp-5); cursor: pointer; font-family: inherit; color: inherit;
-  background: var(--card-sheen), var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-lg); box-shadow: var(--shadow-sm);
+  background: var(--card-sheen), var(--surface); border: 1px solid var(--border-card);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-surface);
   transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease);
 }
 .maint-card:hover { border-color: var(--brand); box-shadow: var(--shadow-md); transform: translateY(-1px); }

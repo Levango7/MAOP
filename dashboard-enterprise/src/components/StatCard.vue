@@ -78,11 +78,14 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
   align-items: center;
   gap: var(--sp-3);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-lg);
   padding: var(--sp-4);
-  /* JB 精修: 去 sheen / hairline / 常驻阴影 — 描边与明度差承担层级 */
-  transition: border-color var(--motion) var(--ease);
+  /* 2026-10-29 用户反馈修正：原注释"去常驻阴影 — 描边与明度差承担层级"，
+   * 但描边仅 1.49:1、明度差仅 1.09:1，实测分不出卡片与底布。改用卡片专用
+   * 描边（1.89:1）+ 一层克制阴影，仍不上浮。 */
+  box-shadow: var(--shadow-surface);
+  transition: border-color var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
   position: relative;
 }
 /* JB 精修: hover 只改描边, 不要"飘浮"(translateY/shadow-pop 是模板感来源) */
