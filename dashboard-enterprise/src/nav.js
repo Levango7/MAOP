@@ -52,6 +52,23 @@ export const nav = [
   { to: '/capability/protocols', label: 'nav.protocols', icon: 'share2', subtitle: 'nav.protocols.subtitle' },
   { to: '/capability/worktrees', label: 'nav.worktrees', icon: 'git-compare', subtitle: 'nav.worktrees.subtitle' },
   { to: '/capability/agent-proxy', label: 'nav.agentProxy', icon: 'arrow-left-right', subtitle: 'nav.agentProxy.subtitle' },
+  // ── 2026-10-29 补齐：以下 4 个页面此前只有路由、没有导航入口 ──
+  // 实测 `git grep "capability/examples"` 只命中 router/index.js 本身，
+  // 全仓没有任何 router-link / router.push 指向它们 —— 除了手输 URL，
+  // 用户永远到不了。这几页是 5.5.0 新增能力，不可达等于没交付。
+  { to: '/capability/agent-versions', label: 'nav.agentVersions', icon: 'git-branch', subtitle: 'nav.agentVersions.subtitle' },
+  { to: '/capability/credential-vault', label: 'nav.credentialVault', icon: 'key', subtitle: 'nav.credentialVault.subtitle' },
+  { to: '/capability/long-running-tasks', label: 'nav.longRunningTasks', icon: 'timer', subtitle: 'nav.longRunningTasks.subtitle' },
+  { to: '/capability/examples', label: 'nav.examples', icon: 'file', subtitle: 'nav.examples.subtitle' },
+  // ── 同上：再 3 个成型的 Agent 页同样没有入口 ──
+  // 判定口径见 src/__tests__/ 的不可达路由核查：router 里带 component 的真页面，
+  // 既不在 nav 的 to / matchPaths 里，全仓也没有 to=/push()/href= 指向它。
+  // 注意 /capability/agent-recommend **不补**：AgentRecommend.vue 已被
+  // AgentRegistry.vue 作为 recommend tab 嵌入（第 289 行 `<AgentRecommend />`），
+  // 推荐功能经由本项即可达，独立路由属冗余别名，保留只为深链不断。
+  { to: '/capability/agent-registry', label: 'nav.agentRegistry', icon: 'grid', subtitle: 'nav.agentRegistry.subtitle' },
+  { to: '/capability/agent-billing', label: 'nav.agentBilling', icon: 'chart', subtitle: 'nav.agentBilling.subtitle' },
+  { to: '/capability/agent-gateway', label: 'nav.agentGateway', icon: 'share-nodes', subtitle: 'nav.agentGateway.subtitle' },
 
   // ── 运维 ─────────────────────────────────────────────────────
   { section: 'nav.group.operate' },
