@@ -171,5 +171,12 @@
 - **下一步（动前会先在本表再登记）**：企业版 allowlist 31 条烧降。先分诊「仓内 FeatureFlag
   门控的 4 个路由」与「需 overlay 的 3 个路由」——后者要改 MAOS `maop/enterprise/*`，
   涉及完整性清单重签，须与持私钥会话协调，未获指示前不动。
+- **进展（2026-10-30）**：
+  - 已推送 **PR #181**（分支 `fix/clean-ci-collection-rule`）。
+  - 分诊结果：31 条 = 仓内 17（tenant 5 / rbac 5 / quotas 7）+ overlay 14
+    （sso 5 / n8n 4 / licenses 5）。**只做仓内 17**，overlay 14 条留批，需协调代签。
+  - 在途：分支 `fix/enterprise-response-models`（worktree `F:/Nexus/MAOP-ent17`，
+    自 2db48dc1，3 提交）：镜像模型 + 三条 router 接线 + 21 例线缆契约 +
+    棘轮 allowlist 31 → 14。未推送。
 - **不碰**：`py/maop/dashboard/server.py` 与 lifespan 接线面（ZCode 第四轮）、
   `core/**` 宽口径异常收窄批（ADR-023 D8）、`dashboard-enterprise/src/**`。
