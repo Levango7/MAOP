@@ -51,8 +51,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   —— 此前成本条目的 agent/phase 两维在账面上是空的。
 - 测试 `tests/test_cost_attribution.py` 6 例：聚合与手算子集逐条对齐 / 未归属桶 /
   归属接线（含旧调用零破坏）/ 未配置不告警 / 严重度分档 / 告警落库与去重。
-- **M0 边界**（章程见 ROADMAP「M-X3」）：本条含聚合与告警；dashboard 端点/视图
-  切片因 routers 面在他线 response-model 批次中，顺延为下一小批。
+- **端点切片（2026-10-30 补，routers 面他线批次已落库）**：
+  - `routers/cost_attribution.py`：`GET /api/cost-attribution`（admin-only 三维
+    聚合，start_date/end_date 窗口）+ `POST /api/cost-attribution/check-budget`
+    （**只查不落库**的越阈检查；入库走 `emit_budget_alerts`，由调度/CLI 触发）；
+  - `routers/cost_attribution_schemas.py`：响应模型（`DimensionBucket` 三键与
+    单元对齐断言同源）；`_register_routes` 注册；死接线条目随之移除；
+  - 端点契约测试 `tests/test_cost_attribution_endpoint.py` 5 例（含 admin-only
+    403 两例、check-budget 不落库断言、窗口过滤）。
+- **M0 余量**：前端视图属 dashboard-enterprise 前端线领地（板记已委托，
+  数据源即本端点）。
 
 ### 分层收官批 第二刀：黑板→WS 桥接线（问题#9 收口，2026-10-29）
 

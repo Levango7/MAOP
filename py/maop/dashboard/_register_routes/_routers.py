@@ -144,6 +144,11 @@ def _register_core_routers(app: FastAPI) -> None:
     app.include_router(runs.router)
     app.include_router(share.router)
     app.include_router(model.router)
+
+    # M-X3 成本归因（2026-10-29）：/api/cost-attribution 聚合 + 预算越阈检查
+    from maop.dashboard.routers import cost_attribution as cost_attribution_router
+
+    app.include_router(cost_attribution_router.router)
     # F2-01 first: evolution_experiment owns the static /api/evolution/ab/list,
     # while evolve_insights owns /api/evolution/ab/{cycle_id}. Starlette picks
     # the first full match, so the param route must not be registered earlier —
