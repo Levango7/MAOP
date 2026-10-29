@@ -6,6 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# 整份文件测的都是企业版持久层；企业包缺席时 47 条用例全红，故模块级显式 skip。
+pytest.importorskip("maop.enterprise.pg_persist")
+
 
 @pytest.fixture(autouse=True)
 def enterprise_mode():

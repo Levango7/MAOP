@@ -150,6 +150,36 @@
   `routers/*_schemas.py` 面。**他线注意**：`ws_blackboard_bridge.py` 内部两处
   `except Exception` 属该批候选，如你方先行收窄请在本表回一行，我 rebase 跟随。
 
+## 领地登记（Qoder-CN 会话 17ef022a，2026-10-30：response_model 棘轮线）
+
+补登记：2026-10-28 17:15 那批 `routers/*_schemas.py` 就是本线产物（上表已注意到）。
+
+- **在途**：分支 `fix/clean-ci-collection-rule`（自 15510ae1，worktree `F:/Nexus/MAOP-p1b`，
+  7 提交 `724db535..ea1b8486`；与 origin/master 2db48dc1 无文件交集，已核可合）。
+  内容：企业包收集判据由「文本关键字」改按 AST（连坐 37 → 17，两份 conftest 共用
+  `py/tests/_overlay_rule.py`）；复原 4 处被旧判据吃掉的诚实守卫（显式 skip）；
+  判据修好后棘轮抓到的 13 条缺口（12 条建模 + 1 条如实证非 JSON/SSE）；
+  同批两条被叫醒的存量红（A2A 开关文档 / SAML 第三例守卫）；新信封 status 默认 error。
+- **领地（本线独占，勿动）**：`py/maop/dashboard/routers/{credential_vault,share,
+  agent_versions,long_running_task}.py` 与其 `*_schemas.py`；
+  `py/tests/_overlay_rule.py`；`py/tests/conftest.py`、`py/tests/e2e/conftest.py`；
+  `py/tests/test_overlay_collection_rule.py`；
+  `py/tests/test_{vault_share,versions_tasks}_router_contracts.py`；
+  `py/tests/fixtures/{frontend_non_json_endpoints.txt,frontend_response_model_allowlist.txt,
+  enterprise_response_model_allowlist.txt}`；
+  `py/tests/test_{frontend,enterprise}_response_models.py`；`py/maop/config/edition.py`。
+- **下一步（动前会先在本表再登记）**：企业版 allowlist 31 条烧降。先分诊「仓内 FeatureFlag
+  门控的 4 个路由」与「需 overlay 的 3 个路由」——后者要改 MAOS `maop/enterprise/*`，
+  涉及完整性清单重签，须与持私钥会话协调，未获指示前不动。
+- **进展（2026-10-30）**：
+  - 已推送 **PR #181**（分支 `fix/clean-ci-collection-rule`）。
+  - 分诊结果：31 条 = 仓内 17（tenant 5 / rbac 5 / quotas 7）+ overlay 14
+    （sso 5 / n8n 4 / licenses 5）。**只做仓内 17**，overlay 14 条留批，需协调代签。
+  - 在途：分支 `fix/enterprise-response-models`（worktree `F:/Nexus/MAOP-ent17`，
+    自 2db48dc1，3 提交）：镜像模型 + 三条 router 接线 + 21 例线缆契约 +
+    棘轮 allowlist 31 → 14。未推送。
+- **不碰**：`py/maop/dashboard/server.py` 与 lifespan 接线面（ZCode 第四轮）、
+  `core/**` 宽口径异常收窄批（ADR-023 D8）、`dashboard-enterprise/src/**`。
 ## 领地登记（Examples 会话，2026-10-29：前端可达性 + 三类静默失败守卫）
 
 - **进行中**：`dashboard-enterprise/src/**` 内三个文件 —— `nav.js`（补导航入口）、

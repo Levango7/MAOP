@@ -20,6 +20,10 @@ from fastapi.testclient import TestClient
 
 from maop.config.edition import Edition, reset_edition, set_edition
 
+# sso 路由在模块级导入 maop.enterprise.sso（ADR-017 后企业代码在私有仓），企业包
+# 缺席时这 4 条用例连路由都装不起来，故模块级显式 skip。
+pytest.importorskip("maop.enterprise")
+
 
 @pytest.fixture(autouse=True)
 def _enterprise_edition(monkeypatch: pytest.MonkeyPatch) -> Any:

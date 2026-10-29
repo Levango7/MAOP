@@ -20,10 +20,15 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import pytest
 from fastapi import WebSocketDisconnect
 
 from maop.dashboard.routers import auth as _auth_mod
-from maop.dashboard.routers import notifications as _notif_mod
+
+# notifications 路由在模块级导入 maop.enterprise.notification.models（ADR-017 后
+# 企业代码在私有仓）。企业包缺席时用 importorskip 显式跳过：报告里留一条 skip，
+# 而不是让 collect_ignore 把整个文件一起吞掉。
+_notif_mod = pytest.importorskip("maop.dashboard.routers.notifications")
 
 
 class _StubWebSocket:

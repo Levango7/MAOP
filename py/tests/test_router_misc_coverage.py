@@ -66,8 +66,9 @@ def tenant_client(tmp_path, monkeypatch):
 
 class TestTenantList:
     def test_list(self, tenant_client):
-        # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-        # enterprise installed (maop-enterprise wheel): guard removed
+        # list_tenants 经 maop.enterprise.tenant.TenantStatus（模块级导入企业包）
+        # 才拿得到枚举；企业包缺席时本用例无从成立。
+        pytest.importorskip("maop.enterprise.tenant")
         resp = tenant_client.get("/api/tenant/list")
         assert resp.status_code == 200
 
@@ -78,8 +79,7 @@ class TestTenantList:
 
 class TestTenantCreate:
     def test_happy(self, tenant_client):
-        # H4 修复：将 importorskip 改为显式 pytest.skip，让测试报告显式统计跳过数。
-        # enterprise installed (maop-enterprise wheel): guard removed
+        pytest.importorskip("maop.enterprise.tenant")
         resp = tenant_client.post(
             "/api/tenant/create",
             json={"tenant_id": "t1", "name": "test"},
