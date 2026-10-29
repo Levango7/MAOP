@@ -20,6 +20,11 @@
   --bg3: #2e3138;         /* workbench-300 */
   --bg4: #1b1d21;
   --border: #3c4048;      /* 中性灰描边, 夜间可读性阈值之上 */
+  /* 2026-10-29 卡片专用描边：--border 在 --surface 上只有 1.49:1，用户反馈
+   * "card 和底布界限区别不够明显"。此处提到 #4a4f59 → on --surface 1.89:1。
+   * 只给卡片类用，不动 --border 全局值——注释里说过的理由仍成立：
+   * 容器描边整体提到 3:1 会让界面"方框化"，破坏 JetBrains 式细描边分层。 */
+  --border-card: #4a4f59;
   --text: #e8eaf0;
   --text2: #adb4c2;
   --text3: #7c8595;  /* legacy alias — 语义等价于 --text-faint, 新代码应使用 --text-faint */
@@ -153,6 +158,13 @@
   --shadow-topbar: 0 1px 0 rgba(0, 0, 0, .30);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, .40);
   --shadow-brand: 0 2px 10px rgba(12, 133, 122, .30);
+  /* 2026-10-29 页面内卡片专用阴影：原设计"卡片不靠阴影抬升"在 --surface 与
+   * --bg 明度差只有 1.09:1 时失效——描边 1.49:1 + 明度差 1.09:1 叠加等于没有分层。
+   * 这里给一层**极浅**接触阴影 + 一层大半径低透明度环境阴影，保留"静止感"但
+   * 让卡片真的浮起来。
+   * 不复用 --shadow-card：那个是浮层语义（CoachMarks 遮罩 / NodeDetailPanel 抽屉
+   * 在用），值 0 4px 16px 偏"弹窗感"，压在页面里会让卡片看起来可点开。 */
+  --shadow-surface: 0 1px 2px rgba(0, 0, 0, .28), 0 6px 16px -10px rgba(0, 0, 0, .55);
   --shadow-card: 0 4px 16px rgba(0, 0, 0, .30);
   --shadow-modal: 0 12px 40px rgba(0, 0, 0, .50);
   --shadow-inset-highlight: inset 0 1px 0 rgba(255, 255, 255, .25);
