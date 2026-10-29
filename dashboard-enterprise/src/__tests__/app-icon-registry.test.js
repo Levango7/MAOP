@@ -4,9 +4,11 @@ import path from 'node:path';
 
 /**
  * AppIcon 的 glyph 计算是 `ICONS[name] || ''` —— 未知名字**静默渲染为空**，
- * 既不报错也不告警。2026-10-29 实测：13 个名字被 9 个视图引用却没有定义
+ * 既不报错也不告警。2026-10-29 实测：14 个名字被 9 个视图引用却没有定义
  * （key / layers / list / timer / lock / grid / flag / history / check-square /
- * git-commit / chart / heart-pulse / share-nodes），页面标题旁一直是空白，
+ * git-commit / chart / heart-pulse / share-nodes，以及 refresh-cw ——
+ * 前 13 个是首轮扫描结果，refresh-cw 是本守卫第一次跑起来后才抓到的，
+ * 正说明"人工扫描会漏、机器扫描不会"），页面标题旁一直是空白，
  * 而所有测试与 lint 都是绿的。
  *
  * 这个用例把「引用集合 ⊆ 定义集合」钉成断言：少定义一个图标 CI 就红。

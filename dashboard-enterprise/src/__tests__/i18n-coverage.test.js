@@ -60,8 +60,7 @@ function dictionaryKeys() {
   return keys;
 }
 
-/** 代码里 t('literal') 的引用。动态拼接（'view.foo.' + x）不是字面量，跳过。 */
-function referencedKeys() {
+/** 代码里 t('literal') 的引用。动态拼接（'view.foo.' + x）不是字面量，跳过。 */function referencedKeys() {
   const used = new Map();
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -102,6 +101,24 @@ describe('i18n coverage', () => {
     ).toEqual([]);
   });
 
+  it('every nav label / subtitle / section key exists in the dictionary', () => {
+    // 盲区：nav.js 用的是 `{ label: 'nav.xxx' }` 这种纯字符串字段，由 NavItem
+    // 渲染时调 t()，不是 t('...') 字面量调用 —— 上面的 referencedKeys() 抓不到。
+    const dict = dictionaryKeys();
+    const navText = fs.readFileSync(path.join(SRC, 'nav.js'), 'utf-8');
+    const missing = [];
+    for (const field of ['label', 'subtitle', 'section']) {
+      const re = new RegExp(`\\b${field}:\\s*'([^']+)'`, 'g');
+      for (const m of navText.matchAll(re)) {
+        if (!dict.has(m[1])) missing.push(`${m[1]} (nav.${field})`);
+      }
+    }
+    expect(
+      missing,
+      `nav.js 引用的词条缺失，侧边栏会显示 key 原文：\n  ${missing.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
   it('en and zh dictionaries have identical key sets', () => {
     const en = dictionaryKeys();
     // 用同一套解析取 zh：coreMessages.zh ∪ view-*.js 的 zh 块
@@ -123,8 +140,14 @@ describe('i18n coverage', () => {
   });
 
   it('actually parses a non-trivial dictionary and reference set', () => {
-    // 防止正则失效导致上面两个用例空转变绿
+    // 防止正则失效导致上面几个用例空转变绿
     expect(dictionaryKeys().size).toBeGreaterThan(3000);
     expect(referencedKeys().size).toBeGreaterThan(2000);
+    // nav 的 key 引用也要真有 100+ 条，否则上面的 nav 用例是空转
+    const navText = fs.readFileSync(path.join(SRC, 'nav.js'), 'utf-8');
+    const navRefs = [
+      ...navText.matchAll(/\b(?:label|subtitle|section):\s*'([^']+)'/g),
+    ];
+    expect(navRefs.length).toBeGreaterThan(100);
   });
 });
