@@ -210,11 +210,9 @@ def cmd_run(task: str, depth: int = 0, agent: str = "") -> Any:
     cap the run is refused with a non-zero exit instead of re-entering
     the orchestration loop.
 
-    ``agent`` (``--agent``, M-T3.3 M1) pins the executing agent: it is
-    forwarded as ``MaopLoop.run(agent=...)`` (F6a forced_agent), so a
-    caller — e.g. the k8s operator resolving a MaopAgent CR — can route
-    the task to a declared agent instead of plan-based selection.
-    Empty (default) preserves the previous behaviour.
+    ``agent`` (``--agent``) pins the executing agent via
+    ``MaopLoop.run(agent=...)`` (F6a forced_agent); empty keeps previous
+    behaviour. Used by the k8s operator for MaopAgent CR resolution.
     """
     depth = max(depth, current_depth())
     if depth >= MAX_SELF_DELEGATION_DEPTH:
@@ -774,9 +772,7 @@ def main() -> Any:
                              "MAOP_DELEGATION_DEPTH; capped at "
                              f"{MAX_SELF_DELEGATION_DEPTH})")
     parser.add_argument("--agent", "-a", default="",
-                        help="Pin the executing agent for run "
-                             "(MaopLoop forced_agent; used by the k8s operator "
-                             "for MaopAgent CR resolution)")
+                        help="Pin the executing agent (MaopLoop forced_agent)")
     parser.add_argument("--port", "-p", type=int, default=9079, help="Dashboard port (default: 9079)")
     parser.add_argument("--host", default="127.0.0.1", help="Dashboard host (default: 127.0.0.1)")
     args = parser.parse_args()
