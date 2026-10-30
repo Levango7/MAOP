@@ -50,16 +50,44 @@ def _condition(cond_type: str, reason: str, message: str, when: str) -> dict[str
     }
 
 
-def plan_launch(*, when: str | None = None) -> Transition:
-    """观测到未启动的 MaopTask：进入 Running 并记录 startTime."""
+def plan_launch(
+    *,
+    when: str | None = None,
+    agent: str = "",
+    agent_resolved: bool | None = None,
+) -> Transition:
+    """观测到未启动的 MaopTask：进入 Running 并记录 startTime.
+
+    M1：``agent`` 与 ``agent_resolved`` 提供时追加 ``AgentResolved`` 条件 ——
+    True=MaopAgent CR 存在（命令带 ``--agent`` pin）；False=未声明（按 M0
+    行为不 pin）。两参缺省时不追加条件，输出与 M0 保持一致。
+    """
     when = when or now_iso()
+    conditions = [
+        _condition("Launched", "SubprocessStarted", "maop run subprocess started", when)
+    ]
+    if agent and agent_resolved is not None:
+        if agent_resolved:
+            conditions.append(
+                _condition(
+                    "AgentResolved",
+                    "MaopAgentFound",
+                    f"MaopAgent {agent!r} resolved; executing agent pinned",
+                    when,
+                )
+            )
+        else:
+            conditions.append(
+                _condition(
+                    "AgentResolved",
+                    "MaopAgentNotDeclared",
+                    f"MaopAgent {agent!r} not found; running without pinning",
+                    when,
+                )
+            )
     return Transition(
         phase="Running",
-        patch={
-            "phase": "Running",
-            "startTime": when,
-            "conditions": [_condition("Launched", "SubprocessStarted", "maop run subprocess started", when)],
-        },
+        patch={"phase": "Running", "startTime": when, "conditions": conditions},
     )
 
 

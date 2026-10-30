@@ -39,6 +39,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M-T3.3 Operator M1 —— MaopAgent CR 解析 + agent pinning（2026-10-30）
+
+``spec.agent`` 从"校验透传"变为真正参与执行路由：
+
+- operator：controller 注入 ``resolver`` 后读取同名 MaopAgent CR（gateway 惰性
+  k8s 客户端，404→None）；**CR 存在 → 命令带 ``--agent`` 并置
+  ``AgentResolved=True`` 条件；未声明 → 按 M0 行为不 pin（``AgentResolved=False``
+  注记），任务照常执行**。
+- CLI：``maop run --agent <name>`` → ``cmd_run(agent=)`` → ``MaopLoop.run(agent=)``
+  （复用 F6a ``forced_agent``；默认空字符串保持原行为）。
+- 测试：``test_operator_m1.py`` 10 例（命令形状 / AgentResolved 条件 /
+  解析与不解析 / invalid 不解析 / CR 坐标与 CRD 机器对齐哨兵）+ ``test_cli``
+  ``--agent`` 解析传递；M0 测试面未改断言（默认路径逐字节保持）。
+- 诚实边界：解析到的 ``maxTurns`` / ``model`` / ``tools`` 暂不消费 —— turn 会计
+  （``status.turns``）与配额/多租户是后续里程碑（M2/M3）。
+
 ### operator 镜像构建修复 —— 两处 Dockerfile 缺陷（2026-10-30）
 
 `deploy/k8s/operator/Dockerfile`（随 #184 合并）在 CI master build-only 腿上

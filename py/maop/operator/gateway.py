@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,20 @@ class StatusGateway(Protocol):
     ) -> None: ...
 
 
+class AgentResolver(Protocol):
+    """MaopAgent CR 解析接口（M1，可注入替换）。解析不到返回 ``None``。"""
+
+    async def resolve_agent(
+        self, *, name: str, namespace: str
+    ) -> dict[str, Any] | None: ...
+
+
 class KubernetesStatusGateway:
-    """基于官方客户端的默认实现（惰性导入，调用时才需要装包）。"""
+    """基于官方客户端的默认实现（惰性导入，调用时才需要装包）.
+
+    M1 起同时实现 :class:`AgentResolver`：读取 MaopAgent CR 供 controller
+    决定是否 pin 执行 agent。
+    """
 
     def __init__(self) -> None:
         try:
@@ -57,6 +69,32 @@ class KubernetesStatusGateway:
                 body={"status": patch},
             ),
         )
+
+
+    async def resolve_agent(
+        self, *, name: str, namespace: str
+    ) -> dict[str, Any] | None:
+        """读取同名 MaopAgent CR；404 → ``None``（未声明），其余错误上抛（kopf 重试）."""
+        from kubernetes.client.rest import ApiException
+
+        def _get() -> Any:
+            return self._api.get_namespaced_custom_object(
+                group="maop.io",
+                version="v1alpha1",
+                namespace=namespace,
+                plural="maopagents",
+                name=name,
+            )
+
+        # 与 patch_status 同理：官方客户端是同步阻塞调用，丢线程池。
+        loop = asyncio.get_running_loop()
+        try:
+            raw = await loop.run_in_executor(None, _get)
+        except ApiException as exc:
+            if exc.status == 404:
+                return None
+            raise
+        return cast("dict[str, Any]", raw)
 
 
 @dataclass(frozen=True)
