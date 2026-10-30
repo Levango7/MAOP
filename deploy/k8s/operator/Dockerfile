@@ -17,11 +17,15 @@ WORKDIR /app
 RUN pip install --no-cache-dir "kopf>=1.36,<2" "kubernetes>=29,<32"
 
 # maop 本体（含 cli.py 的 `maop run` 入口）。
+# config/ 必需：wheel 的 hatch_build 钩子把 ../config 当必需构建资产
+# （dashboard/dist-enterprise 才是可跳过项），缺则 metadata-generation-failed。
 COPY py/ /app/py/
+COPY config/ /app/config/
 RUN pip install --no-cache-dir /app/py
 
-# 非 root 运行。
-RUN useradd --create-home operator
+# 非 root 运行。基镜像（Debian slim）已带 operator 组（GID 37），
+# 直接复用：裸 useradd 会因同名组已存在而拒绝（exit 9）。
+RUN useradd --create-home --gid operator operator
 USER operator
 
 ENTRYPOINT ["python", "-m", "maop.operator"]

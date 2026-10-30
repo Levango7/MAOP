@@ -233,8 +233,17 @@
   `tests/test_operator_m0.py` 15 例 + ROADMAP/CHANGELOG。PR 上 23 pass / 8 skip /
   0 fail。分支 `feat/operator-m0` 与 worktree `F:/Nexus/MAOP-op` 保留，后续刀续用。
 - **M0 边界（留给后续刀）**：未含 MaopAgent CR 解析 / turn budget / 配额多租。
-- **验证待记**：operator 镜像 build-only 腿带 `if: push && (main||master)`，
-  PR 上 skip —— 首次真实构建在 master 首跑（run 41097523007）随合并触发。
+- **⚠️ M0.1 热修（2026-10-30 晚）**：operator 镜像构建两处修复 —— ① 补
+  `COPY config/`（wheel 的 `hatch_build.py` 把 `../config` 当**必需**资产，
+  `dashboard/dist-enterprise` 才可缺省；缺则 `metadata-generation-failed`）；
+  ② `useradd --gid operator`（基镜像 Debian slim 自带 `operator` 组 GID 37，
+  裸 useradd 同名组冲突 exit 9）。**均由本地复刻 CI 构建逮到（未等 master 红）**；
+  守卫测试 `test_operator_dockerfile_build_invariants`；分支
+  `fix/operator-image-build`。
+- **验证现状**：PR 上 docker 腿 skip（`if: push && (main||master)`）；master 首跑
+  41097523007 被后续合并的 cancel-in-progress（同 ref 新 run 取消旧 run）连续顶掉，
+  docs-only 合并的 master run 里 docker 腿亦 skip —— 真正首验顺延为本热修的
+  code 合并（merge 后 master 全矩阵跑 docker + operator 腿）。
 - **不碰**：`deploy/k8s/operator/` 既有 Chart/CRD（只加 Dockerfile）；
   他线的宽口径异常收窄批与前端面。
 - **已知环境干扰**：本机可达 FlintSpark k4 e2e 的 kind 集群时，既有

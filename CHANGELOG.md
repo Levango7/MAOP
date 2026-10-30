@@ -39,6 +39,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### operator 镜像构建修复 —— 两处 Dockerfile 缺陷（2026-10-30）
+
+`deploy/k8s/operator/Dockerfile`（随 #184 合并）在 CI master build-only 腿上
+必然失败，两处缺陷均由**本地复刻 CI 构建**在合并后数小时内逮到（未等到 master 红）：
+
+1. **缺 `COPY config/`**：只拷了 `py/`，而 wheel 目标经 `hatch_build.py` 把
+   `../config` 视为**必需**构建资产（`dashboard/dist-enterprise` 才可跳过）——
+   报 `metadata-generation-failed` / `FileNotFoundError: required build asset
+   missing: /app/config`。
+2. **`useradd` 同名组冲突**：基镜像（Debian slim）自带 `operator` 组（GID 37），
+   裸 `useradd --create-home operator` 因同名组已存在直接 exit 9。
+
+修复：`COPY config/ /app/config/`（`/app/py/../config` 由此可解析）+
+`useradd --create-home --gid operator operator`（复用既有组）。守卫：
+`test_operator_dockerfile_build_invariants` 静态钉住两条不变量（COPY config/
+且早于 pip install /app/py；useradd 带 --gid）——PR 上 docker 腿不跑
+（`if: push && (main||master)`），静态守卫是 PR 期唯一防线。
+
 ### 纯净 CI 的收集跳过判据改按 AST —— 20 个测试文件此前从未运行过（2026-10-30）
 
 `tests/conftest.py` 与 `tests/e2e/conftest.py` 用「文件文本里出现过 `maop.enterprise`
