@@ -221,13 +221,25 @@
 - **前端视图委托**：dashboard-enterprise 的成本归因视图属前端线领地
   （Examples 会话/kilo），数据源即本端点（`GET /api/cost-attribution`）；
   本会话不碰 `dashboard-enterprise/src/**`。
+
 ## 领地登记（ZCode session_f62ccbe…，2026-10-30 第七轮：M-T3.3 Operator M0 第一刀）
 
-- **进行中**：K8s Operator M0 —— 新包 `py/maop/operator/`（spec/reconcile/
-  controller/gateway/handlers/__main__）+ `deploy/k8s/operator/Dockerfile` +
-  CI docker 作业 build-only 腿 + `tests/test_operator_m0.py` 15 例 + ROADMAP/
-  CHANGELOG。分支 `feat/operator-m0`，worktree `F:/Nexus/MAOP-op`。
+- **已完成（2026-10-30：PR #184 合并 → master `2f421757`）**：K8s Operator M0 ——
+  新包 `py/maop/operator/`（spec/reconcile/controller/gateway/handlers/__main__）
+  + `deploy/k8s/operator/Dockerfile` + CI docker 作业 build-only 腿 +
+  `tests/test_operator_m0.py` 15 例 + ROADMAP/CHANGELOG。PR 上 23 pass / 8 skip /
+  0 fail。分支 `feat/operator-m0` 与 worktree `F:/Nexus/MAOP-op` 保留，后续刀续用。
+- **M0 边界（留给后续刀）**：未含 MaopAgent CR 解析 / turn budget / 配额多租。
+- **验证待记**：operator 镜像 build-only 腿带 `if: push && (main||master)`，
+  PR 上 skip —— 首次真实构建在 master 首跑（run 41097523007）随合并触发。
 - **不碰**：`deploy/k8s/operator/` 既有 Chart/CRD（只加 Dockerfile）；
   他线的宽口径异常收窄批与前端面。
 - **已知环境干扰**：本机可达 FlintSpark k4 e2e 的 kind 集群时，既有
   `test_k8s_operator.py` 集群分层用例会误连并红（非本批回归，master 同样）。
+- **共享树自记**：本会话一度误判主工作树 `refactor/layering-closeout` 为本人分支
+  并起过 rebase（已 abort，分支 tip `77747fc9` 未变）；该树 4 个未提交改动
+  （`py/maop/config/settings.py`、`py/maop/dashboard/server.py`、
+  `py/tests/test_dead_wiring_inventory.py` + 未跟踪
+  `py/tests/test_layering_lifespan_wiring.py`）被短暂 stash 后**逐字节还原**、
+  现仍在工作树原位。归属请相关会话认领（像 layering 线的 lifespan 接线草稿），
+  本会话不再触碰该树。
