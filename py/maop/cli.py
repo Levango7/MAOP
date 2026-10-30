@@ -200,7 +200,7 @@ def cmd_status() -> Any:
         logger.warning("cmd_status: 查询 MAOP 状态失败（刻意降级，不阻塞退出码），异常: %s", exc, exc_info=True)
 
 
-def cmd_run(task: str, depth: int = 0) -> Any:
+def cmd_run(task: str, depth: int = 0, agent: str = "") -> Any:
     """Run a task through Python-native MaopLoop.
 
     Depth arrives from ``--depth`` or from the inherited
@@ -209,6 +209,10 @@ def cmd_run(task: str, depth: int = 0) -> Any:
     a self-referential agent from forking itself indefinitely.  At the
     cap the run is refused with a non-zero exit instead of re-entering
     the orchestration loop.
+
+    ``agent`` (``--agent``) pins the executing agent via
+    ``MaopLoop.run(agent=...)`` (F6a forced_agent); empty keeps previous
+    behaviour. Used by the k8s operator for MaopAgent CR resolution.
     """
     depth = max(depth, current_depth())
     if depth >= MAX_SELF_DELEGATION_DEPTH:
@@ -224,7 +228,7 @@ def cmd_run(task: str, depth: int = 0) -> Any:
 
         from maop.maop_loop import MaopLoop
         loop = MaopLoop(root_dir=str(_runtime_root()))
-        result = asyncio.run(loop.run(task))
+        result = asyncio.run(loop.run(task, agent=agent))
         elapsed = (time.monotonic() - start) * 1000
         # 输出执行结果
         if result.trace_id:
@@ -767,6 +771,8 @@ def main() -> Any:
                         help="Self-delegation depth (also inherited via "
                              "MAOP_DELEGATION_DEPTH; capped at "
                              f"{MAX_SELF_DELEGATION_DEPTH})")
+    parser.add_argument("--agent", "-a", default="",
+                        help="Pin the executing agent (MaopLoop forced_agent)")
     parser.add_argument("--port", "-p", type=int, default=9079, help="Dashboard port (default: 9079)")
     parser.add_argument("--host", default="127.0.0.1", help="Dashboard host (default: 127.0.0.1)")
     args = parser.parse_args()
@@ -782,7 +788,7 @@ def main() -> Any:
     elif args.action == "run":
         if not args.task:
             sys.exit(1)
-        cmd_run(args.task, depth=args.depth)
+        cmd_run(args.task, depth=args.depth, agent=args.agent)
     elif args.action == "validate":
         cmd_validate()
     elif args.action == "health":

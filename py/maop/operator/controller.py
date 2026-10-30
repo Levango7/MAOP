@@ -4,10 +4,13 @@
 1. ``spec.parse_task_spec`` 校验 —— 失败直接补丁 Failed（reason=InvalidSpec），
    **不拉起**子进程；
 2. 终态（status.phase 已是 terminal）→ no-op（k8s 事件重放幂等）；
-3. 否则补丁 Running（``plan_launch``）→ runner 执行 ``command_for(spec)`` →
+3. （M1）``resolver`` 注入时解析 ``spec.agent`` 的 MaopAgent CR —— 存在即
+   pin（命令带 ``--agent``，``AgentResolved=True`` 条件）；未声明则按 M0
+   行为不 pin（``AgentResolved=False`` 条件），两者都继续执行；
+4. 否则补丁 Running（``plan_launch``）→ runner 执行 ``command_for(spec)`` →
    按结果补丁终态（``plan_finish``）；任务被取消 → Cancelled 后原样上抛。
 
-gateway/runner 全部构造注入 —— 测试用 fake 驱动全链路，不需要 k8s。
+gateway/runner/resolver 全部构造注入 —— 测试用 fake 驱动全链路，不需要 k8s。
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ import asyncio
 import logging
 from typing import Any
 
-from maop.operator.gateway import RunOutcome, StatusGateway, SubprocessRunner
+from maop.operator.gateway import AgentResolver, RunOutcome, StatusGateway, SubprocessRunner
 from maop.operator.reconcile import is_terminal, plan_finish, plan_launch
 from maop.operator.spec import InvalidSpecError, command_for, parse_task_spec
 
@@ -31,10 +34,12 @@ class OperatorController:
         *,
         gateway: StatusGateway,
         runner: SubprocessRunner,
+        resolver: AgentResolver | None = None,
         timeout_s: float | None = None,
     ) -> None:
         self._gateway = gateway
         self._runner = runner
+        self._resolver = resolver
         self._timeout_s = timeout_s
 
     async def handle_task(
@@ -59,12 +64,27 @@ class OperatorController:
             await self._patch(name, namespace, plan_finish(invalid=str(exc)))
             return {"phase": "Failed", "launched": False, "reason": "InvalidSpec"}
 
-        # 3. Running + 拉起。
-        await self._patch(name, namespace, plan_launch())
-        logger.info("[operator] %s/%s launching: %s", namespace, name, spec.prompt[:80])
+        # 3. M1: MaopAgent CR 解析（存在即 pin；未注入 resolver 时保持 M0 行为）。
+        agent_resolved: bool | None = None
+        if self._resolver is not None:
+            agent_resolved = (
+                await self._resolver.resolve_agent(name=spec.agent, namespace=namespace)
+            ) is not None
+        pin = agent_resolved is True
+
+        # 4. Running + 拉起。
+        await self._patch(
+            name, namespace, plan_launch(agent=spec.agent, agent_resolved=agent_resolved)
+        )
+        logger.info(
+            "[operator] %s/%s launching (agent=%s resolved=%s pinned=%s): %s",
+            namespace, name, spec.agent, agent_resolved, pin, spec.prompt[:80],
+        )
 
         try:
-            outcome = await self._runner.run(command_for(spec), timeout_s=self._timeout_s)
+            outcome = await self._runner.run(
+                command_for(spec, pin_agent=pin), timeout_s=self._timeout_s
+            )
         except asyncio.CancelledError:
             await self._patch(name, namespace, plan_finish(cancelled=True))
             raise

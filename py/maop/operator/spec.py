@@ -81,11 +81,19 @@ def parse_task_spec(
     )
 
 
-def command_for(spec: MaopTaskSpec) -> list[str]:
-    """构造执行命令（M0：``maop run <prompt>``）.
+def command_for(spec: MaopTaskSpec, *, pin_agent: bool = False) -> list[str]:
+    """构造执行命令.
 
-    诚实边界：``spec.agent`` / ``tenant`` / ``maxTurns`` 在 M0 只做校验与
-    透传记录（status 注释），不参与命令——``maop run`` 当前不接受这些参数，
-    MaopAgent CR 解析与 turn 预算是后续里程碑（见包 docstring）。
+    M0 形状：``maop run <prompt>``；M1 起 ``pin_agent=True`` 插入
+    ``--agent <spec.agent>`` —— 由 controller 依据 MaopAgent CR 解析结果决定
+    （CR 存在即 pin）。``maop run --agent`` 把该名字落为 MaopLoop 的
+    forced_agent（F6a），使 ``spec.agent`` 真正参与执行路由。
+
+    诚实边界：``tenant`` / ``maxTurns`` 仍只校验与透传记录；turn 会计
+    （status.turns）与配额是后续里程碑（见包 docstring）。
     """
-    return ["maop", "run", spec.prompt]
+    command = ["maop", "run"]
+    if pin_agent:
+        command += ["--agent", spec.agent]
+    command.append(spec.prompt)
+    return command
