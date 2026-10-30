@@ -236,3 +236,37 @@ def test_require_kopf_raises_with_guidance_when_missing(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", _no_kopf)
     with pytest.raises(RuntimeError, match="pip install kopf"):
         handlers._require_kopf()
+
+
+# ── 镜像构建静态守卫 ─────────────────────────────────────────────────
+
+
+def test_operator_dockerfile_build_invariants():
+    """镜像构建不变量（2026-10-30 本地复刻 CI 构建两处真红的静态钉）。
+
+    PR 上 docker 腿不跑（``if: push && (main||master)``），静态守卫是 PR 期唯一防线。
+
+    1. **config/ 拷贝**：``py/hatch_build.py`` 把 ``../config`` 当必需构建资产
+       （``dashboard/dist-enterprise`` 才可跳过），缺则 wheel 构元数据阶段
+       ``metadata-generation-failed``。要求 ``COPY config/ /app/config/`` 且
+       早于 ``pip install /app/py``（``/app/py/../config`` 由此可解析）。
+    2. **useradd 复用既有组**：基镜像（Debian slim）自带 ``operator`` 组
+       （GID 37），裸 ``useradd`` 会因同名组已存在直接 exit 9 —— 必须带
+       ``--gid``。
+    """
+    dockerfile = REPO / "deploy" / "k8s" / "operator" / "Dockerfile"
+    lines = [ln.strip() for ln in dockerfile.read_text(encoding="utf-8").splitlines()]
+
+    copy_config = [
+        i for i, ln in enumerate(lines) if ln.startswith("COPY config/") and "/app/config" in ln
+    ]
+    pip_install = [i for i, ln in enumerate(lines) if "pip install" in ln and "/app/py" in ln]
+    assert copy_config, "operator Dockerfile 必须 COPY config/ 到 /app/config（wheel 必需资产）"
+    assert pip_install, "operator Dockerfile 必须在 /app/py 上 pip install"
+    assert copy_config[0] < pip_install[0], "COPY config/ 必须早于 pip install /app/py"
+
+    useradd = [ln for ln in lines if ln.startswith("RUN useradd")]
+    assert useradd, "operator Dockerfile 应有 useradd（非 root 运行）"
+    assert all("--gid" in ln for ln in useradd), (
+        "useradd 必须带 --gid 复用基镜像既有 operator 组（同名组裸建 exit 9）"
+    )
