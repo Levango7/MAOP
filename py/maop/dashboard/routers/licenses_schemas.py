@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -48,3 +50,24 @@ class LicenseListEnvelope(BaseModel):
 class LicenseEnvelope(BaseModel):
     status: str = "error"
     license: LicenseItem
+
+
+class LicenseAuditItem(BaseModel):
+    """``LicenseAuditEntry`` 的线缆形状（详情面板的"操作历史"）。"""
+
+    model_config = ConfigDict(extra="allow")
+
+    log_id: str
+    license_id: str
+    action: str
+    actor: str = ""
+    timestamp: float
+    detail: str = ""
+    ip_address: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class LicenseAuditListEnvelope(BaseModel):
+    status: str = "error"
+    audit_logs: list[LicenseAuditItem] = Field(default_factory=list)
+    count: int = 0

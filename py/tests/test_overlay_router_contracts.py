@@ -61,6 +61,8 @@ MODELLED = (
     ("GET", "/api/licenses/{license_id}"),
     ("POST", "/api/licenses/{license_id}/renew"),
     ("POST", "/api/licenses/{license_id}/revoke"),
+    # 前端详情面板读"操作历史"的那条（2026-10-31 字段契约修复带出来的端点）。
+    ("GET", "/api/licenses/{license_id}/audit"),
 )
 
 PROVIDER = {
@@ -104,6 +106,16 @@ EXECUTION = {
     "data": {"input": 1},
     "error": None,
 }
+AUDIT_ENTRY = {
+    "log_id": "log-1",
+    "license_id": "maop_abc_secret",
+    "action": "created",
+    "actor": "admin",
+    "timestamp": 1.0,
+    "detail": "",
+    "ip_address": "127.0.0.1",
+    "metadata": {},
+}
 LICENSE = {
     "license_id": "maop_abc_secret",
     "customer": "Acme",
@@ -116,7 +128,8 @@ LICENSE = {
     "expires_at": 2.0,
     "revoked_at": None,
     "revoked_reason": "",
-    "license_key": "maop_abc_secret",
+    # 低熵占位：高熵假 key 会被 gitleaks 的 generic-api-key 规则判成泄漏。
+    "license_key": "not-a-real-key",
     "issued_by": "admin",
     "notes": "email: ops@acme.test",
     "created_at": 1.0,
@@ -209,6 +222,9 @@ class _FakeLicenseManager:
 
     def revoke_license(self, license_id: str, **kwargs: object) -> _Dump:
         return _Dump({**LICENSE, "license_id": license_id, "status": "revoked"})
+
+    def get_audit_logs(self, license_id: str = "", **kwargs: object) -> list[_Dump]:
+        return [_Dump(AUDIT_ENTRY)]
 
 
 # ── overlay stand-ins (only installed when the real package is absent) ──
@@ -475,6 +491,13 @@ def test_license_mutations_wire_shape(client) -> None:
     assert revoked["license"]["status"] == "revoked"
 
 
+def test_license_audit_wire_shape(client) -> None:
+    body = client.get("/api/licenses/maop_abc_secret/audit").json()
+    assert set(body) == _fields(licenses_schemas.LicenseAuditListEnvelope)
+    assert body["count"] == 1
+    assert set(body["audit_logs"][0]) == _fields(licenses_schemas.LicenseAuditItem)
+
+
 # ── 3. extra="allow"：上游新增字段必须原样到前端 ──────────────────
 
 
@@ -522,6 +545,7 @@ def test_mirrors_match_the_overlay_models() -> None:
         (sso_schemas.SSOProviderItem, sso_store.SSOProviderResponse),
         (n8n_schemas.N8nExecutionItem, n8n_mod.N8nWorkflowExecution),
         (licenses_schemas.LicenseItem, license_mod.LicenseRecord),
+        (licenses_schemas.LicenseAuditItem, license_mod.LicenseAuditEntry),
     ]
     mismatched = {
         mine.__name__: {

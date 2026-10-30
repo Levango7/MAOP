@@ -232,7 +232,7 @@ async def delete_license(license_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "deleted": True}
 
 
-@router.get("/{license_id}/audit")
+@router.get("/{license_id}/audit", response_model=licenses_schemas.LicenseAuditListEnvelope)
 @handle_api_errors
 async def get_license_audit(
     license_id: str,
