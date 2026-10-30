@@ -259,11 +259,21 @@ CI 里这条门禁正处于"被连坐跳过"状态，所以没人看见。**已�
   纯净 CI 下这套契约不再整份消失。
 - 变异反证 4 例（条目去掉 `extra="allow"` / 去掉 `response_model` / 必填键补默认值 /
   执行响应改回信封）全红，文件按 SHA256 逐字节复原。
-- 验证：新契约 14 例 + 棘轮 7 例绿；纯净 CI 复刻（硬拦 overlay）50 passed /
-  3 skipped；ruff 0 条、mypy 0 error。
-- 顺带发现（本批未改）：`Licenses.vue` 从响应里读 `customer_name` / `customer_email` /
-  `version` / `max_agents` / `history`，而 `LicenseRecord` 只给 `customer` / `notes` /
-  `features`，客户名列与部分详情项实际一直是空的；属于前后端字段契约缺口，需单独裁决。
+- 验证：新契约 15 例 + 棘轮 7 例绿；纯净 CI 复刻（硬拦 overlay）50 passed /
+  3 skipped；前端 Licenses 18 例、全量 75 文件 667 例绿；ruff / eslint 0 条、mypy 0 error。
+- 修 `Licenses.vue` 与前端的字段契约缺口（同批发现并收口）：页面读的 `customer_name` /
+  `customer_email` / `version` / `max_agents` / `history`，后端一个都不返回（`LicenseRecord`
+  只有 `customer` / `notes`（`email: ...`）/ `edition` / `features`（`max_agents:N`）），
+  所以「客户」列与详情里的邮箱 / 版本 / Agent 数 / 操作历史一直是空的。
+  - 视图里集中做一次翻译（`normalizeLicense`）：`customer` → `customer_name`、
+    `notes` 里的 `email:` → `customer_email`、`edition` → `version`（顺带本地化标签）、
+    `features` 里的 `max_agents:` → `max_agents`。
+  - 操作历史改走真实端点 `GET /api/licenses/{id}/audit`（前端此前从未调用），
+    该端点随之补 `response_model`（`LicenseAuditListEnvelope`），棘轮仍为 0。
+  - 生成对话框的"版本"下拉框删除：`LicenseCreateRequest` 没有 edition 字段、签发恒为
+    enterprise，选什么都发不出去，改为只读显示；表单里的死字段 `form.version` 一并删除。
+  - 测试夹具从"页面字段形状"改成后端真实线缆形状（原来的 mock 会把翻译缺失掩盖掉），
+    新增派生字段、审计历史、只读版本三个用例；变异反证 4 例全红。
 
 ### 分层收官批：middleware 子包化 + lifespan 接线（2026-10-28）
 

@@ -11,19 +11,37 @@ import { EmptyState, DataTable } from '../components/index.js';
 
 const mountOptions = { global: { stubs: { PageHeader: { template: '<slot />' } } } };
 
-// Helper: build a license object with sensible defaults
+// Helper: build a license object in the shape the API actually returns
+// (LicenseRecord: customer / notes / edition / features). The view derives the
+// display columns (customer_name / customer_email / version / max_agents) from
+// these — mocks shaped like the display fields would hide that translation.
 function makeLicense(overrides = {}) {
   return {
     license_id: 'maop_abc123_secret',
-    customer_name: 'Acme Corp',
-    customer_email: 'admin@acme.com',
-    version: 'enterprise',
+    customer: 'Acme Corp',
+    edition: 'enterprise',
     status: 'active',
     expires_at: Math.floor(Date.now() / 1000) + 86400 * 365,
-    max_agents: 10,
+    features: ['max_agents:10'],
     max_users: 50,
+    notes: 'email: admin@acme.com',
+    // 故意不像真 key：高熵值会被 gitleaks 的 generic-api-key 判成泄漏。
+    license_key: 'not-a-real-key',
+    issued_at: Math.floor(Date.now() / 1000),
     created_at: Math.floor(Date.now() / 1000),
     ...overrides,
+  };
+}
+
+function auditRoute(id = 'maop_abc123_secret') {
+  return {
+    [`/api/licenses/${id}/audit`]: {
+      status: 'ok',
+      count: 1,
+      audit_logs: [
+        { log_id: 'log-1', license_id: id, action: 'created', actor: 'admin', timestamp: 1.0, detail: '', ip_address: '', metadata: {} },
+      ],
+    },
   };
 }
 
@@ -86,7 +104,30 @@ describe('Licenses.vue', () => {
     }));
     const wrapper = await mountLicenses();
     expect(wrapper.findComponent(DataTable).exists()).toBe(true);
+    // customer -> customer_name, features['max_agents:10'] -> 10
     expect(wrapper.text()).toContain('Acme Corp');
+    expect(wrapper.text()).toContain('10');
+    wrapper.unmount();
+  });
+
+  it('derives the version column from edition', async () => {
+    mockFetch(defaultRoutes({
+      '/api/licenses/list': { status: 'ok', licenses: [makeLicense()] },
+    }));
+    const wrapper = await mountLicenses();
+    expect(wrapper.text()).toContain('Enterprise');
+    wrapper.unmount();
+  });
+
+  it('leaves derived fields empty instead of showing undefined', async () => {
+    mockFetch(defaultRoutes({
+      '/api/licenses/list': {
+        status: 'ok',
+        licenses: [makeLicense({ notes: '', features: [], edition: '' })],
+      },
+    }));
+    const wrapper = await mountLicenses();
+    expect(wrapper.text()).not.toContain('undefined');
     wrapper.unmount();
   });
 
@@ -155,6 +196,17 @@ describe('Licenses.vue', () => {
     wrapper.unmount();
   });
 
+  it('shows a fixed Enterprise edition instead of a version selector', async () => {
+    // 后端 create 请求没有 edition 字段（签发恒为 enterprise），下拉框选什么都
+    // 不会被发送——不能保留一个"看起来能选"的控件。
+    mockFetch(defaultRoutes());
+    const wrapper = await mountLicenses();
+    await wrapper.find('.lic-btn--primary').trigger('click');
+    expect(wrapper.find('.lic-dialog select').exists()).toBe(false);
+    expect(wrapper.find('.lic-dialog .lic-static').text()).toContain('Enterprise');
+    wrapper.unmount();
+  });
+
   it('shows form validation error when customer name is empty', async () => {
     mockFetch(defaultRoutes());
     const wrapper = await mountLicenses();
@@ -195,7 +247,8 @@ describe('Licenses.vue', () => {
     const lic = makeLicense();
     mockFetch(defaultRoutes({
       '/api/licenses/list': { status: 'ok', licenses: [lic] },
-      '/api/licenses/maop_abc123_secret': { status: 'ok', license: { ...lic, history: [] } },
+      '/api/licenses/maop_abc123_secret': { status: 'ok', license: lic },
+      ...auditRoute(),
     }));
     const wrapper = await mountLicenses();
     // Click first data row in DataTable
@@ -206,6 +259,27 @@ describe('Licenses.vue', () => {
     await flushPromises();
     // DetailDrawer uses Teleport to body, so check document.body
     expect(document.querySelector('.detail-drawer')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it('fills customer email, version, max_agents and audit history in the drawer', async () => {
+    const lic = makeLicense();
+    mockFetch(defaultRoutes({
+      '/api/licenses/list': { status: 'ok', licenses: [lic] },
+      '/api/licenses/maop_abc123_secret': { status: 'ok', license: lic },
+      ...auditRoute(),
+    }));
+    const wrapper = await mountLicenses();
+    await wrapper.find('.dt tbody tr').trigger('click');
+    await flushPromises();
+    await flushPromises();
+    await flushPromises();
+    const text = document.body.textContent || '';
+    expect(text).toContain('admin@acme.com');   // notes -> customer_email
+    expect(text).toContain('Enterprise');       // edition -> version
+    expect(text).toContain('10');               // features -> max_agents
+    expect(text).toContain('created');          // /audit -> history
+    expect(text).toContain('admin');
     wrapper.unmount();
   });
 
