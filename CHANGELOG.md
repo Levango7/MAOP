@@ -160,6 +160,27 @@ CI 里这条门禁正处于"被连坐跳过"状态，所以没人看见。**已�
 - `test_enterprise_integration.py::TestSAMLIntegration::test_saml_handler_parses_real_signed_response`
   也 `from maop.enterprise.saml_handler import ...`，上一笔只给同类另外两条加了守卫
   （它在按文件跑的复扫里被 `xmlsec` 的 importorskip 顺带跳过，整轮跑才暴露）。补齐。
+### M-T3.3 K8s Operator M0 第一刀（2026-10-30）
+
+- **controller 骨架 `py/maop/operator/`（新包）**：`spec`（MaopTask CR 解析校验，
+  与 `crds/maoptask.yaml` 机器对齐）+ `reconcile`（Pending→Running→
+  Succeeded/Failed/TimedOut/Cancelled 状态机，phase 枚举与 CRD 一致）+
+  `controller`（gateway/runner 全注入，mock 全链路可测）+ `gateway`
+  （KubernetesStatusGateway 惰性导入 + asyncio 子进程 runner）+ `handlers`
+  （kopf 薄层，可选导入带安装指引）+ `__main__`（镜像 ENTRYPOINT）。
+- **镜像构建来源落地**：`deploy/k8s/operator/Dockerfile`（解决 README §Status
+  "ghcr.io/maop/operator 无构建来源"项）；CI docker 作业加 build-only 腿
+  （只构建不推送——推送属发布决策）。
+- **测试 `tests/test_operator_m0.py` 15 例**：mock 链路（MaopTask→子进程→status
+  回写）全绿；`test_spec_matches_crd_schema` 把 spec 校验规则与 CRD YAML 机器
+  对齐（防漂移哨兵）；kopf 缺失报错口径钉死。
+- **诚实边界**：`spec.agent`/tenant/maxTurns 校验并透传，但不参与命令
+  （`maop run` 无这些参数，MaopAgent 解析属后续里程碑）；真集群 kind 验证按
+  章程不进 M0；既有的多租户/插件 skip 占位属 planned 特性，维持不动。
+- 已知本地环境干扰（非本批回归）：本机若可达**其他项目的 kind 集群**（如
+  FlintSpark k4 e2e），`test_k8s_operator.py` 的集群分层用例会误连并红——
+  与 master 逐字一致的环境问题，CI（无 kubectl）不受影响。
+
 ### M-X3 细粒度成本归因 M0（后端，2026-10-29）
 
 - **`core/cost_attribution.py`（新）**：按 agent / phase / model 三维聚合

@@ -783,7 +783,21 @@ jobs:
           push: ${{ github.event_name != 'pull_request' && steps.reg.outputs.configured == 'true' }}
           tags: |
             ${{ secrets.REGISTRY_URL || 'maop' }}/maop:latest
-            ${{ secrets.REGISTRY_URL || 'maop' }}/maop:${{ github.sha }}
+            ${{ secrets.REGISTRY_URL || 'maop' }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── M-T3.3 M0：operator 镜像构建（build-only，不部署）─────────
+      # 解决 ghcr.io/maop/operator 无构建来源的问题（README §Status 的
+      # "No image build source" 项）。只构建不推送：推送属发布决策，
+      # 需 registry secrets 与 tag 策略先行。
+      - name: Build operator image (build-only)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/k8s/operator/Dockerfile
+          push: false
+          tags: ghcr.io/maop/operator:m0-build-check
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
