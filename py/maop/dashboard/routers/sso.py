@@ -33,6 +33,7 @@ from pydantic import BaseModel
 
 from maop.config.edition import FeatureFlag, has_feature
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers import sso_schemas
 
 # ── Service layer ──────────────────────────────────────────────────
 from maop.dashboard.services import auth_service
@@ -190,7 +191,7 @@ async def get_config(request: Request) -> dict[str, Any]:
 # ════════════════════════════════════════════════════════════════════
 
 
-@router.post("/providers")
+@router.post("/providers", response_model=sso_schemas.SSOProviderEnvelope)
 @handle_api_errors
 async def create_provider(request: Request, body: SSOProviderCreate) -> dict[str, Any]:
     """添加 IdP 配置（PRD 4.1 / 4.2.1）。"""
@@ -210,7 +211,7 @@ async def create_provider(request: Request, body: SSOProviderCreate) -> dict[str
     return {"status": "ok", "provider": reg.to_masked_response(resp)}
 
 
-@router.get("/providers")
+@router.get("/providers", response_model=sso_schemas.SSOProviderListEnvelope)
 @handle_api_errors
 async def list_providers(
     request: Request,
@@ -255,7 +256,7 @@ async def get_provider(request: Request, provider_id: int) -> dict[str, Any]:
     return {"status": "ok", "provider": reg.to_masked_response(resp)}
 
 
-@router.put("/providers/{provider_id}")
+@router.put("/providers/{provider_id}", response_model=sso_schemas.SSOProviderEnvelope)
 @handle_api_errors
 async def update_provider(
     request: Request,
@@ -284,7 +285,7 @@ async def update_provider(
     return {"status": "ok", "provider": reg.to_masked_response(resp)}
 
 
-@router.delete("/providers/{provider_id}")
+@router.delete("/providers/{provider_id}", response_model=sso_schemas.SSOProviderDeletedEnvelope)
 @handle_api_errors
 async def delete_provider(request: Request, provider_id: int) -> dict[str, Any]:
     """删除 IdP。"""
@@ -303,7 +304,7 @@ async def delete_provider(request: Request, provider_id: int) -> dict[str, Any]:
     return {"status": "ok", "deleted": True}
 
 
-@router.post("/providers/{provider_id}/test")
+@router.post("/providers/{provider_id}/test", response_model=sso_schemas.SSOProviderTestEnvelope)
 @handle_api_errors
 async def test_provider(request: Request, provider_id: int) -> dict[str, Any]:
     """测试 IdP 连接（PRD 4.2.3）。"""

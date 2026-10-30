@@ -31,6 +31,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers import licenses_schemas
 from maop.dashboard.services import billing_service
 
 # 直接复用 license_manager 中的 Pydantic 请求模型，让 FastAPI 自动校验。
@@ -64,7 +65,7 @@ def _require_feature() -> None:
 # ── Endpoints ─────────────────────────────────────────────────────
 
 
-@router.get("/list")
+@router.get("/list", response_model=licenses_schemas.LicenseListEnvelope)
 @handle_api_errors
 async def list_licenses(
     request: Request,
@@ -81,7 +82,7 @@ async def list_licenses(
     }
 
 
-@router.post("/create")
+@router.post("/create", response_model=licenses_schemas.LicenseEnvelope)
 @handle_api_errors
 async def create_license(request: Request, body: LicenseCreateRequest) -> dict[str, Any]:
     """Issue a new license. Requires admin."""
@@ -131,7 +132,7 @@ async def list_audit_logs(
     }
 
 
-@router.get("/{license_id}")
+@router.get("/{license_id}", response_model=licenses_schemas.LicenseEnvelope)
 @handle_api_errors
 async def get_license(license_id: str, request: Request) -> dict[str, Any]:
     """Get a single license by ID."""
@@ -172,7 +173,7 @@ async def update_license(license_id: str, request: Request, body: LicenseUpdateR
     return {"status": "ok", "license": record}
 
 
-@router.post("/{license_id}/renew")
+@router.post("/{license_id}/renew", response_model=licenses_schemas.LicenseEnvelope)
 @handle_api_errors
 async def renew_license(license_id: str, request: Request, body: LicenseRenewRequest) -> dict[str, Any]:
     """Renew a license: re-sign with a new expiry date."""
@@ -191,7 +192,7 @@ async def renew_license(license_id: str, request: Request, body: LicenseRenewReq
     return {"status": "ok", "license": record}
 
 
-@router.post("/{license_id}/revoke")
+@router.post("/{license_id}/revoke", response_model=licenses_schemas.LicenseEnvelope)
 @handle_api_errors
 async def revoke_license(license_id: str, request: Request, body: LicenseRevokeRequest) -> dict[str, Any]:
     """Revoke a license."""
