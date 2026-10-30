@@ -81,7 +81,9 @@ def parse_task_spec(
     )
 
 
-def command_for(spec: MaopTaskSpec, *, pin_agent: bool = False) -> list[str]:
+def command_for(
+    spec: MaopTaskSpec, *, pin_agent: bool = False, apply_turn_budget: bool = False
+) -> list[str]:
     """构造执行命令.
 
     M0 形状：``maop run <prompt>``；M1 起 ``pin_agent=True`` 插入
@@ -89,11 +91,16 @@ def command_for(spec: MaopTaskSpec, *, pin_agent: bool = False) -> list[str]:
     （CR 存在即 pin）。``maop run --agent`` 把该名字落为 MaopLoop 的
     forced_agent（F6a），使 ``spec.agent`` 真正参与执行路由。
 
-    诚实边界：``tenant`` / ``maxTurns`` 仍只校验与透传记录；turn 会计
-    （status.turns）与配额是后续里程碑（见包 docstring）。
+    M2：``apply_turn_budget=True`` 插入 ``--max-turns <spec.max_turns>`` ——
+    任务级 turn 上限（一个 turn = 一次 dispatch 尝试）；operator 总是透传。
+    实际消耗经 ``[USAGE] turns=N`` 行回写 ``status.turns``。
+
+    诚实边界：``tenant`` 仍只校验与透传记录；tokensUsed/配额是后续里程碑。
     """
     command = ["maop", "run"]
     if pin_agent:
         command += ["--agent", spec.agent]
+    if apply_turn_budget:
+        command += ["--max-turns", str(spec.max_turns)]
     command.append(spec.prompt)
     return command

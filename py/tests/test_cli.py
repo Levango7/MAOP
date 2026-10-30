@@ -40,7 +40,7 @@ class TestArgParsing:
             cli.main()
             # P1-8: cmd_run now carries the self-delegation depth (default 0)
             # M1: --agent also arrives (default "")
-            mock_run.assert_called_once_with("fix bug", depth=0, agent="")
+            mock_run.assert_called_once_with("fix bug", depth=0, agent="", max_turns=0)
 
     def test_run_action_with_depth(self):
         # P1-8: --depth is declared argparse-side (agents.yaml's self-referential
@@ -49,7 +49,7 @@ class TestArgParsing:
         with patch.object(sys, "argv", ["MAOP", "run", "--task", "fix bug", "--depth", "2"]), \
              patch("maop.cli.cmd_run") as mock_run:
             cli.main()
-            mock_run.assert_called_once_with("fix bug", depth=2, agent="")
+            mock_run.assert_called_once_with("fix bug", depth=2, agent="", max_turns=0)
 
     def test_run_action_with_agent(self):
         # M-T3.3 M1: --agent pins the executing agent (CLI face). MaopLoop 侧
@@ -57,7 +57,14 @@ class TestArgParsing:
         with patch.object(sys, "argv", ["MAOP", "run", "--task", "fix bug", "--agent", "researcher"]), \
              patch("maop.cli.cmd_run") as mock_run:
             cli.main()
-            mock_run.assert_called_once_with("fix bug", depth=0, agent="researcher")
+            mock_run.assert_called_once_with("fix bug", depth=0, agent="researcher", max_turns=0)
+
+    def test_run_action_with_max_turns(self):
+        # M2: --max-turns caps orchestration turns (dispatch attempts).
+        with patch.object(sys, "argv", ["MAOP", "run", "--task", "fix bug", "--max-turns", "7"]), \
+             patch("maop.cli.cmd_run") as mock_run:
+            cli.main()
+            mock_run.assert_called_once_with("fix bug", depth=0, agent="", max_turns=7)
 
     def test_run_depth_cap_exits(self):
         # P1-8: at the hard cap the CLI refuses to re-enter the loop.
@@ -93,7 +100,7 @@ class TestArgParsing:
         with patch.object(sys, "argv", ["MAOP", "run", "-t", "do something"]), \
              patch("maop.cli.cmd_run") as mock_run:
             cli.main()
-            mock_run.assert_called_once_with("do something", depth=0, agent="")
+            mock_run.assert_called_once_with("do something", depth=0, agent="", max_turns=0)
 
     def test_short_port_flag(self):
         with patch.object(sys, "argv", ["MAOP", "start", "-p", "9999"]), \

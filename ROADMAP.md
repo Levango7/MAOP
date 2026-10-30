@@ -398,18 +398,22 @@
   与 CRD YAML 机器对齐）。结构断言现状修正：既有测试并非"仅文件存在性"——
   2026-09-28 起已有分层套件（28 passed/8 skipped 当时），skip 为缺
   helm/kubectl/集群的环境条件，multi-tenant/plugin/RLS 占位属 planned 特性。
-- M0 余量：~~`spec.agent` → MaopAgent CR 解析~~（**M1 已交付**）；turn 预算、
-  配额/多租户 = 后续里程碑（M2/M3）。
+- M0 余量：~~`spec.agent` → MaopAgent CR 解析~~（**M1 已交付**）；~~turn 预算~~
+  （**M2 已交付**）；配额/多租户 = M3。
 - 里程碑进展（2026-10-30 晚）：
   - **M0.1（#188 已合）**：operator 镜像构建两处缺陷修复 —— 缺 `COPY config/`
     （wheel 的 hatch_build 把 `../config` 当必需资产）+ `useradd` 同名组冲突
     （基镜像自带 operator 组）；由本地复刻 CI 构建逮到，本地复刻构建已绿。
-  - **M1（本批）**：`spec.agent` → MaopAgent CR 解析 + agent pinning —— CR 存在
+  - **M1（PR #189）**：`spec.agent` → MaopAgent CR 解析 + agent pinning —— CR 存在
     → `maop run --agent`（F6a forced_agent）+ `AgentResolved=True` 条件；未声明 →
-    M0 行为 + 注记；CLI 增 `--agent`。maxTurns/turns 会计与配额 = M2/M3。
+    M0 行为 + 注记；CLI 增 `--agent`。
+  - **M2（本批）**：`spec.maxTurns` → 命令恒带 `--max-turns`（loop 侧硬上限：
+    一个 turn = 一次 dispatch 尝试）+ `[USAGE] turns=N` 协议行 → 终态补丁
+    `status.turns`；`cli.py` 按先例拆出 `cli_run.py`。配额/多租户 = M3。
 - M0 验收：mock 链路（MaopTask→子进程→status 回写）测试全绿 ✅；结构对齐
-  哨兵上线 ✅；operator 镜像在 CI 构建成功 —— M0.1 修复后随 master 全矩阵
-  开跑（docker 作业内 operator build-only 腿）。**真集群 kind 验证不进 M0**（外部条件）。
+  哨兵上线 ✅；**operator 镜像在 CI 构建成功 ✅**（2026-10-30，master run
+  `41118378867`：`Build operator image (build-only): success`）。
+  **真集群 kind 验证不进 M0**（外部条件）。
 - 阻碍位置：无外部依赖，纯工程量。已知本地环境干扰：可达其他项目的 kind
   集群时既有集成用例会误连（详见 CHANGELOG 2026-10-30 条目）。
 

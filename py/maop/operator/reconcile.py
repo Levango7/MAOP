@@ -91,12 +91,22 @@ def plan_launch(
     )
 
 
+def _with_turns(t: Transition, turns: int | None) -> Transition:
+    """M2：终态补丁附加 ``status.turns``（仅在观测到消耗数时）。"""
+    if turns is None:
+        return t
+    patch = dict(t.patch)
+    patch["turns"] = int(turns)
+    return Transition(phase=t.phase, patch=patch)
+
+
 def plan_finish(
     *,
     exit_code: int | None = None,
     timed_out: bool = False,
     cancelled: bool = False,
     invalid: str | None = None,
+    turns: int | None = None,
     when: str | None = None,
 ) -> Transition:
     """子进程结束后的终态转换.
@@ -104,55 +114,72 @@ def plan_finish(
     - 退出码 0 → Succeeded；非 0 → Failed（message 携带退出码）；
     - runner 超时 → TimedOut；任务被取消 → Cancelled；
     - spec 校验失败（``invalid`` 携带原因）→ Failed（reason=InvalidSpec，
-      **不经过子进程**）。
+      **不经过子进程**）；
+    - M2：``turns`` 为观测到的编排 turn 消耗数（operator 从 ``[USAGE]
+      turns=N`` 协议行解析），有值时写入终态补丁的 ``status.turns``。
     """
     when = when or now_iso()
     if invalid:
-        return Transition(
+        return _with_turns(
+            Transition(
+                phase="Failed",
+                patch={
+                    "phase": "Failed",
+                    "completionTime": when,
+                    "conditions": [_condition("Completed", "InvalidSpec", invalid, when)],
+                },
+            ),
+            turns,
+        )
+    if cancelled:
+        return _with_turns(
+            Transition(
+                phase="Cancelled",
+                patch={
+                    "phase": "Cancelled",
+                    "completionTime": when,
+                    "conditions": [_condition("Completed", "Cancelled", "task cancelled", when)],
+                },
+            ),
+            turns,
+        )
+    if timed_out:
+        return _with_turns(
+            Transition(
+                phase="TimedOut",
+                patch={
+                    "phase": "TimedOut",
+                    "completionTime": when,
+                    "conditions": [_condition("Completed", "TimedOut", "subprocess exceeded its time budget", when)],
+                },
+            ),
+            turns,
+        )
+    code = int(exit_code if exit_code is not None else -1)
+    if code == 0:
+        return _with_turns(
+            Transition(
+                phase="Succeeded",
+                patch={
+                    "phase": "Succeeded",
+                    "completionTime": when,
+                    "conditions": [_condition("Completed", "ExitZero", "maop run finished successfully", when)],
+                },
+            ),
+            turns,
+        )
+    return _with_turns(
+        Transition(
             phase="Failed",
             patch={
                 "phase": "Failed",
                 "completionTime": when,
-                "conditions": [_condition("Completed", "InvalidSpec", invalid, when)],
+                "conditions": [
+                    _condition("Completed", "ExitNonZero", f"maop run exited with code {code}", when)
+                ],
             },
-        )
-    if cancelled:
-        return Transition(
-            phase="Cancelled",
-            patch={
-                "phase": "Cancelled",
-                "completionTime": when,
-                "conditions": [_condition("Completed", "Cancelled", "task cancelled", when)],
-            },
-        )
-    if timed_out:
-        return Transition(
-            phase="TimedOut",
-            patch={
-                "phase": "TimedOut",
-                "completionTime": when,
-                "conditions": [_condition("Completed", "TimedOut", "subprocess exceeded its time budget", when)],
-            },
-        )
-    code = int(exit_code if exit_code is not None else -1)
-    if code == 0:
-        return Transition(
-            phase="Succeeded",
-            patch={
-                "phase": "Succeeded",
-                "completionTime": when,
-                "conditions": [_condition("Completed", "ExitZero", "maop run finished successfully", when)],
-            },
-        )
-    return Transition(
-        phase="Failed",
-        patch={
-            "phase": "Failed",
-            "completionTime": when,
-            "conditions": [
-                _condition("Completed", "ExitNonZero", f"maop run exited with code {code}", when)
-            ],
-        },
+        ),
+        turns,
     )
 
 

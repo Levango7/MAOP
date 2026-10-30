@@ -39,6 +39,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M-T3.3 Operator M2 —— turn 预算透传 + status.turns 会计（2026-10-30）
+
+``spec.maxTurns`` 从"校验透传"变为真正生效：
+
+- **loop**：``MaopLoop.run(max_turns=)`` 新增；一个 turn = 一次
+  ``dispatcher.dispatch`` 尝试（含重试迭代与并行子任务），预算耗尽即停止派发
+  （原样返回最后一个结果，或合成失败 ``turn budget exhausted``）；消耗计数经
+  ``LoopResult.turns`` 返回。``None`` = 不设上限（既有行为逐字节不变）。
+- **CLI**：``maop run --max-turns N``（0 = 不限）+ 稳定协议行
+  ``[USAGE] turns=N``（与 ``[TRACE]`` 同款单行，成功/失败都打印）。
+  ``cli.py`` 按 ``cli_evolution`` 先例拆出 ``cli_run.py``（``cmd_run`` 迁移；
+  门面 re-export 保持 ``maop.cli.cmd_run`` 的 patch 面不变）——cli.py 曾在
+  file-size 800 线（M1 时 803 → 压缩回 799），此次净减。
+- **operator**：命令恒带 ``--max-turns <spec.maxTurns>``；终态补丁解析
+  ``[USAGE] turns=N`` 写入 ``status.turns``（缺行不写——与未打该行的旧版
+  ``maop run`` 前向兼容）。
+- 边界：tokensUsed 与配额/多租户 = M3。
+
 ### M-T3.3 Operator M1 —— MaopAgent CR 解析 + agent pinning（2026-10-30）
 
 ``spec.agent`` 从"校验透传"变为真正参与执行路由：
@@ -72,6 +90,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 `test_operator_dockerfile_build_invariants` 静态钉住两条不变量（COPY config/
 且早于 pip install /app/py；useradd 带 --gid）——PR 上 docker 腿不跑
 （`if: push && (main||master)`），静态守卫是 PR 期唯一防线。
+
+**CI 首验（2026-10-30）：master run `41118378867` 全绿 —— `Build operator
+image (build-only): success`** —— M0 验收「operator 镜像在 CI 构建成功」落定。
 
 ### 纯净 CI 的收集跳过判据改按 AST —— 20 个测试文件此前从未运行过（2026-10-30）
 
