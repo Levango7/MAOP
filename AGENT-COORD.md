@@ -273,8 +273,11 @@
   pinning（`spec.agent` 真正参与路由：CR 存在 → `--agent`（F6a forced_agent）+
   `AgentResolved` 条件；未声明 → M0 行为 + 注记；CLI 增 `--agent`）。
   插曲：首跑 docs-gate 红 = file-size（cli.py 803>800）——压缩 M1 注释回 799。
-- **M2（PR #190）CI 进行中**：`spec.maxTurns` 端到端（`--max-turns` 硬上限 +
-  `[USAGE] turns=N` → `status.turns`）+ `cli_run.py` 拆分；堆叠于 M1。
+- **M2（PR #190，堆叠于 M1）**：`spec.maxTurns` → 命令恒带 `--max-turns`
+  （loop 侧硬上限：一个 turn = 一次 dispatch 尝试；耗尽即停派发）+ `[USAGE]
+  turns=N` 协议行 → 终态补丁 `status.turns`；`cli.py` 按 `cli_evolution` 先例
+  拆出 `cli_run.py`（净减行数，远离 800 线）。裁决记录：tokensUsed/配额多租
+  = M3。
 
 ## 领地登记（ZCode session_f62ccbe…，2026-10-31 第八轮：MAOS 协调收尾 + M-X1/M-X2 立项）
 

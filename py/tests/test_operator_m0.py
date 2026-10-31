@@ -144,7 +144,8 @@ async def test_controller_happy_path():
         name="task-1", namespace="maop-system", body=_body()
     )
     assert result == {"phase": "Succeeded", "launched": True}
-    assert runner.commands == [["maop", "run", "检查订单服务健康"]]
+    # M2: operator 命令恒定带任务级 turn 预算（spec.maxTurns）
+    assert runner.commands == [["maop", "run", "--max-turns", "5", "检查订单服务健康"]]
     phases = [p["phase"] for _, _, p in gateway.patches]
     assert phases == ["Running", "Succeeded"]
     assert gateway.patches[0][0] == "task-1" and gateway.patches[0][1] == "maop-system"

@@ -226,6 +226,7 @@ class MaopLoop(ExecuteMixin, PhasesMixin):
         skip_verify: bool = False,
         parent_trace_id: str = "",
         agent: str = "",
+        max_turns: int | None = None,
     ) -> LoopResult:
         """Execute a full Plan -> Execute -> Verify cycle.
 
@@ -244,6 +245,11 @@ class MaopLoop(ExecuteMixin, PhasesMixin):
         start = time.monotonic()
         trace_id = uuid.uuid4().hex
         lc = self._loop_config
+
+        # M2: 每次 run 重置 turn 预算与计数（一个 turn = 一次 dispatch 尝试；
+        # None = 不设上限，维持既有行为）。计数最终经 LoopResult.turns 返回。
+        self._max_turns = max_turns
+        self._turns_used = 0
 
         logger.info("MAOP Loop started | task=%s | trace=%s", task[:80], trace_id)
         self._log("loop", "INFO", "Loop started", trace_id=trace_id, task=task[:80])

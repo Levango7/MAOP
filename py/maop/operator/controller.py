@@ -7,8 +7,10 @@
 3. （M1）``resolver`` 注入时解析 ``spec.agent`` 的 MaopAgent CR —— 存在即
    pin（命令带 ``--agent``，``AgentResolved=True`` 条件）；未声明则按 M0
    行为不 pin（``AgentResolved=False`` 条件），两者都继续执行；
-4. 否则补丁 Running（``plan_launch``）→ runner 执行 ``command_for(spec)`` →
-   按结果补丁终态（``plan_finish``）；任务被取消 → Cancelled 后原样上抛。
+4. 否则补丁 Running（``plan_launch``）→ runner 执行 ``command_for(spec)``
+   （M2：恒带任务级 ``--max-turns``）→ 按结果补丁终态（``plan_finish``；
+   M2：解析 ``[USAGE] turns=N`` 写入 ``status.turns``）；任务被取消 →
+   Cancelled 后原样上抛。
 
 gateway/runner/resolver 全部构造注入 —— 测试用 fake 驱动全链路，不需要 k8s。
 """
@@ -17,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any
 
 from maop.operator.gateway import AgentResolver, RunOutcome, StatusGateway, SubprocessRunner
@@ -24,6 +27,15 @@ from maop.operator.reconcile import is_terminal, plan_finish, plan_launch
 from maop.operator.spec import InvalidSpecError, command_for, parse_task_spec
 
 logger = logging.getLogger(__name__)
+
+#: M2 协议行：``maop run`` 在 stdout 打印的 turn 消耗（与 [TRACE] 同为稳定单行）。
+_USAGE_TURNS_RE = re.compile(r"\[USAGE\]\s*turns=(\d+)")
+
+
+def _parse_turns(stdout: str) -> int | None:
+    """从子进程输出解析 ``[USAGE] turns=N``；缺行返回 ``None``（不写 turns）。"""
+    match = _USAGE_TURNS_RE.search(stdout or "")
+    return int(match.group(1)) if match else None
 
 
 class OperatorController:
@@ -83,7 +95,8 @@ class OperatorController:
 
         try:
             outcome = await self._runner.run(
-                command_for(spec, pin_agent=pin), timeout_s=self._timeout_s
+                command_for(spec, pin_agent=pin, apply_turn_budget=True),
+                timeout_s=self._timeout_s,
             )
         except asyncio.CancelledError:
             await self._patch(name, namespace, plan_finish(cancelled=True))
@@ -97,6 +110,7 @@ class OperatorController:
             exit_code=outcome.exit_code,
             timed_out=outcome.timed_out,
             cancelled=outcome.cancelled,
+            turns=_parse_turns(outcome.stdout_tail),
         )
         await self._patch(name, namespace, finish)
         logger.info(
