@@ -249,8 +249,14 @@ def _get_marketplace() -> Any:
     with _mcp_marketplace_lock:
         if _mcp_marketplace is not None:  # double-checked locking
             return _mcp_marketplace
+        from maop.config.settings import marketplace_verify_key_path
+        from maop.core.marketplace.signing import PackageVerifier
         from maop.core.mcp.mcp_marketplace import MCPMarketplace
-        _mcp_marketplace = MCPMarketplace()
+
+        verify_key = marketplace_verify_key_path()
+        _mcp_marketplace = MCPMarketplace(
+            verifier=PackageVerifier(verify_key) if verify_key else None,
+        )
         logger.info("[mcp_service] MCPMarketplace singleton initialised")
     return _mcp_marketplace
 

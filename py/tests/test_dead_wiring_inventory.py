@@ -97,7 +97,7 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
             "core/security/sandbox.py 是在跑的沙箱；本模块的 env 白名单已于 2026-10-05 移植过去，"
             "剩下的 SandboxManager 是重复实现"
         ),
-    ),    "maop.core.marketplace.signing": ("unwired", "marketplace 签名未接线"),
+    ),
     "maop.core.mcp.mcp_adapter": ("unwired", "MCPAdapter 仅测试实例化；adapter_factory 不产出它"),
     "maop.core.memory.hybrid_search": ("unwired", "混合检索未接入记忆读路径"),
     "maop.core.memory.knowledge_graph_reasoning": (

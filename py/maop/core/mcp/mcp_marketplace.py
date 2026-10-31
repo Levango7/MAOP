@@ -13,6 +13,13 @@ Security model (aligned with project_memory.md Plugin manifest SHA-256 rule):
     the server entry OR an explicit ``confirm_untrusted=True`` opt-in from
     the caller. A missing checksum on an untrusted registry without opt-in
     raises ``ValueError`` and the install is refused.
+  - M-X1 (2026-10-31): when a :class:`PackageVerifier` is injected (optionally
+    with a ``KeyManagement`` store for rotation/revocation), catalog entries
+    carrying ``signature_hex`` are verified with Ed25519 before install —
+    the signature covers the registry-published entry dict exactly (raw keys,
+    canonical JSON). ``require_signature=True`` makes a missing signature or
+    missing verifier refuse the install. Without an injected verifier the
+    trust model is unchanged (checksum + trusted).
   - All network requests use a 10-second timeout and the standard-library
     ``urllib`` (no new dependencies).
 
@@ -40,6 +47,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from maop.core.marketplace.signing import PackageVerifier
 from maop.core.mcp.mcp_hub import MCPServerConfig, TransportType
 
 logger = logging.getLogger(__name__)
@@ -61,6 +69,8 @@ class MarketplaceServer(BaseModel):
     transport_type: str = "stdio"  # stdio | sse | websocket
     default_config: dict[str, Any] = Field(default_factory=dict)
     checksum: str | None = None  # expected SHA-256 hex digest of download_url payload
+    signature_hex: str | None = None  # M-X1: Ed25519 signature over the catalog entry
+    signer_key_id: str | None = None  # M-X1: key id in KeyManagement (rotation mode)
     tags: list[str] = Field(default_factory=list)
     verified: bool = False
     install_count: int = 0
@@ -107,6 +117,9 @@ class MCPMarketplace:
         self,
         config_path: Path | None = None,
         cache_dir: Path | None = None,
+        verifier: PackageVerifier | None = None,
+        key_mgmt: Any | None = None,
+        require_signature: bool = False,
     ) -> None:
         self._config_path: Path = (
             Path(config_path) if config_path is not None else self.DEFAULT_CONFIG_PATH
@@ -120,6 +133,14 @@ class MCPMarketplace:
         # Installed servers live next to the active config so writes stay local
         # to the project (never the package default unless explicitly pointed at).
         self._installed_path: Path = self._config_path.parent / "mcp_installed.yaml"
+        # M-X1: 包签名校验（可选启用）。verifier/key_mgmt 均未配置时信任模型
+        # 维持 checksum + trusted 现状；配置了 verifier 后，目录条目携带的
+        # ``signature_hex`` 会在安装时验签（fail-closed）。
+        # key_mgmt（``core/marketplace/key_management.KeyManagement``）注入后
+        # 走轮换/黑名单多钥路径（``signer_key_id`` 作 tool_id）。
+        self._verifier = verifier
+        self._key_mgmt = key_mgmt
+        self._require_signature = require_signature
 
     # ── Config persistence ───────────────────────────────────────
 
@@ -283,8 +304,13 @@ class MCPMarketplace:
 
     def _fetch_registry_catalog(
         self, registry: MarketplaceRegistry
-    ) -> list[MarketplaceServer]:
+    ) -> list[tuple[MarketplaceServer, dict[str, Any]]]:
         """Fetch and parse one registry's catalog.
+
+        Returns ``(server, raw_entry)`` pairs — the raw entry dict is kept
+        alongside so signature verification (M-X1) sees exactly the bytes the
+        registry published (``MarketplaceServer(**item)`` would drop unknown
+        keys and break the canonical-JSON payload).
 
         Any network/parse failure logs a warning and returns an empty list
         so a single broken registry never aborts an aggregate fetch.
@@ -316,12 +342,12 @@ class MCPMarketplace:
         else:
             return []
 
-        servers: list[MarketplaceServer] = []
+        servers: list[tuple[MarketplaceServer, dict[str, Any]]] = []
         for item in servers_data:
             if not isinstance(item, dict):
                 continue
             try:
-                servers.append(MarketplaceServer(**item))
+                servers.append((MarketplaceServer(**item), item))
             except Exception as exc:
                 logger.debug(
                     "[mcp_marketplace] Skipping malformed server entry in '%s': %s",
@@ -353,7 +379,7 @@ class MCPMarketplace:
 
         all_servers: list[MarketplaceServer] = []
         for reg in registries:
-            all_servers.extend(self._fetch_registry_catalog(reg))
+            all_servers.extend(server for server, _raw in self._fetch_registry_catalog(reg))
         return all_servers
 
     # ── Search ───────────────────────────────────────────────────
@@ -388,10 +414,12 @@ class MCPMarketplace:
 
     def _find_in_catalog(
         self, name: str, registry_name: str | None = None
-    ) -> tuple[MarketplaceServer, MarketplaceRegistry] | None:
+    ) -> tuple[MarketplaceServer, MarketplaceRegistry, dict[str, Any]] | None:
         """Locate a server by name across enabled registries.
 
-        Returns the first ``(server, registry)`` pair whose server name matches.
+        Returns the first ``(server, registry, raw_entry)`` triple whose server
+        name matches; ``raw_entry`` is the registry-published dict (for M-X1
+        signature verification over the exact published payload).
         """
         if registry_name is not None:
             registries = [
@@ -402,9 +430,9 @@ class MCPMarketplace:
             registries = [r for r in self._config.registries if r.enabled]
 
         for reg in registries:
-            for srv in self._fetch_registry_catalog(reg):
+            for srv, raw_entry in self._fetch_registry_catalog(reg):
                 if srv.name == name:
-                    return srv, reg
+                    return srv, reg, raw_entry
         return None
 
     def _load_installed(self) -> dict[str, dict[str, Any]]:
@@ -498,7 +526,7 @@ class MCPMarketplace:
         found = self._find_in_catalog(name, registry_name)
         if found is None:
             raise ValueError(f"Server '{name}' not found in any enabled registry")
-        server, registry = found
+        server, registry, raw_entry = found
 
         # Security gate: untrusted + no checksum + no opt-in → refuse.
         if not registry.trusted and verify_checksum and server.checksum is None and not confirm_untrusted:
@@ -523,6 +551,19 @@ class MCPMarketplace:
                     f"got {actual}"
                 )
 
+        # M-X1: Ed25519 signature gate. Verification runs only when a verifier
+        # (and optionally a KeyManagement store) is configured; with
+        # ``require_signature`` set, a missing signature or missing verifier
+        # refuses the install as well (fail-closed).
+        has_verifier = self._verifier is not None
+        if self._require_signature and (server.signature_hex is None or not has_verifier):
+            raise ValueError(
+                f"Server '{name}' has no signature_hex (or no verifier configured) "
+                f"but signature verification is required"
+            )
+        if server.signature_hex is not None and has_verifier:
+            self._verify_catalog_signature(name, server, raw_entry)
+
         # Record in the installed index (never touches mcp_servers.yaml).
         installed = self._load_installed()
         installed[name] = {
@@ -532,6 +573,8 @@ class MCPMarketplace:
             "transport": server.transport_type,
             "config": server.default_config,
             "checksum": server.checksum,
+            "signature_hex": server.signature_hex,
+            "signer_key_id": server.signer_key_id,
             "installed_at": time.time(),
         }
         self._save_installed(installed)
@@ -541,6 +584,37 @@ class MCPMarketplace:
             server.name, server.version, registry.name,
         )
         return self._to_server_config(server)
+
+    def _verify_catalog_signature(
+        self, name: str, server: MarketplaceServer, raw_entry: dict[str, Any]
+    ) -> None:
+        """Verify the catalog entry's Ed25519 signature (M-X1, fail-closed).
+
+        The signed payload is the registry-published entry dict minus
+        ``signature_hex`` — verified against the raw published bytes, not the
+        narrowed :class:`MarketplaceServer` model. With ``key_mgmt`` injected
+        the rotation/blacklist-aware multi-key path is used (``signer_key_id``
+        as tool_id, defaulting to the server name).
+
+        Raises
+        ------
+        ValueError / SignatureError
+            On any verification failure (malformed, missing, invalid).
+        """
+        entry = dict(raw_entry)
+        signature_hex = entry.get("signature_hex") or server.signature_hex
+        if not signature_hex:
+            raise ValueError(f"Server '{name}' carries no signature to verify")
+        signed_payload = {k: v for k, v in entry.items() if k != "signature_hex"}
+        assert self._verifier is not None  # caller guarantees (has_verifier gate)
+        if self._key_mgmt is not None:
+            tool_id = server.signer_key_id or server.name
+            self._verifier.verify_with_key_management(
+                signed_payload, signature_hex, tool_id, self._key_mgmt
+            )
+        else:
+            self._verifier.verify_package({**signed_payload, "signature_hex": signature_hex})
+        logger.info("[mcp_marketplace] Signature verified for '%s'", name)
 
     def uninstall(self, name: str) -> bool:
         """Remove a server from the installed index.

@@ -101,15 +101,15 @@ _MODULE_RE = re.compile(r"^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)*$")
 # ── 已知未接线模块（已决策，不触发失败）────────────────────────────
 # 每条必须写明**为什么留着**与**后续打算**，否则退化成"用豁免掩盖问题"。
 KNOWN_UNWIRED: dict[str, str] = {
-    "maop.core.marketplace.signing": (
-        "Marketplace 包签名（G-01：以 Ed25519 非对称签名替代 HMAC-SHA256）。"
-        "设计与测试均完整（test_marketplace_f301.py），零运行时导入方。"
-        "待决策：接入 MCP marketplace 安装路径，或删除。"
-    ),
+    # 2026-10-31 已接线（M-X1，不再登记）：maop.core.marketplace.signing ——
+    # 经 core/mcp/mcp_marketplace.py 安装路径验签（MAOP_MARKETPLACE_VERIFY_KEY
+    # 配置公钥即启用；require_signature 可强制）。
     "maop.core.marketplace.key_management": (
-        "签名密钥分发 / 轮换 / 吊销 / 黑名单（545 行，含完整测试）。零导入方。"
-        "**接入签名校验前必须先接这个** —— 否则密钥无法轮换，"
-        "一次泄露就只能改代码。"
+        "签名密钥分发 / 轮换 / 吊销 / 黑名单（545 行，含完整测试）。"
+        "2026-10-31（M-X1）：已可经 ``MCPMarketplace(key_mgmt=...)`` 注入启用"
+        "（轮换/黑名单多钥验签路径，signing.verify_with_key_management），"
+        "但**默认构造不注入**——完整密钥治理（注册/分发面、与 license 链的"
+        "归一）仍待排期，故保留登记。"
     ),
     "maop.core.marketplace.sandbox": (
         "G-02：以白名单环境替换 os.environ.copy()，防止 JWT_SECRET / DB_PASSWORD / "

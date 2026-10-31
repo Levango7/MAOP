@@ -45,6 +45,16 @@ def a2a_gateway_enabled() -> bool:
     return os.environ.get("MAOP_A2A_GATEWAY", "0") == "1"
 
 
+def marketplace_verify_key_path() -> str:
+    """``MAOP_MARKETPLACE_VERIFY_KEY``：Marketplace 包签名校验公钥（PEM 路径）.
+
+    非空时 marketplace 安装路径对带 ``signature_hex`` 的目录条目做 Ed25519
+    验签（见 ``core/marketplace/signing.py``，M-X1）；空串 = 未配置（不验签，
+    信任模型维持 checksum + trusted 现状）。config-drift 收敛点，调用方走这里。
+    """
+    return os.environ.get("MAOP_MARKETPLACE_VERIFY_KEY", "").strip()
+
+
 def _default_auth_enabled() -> bool:
     """默认认证策略（High 安全修复：secure-by-default）。
 
