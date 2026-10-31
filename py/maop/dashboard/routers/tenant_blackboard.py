@@ -14,6 +14,11 @@ Endpoints:
 
 ``/rbac/permissions`` stays open on purpose: it returns the static
 ``RBACPermission`` enum, no tenant data.
+
+``GET /tenants/{tenant_id}`` additionally threads the authenticated caller's
+context into the service, so when the enterprise package is installed the M3
+enforcer (MAOS grant table) is injected at construction time — option B in the
+MAOS M3 readiness doc.
 """
 
 from __future__ import annotations
@@ -24,6 +29,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from maop.core.reliability.coordination_tenant import TenantContext
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import tenant_blackboard_service
@@ -31,6 +37,24 @@ from maop.dashboard.services import tenant_blackboard_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/tenant-blackboard", tags=["tenant-blackboard"])
+
+
+def _caller_context(request: Request, tenant_id: str) -> TenantContext | None:
+    """Build the requesting user's context, or ``None`` if there is no identity.
+
+    With auth disabled (``MAOP_ENV`` dev/test/local, or ``MAOP_AUTH_ENABLED=0``)
+    the middleware pins the identity to ``"anonymous"`` — there is no user/tenant
+    boundary to enforce, so the service keeps its historical system context.
+    Returning a context here is what lets the enterprise enforcer become
+    authoritative for this read (option B injection).
+    """
+    user_id = getattr(request.state, "auth_identity", "") or ""
+    if not user_id or user_id == "anonymous":
+        return None
+    roles = tuple(getattr(request.state, "auth_roles", None) or ())
+    return tenant_blackboard_service.context_for_caller(
+        tenant_id=tenant_id, user_id=user_id, roles=roles
+    )
 
 
 # ── Request models ─────────────────────────────────────────────────
@@ -62,9 +86,22 @@ async def list_tenants(request: Request) -> dict[str, Any]:
 @router.get("/tenants/{tenant_id}")
 @handle_api_errors("tenant detail")
 async def get_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
-    """Get detailed snapshot + recent history for a tenant (admin, read-only)."""
+    """Get detailed snapshot + recent history for a tenant.
+
+    Two layers: ``require_admin`` keeps the HTTP admin gate that master added
+    (cross-tenant read), and the caller's context is threaded into the service so
+    the M3 enforcer is injected — enterprise deployments authorize through
+    MAOS's grant table, the personal edition through MAOP's role-derived
+    ``blackboard:read``. A ``PermissionError`` from the enforcer maps to 403.
+    """
     require_admin(request)
-    return {"status": "ok", "data": tenant_blackboard_service.get_tenant(tenant_id)}
+    try:
+        detail = tenant_blackboard_service.get_tenant(
+            tenant_id, caller=_caller_context(request, tenant_id)
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return {"status": "ok", "data": detail}
 
 
 # ── Delete tenant data ──────────────────────────────────────────────

@@ -1,15 +1,21 @@
-"""RBAC on ``/api/tenant-blackboard/*`` — enforced by the real guard, not a patch.
+"""RBAC on ``/api/tenant-blackboard/*`` — real guard + M3 enforcer injection.
 
-The tenant roster and any single tenant's snapshot are cross-tenant reads: they
-hand the caller other tenants' identifiers, entry counts and content. Until
-2026-10-24 they carried no guard at all, while ``DELETE`` and
-``/context/validate`` did — and ``test_coordination_m4``'s ``admin_client``
-fixture replaced ``require_admin`` with a no-op, so nothing in the suite could
-tell a guarded endpoint from an unguarded one.
+Two themes live here:
 
-Here the guard is real: role comes from ``request.state.auth_roles`` exactly as
-AuthMiddleware sets it, so a read-only principal getting 403 is evidence about
-the product, not about a mock.
+1. The tenant roster and any single tenant's snapshot are cross-tenant reads:
+   they hand the caller other tenants' identifiers, entry counts and content.
+   Until 2026-10-24 they carried no guard at all, while ``DELETE`` and
+   ``/context/validate`` did — and ``test_coordination_m4``'s ``admin_client``
+   fixture replaced ``require_admin`` with a no-op, so nothing in the suite could
+   tell a guarded endpoint from an unguarded one. Here the guard is real: role
+   comes from ``request.state.auth_roles`` exactly as AuthMiddleware sets it.
+
+2. The MAOS M3 readiness doc (待决 #2, option B) asks MAOP to inject the
+   enterprise enforcer into ``TenantBlackboard``. ``get_tenant`` now threads the
+   authenticated caller's context into the service, which lazily imports
+   ``maop.enterprise.rbac_m3_adapter.create_m3_enforcer()`` — MAOP never imports
+   enterprise at module scope. ``FallbackRBACEnforcer`` is pinned fail-closed
+   (待决 #3: its docstring used to promise the opposite).
 """
 
 from __future__ import annotations
@@ -17,15 +23,20 @@ from __future__ import annotations
 import ast
 import asyncio
 import inspect
+import pathlib
+import sys
 import textwrap
+import types
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from maop.core.reliability.blackboard import get_blackboard
+from maop.core.reliability.blackboard import Blackboard, get_blackboard
 from maop.core.reliability.coordination_tenant import (
+    FallbackRBACEnforcer,
     RBACPermission,
     TenantBlackboard,
     TenantContext,
@@ -82,6 +93,19 @@ def _seed(bb, tenant_id: str, domain: str, content: dict[str, Any]) -> None:
         permissions=frozenset({RBACPermission.BB_WRITE, RBACPermission.BB_READ}),
     )
     asyncio.run(TenantBlackboard(bb, ctx).write(domain, content))
+
+
+@pytest.fixture
+def bb_with_data():
+    """An isolated blackboard holding exactly one entry tagged to ``acme``."""
+    bb = Blackboard()
+    ctx = TenantContext(
+        tenant_id="acme",
+        user_id="seed",
+        permissions=frozenset({RBACPermission.BB_WRITE, RBACPermission.BB_READ}),
+    )
+    asyncio.run(TenantBlackboard(bb, ctx).write("decision", {"verdict": "approve"}))
+    return bb
 
 
 # ── the guard ─────────────────────────────────────────────────────
@@ -178,3 +202,181 @@ def test_service_deletes_through_the_rbac_wrapper() -> None:
     assert "bb._entries" not in code, code
     assert "bb._lock" not in code, code
     assert "await tbb.clear(domain)" in code, code
+
+
+# ── G2: enterprise enforcer resolution (lazy import, singleton manager) ──
+
+
+def test_no_top_level_enterprise_import() -> None:
+    """The enterprise adapter must be imported lazily, not at module scope.
+
+    AST over the module body — a grep would also match the docstring and the
+    lazy import inside ``resolve_m3_enforcer``, which are exactly the cases we
+    want to allow. A personal build must import this module cleanly.
+    """
+    tree = ast.parse(pathlib.Path(tenant_blackboard_service.__file__).read_text(encoding="utf-8"))
+    offenders = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and "enterprise" in (node.module or "")
+    ]
+    assert offenders == []
+
+
+def test_resolve_returns_none_without_enterprise_package() -> None:
+    with patch.dict(sys.modules, {"maop.enterprise.rbac_m3_adapter": None}):
+        assert tenant_blackboard_service.resolve_m3_enforcer() is None
+
+
+def test_resolve_reuses_the_process_rbac_manager_singleton() -> None:
+    """The adapter's own default would open a second RBAC store handle."""
+    fake_adapter = types.ModuleType("maop.enterprise.rbac_m3_adapter")
+    create = MagicMock(name="create_m3_enforcer")
+    fake_adapter.create_m3_enforcer = create
+    sentinel_manager = object()
+
+    with patch.dict(sys.modules, {"maop.enterprise.rbac_m3_adapter": fake_adapter}), patch(
+        "maop.dashboard.services.rbac_service.get_rbac_manager", return_value=sentinel_manager
+    ):
+        enforcer = tenant_blackboard_service.resolve_m3_enforcer()
+
+    assert enforcer is create.return_value
+    create.assert_called_once_with(sentinel_manager)
+
+
+def test_resolve_degrades_to_fallback_when_manager_unavailable() -> None:
+    fake_adapter = types.ModuleType("maop.enterprise.rbac_m3_adapter")
+    fake_adapter.create_m3_enforcer = MagicMock()
+
+    with patch.dict(sys.modules, {"maop.enterprise.rbac_m3_adapter": fake_adapter}), patch(
+        "maop.dashboard.services.rbac_service.get_rbac_manager",
+        side_effect=RuntimeError("feature RBAC not available"),
+    ):
+        assert tenant_blackboard_service.resolve_m3_enforcer() is None
+
+    fake_adapter.create_m3_enforcer.assert_not_called()
+
+
+# ── caller context ────────────────────────────────────────────────
+
+
+def test_privileged_role_gets_blackboard_read() -> None:
+    ctx = tenant_blackboard_service.context_for_caller("acme", "alice", ("admin",))
+    assert (ctx.user_id, ctx.tenant_id) == ("alice", "acme")
+    assert ctx.has_permission(RBACPermission.BB_READ)
+
+
+def test_unprivileged_role_gets_no_permissions() -> None:
+    ctx = tenant_blackboard_service.context_for_caller("acme", "bob", ("viewer",))
+    assert ctx.permissions == frozenset()
+    assert not ctx.has_permission(RBACPermission.BB_READ)
+
+
+# ── G3: fallback enforcer is fail-closed (docstring/代码 一致) ──
+
+
+def test_fallback_denies_context_without_the_permission() -> None:
+    ctx = TenantContext(tenant_id="acme", user_id="bob", roles=frozenset({"viewer"}))
+    assert FallbackRBACEnforcer().check(ctx, RBACPermission.BB_READ, "*") is False
+
+
+def test_fallback_allows_granted_permission_then_vetoes_explicit_denial() -> None:
+    enforcer = FallbackRBACEnforcer()
+    ctx = TenantContext(
+        tenant_id="acme",
+        user_id="alice",
+        roles=frozenset({"operator"}),
+        permissions=frozenset({RBACPermission.BB_READ}),
+    )
+    assert enforcer.check(ctx, RBACPermission.BB_READ, "*") is True
+    enforcer.deny("operator", RBACPermission.BB_READ, "*")
+    assert enforcer.check(ctx, RBACPermission.BB_READ, "*") is False
+
+
+# ── service-level injection ───────────────────────────────────────
+
+
+def test_get_tenant_with_caller_uses_injected_enforcer(bb_with_data, monkeypatch) -> None:
+    """The enforcer must see the caller, not a synthetic superadmin."""
+    seen: list[tuple] = []
+
+    class _Denying:
+        def check(self, ctx, permission, resource):
+            seen.append((ctx.user_id, permission, resource))
+            return False
+
+    monkeypatch.setattr(tenant_blackboard_service, "resolve_m3_enforcer", lambda: _Denying())
+    monkeypatch.setattr(tenant_blackboard_service, "get_blackboard", lambda: bb_with_data)
+    caller = tenant_blackboard_service.context_for_caller("acme", "bob", ("viewer",))
+
+    with pytest.raises(PermissionError):
+        tenant_blackboard_service.get_tenant("acme", caller=caller)
+
+    assert seen[0] == ("bob", RBACPermission.BB_READ, "*")
+
+
+def test_get_tenant_with_permitted_caller_reads_snapshot(bb_with_data, monkeypatch) -> None:
+    class _Allowing:
+        def check(self, ctx, permission, resource):
+            return True
+
+    monkeypatch.setattr(tenant_blackboard_service, "resolve_m3_enforcer", lambda: _Allowing())
+    monkeypatch.setattr(tenant_blackboard_service, "get_blackboard", lambda: bb_with_data)
+    caller = tenant_blackboard_service.context_for_caller("acme", "alice", ("admin",))
+
+    detail = tenant_blackboard_service.get_tenant("acme", caller=caller)
+    assert detail["tenant_id"] == "acme"
+    assert detail["snapshot"]["_meta"]["total_entries"] == 1
+
+
+def test_get_tenant_without_caller_keeps_system_context(bb_with_data, monkeypatch) -> None:
+    """Auth disabled ⇒ no identity boundary; the historical path must not change."""
+    calls: list[int] = []
+    monkeypatch.setattr(
+        tenant_blackboard_service, "resolve_m3_enforcer", lambda: calls.append(1) or None
+    )
+    monkeypatch.setattr(tenant_blackboard_service, "get_blackboard", lambda: bb_with_data)
+
+    assert tenant_blackboard_service.get_tenant("acme")["snapshot"]["_meta"]["total_entries"] == 1
+    assert calls == [], "no enforcer is resolved when there is no caller"
+
+
+# ── HTTP surface: admin gate + per-caller enforcer ────────────────
+
+
+def test_detail_still_requires_admin(reader, monkeypatch) -> None:
+    """The master HTTP admin gate is retained (fixture admin_required_reads)."""
+    monkeypatch.setattr(tenant_blackboard_service, "resolve_m3_enforcer", lambda: None)
+    assert reader.get("/api/tenant-blackboard/tenants/acme").status_code == 403
+
+
+def test_detail_200_for_admin_in_personal_edition(bb_with_data, monkeypatch) -> None:
+    monkeypatch.setattr(tenant_blackboard_service, "get_blackboard", lambda: bb_with_data)
+    monkeypatch.setattr(tenant_blackboard_service, "resolve_m3_enforcer", lambda: None)
+
+    resp = _make_app(roles=["admin"]).get("/api/tenant-blackboard/tenants/acme")
+
+    assert resp.status_code == 200
+    assert resp.json()["data"]["tenant_id"] == "acme"
+
+
+def test_detail_403_when_enforcer_denies_even_an_admin(bb_with_data, monkeypatch) -> None:
+    """require_admin passes, yet the injected enforcer (MAOS grant table) denies.
+
+    This is the G2 payoff: the HTTP role gate is not the whole story once the
+    enterprise enforcer owns the decision.
+    """
+
+    class _Denying:
+        def check(self, ctx, permission, resource):
+            return False
+
+    monkeypatch.setattr(tenant_blackboard_service, "get_blackboard", lambda: bb_with_data)
+    monkeypatch.setattr(tenant_blackboard_service, "resolve_m3_enforcer", lambda: _Denying())
+
+    resp = _make_app(roles=["admin"]).get("/api/tenant-blackboard/tenants/acme")
+
+    assert resp.status_code == 403
+    body = resp.json()
+    assert body["code"] == "HTTP_403"
+    assert "blackboard:read" in body["error"]

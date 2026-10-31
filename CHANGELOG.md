@@ -39,6 +39,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M3 黑板鉴权接线：企业版 enforcer 显式注入（G2）+ FallbackRBACEnforcer docstring 修正（G3）（2026-10-31）
+
+MAOS 侧对 readiness 文档待决 #2 已按**选项 B** 交付 —— `maop.enterprise.rbac_m3_adapter`
+导出 `create_m3_enforcer()` 工厂，剩下的唯一一步在 MAOP：**构造 `TenantBlackboard`
+时把 enforcer 传进去**。本轮在 `origin/master`（`941c9603`）基线上重建并落地
+（参考实现基于 9 天前 master，未直接复用）。
+
+- `tenant_blackboard_service.resolve_m3_enforcer()`：**懒导入**适配器（模块级不 import
+  enterprise，个人版照样导入本模块）。manager 复用 `rbac_service.get_rbac_manager()`
+  单例 —— 适配器自建会多开一个 RBAC 存储句柄（PG 优先、`data/rbac.db` 兜底），
+  其 docstring 也警告了这点。manager 拿不到时退回 fallback，但**记一条 warning**：
+  鉴权降级不该是静默的。
+- `tenant_blackboard_service.context_for_caller(...)` + `_PRIVILEGED_ROLES`：从调用方
+  上下文构造带权限的 `TenantContext`（个人版据此推导 `blackboard:read`，企业版由
+  MAOS 授权表裁决）。
+- `get_tenant(..., caller=...)`：有身份就按调用者上下文构造并注入 enforcer；
+  没有身份边界（认证关闭时中间件把身份钉成 `anonymous`）保持既有系统上下文，
+  个人版行为逐字不变。
+- 路由 `GET /api/tenant-blackboard/tenants/{tenant_id}`：新增 `_caller_context`，
+  把已认证调用方上下文透传给 service，使企业版 enforcer 对该读生效；`PermissionError`
+  经 `handle_api_errors` 映射为 403。**保留 master 的 `require_admin` HTTP 守卫**
+  （`tests/fixtures/admin_required_read_endpoints.txt` 已登记该端点），
+  构成"admin 角色门 + enforcer 授权"双层；`FallbackRBACEnforcer` docstring 改为
+  **fail-closed** 描述（G3），并指向企业部署应注入 `create_m3_enforcer()`。
+
+**验证**：`test_tenant_blackboard_rbac.py` 全绿（含 G2 注入路径、懒导入 AST 检查、
+单例复用、fallback fail-closed、调用方三态），`test_coordination_m3/m4` 与
+`test_admin_required_reads` 回归通过。
+
 ### M-T3.3 Operator M1 —— MaopAgent CR 解析 + agent pinning（2026-10-30）
 
 ``spec.agent`` 从"校验透传"变为真正参与执行路由：
