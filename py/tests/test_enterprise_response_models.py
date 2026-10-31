@@ -6,12 +6,12 @@ this repository but are mounted only under ``FeatureFlag.MULTI_USER`` — were
 never intersected: 31 frontend-called enterprise endpoints returned an untyped
 dict with no line anywhere, and the personal gate reported a clean burn-down.
 
-Measured, not estimated: the enterprise app exposes 74 METHOD/PATH pairs, 32 of
+Measured, not estimated: the enterprise app exposed 74 METHOD/PATH pairs, 32 of
 them referenced by the dashboard, 0 typed. One is exempted as non-JSON (SAML SP
-metadata comes back as ``application/xml``). 17 of the remaining 31 were modelled
-on 2026-10-30 (tenant / rbac / quotas), leaving 14 lines in
-``fixtures/enterprise_response_model_allowlist.txt``; those 14 all sit in the
-three routers that cannot be imported without the commercial overlay.
+metadata comes back as ``application/xml``). 17 of the 31 were modelled on
+2026-10-30 (tenant / rbac / quotas) and the last 14 on 2026-10-31 (sso / n8n /
+licenses, whose models are mirrored in-repo so they are typed even where the
+commercial overlay is absent). The allowlist is now empty and must stay that way.
 
 Three routers cannot be imported at all in a clean CI checkout: they pull the
 commercial overlay in at module level, and that overlay ships in a second
@@ -57,8 +57,8 @@ NON_JSON = FIXTURES / "frontend_non_json_endpoints.txt"
 PERSONAL_ALLOWLIST = FIXTURES / "frontend_response_model_allowlist.txt"
 
 # Starting ceiling, measured 2026-10-24 — this list may only shrink.
-# 2026-10-30: 31 → 14 after the tenant / rbac / quotas batch.
-RATCHET_CAP = 14
+# 2026-10-30: 31 → 14 (tenant / rbac / quotas); 2026-10-31: 14 → 0.
+RATCHET_CAP = 0
 
 
 def _routes() -> dict[tuple[str, str], dict]:

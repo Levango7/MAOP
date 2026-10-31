@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field  # noqa: F401
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers import n8n_schemas
 from maop.dashboard.services import integration_service
 from maop.enterprise.n8n import N8nIntegrationError
 
@@ -110,7 +111,7 @@ async def receive_webhook(request: Request) -> dict[str, Any]:
     )
 
 
-@router.get("/workflows")
+@router.get("/workflows", response_model=n8n_schemas.N8nWorkflowListEnvelope)
 @handle_api_errors("n8n list workflows")
 async def list_workflows(request: Request) -> dict[str, Any]:
     """List all n8n workflows."""
@@ -127,7 +128,7 @@ async def list_workflows(request: Request) -> dict[str, Any]:
     return {"status": "ok", **result}
 
 
-@router.post("/workflows/{workflow_id}/trigger")
+@router.post("/workflows/{workflow_id}/trigger", response_model=n8n_schemas.N8nExecutionItem)
 @handle_api_errors("n8n trigger workflow")
 async def trigger_workflow(
     workflow_id: str,
@@ -159,7 +160,7 @@ async def trigger_workflow(
     return {"status": "ok", **execution}
 
 
-@router.get("/executions/{execution_id}")
+@router.get("/executions/{execution_id}", response_model=n8n_schemas.N8nExecutionItem)
 @handle_api_errors("n8n get execution")
 async def get_execution(execution_id: str, request: Request) -> dict[str, Any]:
     """Get the status of an n8n workflow execution."""
@@ -176,7 +177,7 @@ async def get_execution(execution_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", **execution}
 
 
-@router.get("/health")
+@router.get("/health", response_model=n8n_schemas.N8nHealthEnvelope)
 @handle_api_errors("n8n health check")
 async def health_check(request: Request) -> dict[str, Any]:
     """Check if n8n is reachable."""

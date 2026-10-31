@@ -168,8 +168,27 @@
 - **已知遗留（未立项，下一批再登记）**：① CI 串行腿的 junit 未上传、失败不 annotate，
   且 `--reruns=3` 与 nightly 同腿的 `--reruns=0` 口径相反；② `/api/notifications` 注册处
   注释称"双版本可用"，但其 schema 模块级依赖 overlay（个人版整块缺失），属产品边界待裁。
+- **进展（2026-10-31，尾批做完）**：分支 `fix/enterprise-response-models-overlay`
+  （自 `78254584`，1 提交）：sso 5 / n8n 4 / licenses 5 共 14 条补 `response_model`，
+  镜像模型仓内新建 `routers/{sso,n8n,licenses}_schemas.py`；棘轮 allowlist 14 → 0。
+  **更正 10-30 的判断**：这 14 条端点都在 MAOP 自己的 router 里，仓内建镜像即可，
+  **不碰 MAOS、不需要重签完整性清单**；只有想把 `dict[str, Any]` 换成 overlay 真类型
+  时才需要持钥会话。条目模型统一 `extra="allow"`（仓库外的形状不能收窄，否则静默丢键）；
+  trigger / executions 两条响应本来就无信封（`status` 是执行状态，被 `**execution` 覆盖）。
+  新增 `tests/test_overlay_router_contracts.py`（15 例，纯净 CI 用模块替身真跑）；
+  变异反证 4 例全红。
+  **同批修掉许可证页的字段契约缺口**（用户指示）：`Licenses.vue` 读的
+  `customer_name`/`customer_email`/`version`/`max_agents` 由 `customer`/`notes`/
+  `edition`/`features` 在视图里翻译，`history` 改走真实端点
+  `GET /api/licenses/{id}/audit`（该端点随之补 `response_model`）；生成对话框里
+  发不出去的"版本"下拉框改成只读。**他线注意**：本次动了
+  `dashboard-enterprise/src/views/Licenses.vue` 与其 `src/__tests__/Licenses.test.js`
+  （Examples 会话登记的 nav/i18n/AppIcon 三个文件不冲突，但如你方也要动 Licenses
+  页请先在本表回一行）。
 - **领地（本线独占，勿动）**：`py/maop/dashboard/routers/{credential_vault,share,
-  agent_versions,long_running_task,tenant,rbac,quotas}.py` 与其 `*_schemas.py`；
+  agent_versions,long_running_task,tenant,rbac,quotas,sso,n8n,licenses}.py` 与其
+  `*_schemas.py`；`py/tests/test_overlay_router_contracts.py`；
+  `dashboard-enterprise/src/views/Licenses.vue` 与其 `src/__tests__/Licenses.test.js`；
   `py/tests/_overlay_rule.py`；`py/tests/conftest.py`、`py/tests/e2e/conftest.py`；
   `py/tests/test_overlay_collection_rule.py`；
   `py/tests/test_{vault_share,versions_tasks}_router_contracts.py`、
@@ -177,9 +196,8 @@
   `py/tests/fixtures/{frontend_non_json_endpoints.txt,frontend_response_model_allowlist.txt,
   enterprise_response_model_allowlist.txt}`；
   `py/tests/test_{frontend,enterprise}_response_models.py`；`py/maop/config/edition.py`。
-- **下一步（动前会先在本表再登记）**：企业版 allowlist 剩 14 条（sso 5 / n8n 4 / licenses 5）
-  在三个模块级导入 overlay 的 router 里，改它们要动 MAOS `maop/enterprise/*` + 重签
-  完整性清单，须与持私钥会话协调；未协调好之前本线不动 MAOS。
+- **下一步（动前会先在本表再登记）**：企业版 response_model 棘轮已归零，本线该主题收口。
+  候选：`/api/notifications` 的产品边界裁决（见上方遗留②）。
 - **不碰**：`py/maop/dashboard/server.py` 与 lifespan 接线面（ZCode 第四轮）、
   `core/**` 宽口径异常收窄批（ADR-023 D8）、`dashboard-enterprise/src/**`。
 

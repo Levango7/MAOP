@@ -269,6 +269,46 @@ CI 里这条门禁正处于"被连坐跳过"状态，所以没人看见。**已�
 - 验证：新契约 21 例 + 棘轮 7 例绿；纯净 CI 复刻（硬拦 overlay）26 passed /
   1 skipped；存量 enterprise 相关 115 例 + router smoke 576 例无回归；ruff 0 条。
 
+### 企业版棘轮 14 → 0：sso / n8n / licenses 14 条端点建模（2026-10-31）
+
+- 三条模块级依赖商业 overlay 的 router 补上 `response_model`：sso 5 / n8n 4 /
+  licenses 5。新增 `routers/{sso,n8n,licenses}_schemas.py`，同样是**仓内线缆形状
+  镜像**——直接在仓内建模而不是引用 overlay 的 Pydantic 模型，纯净 CI 检出里
+  OpenAPI 才有可引用的 schema；只有想把 `dict[str, Any]` 换成 overlay 真类型时
+  才需要动 MAOS 并重签完整性清单。
+- 条目模型统一开 `extra="allow"`：这几个形状的持有者要么在另一个仓库（可独立加字段），
+  要么干脆是 n8n 的自由格式 JSON。严格模型会**静默丢键**（前端拿不到、日志无痕、
+  门禁全绿）；放开后新增字段原样透传，改名/删必填字段则因缺键变成 500，属响亮失败。
+- `POST /api/n8n/workflows/{id}/trigger` 与 `GET /api/n8n/executions/{id}` 的响应
+  **没有信封**：router 写的是 `{"status": "ok", **execution}`，执行对象自带的
+  `status` 覆盖了字面量，线上这个键一直是执行状态（running / success / ...），
+  前端也按执行状态读。模型据此按执行对象建模，并用用例钉住这一语义。
+- 棘轮：`enterprise_response_model_allowlist.txt` 14 → 0（只剩表头注释），
+  `RATCHET_CAP` 同步归零。
+- 新增 `tests/test_overlay_router_contracts.py`（14 例）：OpenAPI 类型 +
+  "已建模却仍在 allowlist"反向守卫；14 条端点真跑逐键比对；上游新增键必须透传
+  （`extra="allow"` 的性质守卫）；必填键缺失必须是 500；执行响应不是信封；
+  装了企业包时逐字段对账 `SSOProviderResponse` / `N8nWorkflowExecution` /
+  `LicenseRecord`。overlay 不可导入时注入三个模块替身，让路由能真导入、真跑，
+  纯净 CI 下这套契约不再整份消失。
+- 变异反证 4 例（条目去掉 `extra="allow"` / 去掉 `response_model` / 必填键补默认值 /
+  执行响应改回信封）全红，文件按 SHA256 逐字节复原。
+- 验证：新契约 15 例 + 棘轮 7 例绿；纯净 CI 复刻（硬拦 overlay）50 passed /
+  3 skipped；前端 Licenses 18 例、全量 75 文件 667 例绿；ruff / eslint 0 条、mypy 0 error。
+- 修 `Licenses.vue` 与前端的字段契约缺口（同批发现并收口）：页面读的 `customer_name` /
+  `customer_email` / `version` / `max_agents` / `history`，后端一个都不返回（`LicenseRecord`
+  只有 `customer` / `notes`（`email: ...`）/ `edition` / `features`（`max_agents:N`）），
+  所以「客户」列与详情里的邮箱 / 版本 / Agent 数 / 操作历史一直是空的。
+  - 视图里集中做一次翻译（`normalizeLicense`）：`customer` → `customer_name`、
+    `notes` 里的 `email:` → `customer_email`、`edition` → `version`（顺带本地化标签）、
+    `features` 里的 `max_agents:` → `max_agents`。
+  - 操作历史改走真实端点 `GET /api/licenses/{id}/audit`（前端此前从未调用），
+    该端点随之补 `response_model`（`LicenseAuditListEnvelope`），棘轮仍为 0。
+  - 生成对话框的"版本"下拉框删除：`LicenseCreateRequest` 没有 edition 字段、签发恒为
+    enterprise，选什么都发不出去，改为只读显示；表单里的死字段 `form.version` 一并删除。
+  - 测试夹具从"页面字段形状"改成后端真实线缆形状（原来的 mock 会把翻译缺失掩盖掉），
+    新增派生字段、审计历史、只读版本三个用例；变异反证 4 例全红。
+
 ### 分层收官批：middleware 子包化 + lifespan 接线（2026-10-28）
 
 - **`core/security/middleware.py` 1188 行 → 六文件子包**：`_auth`（AuthMiddleware
