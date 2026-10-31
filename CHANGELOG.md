@@ -73,6 +73,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 且早于 pip install /app/py；useradd 带 --gid）——PR 上 docker 腿不跑
 （`if: push && (main||master)`），静态守卫是 PR 期唯一防线。
 
+### CI 串行腿的可观测性加固（2026-10-31）
+
+九平台矩阵里 `-m "not slow and serial"` 那条腿此前是**静默失败面**：步骤没有
+`set +e`，pytest 一红整个 step 当场终止 ⇒ 既不 annotate，也不上传它的 junit
+（`Upload test results` 只收 `py/test-results.xml`）。结果是"串行腿红"这件事
+只剩滚屏，而主腿早就有 annotation + artifact。
+
+- 步骤改为：输出 `tee` 到 `serial-pytest.log` → 用 `PIPESTATUS[0]` 取 pytest
+  自己的退码（不受 `tee` 退码替换）→ 红时按 `test-results-serial.xml` 出
+  annotation 并打日志尾部 → **原样透传退码**。判据没动：红还是红。
+- 重试计数进 check-run notice。`--reruns=3` 会把 flaky 洗成绿，这一点是刻意的
+  （`nightly.yml:135` 用 `--reruns=0` 做同类 flake 的复现腿，两条腿口径相反是
+  设计而不是漂移）——但"这轮洗了几次"必须看得见，否则 CI 绿与"绿得可疑"同形。
+- artifact 路径扩成 `test-results.xml` + `test-results-serial.xml` + 串行腿日志。
+
+验证（跑的是 ci.yml 里那段脚本本身，从 YAML 解析出来执行，不抄第二份）：
+
+| 用例 | 退码 | annotation | notice | 结论 |
+|---|---|---|---|---|
+| 红 + 有重试 | 1 | 有（点名 `test_b`） | 有 `3 rerun` | 红且可归因 |
+| 绿 + 有重试 | 0 | 无 | 有 `3 rerun` | 不谎报，但把重试暴露出来 |
+| 绿 + 无重试 | 0 | 无 | 无 | 判据不是无条件放行 |
+| 旧写法（对照） | 1 | **无** | — | 修复前的形态：红但静默 |
+
 ### 纯净 CI 的收集跳过判据改按 AST —— 20 个测试文件此前从未运行过（2026-10-30）
 
 `tests/conftest.py` 与 `tests/e2e/conftest.py` 用「文件文本里出现过 `maop.enterprise`

@@ -324,20 +324,53 @@ jobs:
         # 门禁而测试全过。改为 --cov-append 合流到同一 coverage.xml，ratchet
         # 读到主+serial 的完整覆盖（本地实测 81.59%）。注意: 不能用 --no-cov
         # + 依赖主 step 数据——append 模式下本 step 若不收集则数据面缺 serial。
+        #
+        # 可观测性加固(2026-10-31)。此前这一腿是**静默失败面**：没有 set +e，
+        # pytest 一红整个 step 当场终止 → 既不 annotate 也不上传它的 junit，
+        # 失败只剩滚屏（主腿有 test-results.xml，串行腿的 test-results-serial.xml
+        # 从头到尾没人收）。三条改动都只加可见性，**不改判据**：
+        #   ① 输出 tee 到日志，失败时打尾部 + 按自己的 junit 出 annotation，
+        #      最后原样透传 pytest 退码（判据不变，红还是红）；
+        #   ② 重试计数进 check-run notice——--reruns=3 会把 flaky 洗成绿，
+        #      这是有意为之（ nightly.yml:135 用 --reruns=0 做 flake 复现，
+        #      两条腿口径相反是设计而非漂移），但"洗过几次"必须看得见；
+        #   ③ 两条 xunit 产物与日志一并进 artifact（见下一步 Upload test results）。
         shell: bash
         run: |
+          set +e
           python -m pytest tests/ -q --ignore=tests/contract \
             -m "not slow and serial" -n 0 \
             --cov=maop --cov-append --cov-report=xml \
-            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results-serial.xml
+            --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results-serial.xml \
+            2>&1 | tee serial-pytest.log
+          serial_code="${PIPESTATUS[0]}"
+          set -e
+          echo "serial tests exit code: ${serial_code}"
+          reruns=$(grep -oE '[0-9]+ rerun' serial-pytest.log | tail -1)
+          if [ -n "${reruns}" ]; then
+            echo "::notice::serial 腿重试计数: ${reruns}（nightly 以 --reruns=0 复现同类 flake）"
+          fi
+          if [ "${serial_code}" -ne 0 ]; then
+            # 只出 annotation，不改退码；脚本自身对坏文件只 warning，不能让它把红洗成绿。
+            python scripts/junit_annotate.py test-results-serial.xml || true
+            echo "----- serial-pytest.log tail -----"
+            tail -n 25 serial-pytest.log
+          fi
+          exit "${serial_code}"
 
       - name: Upload test results
+        # 串行腿的 junit 以前不在 artifact 里：那条腿红的时候，下载 artifact 也
+        # 拿不到它的结果（只能翻滚屏，而 step 一红就没有 annotation）。
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: py/test-results.xml
+          path: |
+            py/test-results.xml
+            py/test-results-serial.xml
+            py/serial-pytest.log
           retention-days: 7
+          if-no-files-found: warn
 
       - name: Upload coverage data (debug ratchet failures)
         # 2026-08-30: ratchet 失败时需要 coverage.xml 定位平台差异（ubuntu 挂
