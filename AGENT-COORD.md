@@ -307,3 +307,24 @@
   `py/tests/test_layering_lifespan_wiring.py`）被短暂 stash 后**逐字节还原**、
   现仍在工作树原位。归属请相关会话认领（像 layering 线的 lifespan 接线草稿），
   本会话不再触碰该树。
+## 领地登记（CodeArts，2026-10-31：主工作树残留核验 + 两项认领交付）
+
+- **核验发现（只读）**：主工作树 4 个未提交改动（MAOP-op §共享树自记 标注"待认领"的
+  lifespan 草稿）已被 `origin/master` 吸收且上游更新（`server.py:140/199` 已有
+  `start/shutdown_layering_services`；`settings.py:39` 已有 `a2a_gateway_enabled`；
+  `test_layering_lifespan_wiring.py` 上游为 **6 判据**、工作树草稿仅 4 判据 ⇒ 过时），
+  故**已清理**：3 tracked 文件 `git checkout HEAD --` 还原、未跟踪文件移出；清理前归档
+  `F:/Nexus/_archive/MAOP-lifespan-residue-2026-10-31/`（residue.patch + 未跟踪文件 + SHA256SUMS，校验 OK）。
+- **已认领交付（2 项，各自独立 worktree + 分支 + PR）**：
+  1. **G2 黑板 enforcer 注入（G2+G3）** —— worktree `F:/Nexus/MAOP-g2`，分支
+     `feat/m3-g2-enforcer-injection`（baseline origin/master 941c9603，commit `540c8ca2`），
+     **PR #196**。5 文件：`tenant_blackboard_service.py`（+`_PRIVILEGED_ROLES`/`context_for_caller`/
+     `resolve_m3_enforcer` + `get_tenant(caller=)` 注入）、router 透传 caller
+     （**保留 master 的 require_admin**，双层授权）、`coordination_tenant.py`
+     （FallbackRBACEnforcer docstring 改 fail-closed）、测试合并（+228）、CHANGELOG。
+     验证：目标 23 passed + 回归 108 + 284 passed；跨仓契约校验 OK。
+  2. **V6 M2 适配器契约一致性测试** —— worktree `F:/Nexus/MAOP-adapter`，分支
+     `test/adapter-consistency`（baseline origin/master，commit `4917f08`），**PR #195**。
+     新增 `py/tests/test_adapter_contract_consistency.py`（715 行/93 用例），
+     6 个一等公民适配器 × 9 契约维度。验证：93 passed，回归 293 passed / 19 skipped。
+- **未碰**：其余 16 个 MAOP worktree 战线、MAOS 仓（G1 已在 MAOS master，未改）。
