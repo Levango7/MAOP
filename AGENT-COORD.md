@@ -154,7 +154,15 @@
 
 补登记：2026-10-28 17:15 那批 `routers/*_schemas.py` 就是本线产物（上表已注意到）。
 
-- **已完成（2026-10-30 合并，本线这两批收口）**：
+- **已完成（2026-10-31 合并，棘轮线彻底收口）**：
+  - **PR #187 → 合并提交 `78a61278`**（分支 `fix/enterprise-response-models-overlay`）：
+    企业版 allowlist **14 → 0**（sso 5 / n8n 4 / licenses 5 在仓内建模，**不需要动 MAOS、
+    不需要重签完整性清单**），并修掉许可证页的字段契约缺口（页面按 `customer`/`notes`/
+    `edition`/`features` 翻译取数，操作历史改走 `GET /api/licenses/{id}/audit`，
+    发不出去的"版本"下拉框改只读）。棘轮 `RATCHET_CAP = 0`，两份 allowlist 均空。
+    注：该分支中途 **force-push 过一次**——测试夹具里形似真 key 的高熵值被 gitleaks
+    判成泄漏，只改值不够（旧值已进历史会被段②全历史扫到），故重写为不含该值的等价提交。
+- **已完成（2026-10-30 合并，本线这两批改完）**：
   - **PR #181 → 合并提交 `7c3330a0`**（分支 `fix/clean-ci-collection-rule`）：企业包收集判据由
     「文本关键字」改按 AST（连坐 37 → 17，两份 conftest 共用 `py/tests/_overlay_rule.py`）；
     复原 4 处被旧判据吃掉的诚实守卫（显式 skip）；判据修好后棘轮抓到并收口的 13 条缺口
@@ -168,7 +176,7 @@
 - **已知遗留（未立项，下一批再登记）**：① CI 串行腿的 junit 未上传、失败不 annotate，
   且 `--reruns=3` 与 nightly 同腿的 `--reruns=0` 口径相反；② `/api/notifications` 注册处
   注释称"双版本可用"，但其 schema 模块级依赖 overlay（个人版整块缺失），属产品边界待裁。
-- **进展（2026-10-31，尾批做完）**：分支 `fix/enterprise-response-models-overlay`
+- **进展（2026-10-31，尾批已随 PR #187 合并，见上方「已完成」）**：分支 `fix/enterprise-response-models-overlay`
   （自 `78254584`，1 提交）：sso 5 / n8n 4 / licenses 5 共 14 条补 `response_model`，
   镜像模型仓内新建 `routers/{sso,n8n,licenses}_schemas.py`；棘轮 allowlist 14 → 0。
   **更正 10-30 的判断**：这 14 条端点都在 MAOP 自己的 router 里，仓内建镜像即可，
