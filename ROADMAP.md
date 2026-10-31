@@ -419,12 +419,16 @@
 
 ### M-X1 Agent Marketplace 签名校验（M0 章程）
 
-- 现状：v5.1.0 Skill 市场只做基础导入/导出；社区共享与签名校验仍待排期。
-- M0 范围：sign/verify 工具链（Ed25519，与 MAOS 激活链同构算法）+ 发布与
-  校验入口（CLI 或 API）+ 威胁模型文档。
-- M0 验收：篡改清单 / 缺失签名两方向判红；构建→签名→校验→拒绝四态冒烟。
-- 阻碍位置：**密钥治理**——生产签发流程需与部署侧确认（与 T1.5 phase 2 产物
-  签名同一条治理链，MAOS 侧已有先例可复用）。
+- 现状（2026-10-31 更新）：**M0 已交付（接线式）**——Ed25519 工具链
+  （``core/marketplace/signing.py``，2026-09 起已存在但零接线）接入
+  ``MCPMarketplace`` 安装路径：``verifier``/``key_mgmt``/``require_signature``
+  注入 + 目录条目验签（fail-closed）+ ``MAOP_MARKETPLACE_VERIFY_KEY`` 配置面 +
+  CLI ``--require-signature`` + 威胁模型文档
+  （``docs/marketplace-signing-threat-model.md``）。验收：篡改/缺失签名判红、
+  四态冒烟 = ``test_mcp_marketplace.py::TestSignatureGate``（5 例）✅。
+- 余量：密钥治理呈批（生产签发流程：公钥分发通道 / operator 私钥保管 /
+  轮换吊销 SLA / ``require_signature`` 默认值演进）——**不阻塞 M0 验收**；
+  Skill 包分发面的签名扩展另批。
 
 ### M-X2 多后端编排器适配（Temporal/Airflow，M0 章程）
 

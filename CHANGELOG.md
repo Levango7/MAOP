@@ -39,6 +39,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M-X1 Marketplace 签名 M0 —— Ed25519 验签接入安装路径（2026-10-31）
+
+``core/marketplace/signing.py``（Ed25519 工具链，2026-09 起功能完整但零接线、
+在 ``check_wiring`` ``KNOWN_UNWIRED`` 在册）自本批起接入运行时：
+
+- ``MCPMarketplace`` 增 ``verifier`` / ``key_mgmt`` / ``require_signature`` 注入；
+  安装路径对携带 ``signature_hex`` 的目录条目验签——签名覆盖注册表发布的
+  **原始条目 dict**（canonical JSON；narrowed model 会丢未知键，故安装链保留
+  raw entry），任何失败 fail-closed 拒绝安装；轮换/黑名单多钥路径经
+  ``key_mgmt=KeyManagement(...)`` 注入启用（``verify_with_key_management``，
+  ``signer_key_id`` 作 tool_id）。
+- 公钥经 ``MAOP_MARKETPLACE_VERIFY_KEY``（settings 助手
+  ``marketplace_verify_key_path()``）配置，CLI 与 plugin_service 两个构造点
+  均接线；CLI ``maop mcp marketplace install --require-signature`` 强制
+  缺失即拒。
+- ``check_wiring``：signing 销账（已接线）；key_management 更新为"可选注入
+  路径已备、完整密钥治理仍待排期"。威胁模型见
+  ``docs/marketplace-signing-threat-model.md``。
+- ``cli.py`` 按先例拆出 ``cli_mcp_marketplace.py``（``mcp marketplace`` 子命令
+  族；cli.py 810 → 694，远离 800 门禁线）。
+- 边界（诚实登记）：未注入 verifier 的部署信任模型不变（checksum + trusted）；
+  生产签发流程（密钥治理呈批）不阻塞 M0。
+
 ### M-T3.3 Operator M2 —— turn 预算透传 + status.turns 会计（2026-10-30）
 
 ``spec.maxTurns`` 从"校验透传"变为真正生效：
