@@ -8,25 +8,15 @@ re-export ``cmd_run`` —— CLI 调用面与既有测试的 patch 目标
 
 from __future__ import annotations
 
-import os
 import sys
 import time
-from pathlib import Path
 from typing import Any
 
 from maop.cli_run_outcome import explain_unsuccessful_run
-from maop.config.home import ensure_runtime_root
 from maop.core.agent.delegation.depth import (
     MAX_SELF_DELEGATION_DEPTH,
     current_depth,
 )
-
-
-def _runtime_root() -> Path:
-    """返回可用根并导出给子进程/导入（与 ``maop.cli._runtime_root`` 同语义）。"""
-    root = ensure_runtime_root()
-    os.environ["MAOP_ROOT_DIR"] = str(root)
-    return root
 
 
 def _emit_fail(name: str, exc: BaseException | str) -> None:
@@ -65,7 +55,11 @@ def cmd_run(task: str, depth: int = 0, agent: str = "", max_turns: int = 0) -> A
     try:
         import asyncio
 
+        # 延迟导入：cli.py 是本模块的门面（re-export），模块级导入会成环；
+        # 复用其 _runtime_root 也避免在 config-drift 门禁里重复一次 env 写。
+        from maop.cli import _runtime_root
         from maop.maop_loop import MaopLoop
+
         loop = MaopLoop(root_dir=str(_runtime_root()))
         result = asyncio.run(loop.run(task, agent=agent, max_turns=max_turns or None))
         elapsed = (time.monotonic() - start) * 1000
