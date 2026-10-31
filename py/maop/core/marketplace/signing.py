@@ -1,24 +1,17 @@
 """Marketplace package signing — Ed25519 asymmetric signature verification.
 
-.. warning::
+.. note::
 
-   **本模块未接入任何运行时路径（2026-09-24 取证）。**
-
-   AST 导入分析确认：全仓**零运行时导入方**，仅被
-   ``tests/test_marketplace_f301.py`` 导入（该测试全绿，覆盖签名往返 /
-   篡改拒绝 / 错误密钥拒绝 / 畸形签名拒绝）。
-
-   功能完整（2026-09-25 起是仓库内**唯一**的 Ed25519 工具/包签名实现），但没有任何
-   用户可达路径。已上线的 :mod:`maop.core.mcp.mcp_marketplace` **不认识
-   signature 字段**（其信任模型是 SHA-256 checksum + ``trusted`` 注册表标志），
-   因此本模块与线上安装路径之间**没有集成点**。
-
-   接入时**必须同时接入** :mod:`maop.core.marketplace.key_management`
-   —— 否则密钥无法轮换 / 吊销，一次泄露就只能改代码。
-
-   状态：待决策。ROADMAP.md:173 把签名校验列为**阶段三**（Month 10–21）
-   的 Agent Marketplace 事项且标注「仍待排期」，故尚未排期。
-   登记于 ``scripts/check_wiring.py`` 的 ``KNOWN_UNWIRED``。
+   **2026-10-31 起接入运行时（M-X1）。** :mod:`maop.core.mcp.mcp_marketplace`
+   的安装路径对携带 ``signature_hex`` 的目录条目做 Ed25519 验签——签名覆盖
+   注册表发布的**原始条目 dict**（canonical JSON）；公钥经
+   ``MAOP_MARKETPLACE_VERIFY_KEY``（settings 助手
+   ``marketplace_verify_key_path()``）注入 ``MCPMarketplace(verifier=...)``，
+   ``require_signature=True`` 强制签名存在（fail-closed）。轮换/黑名单多钥
+   路径经 ``MCPMarketplace(key_mgmt=KeyManagement(...))`` 注入启用（见
+   :meth:`PackageVerifier.verify_with_key_management`）。威胁模型见
+   ``docs/marketplace-signing-threat-model.md``。此前（2026-09-24/25）本模块
+   完整但零运行时导入方，登记于 ``check_wiring.py`` 的 ``KNOWN_UNWIRED``。
 
 G-01 security fix: replaces the previous HMAC-SHA256 symmetric scheme with
 Ed25519 asymmetric signatures. This allows:

@@ -292,7 +292,16 @@
 - **M-X1 Marketplace 签名（用户授权立项）**：按 #177 章程推进 M0——Ed25519
   sign/verify 工具链 + 发布/校验入口 + 威胁模型文档；**密钥治理前置路线**：
   先以 dev/test key 落工具链与四态冒烟（构建→签名→校验→拒绝），生产签发
-  流程单独呈批、不阻塞 M0。开工前另行登记分支。
+  流程单独呈批、不阻塞 M0。
+- **M-X1 M0 交付（2026-10-31，接线式）**：核实时发现 Ed25519 工具链
+  （`core/marketplace/signing.py` + `key_management.py`）2026-09 起已存在且
+  测试全绿、但零运行时导入（KNOWN_UNWIRED 在册）——M0 真工作=接线：
+  `MCPMarketplace(verifier/key_mgmt/require_signature)` + 安装路径对原始目录
+  条目验签（fail-closed）+ `MAOP_MARKETPLACE_VERIFY_KEY` 配置面（settings
+  助手）+ CLI `--require-signature` + 两个运行时构造点（cli/plugin_service）
+  接线 + 威胁模型 `docs/marketplace-signing-threat-model.md`。顺带按先例拆出
+  `cli_mcp_marketplace.py`（cli.py 810→694）。分支
+  `feat/mx1-marketplace-signing-m0`。
 - **M-X2 Temporal（用户授权立项，前置 M0 路线）**：adapter 接口先行 + demo
   workflow（3 节点）在 Temporal dev server 跑通一次；企业侧生产运行时供给
   未定不阻塞 M0（只证明编译与连通）。开工前另行登记分支。
