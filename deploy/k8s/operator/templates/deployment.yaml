@@ -1,8 +1,11 @@
 {{/*
-⚠ PLANNED — NOT IMPLEMENTED. This template describes the intended controller
-Deployment only: there is no controller implementation and the referenced image
-(ghcr.io/maop/operator) has no build source in this repository, so it cannot be
-pulled. See ../README.md §Status.
+Controller Deployment running the implemented operator (py/maop/operator;
+image built via ../Dockerfile). Probe contract: the operator process serves
+GET /healthz on the metrics port via kopf's built-in liveness server
+(py/maop/operator/__main__.py) — kopf serves a single endpoint, so readiness
+shares the /healthz path. Validated against kind (kindest/node v1.35) smoke
+2026-11-01. The other PLANNED banners in this directory (crd.yaml, README,
+networkpolicy) are separately outdated and tracked as docs debt.
 */}}
 apiVersion: apps/v1
 kind: Deployment
@@ -62,6 +65,11 @@ spec:
             - --plugins-strict-api={{ .Values.controller.plugins.strictApi }}
             {{- end }}
           env:
+            # 子进程 `maop run` 的运行时根目录（熔断器/使用记录等写这里）。
+            # 非容器化本机跑 MAOP 用默认家目录；集群里必须落到下面
+            # runtime-data 可写卷上（kind 烟测 2026-11-01 逮到）。
+            - name: MAOP_ROOT_DIR
+              value: /data
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -79,8 +87,13 @@ spec:
             - name: metrics
               containerPort: {{ .Values.service.metricsPort }}
               protocol: TCP
-          {{- if .Values.webhook.enabled }}
           volumeMounts:
+            # 运行时可写卷：容器根文件系统对非 root 用户不可写，缺它子进程
+            # 直接 Permission denied（kind 烟测 2026-11-01 逮到）。
+            # emptyDir = 临时运行态（Pod 重建即失）；生产持久化属后续 values 化。
+            - name: runtime-data
+              mountPath: /data
+          {{- if .Values.webhook.enabled }}
             - name: webhook-certs
               mountPath: /tmp/k8s-webhook-server/serving-certs
               readOnly: true
@@ -95,17 +108,21 @@ spec:
             periodSeconds: 20
           readinessProbe:
             httpGet:
-              path: /readyz
+              # kopf 内置健康服务单端点，readiness 与 liveness 共用 /healthz。
+              path: /healthz
               port: metrics
             initialDelaySeconds: 5
             periodSeconds: 10
-      {{- if .Values.webhook.enabled }}
       volumes:
+        # 运行时可写卷（对应上方 MAOP_ROOT_DIR=/data 的 mount）。
+        - name: runtime-data
+          emptyDir: {}
+        {{- if .Values.webhook.enabled }}
         - name: webhook-certs
           secret:
             defaultMode: 420
             secretName: {{ include "maop-operator.fullname" . }}-webhook-tls
-      {{- end }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

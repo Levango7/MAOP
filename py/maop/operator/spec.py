@@ -94,7 +94,9 @@ def command_for(
     M0 形状：``maop run --task <prompt>``（kind 烟测实证 2026-11-01：CLI 的
     task 走 ``--task/-t`` 选项，裸 prompt 位置参数会被 argparse 拒绝——
     exit code 2）；M1 起 ``pin_agent=True`` 插入 ``--agent <spec.agent>`` ——
-    由 controller 依据 MaopAgent CR 解析结果决定（CR 存在即 pin）。
+    controller 恒 pin（``spec.agent`` 是必填声明；不 pin 会落集群默认 agent，
+    kind 烟测 2026-11-01 实证 'codex' 不存在 → exit 1）。MaopAgent CR 解析
+    结果只作为 ``AgentResolved`` 条件上报，不改变命令形状。
     ``maop run --agent`` 把该名字落为 MaopLoop 的 forced_agent（F6a），
     使 ``spec.agent`` 真正参与执行路由。
 

@@ -1,10 +1,12 @@
 """M-T3.3 Operator M1 —— MaopAgent CR 解析与 agent pinning（mock 全链路）.
 
 M1 交付：``spec.agent`` 真正参与执行路由 ——
-- controller 注入 resolver 后解析 MaopAgent CR：存在 → 命令带 ``--agent``
-  （道路尽头是 MaopLoop 的 forced_agent，F6a，已有
-  ``test_maop_loop::test_run_with_pinned_agent`` 钉住）；未声明 → 按 M0
-  行为不带（仅 ``AgentResolved=False`` 条件注记，任务照常执行）；
+- controller 注入 resolver 后解析 MaopAgent CR：结果只作 ``AgentResolved``
+  条件上报（存在=MaopAgentFound / 缺失=MaopAgentNotDeclared）；命令**恒**
+  带 ``--agent``（``spec.agent`` 是必填声明；2026-11-01 kind 烟测：不 pin
+  会落集群默认 agent 'codex' 必炸 exit 1，故 pin 与 CR 存在与否解耦。
+  ``--agent`` 的下游是 MaopLoop forced_agent（F6a），已有
+  ``test_maop_loop::test_run_with_pinned_agent`` 钉住）；
 - CLI 面（``maop run --agent``）由 ``test_cli`` 钉。
 
 边界：maxTurns/turns 会计与配额是后续里程碑（M2/M3）——本文件不承诺。
@@ -133,7 +135,8 @@ async def test_controller_pins_when_agent_declared():
     assert launched_cond[1]["reason"] == "MaopAgentFound"
 
 
-async def test_controller_does_not_pin_when_agent_absent():
+async def test_controller_pins_even_when_maopagent_cr_absent():
+    """kind 烟测 2026-11-01：CR 缺失不再降级为不 pin——spec.agent 必填即恒 pin。"""
     gateway, runner = FakeGateway(), FakeRunner(RunOutcome(exit_code=0))
     resolver = FakeResolver(None)
     controller = OperatorController(gateway=gateway, runner=runner, resolver=resolver)
@@ -141,19 +144,24 @@ async def test_controller_does_not_pin_when_agent_absent():
     result = await controller.handle_task(name="task-1", namespace="maop-system", body=_body())
 
     assert result == {"phase": "Succeeded", "launched": True}
-    assert runner.commands == [["maop", "run", "--max-turns", "5", "--task", "检查订单服务健康"]]
+    assert runner.commands == [
+        ["maop", "run", "--agent", "support-bot", "--max-turns", "5", "--task", "检查订单服务健康"]
+    ]
     launched_cond = gateway.patches[0][2]["conditions"]
     assert launched_cond[1]["reason"] == "MaopAgentNotDeclared"
 
 
-async def test_controller_without_resolver_keeps_m0_behaviour():
+async def test_controller_without_resolver_still_pins_declared_agent():
+    """无 resolver（M0 形状注入）也恒 pin；仅无 AgentResolved 条件。"""
     gateway, runner = FakeGateway(), FakeRunner(RunOutcome(exit_code=0))
     controller = OperatorController(gateway=gateway, runner=runner)
 
     result = await controller.handle_task(name="task-1", body=_body())
 
     assert result == {"phase": "Succeeded", "launched": True}
-    assert runner.commands == [["maop", "run", "--max-turns", "5", "--task", "检查订单服务健康"]]
+    assert runner.commands == [
+        ["maop", "run", "--agent", "support-bot", "--max-turns", "5", "--task", "检查订单服务健康"]
+    ]
     assert [c["type"] for c in gateway.patches[0][2]["conditions"]] == ["Launched"]
 
 

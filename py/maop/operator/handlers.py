@@ -65,9 +65,14 @@ def get_controller() -> OperatorController:
     """进程级单例（惰性构造；gateway/runner 用默认实现）."""
     global _controller
     if _controller is None:
+        # KubernetesStatusGateway 同时实现 AgentResolver（M1）——kind 烟测
+        # 2026-11-01 发现 resolver 一直没布线（生产恒 pinned=False，任务落
+        # 集群默认 agent 必炸），这里补上。
+        gateway = KubernetesStatusGateway()
         _controller = OperatorController(
-            gateway=KubernetesStatusGateway(),
+            gateway=gateway,
             runner=AsyncSubprocessRunner(),
+            resolver=gateway,
             quota_checker=_enterprise_quota_checker(),
         )
     return _controller

@@ -144,8 +144,10 @@ async def test_controller_happy_path():
         name="task-1", namespace="maop-system", body=_body()
     )
     assert result == {"phase": "Succeeded", "launched": True}
-    # M2: operator 命令恒定带任务级 turn 预算（spec.maxTurns）
-    assert runner.commands == [["maop", "run", "--max-turns", "5", "--task", "检查订单服务健康"]]
+    # M2: operator 命令恒定带任务级 turn 预算（spec.maxTurns）；M1 起 agent 恒 pin
+    assert runner.commands == [
+        ["maop", "run", "--agent", "support-bot", "--max-turns", "5", "--task", "检查订单服务健康"]
+    ]
     phases = [p["phase"] for _, _, p in gateway.patches]
     assert phases == ["Running", "Succeeded"]
     assert gateway.patches[0][0] == "task-1" and gateway.patches[0][1] == "maop-system"
@@ -189,6 +191,18 @@ async def test_controller_is_noop_on_terminal_phase():
         name="task-1", body=_body(), status_phase="Succeeded"
     )
     assert result == {"phase": "Succeeded", "launched": False}
+    assert gateway.patches == []
+    assert runner.commands == []
+
+
+async def test_controller_is_noop_on_running_phase():
+    """kind 烟测 2026-11-01 逮到的自激循环：自己 plan_launch 的 Running 补丁
+    会作为事件回流，无此门则 launch→patch→事件→launch 无限重拉子进程。"""
+    gateway, runner = FakeGateway(), FakeRunner(RunOutcome(exit_code=0))
+    result = await _controller(gateway, runner).handle_task(
+        name="task-1", body=_body(), status_phase="Running"
+    )
+    assert result == {"phase": "Running", "launched": False}
     assert gateway.patches == []
     assert runner.commands == []
 

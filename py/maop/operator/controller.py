@@ -3,10 +3,15 @@
 流程（单个 MaopTask 事件）：
 1. ``spec.parse_task_spec`` 校验 —— 失败直接补丁 Failed（reason=InvalidSpec），
    **不拉起**子进程；
-2. 终态（status.phase 已是 terminal）→ no-op（k8s 事件重放幂等）；
-3. （M1）``resolver`` 注入时解析 ``spec.agent`` 的 MaopAgent CR —— 存在即
-   pin（命令带 ``--agent``，``AgentResolved=True`` 条件）；未声明则按 M0
-   行为不 pin（``AgentResolved=False`` 条件），两者都继续执行；
+2. 终态（status.phase 已是 terminal）或 Running → no-op（k8s 事件重放幂等；
+   Running 门是 kind 烟测 2026-11-01 逮到的关键：自己 ``plan_launch`` 补丁
+   会作为 Running 事件回流，没有这扇门就是 launch→patch→事件→launch 的
+   无限子进程循环——mock 测试的 FakeGateway 捕不到这种自激）；
+3. （M1）``resolver`` 注入时解析 ``spec.agent`` 的 MaopAgent CR —— 结果只
+   作为 ``AgentResolved`` 条件上报，**不决定是否 pin**；``spec.agent`` 是
+   必填声明，命令恒带 ``--agent``（kind 烟测 2026-11-01：无 pin 时
+   ``maop run`` 落集群默认 agent 'codex'，必炸 exit 1）；未注入 resolver
+   则无该条件（M0 行为），两者都继续执行；
 4. （M3.2）``quota_checker`` 注入时过配额门 —— 拒绝则终态 ``QuotaExceeded``
    （不拉起子进程）；社区版不注入配额门 = 行为不变；
 5. 否则补丁 Running（``plan_launch``）→ runner 执行 ``command_for(spec)``
@@ -97,8 +102,9 @@ class OperatorController:
         status_phase: str | None = None,
     ) -> dict[str, Any]:
         """处理一个 MaopTask 事件，返回 ``{"phase": <最终相位>, "launched": bool}``."""
-        # 1. 终态幂等：k8s 事件可能重放，已到终态的任务不再处理。
-        if is_terminal(status_phase):
+        # 1. 终态/Running 幂等：k8s 事件可能重放；Running 是自己 plan_launch
+        #    补丁的回流事件（见模块 docstring 第 2 步），再处理就是无限循环。
+        if is_terminal(status_phase) or status_phase == "Running":
             logger.debug("[operator] %s/%s already %s — noop", namespace, name, status_phase)
             return {"phase": status_phase or "", "launched": False}
 
@@ -110,13 +116,13 @@ class OperatorController:
             await self._patch(name, namespace, plan_finish(invalid=str(exc)))
             return {"phase": "Failed", "launched": False, "reason": "InvalidSpec"}
 
-        # 3. M1: MaopAgent CR 解析（存在即 pin；未注入 resolver 时保持 M0 行为）。
+        # 3. M1: MaopAgent CR 解析 —— 仅上报 AgentResolved 条件；pin 与 CR
+        #    存在与否无关（spec.agent 必填即恒 pin，kind 烟测 2026-11-01）。
         agent_resolved: bool | None = None
         if self._resolver is not None:
             agent_resolved = (
                 await self._resolver.resolve_agent(name=spec.agent, namespace=namespace)
             ) is not None
-        pin = agent_resolved is True
 
         # 4. M3.2: 配额门（注入才生效）——拒绝则终态 QuotaExceeded，不拉起。
         if self._quota_checker is not None:
@@ -133,18 +139,18 @@ class OperatorController:
                 )
                 return {"phase": "QuotaExceeded", "launched": False, "reason": reason}
 
-        # 5. Running + 拉起。
+        # 5. Running + 拉起（pin 恒定：spec.agent 是必填声明）。
         await self._patch(
             name, namespace, plan_launch(agent=spec.agent, agent_resolved=agent_resolved)
         )
         logger.info(
-            "[operator] %s/%s launching (agent=%s resolved=%s pinned=%s): %s",
-            namespace, name, spec.agent, agent_resolved, pin, spec.prompt[:80],
+            "[operator] %s/%s launching (agent=%s resolved=%s pinned=True): %s",
+            namespace, name, spec.agent, agent_resolved, spec.prompt[:80],
         )
 
         try:
             outcome = await self._runner.run(
-                command_for(spec, pin_agent=pin, apply_turn_budget=True),
+                command_for(spec, pin_agent=True, apply_turn_budget=True),
                 timeout_s=self._timeout_s,
             )
         except asyncio.CancelledError:

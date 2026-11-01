@@ -113,7 +113,10 @@ async def test_controller_passes_budget_and_writes_turns():
     result = await controller.handle_task(name="task-1", namespace="maop-system", body=_body())
 
     assert result == {"phase": "Succeeded", "launched": True}
-    assert runner.commands == [["maop", "run", "--max-turns", "5", "--task", "检查订单服务健康"]]
+    # agent 恒 pin（M1，kind 烟测后语义）+ 任务级 turn 预算
+    assert runner.commands == [
+        ["maop", "run", "--agent", "support-bot", "--max-turns", "5", "--task", "检查订单服务健康"]
+    ]
     assert gateway.patches[1][2]["turns"] == 3
 
 
