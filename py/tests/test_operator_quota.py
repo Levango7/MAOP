@@ -1,13 +1,19 @@
-"""M-T3.3 M3.2 —— 配额门（QuotaExceeded 相位接线，检查器注入式）.
+"""M-T3.3 M3.2 —— 配额门（QuotaExceeded 相位接线，检查器注入式）+ 跨仓桥接线.
 
 社区版只提供**机制**：拉起前询问注入的 ``QuotaChecker``、拒绝则终态
 ``QuotaExceeded``（CRD enum 预留相位）且不拉起子进程、终态后回报用量。
 不注入配额门的路径逐字节保持 M0 行为；真实配额策略（多租户聚合）属
-MAOS 企业版配额域（M3.2 的诚实边界）。
+MAOS 企业版配额域——其 operator 侧适配器（``OperatorQuotaChecker``，
+MAOS PR #27）经 ``handlers._enterprise_quota_checker`` 在单例构造时
+try-import 接线（本文件末两例；个人版 import 失败 → None）。
 """
 
 from __future__ import annotations
 
+import sys
+import types
+
+from maop.operator import handlers
 from maop.operator.controller import OperatorController
 from maop.operator.gateway import RunOutcome
 
@@ -137,3 +143,41 @@ async def test_quota_no_checker_keeps_m0_behavior():
 
     assert result == {"phase": "Succeeded", "launched": True}
     assert runner.commands
+
+
+# ── 跨仓桥接线（handlers._enterprise_quota_checker） ────────────────
+
+
+def test_enterprise_checker_wired_when_enterprise_available(monkeypatch):
+    """企业包在 sys.modules → 单例构造注入适配器（MAOS PR #27 桥）。"""
+    recorded: dict = {}
+
+    class _FakeQM:
+        def __init__(self, db_path):
+            recorded["db_path"] = db_path
+
+    class _FakeChecker:
+        def __init__(self, qm):
+            recorded["qm"] = qm
+            self.qm = qm
+
+    fake_quota = types.ModuleType("maop.enterprise.quota")
+    fake_quota.QuotaManager = _FakeQM
+    fake_adapter = types.ModuleType("maop.enterprise.quota_operator")
+    fake_adapter.OperatorQuotaChecker = _FakeChecker
+    monkeypatch.setitem(sys.modules, "maop.enterprise.quota", fake_quota)
+    monkeypatch.setitem(sys.modules, "maop.enterprise.quota_operator", fake_adapter)
+
+    checker = handlers._enterprise_quota_checker()
+
+    assert isinstance(checker, _FakeChecker)
+    assert checker.qm is recorded["qm"]  # 适配器持有构造时传入的 QuotaManager
+    assert str(recorded["db_path"]).endswith("maop.db")
+
+
+def test_enterprise_checker_none_when_personal_edition(monkeypatch):
+    """个人版：maop.enterprise 不可 import → None（配额门不生效，行为同基线）。"""
+    monkeypatch.setitem(sys.modules, "maop.enterprise.quota_operator", None)
+    monkeypatch.setitem(sys.modules, "maop.enterprise.quota", None)
+
+    assert handlers._enterprise_quota_checker() is None

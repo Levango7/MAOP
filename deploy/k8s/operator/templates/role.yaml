@@ -16,6 +16,11 @@ rules:
   - apiGroups: ["maop.io"]
     resources: ["maopagents", "maopagents/status", "maopagents/finalizers"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # M0 缺口（kind 烟测 2026-11-01 逮到）：operator 实际监听的是 maoptasks，
+  # 但 RBAC 只登记了 maopagents —— kopf list/watch 直接 Forbidden。
+  - apiGroups: ["maop.io"]
+    resources: ["maoptasks", "maoptasks/status", "maoptasks/finalizers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
@@ -36,6 +41,10 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["maop.io"]
     resources: ["maopagents", "maopagents/status", "maopagents/finalizers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # M0 缺口（kind 烟测 2026-11-01 逮到）：同 ClusterRole 侧注释。
+  - apiGroups: ["maop.io"]
+    resources: ["maoptasks", "maoptasks/status", "maoptasks/finalizers"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]

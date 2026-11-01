@@ -357,13 +357,17 @@
   `status.tokensUsed` 回写 = M3.3。
 - **不碰**：他线的 cost_attribution schemas 面（M-X3 领地）、前端面。
 
-## 领地登记（ZCode session_f62ccbe…，2026-11-01 第十轮：M-T3.3 收官）
-
 - **M3.2 配额门（收官刀）**：``gateway.QuotaChecker`` 协议 +
   ``reconcile.plan_quota_exceeded``（``QuotaExceeded`` 终态，CRD enum
   预留）+ controller 拉起前询问/终态后回报。**社区版只提供机制**——
   真实多租户配额策略在 MAOS 企业版配额域（``maop/enterprise/quota.py``，
   ADR-016/017 跨仓，板面另立条目）。M-T3.3 社区侧至此收官。
+- **M3.2 运行时接线（跨仓桥闭合）**：``handlers.get_controller()`` 经
+  ``_enterprise_quota_checker()`` try-import MAOS 侧适配器（MAOS PR #27
+  **已合并** `02cb84d7`）——企业版部署自动注入配额门；个人版/构造失败 →
+  ``None``（fail-open + 告警可见）。单测两例（sys.modules 注入
+  企业包/个人版）。E2E 缓存修复（MAOS 无涉）亦已实证（master run E2E 腿
+  success）。
 - **⚠️ 全仓通报（2026-11-01）**：runner 镜像夜间滚动后，Playwright **浏览器
   缓存错配**（旧镜像构建的 webkit-2370 在新镜像启动即
   `libicudata.so.74: cannot open shared object file`）——**所有分支的
@@ -386,3 +390,30 @@
   `py/tests/test_layering_lifespan_wiring.py`）被短暂 stash 后**逐字节还原**、
   现仍在工作树原位。归属请相关会话认领（像 layering 线的 lifespan 接线草稿），
   本会话不再触碰该树。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-01 第十轮：M-T3.3 kind 真集群验证）
+
+- **已完成（里程碑级）**：M0 章程的"真集群 kind 验证为外部条件"**解除**——
+  本地 kind v0.31 + kindest/node v1.35（集群 `maop-mt33`）端到端打通：
+  MaopTask CR → kopf 事件 → spec 校验 → MaopAgent 解析 → 子进程
+  `maop run --agent … --task …` → `[USAGE]` 行解析 → status 回写
+  `Succeeded / turns=1 / tokensUsed=0 / tokensSource=estimated`，
+  单次 launch 无循环，`resolved=True pinned=True`。
+- **七缺陷全部真集群实证**（详见 CHANGELOG [Unreleased] 同日条目）：
+  RBAC maoptasks / 自激循环（Running 事件回流无限重拉，`handle_task`
+  加 Running 门）/ 恒 pin + `get_controller` resolver 布线缺口 /
+  `kopf.Body` Mapping / `--task` CLI 形状 / 探针健康服务
+  （`kopf.run(liveness_endpoint=…)`，readiness 同打 `/healthz`）/
+  运行时可写卷（chart 补 emptyDir `runtime-data` + `MAOP_ROOT_DIR`）。
+  修复集中在 PR #203（提交 357601cd/ad1aa922/fc96c885/df1dd0e0 + 文档批）。
+- **领地**：`py/maop/operator/`（controller/handlers/spec/__main__）、
+  `deploy/k8s/operator/templates/{deployment,role}.yaml`、
+  `py/tests/test_operator_{m0,m1,m2}.py`、CHANGELOG/ROADMAP 本批段。
+- **部署物过时横幅通报**：`deploy/k8s/operator/` 的 `crd.yaml`/`README.md`/
+  `networkpolicy.yaml` 仍带 "PLANNED — NOT IMPLEMENTED" 横幅（controller
+  与 Dockerfile 均已存在，横幅已失实）——本批只修正了被改到的
+  `deployment.yaml` 头注，其余属文档债，留给后续 docs 批收。
+- **CI 侧**：新 run 41343589356 在途；fc96c885 的旧 run（挂 1h13m，吞吐
+  排队）已手动 cancel 腾账号额度（≈20 作业/小时上限）。
+- **不碰**：他线 cost_attribution 面与前端面；MAOS 侧无新改动
+  （quota_operator 桥此前已合）。
