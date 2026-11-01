@@ -415,8 +415,10 @@
     估算）；`MaopResult.usage` + react_loop 回填 + `LoopResult.tokens_used`/
     `tokens_source` + `[USAGE]` 行扩展。CLI 驱动路径本身不产出 token
     （来源标 estimated，不冒充）。
-  - 余量：**M3.2** 配额/多租户（依赖 M3.1 真实值）；**M3.3** operator
-    `status.tokensUsed` 回写。
+  - **M3.3（本批）**：用量会计回写 CRD——`status.tokensUsed` /
+    `status.tokensSource`（measured/estimated）+ 协议行解析扩展（legacy
+    `turns=` 行兼容）。
+  - 余量：**M3.2** 配额/多租户（依赖 M3.1 真实值）。
 - M0 验收：mock 链路（MaopTask→子进程→status 回写）测试全绿 ✅；结构对齐
   哨兵上线 ✅；**operator 镜像在 CI 构建成功 ✅**（2026-10-30，master run
   `41118378867`：`Build operator image (build-only): success`）。

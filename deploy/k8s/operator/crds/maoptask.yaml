@@ -119,6 +119,14 @@ spec:
                 tokensUsed:
                   type: integer
                   description: Total tokens consumed by this task.
+                tokensSource:
+                  type: string
+                  enum:
+                    - measured
+                    - estimated
+                  description: >
+                    Whether tokensUsed is measured (LLM-direct provider usage)
+                    or estimated (CLI drivers report no token usage). M3.3.
                 result:
                   type: string
                   description: Final result / output of the task.

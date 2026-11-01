@@ -39,6 +39,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M-T3.3 Operator M3.3 —— 用量会计回写 CRD（tokensUsed / tokensSource，2026-11-01）
+
+M3.1 的 ``[USAGE] turns=N tokens=M source=S`` 协议行闭合到 CRD：
+
+- controller 解析扩展（``_parse_usage`` 三元组；旧版只有 ``turns=`` 的行
+  保持兼容——缺段不写字段）；终态补丁写入 ``status.turns`` /
+  ``status.tokensUsed`` / ``status.tokensSource``（``tokens_used=0`` 是合法
+  观测值，与"缺段"由 None 区分）。
+- ``maoptask.yaml`` status 增 ``tokensSource``（enum: measured/estimated，
+  机器对齐哨兵同步）；CLI 驱动路径来源为 estimated——**估算值不伪装成实测**。
+- 测试：``test_operator_m3.py`` 9 例（协议行三形态 / 终态补丁三态 /
+  controller 端到端 measured 与 legacy 两路 / CRD 对齐哨兵）。
+
 ### M-T3.3 Operator M3.1 —— 实测 token 计量打通（2026-11-01）
 
 侦察发现成本对账一直在读空值：``MaopResult`` 没有 ``usage`` 字段，

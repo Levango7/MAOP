@@ -9,8 +9,9 @@
    行为不 pin（``AgentResolved=False`` 条件），两者都继续执行；
 4. 否则补丁 Running（``plan_launch``）→ runner 执行 ``command_for(spec)``
    （M2：恒带任务级 ``--max-turns``）→ 按结果补丁终态（``plan_finish``；
-   M2：解析 ``[USAGE] turns=N`` 写入 ``status.turns``）；任务被取消 →
-   Cancelled 后原样上抛。
+   M2/M3.3：解析 ``[USAGE] turns=N [tokens=M] [source=S]`` 写入
+   ``status.turns`` / ``status.tokensUsed`` / ``status.tokensSource``——
+   旧版只有 ``turns=`` 的行同样兼容）；任务被取消 → Cancelled 后原样上抛。
 
 gateway/runner/resolver 全部构造注入 —— 测试用 fake 驱动全链路，不需要 k8s。
 """
@@ -28,14 +29,25 @@ from maop.operator.spec import InvalidSpecError, command_for, parse_task_spec
 
 logger = logging.getLogger(__name__)
 
-#: M2 协议行：``maop run`` 在 stdout 打印的 turn 消耗（与 [TRACE] 同为稳定单行）。
-_USAGE_TURNS_RE = re.compile(r"\[USAGE\]\s*turns=(\d+)")
+#: M2/M3.3 协议行：``maop run`` 在 stdout 打印的 turn/token 消耗
+#: （与 [TRACE] 同为稳定单行；M2 时代只有 ``turns=``，tokens/source 可缺省）。
+_USAGE_RE = re.compile(
+    r"\[USAGE\]\s*turns=(\d+)(?:\s+tokens=(\d+))?(?:\s+source=(\w+))?"
+)
 
 
-def _parse_turns(stdout: str) -> int | None:
-    """从子进程输出解析 ``[USAGE] turns=N``；缺行返回 ``None``（不写 turns）。"""
-    match = _USAGE_TURNS_RE.search(stdout or "")
-    return int(match.group(1)) if match else None
+def _parse_usage(stdout: str) -> tuple[int | None, int | None, str | None]:
+    """解析 ``[USAGE] turns=N [tokens=M] [source=S]``.
+
+    缺行返回 ``(None, None, None)``（旧版 ``maop run`` 不打该行——前向兼容）。
+    """
+    match = _USAGE_RE.search(stdout or "")
+    if not match:
+        return None, None, None
+    turns = int(match.group(1))
+    tokens = int(match.group(2)) if match.group(2) is not None else None
+    source = match.group(3)
+    return turns, tokens, source
 
 
 class OperatorController:
@@ -106,11 +118,14 @@ class OperatorController:
     async def _finalize(
         self, name: str, namespace: str, outcome: RunOutcome
     ) -> dict[str, Any]:
+        turns, tokens_used, tokens_source = _parse_usage(outcome.stdout_tail)
         finish = plan_finish(
             exit_code=outcome.exit_code,
             timed_out=outcome.timed_out,
             cancelled=outcome.cancelled,
-            turns=_parse_turns(outcome.stdout_tail),
+            turns=turns,
+            tokens_used=tokens_used,
+            tokens_source=tokens_source,
         )
         await self._patch(name, namespace, finish)
         logger.info(
