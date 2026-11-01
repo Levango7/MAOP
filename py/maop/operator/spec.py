@@ -91,10 +91,12 @@ def command_for(
 ) -> list[str]:
     """构造执行命令.
 
-    M0 形状：``maop run <prompt>``；M1 起 ``pin_agent=True`` 插入
-    ``--agent <spec.agent>`` —— 由 controller 依据 MaopAgent CR 解析结果决定
-    （CR 存在即 pin）。``maop run --agent`` 把该名字落为 MaopLoop 的
-    forced_agent（F6a），使 ``spec.agent`` 真正参与执行路由。
+    M0 形状：``maop run --task <prompt>``（kind 烟测实证 2026-11-01：CLI 的
+    task 走 ``--task/-t`` 选项，裸 prompt 位置参数会被 argparse 拒绝——
+    exit code 2）；M1 起 ``pin_agent=True`` 插入 ``--agent <spec.agent>`` ——
+    由 controller 依据 MaopAgent CR 解析结果决定（CR 存在即 pin）。
+    ``maop run --agent`` 把该名字落为 MaopLoop 的 forced_agent（F6a），
+    使 ``spec.agent`` 真正参与执行路由。
 
     M2：``apply_turn_budget=True`` 插入 ``--max-turns <spec.max_turns>`` ——
     任务级 turn 上限（一个 turn = 一次 dispatch 尝试）；operator 总是透传。
@@ -107,5 +109,5 @@ def command_for(
         command += ["--agent", spec.agent]
     if apply_turn_budget:
         command += ["--max-turns", str(spec.max_turns)]
-    command.append(spec.prompt)
+    command += ["--task", spec.prompt]
     return command

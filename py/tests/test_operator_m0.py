@@ -94,7 +94,7 @@ def test_parse_rejects_bad_max_turns_and_tools():
 
 def test_command_for_runs_cli():
     spec = parse_task_spec(_body())
-    assert command_for(spec) == ["maop", "run", "检查订单服务健康"]
+    assert command_for(spec) == ["maop", "run", "--task", "检查订单服务健康"]
 
 
 def test_spec_matches_crd_schema():
@@ -145,7 +145,7 @@ async def test_controller_happy_path():
     )
     assert result == {"phase": "Succeeded", "launched": True}
     # M2: operator 命令恒定带任务级 turn 预算（spec.maxTurns）
-    assert runner.commands == [["maop", "run", "--max-turns", "5", "检查订单服务健康"]]
+    assert runner.commands == [["maop", "run", "--max-turns", "5", "--task", "检查订单服务健康"]]
     phases = [p["phase"] for _, _, p in gateway.patches]
     assert phases == ["Running", "Succeeded"]
     assert gateway.patches[0][0] == "task-1" and gateway.patches[0][1] == "maop-system"

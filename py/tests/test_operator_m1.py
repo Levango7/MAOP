@@ -74,7 +74,7 @@ AGENT_CR = {
 
 def test_command_for_default_keeps_m0_shape():
     spec = parse_task_spec(_body())
-    assert command_for(spec) == ["maop", "run", "检查订单服务健康"]
+    assert command_for(spec) == ["maop", "run", "--task", "检查订单服务健康"]
 
 
 def test_command_for_pins_agent_when_requested():
@@ -84,6 +84,7 @@ def test_command_for_pins_agent_when_requested():
         "run",
         "--agent",
         "support-bot",
+        "--task",
         "检查订单服务健康",
     ]
 
@@ -124,7 +125,7 @@ async def test_controller_pins_when_agent_declared():
     assert result == {"phase": "Succeeded", "launched": True}
     # M2 起命令还带任务级 turn 预算（--max-turns）
     assert runner.commands == [
-        ["maop", "run", "--agent", "support-bot", "--max-turns", "5", "检查订单服务健康"]
+        ["maop", "run", "--agent", "support-bot", "--max-turns", "5", "--task", "检查订单服务健康"]
     ]
     assert resolver.calls == [("support-bot", "maop-system")]
     launched_cond = gateway.patches[0][2]["conditions"]
@@ -140,7 +141,7 @@ async def test_controller_does_not_pin_when_agent_absent():
     result = await controller.handle_task(name="task-1", namespace="maop-system", body=_body())
 
     assert result == {"phase": "Succeeded", "launched": True}
-    assert runner.commands == [["maop", "run", "--max-turns", "5", "检查订单服务健康"]]
+    assert runner.commands == [["maop", "run", "--max-turns", "5", "--task", "检查订单服务健康"]]
     launched_cond = gateway.patches[0][2]["conditions"]
     assert launched_cond[1]["reason"] == "MaopAgentNotDeclared"
 
@@ -152,7 +153,7 @@ async def test_controller_without_resolver_keeps_m0_behaviour():
     result = await controller.handle_task(name="task-1", body=_body())
 
     assert result == {"phase": "Succeeded", "launched": True}
-    assert runner.commands == [["maop", "run", "--max-turns", "5", "检查订单服务健康"]]
+    assert runner.commands == [["maop", "run", "--max-turns", "5", "--task", "检查订单服务健康"]]
     assert [c["type"] for c in gateway.patches[0][2]["conditions"]] == ["Launched"]
 
 
