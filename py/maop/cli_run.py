@@ -68,9 +68,10 @@ def cmd_run(task: str, depth: int = 0, agent: str = "", max_turns: int = 0) -> A
             # Machine-readable handle: the dashboard parses this line to link a
             # control job to its run_events timeline (GET /api/runs/{trace_id}).
             print(f"[TRACE] {result.trace_id}")
-        # M2: turn 会计的机器可读出口——成功/失败路径都先打印，保证调用方
-        # （operator）总能读到；与 [TRACE] 同为稳定的单行协议。
-        print(f"[USAGE] turns={result.turns}")
+        # M2/M3.1: turn 与 token 会计的机器可读出口——成功/失败路径都先打印，
+        # 保证调用方（operator）总能读到；与 [TRACE] 同为稳定的单行协议。
+        # tokens 为实测值（LLM 直连路径）；0/estimated = 全程无实测来源。
+        print(f"[USAGE] turns={result.turns} tokens={result.tokens_used} source={result.tokens_source}")
         if result.execution:
             if result.execution.stdout:
                 print(result.execution.stdout)

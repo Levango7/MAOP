@@ -305,6 +305,23 @@
 - **M-X2 Temporal（用户授权立项，前置 M0 路线）**：adapter 接口先行 + demo
   workflow（3 节点）在 Temporal dev server 跑通一次；企业侧生产运行时供给
   未定不阻塞 M0（只证明编译与连通）。开工前另行登记分支。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-01 第九轮：M-T3.3 M3.1 实测 token 计量）
+
+- **进行中**：成本对账真实值通道——侦察发现 `MaopResult` 无 `usage` 字段，
+  `_budget_reconciliation` 永远读 `None`（**M-X3 成本归因的 token 维度全部是
+  启发式估算**，provider 侧明明已解析真实 usage 却在 react_loop 转
+  `MaopResult` 处丢弃）。本批：`MaopResult.usage` + react_loop 回填 +
+  `LoopResult.tokens_used`/`tokens_source` + `[USAGE]` 行扩展
+  （`turns=N tokens=M source=S`）。领地=``core/reliability/error_schema.py``、
+  ``core/agent/llm_chat/react_loop.py``、``loop_executor.py``、``loop_models.py``、
+  ``maop_loop.py``、``maop_loop_phases.py``（``_build_loop_result``）、
+  ``cli_run.py``、``tests/test_turn_budget.py``。分支
+  `feat/operator-m3-tokens-used`。
+- **裁决记录**：CLI 驱动路径（claude/codex 等外部 CLI）本身不产出 token——
+  来源标 `estimated`，不冒充实测；配额多租（M3.2）依赖真实值；operator
+  `status.tokensUsed` 回写 = M3.3。
+- **不碰**：他线的 cost_attribution schemas 面（M-X3 领地）、前端面。
 - **不碰**：`deploy/k8s/operator/` 既有 Chart/CRD（只加 Dockerfile）；
   他线的宽口径异常收窄批与前端面。
 - **已知环境干扰**：本机可达 FlintSpark k4 e2e 的 kind 集群时，既有

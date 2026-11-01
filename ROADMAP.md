@@ -409,7 +409,14 @@
     M0 行为 + 注记；CLI 增 `--agent`。
   - **M2（本批）**：`spec.maxTurns` → 命令恒带 `--max-turns`（loop 侧硬上限：
     一个 turn = 一次 dispatch 尝试）+ `[USAGE] turns=N` 协议行 → 终态补丁
-    `status.turns`；`cli.py` 按先例拆出 `cli_run.py`。配额/多租户 = M3。
+    `status.turns`；`cli.py` 按先例拆出 `cli_run.py`。
+  - **M3.1（本批）**：实测 token 计量打通——发现成本对账一直读空值
+    （`MaopResult` 无 `usage` 字段 → M-X3 成本归因的 token 维度全是启发式
+    估算）；`MaopResult.usage` + react_loop 回填 + `LoopResult.tokens_used`/
+    `tokens_source` + `[USAGE]` 行扩展。CLI 驱动路径本身不产出 token
+    （来源标 estimated，不冒充）。
+  - 余量：**M3.2** 配额/多租户（依赖 M3.1 真实值）；**M3.3** operator
+    `status.tokensUsed` 回写。
 - M0 验收：mock 链路（MaopTask→子进程→status 回写）测试全绿 ✅；结构对齐
   哨兵上线 ✅；**operator 镜像在 CI 构建成功 ✅**（2026-10-30，master run
   `41118378867`：`Build operator image (build-only): success`）。

@@ -20,10 +20,11 @@ class _DispatchResult:
 
 
 class _CountingDispatcher:
-    """总是失败的 fake dispatcher；记录调用次数。"""
+    """总是失败的 fake dispatcher；记录调用次数与返回的 usage。"""
 
-    def __init__(self) -> None:
+    def __init__(self, usage: dict[str, int] | None = None) -> None:
         self.calls = 0
+        self.usage = usage
 
     async def dispatch(self, **kwargs) -> _DispatchResult:
         self.calls += 1
@@ -33,6 +34,7 @@ class _CountingDispatcher:
             exit_code=1,
             error="fake failure",
             trace_id=str(kwargs.get("trace_id", "")),
+            usage=self.usage,
         )
         return _DispatchResult(result)
 
@@ -144,3 +146,106 @@ def test_build_loop_result_reports_turns(tmp_path):
     ctx = PhaseContext(task="t", plan_result={}, analysis_dict={})
     result = loop._build_loop_result(ctx, time.monotonic())
     assert result.turns == 3
+    # M3.1: 未观测到实测 usage → tokens_used=0 且来源=estimated
+    assert result.tokens_used == 0
+    assert result.tokens_source == "estimated"
+
+
+@pytest.mark.asyncio
+async def test_measured_tokens_accumulate_and_flip_source(tmp_path):
+    """M3.1：usage 非空的 dispatch 结果计入实测 token，来源翻转为 measured。"""
+    loop = _loop(tmp_path)
+    dispatcher = _CountingDispatcher(usage={
+        "prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150,
+    })
+    loop._dispatcher = dispatcher
+    loop._max_turns = None
+    loop._turns_used = 0
+    loop._tokens_used_measured = 0
+
+    await loop._execute_with_retry(
+        task="t",
+        fallback_chain=["a1"],
+        routing_key="",
+        workdir=str(tmp_path),
+        timeout=1,
+        retry=False,
+        trace_id="tr3",
+    )
+
+    assert loop._tokens_used_measured == 150
+
+    loop2 = loop  # 同一实例直接构结果，验证接线
+    from maop.core.agent.evolution.phases import PhaseContext
+
+    result = loop2._build_loop_result(
+        PhaseContext(task="t", plan_result={}, analysis_dict={}), time.monotonic(),
+    )
+    assert result.tokens_used == 150
+    assert result.tokens_source == "measured"
+
+
+@pytest.mark.asyncio
+async def test_cli_path_without_usage_keeps_estimated(tmp_path):
+    """CLI 路径（usage=None）：token 不计入实测，来源保持 estimated。"""
+    loop = _loop(tmp_path)
+    dispatcher = _CountingDispatcher(usage=None)
+    loop._dispatcher = dispatcher
+    loop._max_turns = 1
+    loop._turns_used = 0
+    loop._tokens_used_measured = 0
+
+    await loop._execute_with_retry(
+        task="t",
+        fallback_chain=["a1"],
+        routing_key="",
+        workdir=str(tmp_path),
+        timeout=1,
+        retry=False,
+        trace_id="tr4",
+    )
+
+    assert loop._turns_used == 1
+    assert loop._tokens_used_measured == 0
+
+
+# ── M3.1: budget_reconciliation 真实值分支 ───────────────────────────
+
+
+def _fake_exec_result(usage: dict[str, int] | None):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        model="m1", agent="a1", task="task text", stdout="out",
+        usage=usage,
+    )
+
+
+def test_budget_reconciliation_uses_measured_usage(tmp_path):
+    """usage 存在时成本对账记真实 token（不再落启发式估算）。"""
+    from maop.core.cost_tracker import CostTracker
+
+    loop = _loop(tmp_path)
+    loop._budget_reconciliation(
+        _fake_exec_result({
+            "prompt_tokens": 120, "completion_tokens": 80, "total_tokens": 200,
+        }),
+        "trace-m1",
+    )
+    entries = CostTracker(root_dir=str(tmp_path)).get_entries(model="m1")
+    assert len(entries) == 1
+    assert (entries[0].prompt_tokens, entries[0].completion_tokens) == (120, 80)
+    assert entries[0].total_tokens == 200
+
+
+def test_budget_reconciliation_without_usage_still_records(tmp_path):
+    """usage=None（CLI 路径）：记录仍发生（token 值由启发式/空值决定，不冒充实测）。"""
+    from maop.core.cost_tracker import CostTracker
+
+    loop = _loop(tmp_path)
+    loop._budget_reconciliation(_fake_exec_result(None), "trace-m2")
+    entries = CostTracker(root_dir=str(tmp_path)).get_entries(model="m1")
+    assert len(entries) == 1
+    # 无 usage → 启发式估算：task "task text"（9 个 ASCII 字符）→ 9//4 = 2
+    #（确定性公式，见 _budget_reconciliation）；关键是记录存在且语义为估算。
+    assert entries[0].prompt_tokens == 2
