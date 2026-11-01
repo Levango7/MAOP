@@ -35,6 +35,9 @@ class ExecuteMixin:
     # 类属性给缺省值；MaopLoop.run() 每次运行重置为实例属性。
     _max_turns: int | None = None
     _turns_used: int = 0
+    # M3.1: 实测 token 累计（仅 usage 非空的 LLM 直连结果计入；CLI 路径 usage
+    # 为 None 不计入——估算值由 cost_tracker 按 dispatch 单独记录，不冒充实测）。
+    _tokens_used_measured: int = 0
 
     def _turn_budget_remaining(self) -> int | None:
         """剩余 turn 预算；未设上限（``None``）时返回 ``None``（不限制）。"""
@@ -358,6 +361,13 @@ class ExecuteMixin:
                         dry_run=dry_run,
                     )
                     result = dispatch_result.result
+
+                    # M3.1: 累计实测 token（usage=None 的 CLI 路径不计入）。
+                    usage = getattr(result, "usage", None)
+                    if isinstance(usage, dict):
+                        self._tokens_used_measured += int(
+                            usage.get("total_tokens", 0) or 0
+                        )
 
                     if result.is_success():
                         return cast(MaopResult | None, result)

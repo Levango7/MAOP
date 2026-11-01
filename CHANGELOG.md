@@ -39,6 +39,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M-T3.3 Operator M3.1 —— 实测 token 计量打通（2026-11-01）
+
+侦察发现成本对账一直在读空值：``MaopResult`` 没有 ``usage`` 字段，
+``_budget_reconciliation`` 的 ``getattr(exec_result, "usage", None)`` 永远得
+``None``——**M-X3 已合的成本归因，token 维度全部是启发式估算值**（provider
+明明已解析真实 usage：OpenAI ``prompt_tokens``/Anthropic ``input_tokens``，
+却在 react_loop 转 ``MaopResult`` 处被丢弃）。本批打通真实值通道：
+
+- ``MaopResult`` 增 ``usage`` 字段（measured prompt/completion/total；
+  ``None`` = CLI 子进程路径不产出 token）；``new_result()`` 透传。
+- ``react_loop`` LLM 直连路径回填实测 usage（丢弃点修复）；
+  ``_budget_reconciliation`` 的真实值分支随之生效——usage 存在时记录真实
+  token、不再落启发式、不再告警 UNKNOWN（该函数零改动，字段接线即通）。
+- loop 累计：``LoopResult.tokens_used``（实测和）+ ``tokens_source``
+  （measured/estimated）；``[USAGE]`` 行扩展为
+  ``turns=N tokens=M source=S``（operator 既有 ``turns=`` regex 兼容）。
+- 边界（诚实登记）：CLI 驱动路径（claude/codex 等外部 CLI）本身不产出
+  token——该路径继续估算（来源标 estimated），不冒充实测；配额多租
+  （M3.2）依赖本批真实值；operator ``status.tokensUsed`` 回写 = M3.3。
+
 ### M-X1 Marketplace 签名 M0 —— Ed25519 验签接入安装路径（2026-10-31）
 
 ``core/marketplace/signing.py``（Ed25519 工具链，2026-09 起功能完整但零接线、

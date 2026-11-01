@@ -248,8 +248,10 @@ class MaopLoop(ExecuteMixin, PhasesMixin):
 
         # M2: 每次 run 重置 turn 预算与计数（一个 turn = 一次 dispatch 尝试；
         # None = 不设上限，维持既有行为）。计数最终经 LoopResult.turns 返回。
+        # M3.1: 实测 token 累计同样每次 run 重置。
         self._max_turns = max_turns
         self._turns_used = 0
+        self._tokens_used_measured = 0
 
         logger.info("MAOP Loop started | task=%s | trace=%s", task[:80], trace_id)
         self._log("loop", "INFO", "Loop started", trace_id=trace_id, task=task[:80])

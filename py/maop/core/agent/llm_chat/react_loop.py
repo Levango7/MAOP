@@ -264,10 +264,21 @@ class ReactLoop:
                 chat_kwargs["tools"] = tools
             fb_result = await factory.chat_with_fallback(**chat_kwargs)
             content = fb_result.response.content or ""
+            # M3.1: 回填实测 token 用量——provider 已解析 usage（此前在此处被
+            # 丢弃，成本侧只能走启发式估算并告警 UNKNOWN）。
+            resp = fb_result.response
+            usage: dict[str, int] | None = None
+            if resp.total_tokens or resp.prompt_tokens or resp.completion_tokens:
+                usage = {
+                    "prompt_tokens": resp.prompt_tokens,
+                    "completion_tokens": resp.completion_tokens,
+                    "total_tokens": resp.total_tokens,
+                }
             return new_result(
                 agent="", task="",
                 exit_code=0, stdout=content,
-                duration_ms=fb_result.response.latency_ms,
+                duration_ms=resp.latency_ms,
+                usage=usage,
                 trace_id=trace_id,
             )
         except Exception as exc:
