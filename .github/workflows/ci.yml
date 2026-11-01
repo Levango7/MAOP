@@ -582,14 +582,26 @@ jobs:
         id: playwright-version
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> $GITHUB_OUTPUT
 
+      # 2026-11-01 修复：缓存键此前只绑 OS + Playwright 版本，**没绑 runner
+      # 镜像版本**——镜像夜间滚动（ubuntu-latest 迁移潮）后，旧镜像构建的
+      # 缓存浏览器对新镜像不兼容（实测：webkit-2370 启动即
+      # `libicudata.so.74: cannot open shared object file`，37/37 用例全灭在
+      # `browserType.launch`），而 `install-deps` 只装新镜像的依赖集，救不回来。
+      # 修法：把镜像版本（runner 环境变量 ImageVersion）放进 key，且 restore-keys
+      # **不再回退到裸 OS 前缀**（否则旧缓存又会被前缀匹配捞回来）；镜像换代即
+      # 自然失配 → 走 `playwright install --with-deps` 全量重下。
+      - name: Expose runner image version
+        id: image
+        run: echo "version=${ImageVersion:-unknown}" >> $GITHUB_OUTPUT
+
       - name: Cache Playwright browsers
         uses: actions/cache@v6
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+          key: ${{ runner.os }}-${{ steps.image.outputs.version }}-playwright-${{ steps.playwright-version.outputs.version }}
           restore-keys: |
-            ${{ runner.os }}-playwright-
+            ${{ runner.os }}-${{ steps.image.outputs.version }}-playwright-
 
       # FIX: playwright.config.js 声明了 chromium / firefox / webkit 三个
       # project，但此前这里只装 chromium，导致 firefox 与 webkit 启动时报
