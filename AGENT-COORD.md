@@ -235,13 +235,28 @@
   `py/maop/dashboard/routers/notifications.py` 与 `py/maop/dashboard/_register_routes/_routers.py`
   的**注释面**（ZCode 第六轮也动过 `_register_routes`，我只改 notifications 注册块的文字，
   冲突面小；你方若再动请在本表回一行）。
-  **产品口径仍未决**：owner 只批了 C（关盲区 + 改假话），"个人版该不该有通知中心"（A：按企业
-  能力门控 + 前端守卫 / B：把引擎搬进仓内）等你再拍。
+  **产品口径仍未决**（2026-11-02 已拍 A，见下条）：owner 只批了 C（关盲区 + 改假话），
+  "个人版该不该有通知中心"（A：按企业能力门控 + 前端守卫 / B：把引擎搬进仓内）等你再拍。
+- **已完成（2026-11-02，分支 `fix/notifications-enterprise-gate`，PR #204）**：
+  `/api/notifications` 产品边界 **owner 选 A**。后端不改行为（模块级导入即门控），
+  前端把承诺改成与实现一致：`nav.js` 两个通知入口加 `enterprise: true`（个人版由
+  `filterNavByEdition` 隐藏），`router/index.js` 两条路由加 `meta.requiresEnterprise`
+  （深链由既有守卫送回 `/home`）；`nav-coverage.test.js` 新增「导航 enterprise 标记 ⇔
+  路由 requiresEnterprise」双向一致性用例。**不选 B**：把 `NotificationManager`/`EventBus`
+  从 MAOS 搬进仓内要跨 ADR-017 双仓边界、授权资产进开放核、MAOS 完整性清单需重签。
+  实测：前端 75 文件 / 669 用例全绿，eslint 干净；`filterNavByEdition` 探针
+  personal=0 个通知入口、enterprise=2 个。**领地新增（本批）**：
+  `dashboard-enterprise/src/{nav.js,router/index.js}`、
+  `dashboard-enterprise/src/__tests__/nav-coverage.test.js`（Examples 会话的 nav 守卫
+  PR #178 已合并，无冲突）。已知口径代价：`/api/info/edition` 是 admin-only，非 admin
+  在企业版安装按安全默认回落 personal，因而也看不到入口——与 Integrations/AlertRules
+  现有门控一致。
 - **下一步（动前会先在本表再登记）**：企业版 response_model 棘轮已归零，本线该主题收口。
   2026-11-02 再收两项：CI 串行腿可见性（#193）与个人版棘轮导入盲区（#200），棘轮线彻底收口。
-  候选：`/api/notifications` 产品边界 A/B —— 需要 owner 先答"个人版该不该有通知中心"。
+  通知边界已拍 A（见上条），本线无遗留产品决定。
 - **不碰**：`py/maop/dashboard/server.py` 与 lifespan 接线面（ZCode 第四轮）、
-  `core/**` 宽口径异常收窄批（ADR-023 D8）、`dashboard-enterprise/src/**`。
+  `core/**` 宽口径异常收窄批（ADR-023 D8）。`dashboard-enterprise/src/**` 仅在
+  2026-11-02 通知门控批经 owner 批准例外，其余不动。
 
 ## 领地登记（Examples 会话，2026-10-29：前端可达性 + 三类静默失败守卫）
 

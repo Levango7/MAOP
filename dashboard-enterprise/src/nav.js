@@ -103,10 +103,12 @@ export const nav = [
   { to: '/licenses', label: 'nav.licenses', icon: 'shield', subtitle: 'nav.licenses.subtitle', enterprise: true },
 
   // ── 设置（TopBar 齿轮直达；侧边栏保留入口方便直达）────────────
+  // 通知中心依赖商业 overlay 的通知引擎，个人版整块端点不存在，
+  // 因此两个入口按企业版隐藏；深链由路由守卫送回 /home。
   { section: 'nav.group.system' },
   { to: '/settings', label: 'nav.settings', icon: 'gear', subtitle: 'nav.settings.subtitle' },
-  { to: '/notifications', label: 'nav.notifications', icon: 'message-square', subtitle: 'nav.notifications.subtitle' },
-  { to: '/notifications/config', label: 'nav.notificationConfig', icon: 'gear', subtitle: 'nav.notificationConfig.subtitle' },
+  { to: '/notifications', label: 'nav.notifications', icon: 'message-square', subtitle: 'nav.notifications.subtitle', enterprise: true },
+  { to: '/notifications/config', label: 'nav.notificationConfig', icon: 'gear', subtitle: 'nav.notificationConfig.subtitle', enterprise: true },
   { to: '/docs', label: 'nav.docs', icon: 'book-open', subtitle: 'nav.docs.subtitle' },
 ];
 

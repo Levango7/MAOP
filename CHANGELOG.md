@@ -39,6 +39,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 通知中心按企业版门控（2026-11-02）
+
+- **问题**：个人版（未安装 MAOS overlay）没有通知引擎——`notifications` router 与其
+  schema 在模块级导入 `maop.enterprise.notification.models`，注册处整块跳过，26 条
+  端点全部不存在；但侧边栏仍无条件给出 `/notifications` 与 `/notifications/config`
+  两个入口，点进去必然 404。
+- **口径（A）**：明确把通知中心画成企业版能力。后端不改行为（导入即门控），只让 UI
+  的承诺与实现一致：两个导航项加 `enterprise: true`（个人版由 `filterNavByEdition`
+  隐藏），两条路由加 `meta.requiresEnterprise`（深链由既有守卫送回 `/home`）。
+- **守卫**：`nav-coverage.test.js` 新增「导航 enterprise 标记 ⇔ 路由
+  requiresEnterprise」双向一致性用例，防止以后只改一边。
+- **未选 B**：不把 `NotificationManager`/`EventBus` 从 MAOS 搬进 MAOP——跨 ADR-017
+  双仓边界、授权资产进开放核、MAOS 完整性清单需重签，爆炸半径远大于收益。
+- **已知口径代价**：`/api/info/edition` 是 admin-only，非 admin 用户在企业版安装上按
+  安全默认回落 personal，因而也看不到入口——与 Integrations / AlertRules 的门控一致。
+
 ### M-T3.3 Operator —— kind 真集群验证（七缺陷实证修复，2026-11-01）
 
 **M0 章程的"真集群 kind 验证为外部条件"就此解除**：本地 kind v0.31 +
