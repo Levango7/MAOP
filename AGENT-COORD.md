@@ -326,9 +326,13 @@
   缓存错配**（旧镜像构建的 webkit-2370 在新镜像启动即
   `libicudata.so.74: cannot open shared object file`）——**所有分支的
   Playwright E2E 腿都会 37/37 全灭于 `browserType.launch`**（与本批 Python
-  改动无关；他线 `test/adapter-consistency` 同症）。修法已随 PR #198 提交：
-  缓存键加入 runner 镜像版本（`ImageVersion`）且 restore-keys 不再回退裸 OS
-  前缀——**合并后 E2E 自动恢复**；期间各线的 E2E 红可直接归因到本通报。
+  改动无关；他线 `test/adapter-consistency` 同症）。**修复已合并**（PR #198 →
+  master `24fe010f`：缓存键加入 runner 镜像版本 + restore-keys 收紧）——
+  自该提交起 E2E 恢复；更早的 E2E 红均可归因到本通报。
+- **M3.3 进行中（2026-11-01）**：用量会计回写 CRD——`_parse_usage` 三元组
+  （legacy `turns=` 行兼容）+ 终态补丁 `status.tokensUsed`/`status.tokensSource`
+  + CRD status 增 `tokensSource`（enum measured/estimated）+ 机器对齐哨兵。
+  分支 `feat/operator-m3-3-tokens-used-status`。
 - **不碰**：`deploy/k8s/operator/` 既有 Chart/CRD（只加 Dockerfile）；
   他线的宽口径异常收窄批与前端面。
 - **已知环境干扰**：本机可达 FlintSpark k4 e2e 的 kind 集群时，既有

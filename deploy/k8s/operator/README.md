@@ -19,7 +19,9 @@
   RLS-aware data access remain **planned** behavior.
 - Turn budget: `MaopTask.spec.maxTurns` rides along as `maop run --max-turns`
   and the consumed turns are reported back into `status.turns` (M2; one turn =
-  one dispatch attempt).
+  one dispatch attempt). Token usage is reported back into `status.tokensUsed`
+  / `status.tokensSource` (M3.3; `measured` for LLM-direct usage, `estimated`
+  for CLI drivers — estimates are never presented as measured).
 - Tests: `py/tests/test_k8s_operator.py` remains the structure/layering suite
   (with skip placeholders); M0/M1 add mock-chain and guard tests (see above).
 

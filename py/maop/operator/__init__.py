@@ -12,6 +12,9 @@ M0 边界（章程见 ROADMAP「M-T3.3」）：
 - **M2 已实现**：``spec.maxTurns`` → 命令恒带 ``--max-turns``（一个 turn = 一次
   dispatch 尝试；loop 侧硬上限 + 计数）；子进程 ``[USAGE] turns=N`` 解析回写
   ``status.turns``。MaopAgent 解析到的 model/tools 仍不消费。
+- **M3.3 已实现**：``[USAGE] ... tokens=M source=S`` 段解析回写
+  ``status.tokensUsed`` / ``status.tokensSource``（measured/estimated；
+  legacy 行兼容）。配额/多租户（M3.2）仍待排。
 - **未实现（章程明示顺延）**：真集群 kind 验证；tokensUsed 与配额/多租户；
   插件（CRD 标注 planned）。
 
