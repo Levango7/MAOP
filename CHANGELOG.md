@@ -39,6 +39,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M-T3.3 Operator —— kind 真集群验证（七缺陷实证修复，2026-11-01）
+
+**M0 章程的"真集群 kind 验证为外部条件"就此解除**：本地 kind v0.31 +
+kindest/node v1.35（集群 `maop-mt33`）端到端打通——MaopTask CR → kopf
+事件 → spec 校验 → MaopAgent 解析 → 子进程
+`maop run --agent … --task …` → `[USAGE]` 协议行解析 → status 回写
+`Succeeded / turns=1 / tokensUsed=0 / tokensSource=estimated`，单次
+launch 无循环，`resolved=True pinned=True`。七个缺陷全部真集群实证，
+mock 测不出（PR #203，提交 357601cd / ad1aa922 / fc96c885 / df1dd0e0）：
+
+1. **RBAC**：chart 的 ClusterRole/Role 缺 `maoptasks`（含
+   status/finalizers）读写——kopf watch/patch 直接 403。
+2. **自激循环（最重）**：自己 `plan_launch` 的 Running 补丁回流为事件，
+   无门则 launch→patch→事件→launch 无限重拉子进程——`handle_task` 对
+   `status_phase=Running` 也 no-op。mock 的 FakeGateway 捕不到自激。
+3. **agent 不 pin 必炸**：无 pin 时 `maop run` 落集群默认 agent
+   `'codex'`（不存在）exit 1——`spec.agent` 必填即恒 pin；MaopAgent CR
+   解析结果降为 `AgentResolved` 条件上报。同时补生产布线缺口
+   （`get_controller` 从未注入 resolver，而 `KubernetesStatusGateway`
+   本就实现两协议）。
+4. **`kopf.Body` 非 dict**：真实 kopf 传 Mapping，`isinstance(body, dict)`
+   全拒——spec 校验签名放宽为 `Mapping`。
+5. **裸 prompt 位置参数**：CLI 的 task 走 `--task/-t`，裸位置参数被
+   argparse 拒绝（exit 2）。
+6. **探针无服务可探**：kopf runner 从未起健康服务，liveness 3 连败 →
+   CrashLoopBackOff 13 次（Last State=`Completed` exit 0 的假象——进程是
+   被 SIGTERM 优雅退出的）——`__main__` 经
+   `kopf.run(liveness_endpoint=…)` 在 metrics 口提供 `/healthz`；kopf
+   单端点，chart readiness 同打 `/healthz`。
+7. **运行时卷缺失**：非 root 容器根文件系统只读，子进程熔断器初始化
+   `/data/data` Permission denied（活对象上甚至出现过"卷有挂无"的形态）
+   ——chart 补 emptyDir `runtime-data`（挂 `/data`）+
+   `MAOP_ROOT_DIR=/data`。
+
+测试 50→51（+Running 门回归）；mypy/ruff 绿。部署物与进程能力的契约
+（探针口、运行时卷、RBAC）自此由结构测试与真集群烟测双面钉住。
+
 ### M-T3.3 Operator M3.2 —— 配额门接线（QuotaExceeded，检查器注入式，2026-11-01）
 
 M-T3.3 收官刀。社区版只提供**机制**，不内置配额策略（多租户聚合属

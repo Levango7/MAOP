@@ -424,11 +424,13 @@
     （``maop/enterprise/quota.py``，ADR-016/017 跨仓，待与持私钥会话
     协调的下一步）。
   - ~~配额/多租户~~ → **M-T3.3 社区侧至此收官**（M0/M0.1/M1/M2/M3.1/
-    M3.2/M3.3 全落地；kind 真集群验证为外部条件）。
+    M3.2/M3.3 全落地）。
 - M0 验收：mock 链路（MaopTask→子进程→status 回写）测试全绿 ✅；结构对齐
   哨兵上线 ✅；**operator 镜像在 CI 构建成功 ✅**（2026-10-30，master run
   `41118378867`：`Build operator image (build-only): success`）。
-  **真集群 kind 验证不进 M0**（外部条件）。
+  **真集群 kind 验证 ✅**（2026-11-01，原"外部条件"解除：kind v0.31 +
+  kindest/node v1.35 端到端 Succeeded + usage 回写，七缺陷实证修复，
+  详见 CHANGELOG 同日条目与 PR #203）。
 - 阻碍位置：无外部依赖，纯工程量。已知本地环境干扰：可达其他项目的 kind
   集群时既有集成用例会误连（详见 CHANGELOG 2026-10-30 条目）。
 
