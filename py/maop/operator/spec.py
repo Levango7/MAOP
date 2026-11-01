@@ -8,6 +8,7 @@ required ``[agent, prompt]``、``maxTurns >= 1``（默认 20）、``tools`` 数�
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -57,17 +58,21 @@ def _str_list(spec: dict[str, Any], key: str) -> tuple[str, ...]:
 
 
 def parse_task_spec(
-    body: dict[str, Any], *, name: str = "", namespace: str = "default"
+    body: Mapping[str, Any], *, name: str = "", namespace: str = "default"
 ) -> MaopTaskSpec:
-    """把 CR body（``dict``）解析为已校验的 :class:`MaopTaskSpec`.
+    """把 CR body（``Mapping``，dict 或 kopf 的 ``Body`` 包装）解析为已校验的
+    :class:`MaopTaskSpec`.
 
     CRD 的 additionalProperties 行为交给 k8s，这里只取已知键；未知键忽略
-    （向前兼容小版本）。
+    （向前兼容小版本）。kind 烟测实证（2026-11-01）：真实 kopf 传的是
+    ``kopf.Body``——``Mapping`` 子类但**不是** ``dict``，``isinstance(body,
+    dict)`` 会把真集群里的每个任务都误判为 InvalidSpec（mock 测试全喂
+    dict，查不出）。
     """
-    if not isinstance(body, dict):
+    if not isinstance(body, Mapping):
         raise InvalidSpecError("CR body must be a mapping")
     spec = body.get("spec")
-    if not isinstance(spec, dict):
+    if not isinstance(spec, Mapping):
         raise InvalidSpecError("spec is required and must be a mapping")
     metadata = body.get("metadata") or {}
     return MaopTaskSpec(
