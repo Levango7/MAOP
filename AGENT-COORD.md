@@ -152,10 +152,15 @@
 
 ## 领地登记（Qoder-CN 会话 17ef022a，2026-10-31：CI 串行腿可观测性）
 
-- **进行中 / 领地**：`.github/workflows/ci.yml` 的 `test` job 里
+- **已完成（PR #193 → 合并提交 `bc083563`）**：`.github/workflows/ci.yml` 的 `test` job 里
   `Run serial tests (fixed port / shared state)` 步骤 + 紧随的 `Upload test results`
-  步骤。只加可见性（`set +e` + `PIPESTATUS` 透传退码、串行腿 junit 出 annotation、
+  步骤。只加可见性（`PIPESTATUS` 透传退码、串行腿 junit 出 annotation、
   重试计数进 notice、artifact 收两份 xml 与日志），**不改任何判据阈值**。
+  该领地**已释放**，他线可动 `test` job。
+- **踩坑留痕（给改 workflow 的人）**：第一版在取证段前写了 `set -e`，GitHub 的
+  `shell: bash` 默认 `-eo pipefail` ⇒ `reruns=$(grep … | tail -1)` 在"本轮无重试"时
+  退码 1，把**测试全绿**的 9 条腿一起掐红。自测必须按同样的 shell 选项跑
+  （`bash --noprofile --norc -eo pipefail`），否则会漏掉这类失败。
 - **他线注意**：若你也要动 `test` job 的 step 顺序/名称，请先在本表回一行——
   step 名是 `Required checks satisfiability canary` 与 `ci_merge_gate` 读取的锚点。
 - **不碰**：`.github/workflows/nightly.yml`（它的 `--reruns=0` 是 flake 复现腿，
@@ -215,7 +220,7 @@
   `py/tests/fixtures/{frontend_non_json_endpoints.txt,frontend_response_model_allowlist.txt,
   enterprise_response_model_allowlist.txt}`；
   `py/tests/test_{frontend,enterprise}_response_models.py`；`py/maop/config/edition.py`。
-- **在途（2026-10-31 第二批，方案 C）**：分支 `fix/ratchet-import-blindspot`。
+- **已完成（2026-11-02，PR #200 → 合并提交 `0009ef09`，方案 C）**：分支 `fix/ratchet-import-blindspot`。
   个人版棘轮补"导入盲区兜底"：注册清单从 `_register_routes` **AST 解析**，注册了但本机
   导入不了的 router 走 `static_route_map` 源码视图（实测 notifications 26 条 / 前端在用 17 条
   此前两条门禁都不看）；**非 overlay 原因的导入失败一律 raise**，不许降级成源码视图。
