@@ -97,6 +97,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | 绿 + 无重试 | 0 | 无 | 无 | 判据不是无条件放行 |
 | 旧写法（对照） | 1 | **无** | — | 修复前的形态：红但静默 |
 
+**这一批自己踩出来的第二条（如实记录，不删上面的表）**：上面那套自测当时用
+`bash --noprofile --norc step.sh` 跑，**没有带 GitHub `shell: bash` 的默认 `-eo pipefail`**，
+于是漏掉一个真缺陷 —— 推上去后 9 条平台腿在测试全绿的情况下红（run 41209083375）：step
+打印完 `serial tests exit code: 0`，紧跟 `##[error]Process completed with exit code 1`。
+根因是我在取证段前面写了 `set -e`，而 `reruns=$(grep -oE '...' | tail -1)` 在日志里没有
+"rerun" 时 grep 退码 1，`pipefail` 把整条赋值语句变成失败 ⇒ errexit 直接掐死 step。
+判据本该由最后一行 `exit ${serial_code}` 承载，结果"取证失败"改写了"测试结论"。
+
+修法：不再恢复 errexit，取证三条各自 `|| true` 兜住；自测把 shell 选项改成与 GitHub
+完全一致（`bash --noprofile --norc -eo pipefail`），并加一条"牙齿检查"——把那两行坏写法
+注回去，自测必须红（实测 `green, no retry` 用例 rc=1 vs 期望 0 ⇒ FAIL），注回后文件按
+SHA256 复原。教训：**自测的 shell 选项也属于被测环境**，差一个 `-o pipefail` 就足以让
+一段"看起来跑过三种情形"的自测对真实失败完全失明。
+
 ### 纯净 CI 的收集跳过判据改按 AST —— 20 个测试文件此前从未运行过（2026-10-30）
 
 `tests/conftest.py` 与 `tests/e2e/conftest.py` 用「文件文本里出现过 `maop.enterprise`
