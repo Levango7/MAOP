@@ -52,6 +52,12 @@ MAOS 企业版配额域——ADR-016/017 边界，跨仓事项）：
 - 测试：``test_operator_quota.py`` 4 例（拒绝不拉起 + 条件携带
   tenant / 终态重放幂等 / 放行 + 用量回报 / 未注入保持 M0 行为）；
   operator 五套共 48 passed。
+- **运行时接线（跨仓桥闭合，MAOS PR #27 已合）**：
+  ``handlers.get_controller()`` 单例构造经
+  ``_enterprise_quota_checker()`` try-import MAOS 侧适配器
+  （``maop.enterprise.quota_operator.OperatorQuotaChecker``，内部要求
+  企业特性门）——企业版部署自动获得配额门；个人版/构造失败 →
+  ``None``（fail-open + 告警可见，行为同基线）。
 
 ### M-T3.3 Operator M3.3 —— 用量会计回写 CRD（tokensUsed / tokensSource，2026-11-01）
 

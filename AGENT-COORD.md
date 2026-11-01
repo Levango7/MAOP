@@ -323,13 +323,17 @@
   `status.tokensUsed` 回写 = M3.3。
 - **不碰**：他线的 cost_attribution schemas 面（M-X3 领地）、前端面。
 
-## 领地登记（ZCode session_f62ccbe…，2026-11-01 第十轮：M-T3.3 收官）
-
 - **M3.2 配额门（收官刀）**：``gateway.QuotaChecker`` 协议 +
   ``reconcile.plan_quota_exceeded``（``QuotaExceeded`` 终态，CRD enum
   预留）+ controller 拉起前询问/终态后回报。**社区版只提供机制**——
   真实多租户配额策略在 MAOS 企业版配额域（``maop/enterprise/quota.py``，
   ADR-016/017 跨仓，板面另立条目）。M-T3.3 社区侧至此收官。
+- **M3.2 运行时接线（跨仓桥闭合）**：``handlers.get_controller()`` 经
+  ``_enterprise_quota_checker()`` try-import MAOS 侧适配器（MAOS PR #27
+  **已合并** `02cb84d7`）——企业版部署自动注入配额门；个人版/构造失败 →
+  ``None``（fail-open + 告警可见）。单测两例（sys.modules 注入
+  企业包/个人版）。E2E 缓存修复（MAOS 无涉）亦已实证（master run E2E 腿
+  success）。
 - **⚠️ 全仓通报（2026-11-01）**：runner 镜像夜间滚动后，Playwright **浏览器
   缓存错配**（旧镜像构建的 webkit-2370 在新镜像启动即
   `libicudata.so.74: cannot open shared object file`）——**所有分支的

@@ -28,6 +28,11 @@
   **Mechanism only** — the real multi-tenant quota policy lives in the MAOS
   enterprise quota domain (cross-repo, ADR-016/017); the community edition
   ships no quota policy and, un-injected, behaves exactly as before.
+  The operator process wires the enterprise adapter automatically when the
+  MAOS overlay is installed (`handlers.get_controller` →
+  `maop.enterprise.quota_operator.OperatorQuotaChecker`, PR MAOS#27);
+  personal editions and construction failures disable the gate with a
+  logged warning (fail-open).
 - Tests: `py/tests/test_k8s_operator.py` remains the structure/layering suite
   (with skip placeholders); M0/M1 add mock-chain and guard tests (see above).
 

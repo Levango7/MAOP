@@ -3,6 +3,10 @@
 本模块是薄的：校验/状态机在 ``spec``/``reconcile``，k8s IO 在注入的 gateway。
 kopf 是**可选依赖**（镜像内由 Dockerfile 安装）；在无 kopf 的环境 import 本
 模块得到带安装指引的 RuntimeError，而不是裸 ImportError。
+
+M3.2 跨仓桥（2026-11-01）：单例构造时经 ``_enterprise_quota_checker``
+可选接入企业版配额门（MAOS ``maop.enterprise.quota_operator``，PR MAOS#27）
+——个人版/不可用时注入 ``None``（行为同社区版基线，fail-open 且告警可见）。
 """
 
 from __future__ import annotations
@@ -30,6 +34,33 @@ def _require_kopf() -> Any:
     return kopf
 
 
+def _enterprise_quota_checker() -> Any | None:
+    """企业版配额门（M3.2 跨仓桥，MAOS PR #27）——可用则构造，否则 ``None``.
+
+    try-import MAOS 侧 ``maop.enterprise.quota_operator.OperatorQuotaChecker``
+    （内部要求 ``FeatureFlag.TENANT_ISOLATION`` 企业特性门）；个人版 import
+    即失败 → ``None``。构造失败（quota SQLite 不可用等）同样 ``None``——
+    fail-open 与 ``QuotaManager`` 自身哲学一致，但**告警可见**（配额静默
+    失效会出现在日志里，不吞）。
+    """
+    try:
+        from maop.config.home import ensure_runtime_root
+        from maop.enterprise.quota import QuotaManager
+        from maop.enterprise.quota_operator import OperatorQuotaChecker
+
+        db_path = ensure_runtime_root() / "data" / "maop.db"
+        checker = OperatorQuotaChecker(QuotaManager(db_path=str(db_path)))
+        logger.info("[operator] enterprise quota checker wired (db=%s)", db_path)
+        return checker
+    except Exception as exc:
+        logger.warning(
+            "[operator] enterprise quota checker unavailable — quota gate "
+            "disabled (fail-open): %s",
+            exc,
+        )
+        return None
+
+
 def get_controller() -> OperatorController:
     """进程级单例（惰性构造；gateway/runner 用默认实现）."""
     global _controller
@@ -37,6 +68,7 @@ def get_controller() -> OperatorController:
         _controller = OperatorController(
             gateway=KubernetesStatusGateway(),
             runner=AsyncSubprocessRunner(),
+            quota_checker=_enterprise_quota_checker(),
         )
     return _controller
 
