@@ -36,21 +36,21 @@ class MaopTaskSpec:
     tools: tuple[str, ...] = field(default=())
 
 
-def _require_str(spec: dict[str, Any], key: str) -> str:
+def _require_str(spec: Mapping[str, Any], key: str) -> str:
     value = spec.get(key)
     if not isinstance(value, str) or not value.strip():
         raise InvalidSpecError(f"spec.{key} is required and must be a non-empty string")
     return value.strip()
 
 
-def _positive_int(spec: dict[str, Any], key: str, default: int) -> int:
+def _positive_int(spec: Mapping[str, Any], key: str, default: int) -> int:
     value = spec.get(key, default)
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise InvalidSpecError(f"spec.{key} must be an integer >= 1, got {value!r}")
     return int(value)
 
 
-def _str_list(spec: dict[str, Any], key: str) -> tuple[str, ...]:
+def _str_list(spec: Mapping[str, Any], key: str) -> tuple[str, ...]:
     value = spec.get(key) or []
     if not isinstance(value, list) or not all(isinstance(t, str) for t in value):
         raise InvalidSpecError(f"spec.{key} must be a list of strings")
