@@ -344,9 +344,14 @@ jobs:
             --timeout=60 --reruns=3 --reruns-delay=2 --junitxml=test-results-serial.xml \
             2>&1 | tee serial-pytest.log
           serial_code="${PIPESTATUS[0]}"
-          set -e
+          # 这里**不恢复 set -e**：GH 的 shell: bash 默认带 -e -o pipefail，而下面几条
+          # 都是取证语句——grep 没命中(退码 1)、日志文件不存在(退码 2)、tail 打不开文件，
+          # 都会让 step 在测试全绿时自己 abort。实测 run 41209083375：9 条平台腿打印完
+          # "serial tests exit code: 0" 后紧跟 "##[error]Process completed with exit code 1"，
+          # 红因正是 `reruns=$(grep … | tail -1)` 在 pipefail 下退码 1 触发 errexit。
+          # 判据仍由最后一行 exit ${serial_code} 承载：取证失败不许改判。
           echo "serial tests exit code: ${serial_code}"
-          reruns=$(grep -oE '[0-9]+ rerun' serial-pytest.log | tail -1)
+          reruns=$(grep -oE '[0-9]+ rerun' serial-pytest.log 2>/dev/null | tail -1 || true)
           if [ -n "${reruns}" ]; then
             echo "::notice::serial 腿重试计数: ${reruns}（nightly 以 --reruns=0 复现同类 flake）"
           fi
@@ -354,7 +359,7 @@ jobs:
             # 只出 annotation，不改退码；脚本自身对坏文件只 warning，不能让它把红洗成绿。
             python scripts/junit_annotate.py test-results-serial.xml || true
             echo "----- serial-pytest.log tail -----"
-            tail -n 25 serial-pytest.log
+            tail -n 25 serial-pytest.log || true
           fi
           exit "${serial_code}"
 
