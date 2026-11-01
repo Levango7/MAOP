@@ -122,4 +122,38 @@ describe('nav coverage', () => {
     const stale = Object.keys(EXEMPT).filter((p) => !paths.has(p));
     expect(stale, `豁免清单里有已不存在的路由，请删除对应条目：\n  ${stale.join('\n  ')}`).toEqual([]);
   });
+
+  /**
+   * 企业版标记必须两边同步：只标导航会让个人版"看得到入口、点进去被踢回"，
+   * 只标路由会让企业版"手输 URL 能进、侧边栏却找不到"。
+   * 通知中心（/notifications 与 /notifications/config）是这条规则的实例：
+   * 后端整块在商业 overlay 里，个人版端点不存在。
+   */
+  function parseEnterpriseMarks() {
+    const navEnterprise = new Set();
+    for (const line of fs.readFileSync(NAV, 'utf-8').split('\n')) {
+      const m = line.match(/to:\s*'([^']+)'/);
+      if (m && /enterprise:\s*true/.test(line)) navEnterprise.add(m[1]);
+    }
+    const routeMarks = new Map();
+    for (const line of fs.readFileSync(ROUTER, 'utf-8').split('\n')) {
+      const m = line.match(/path:\s*'([^']+)'/);
+      if (m) routeMarks.set(m[1], /requiresEnterprise:\s*true/.test(line));
+    }
+    return { navEnterprise, routeMarks };
+  }
+
+  it('enterprise nav entries and enterprise route guards stay in lockstep', () => {
+    const { navEnterprise, routeMarks } = parseEnterpriseMarks();
+    const navWithoutGuard = [...navEnterprise].filter((p) => !routeMarks.get(p));
+    const guardedWithoutNav = [...routeMarks]
+      .filter(([, gated]) => gated)
+      .map(([p]) => p)
+      .filter((p) => !navEnterprise.has(p));
+
+    expect(navWithoutGuard, `这些导航项标了 enterprise:true，但路由没有 requiresEnterprise 守卫：\n  ${navWithoutGuard.join('\n  ')}`).toEqual([]);
+    expect(guardedWithoutNav, `这些路由有 requiresEnterprise 守卫，但导航项没标 enterprise:true：\n  ${guardedWithoutNav.join('\n  ')}`).toEqual([]);
+    // 防正则失效后空转变绿：当前是 8 条管理页 + 2 个通知中心入口
+    expect(navEnterprise.size).toBeGreaterThanOrEqual(10);
+  });
 });

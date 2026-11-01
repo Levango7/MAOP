@@ -76,9 +76,11 @@ const routes = [
   { path: '/users', name: 'users', component: () => import('../views/Users.vue'), meta: { requiresEnterprise: true } },
 
   // ── 设置 ──
+  // 通知中心的后端（notifications router + schemas）在商业 overlay 里，
+  // 没有企业包时整块端点不存在，所以两条路由同样按企业版守卫。
   { path: '/settings', name: 'settings', component: () => import('../views/Settings.vue') },
-  { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue') },
-  { path: '/notifications/config', name: 'notification-config', component: () => import('../views/NotificationConfig.vue') },
+  { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue'), meta: { requiresEnterprise: true } },
+  { path: '/notifications/config', name: 'notification-config', component: () => import('../views/NotificationConfig.vue'), meta: { requiresEnterprise: true } },
   { path: '/docs', name: 'docs', component: () => import('../views/Docs.vue') },
 
   // ═══ 旧路径 301 重定向（书签/深链/外部链接兼容，零断链）═══
