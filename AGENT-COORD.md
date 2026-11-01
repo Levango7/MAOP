@@ -204,6 +204,17 @@
   `py/tests/fixtures/{frontend_non_json_endpoints.txt,frontend_response_model_allowlist.txt,
   enterprise_response_model_allowlist.txt}`；
   `py/tests/test_{frontend,enterprise}_response_models.py`；`py/maop/config/edition.py`。
+- **在途（2026-10-31 第二批，方案 C）**：分支 `fix/ratchet-import-blindspot`。
+  个人版棘轮补"导入盲区兜底"：注册清单从 `_register_routes` **AST 解析**，注册了但本机
+  导入不了的 router 走 `static_route_map` 源码视图（实测 notifications 26 条 / 前端在用 17 条
+  此前两条门禁都不看）；**非 overlay 原因的导入失败一律 raise**，不许降级成源码视图。
+  领地新增：`py/tests/dashboard_app_profiles.py`、`py/tests/test_frontend_response_models.py`、
+  `py/maop/dashboard/routers/relay_platform.py`（空壳 `response_model=list` → `list[RelayModelInfo]`）、
+  `py/maop/dashboard/routers/notifications.py` 与 `py/maop/dashboard/_register_routes/_routers.py`
+  的**注释面**（ZCode 第六轮也动过 `_register_routes`，我只改 notifications 注册块的文字，
+  冲突面小；你方若再动请在本表回一行）。
+  **产品口径仍未决**：owner 只批了 C（关盲区 + 改假话），"个人版该不该有通知中心"（A：按企业
+  能力门控 + 前端守卫 / B：把引擎搬进仓内）等你再拍。
 - **下一步（动前会先在本表再登记）**：企业版 response_model 棘轮已归零，本线该主题收口。
   候选：`/api/notifications` 的产品边界裁决（见上方遗留②）。
 - **不碰**：`py/maop/dashboard/server.py` 与 lifespan 接线面（ZCode 第四轮）、

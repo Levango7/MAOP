@@ -382,10 +382,14 @@ def _register_audit_router(app: FastAPI) -> None:
 
 def _register_notifications_and_config(app: FastAPI) -> None:
     """Register notifications / config-history / blackboard routers."""
-    # ── Notification Center router (available in both editions) ──
-    # Implements PRD docs/prd-notification-center.md: channels (Email/Webhook/InApp),
-    # rules, templates, event bus, async delivery with retry + dead-letter queue,
-    # and WebSocket real-time push at /api/notifications/ws.
+    # ── Notification Center router ───────────────────────────────────────
+    # Channels (Email/Webhook/InApp), rules, templates, event bus, async
+    # delivery with retry + dead-letter queue, WS push at /api/notifications/ws.
+    #
+    # 这不是"双版本可用"：通知引擎本体（NotificationManager / EventBus）在商业
+    # overlay 里，本 router 与它的响应模型都模块级导入 overlay。没有企业包的
+    # 安装会走到下面的 except，整块端点直接不存在（只剩这条 warning 日志），
+    # 而侧边栏仍给出入口。产品口径要改的话是另一个决定，不在这里顺手改。
     try:
         from maop.dashboard.routers import notifications as notifications_router
         app.include_router(notifications_router.router)
