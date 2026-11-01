@@ -189,9 +189,15 @@
     （含"服务层产出 vs 模型"对账、必填键缺失必须 500 的反向守卫）；overlay 14 条
     （sso 5 / n8n 4 / licenses 5）**留批**——需改 MAOS `maop/enterprise/*` 并重签
     完整性清单，须与持私钥会话协调。
-- **已知遗留（未立项，下一批再登记）**：① CI 串行腿的 junit 未上传、失败不 annotate，
+- **已知遗留（2026-11-02 状态更新，原文照录不删）**：① CI 串行腿的 junit 未上传、失败不 annotate，
   且 `--reruns=3` 与 nightly 同腿的 `--reruns=0` 口径相反；② `/api/notifications` 注册处
   注释称"双版本可用"，但其 schema 模块级依赖 overlay（个人版整块缺失），属产品边界待裁。
+  - ① **已收口**（PR #193 → `bc083563`）：annotate + artifact + 退码透传都补上；`--reruns`
+    经核是**设计而非漂移**（nightly 是 flake 复现腿），所以改成把重试次数暴露成 check-run
+    notice，不统一两侧取值。
+  - ② **一半已收口**（PR #200 → `0009ef09`）：假注释改如实；17 条通知端点两条门禁都不看的
+    盲区由源码视图兜底关掉。**剩下的是产品决定**：个人版该不该有通知中心（A：显式按企业能力
+    门控 + 前端守卫；B：引擎从 MAOS 搬进仓内，需重签完整性清单）。
 - **进展（2026-10-31，尾批已随 PR #187 合并，见上方「已完成」）**：分支 `fix/enterprise-response-models-overlay`
   （自 `78254584`，1 提交）：sso 5 / n8n 4 / licenses 5 共 14 条补 `response_model`，
   镜像模型仓内新建 `routers/{sso,n8n,licenses}_schemas.py`；棘轮 allowlist 14 → 0。
@@ -232,7 +238,8 @@
   **产品口径仍未决**：owner 只批了 C（关盲区 + 改假话），"个人版该不该有通知中心"（A：按企业
   能力门控 + 前端守卫 / B：把引擎搬进仓内）等你再拍。
 - **下一步（动前会先在本表再登记）**：企业版 response_model 棘轮已归零，本线该主题收口。
-  候选：`/api/notifications` 的产品边界裁决（见上方遗留②）。
+  2026-11-02 再收两项：CI 串行腿可见性（#193）与个人版棘轮导入盲区（#200），棘轮线彻底收口。
+  候选：`/api/notifications` 产品边界 A/B —— 需要 owner 先答"个人版该不该有通知中心"。
 - **不碰**：`py/maop/dashboard/server.py` 与 lifespan 接线面（ZCode 第四轮）、
   `core/**` 宽口径异常收窄批（ADR-023 D8）、`dashboard-enterprise/src/**`。
 
