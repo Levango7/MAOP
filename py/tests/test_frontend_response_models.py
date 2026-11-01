@@ -13,8 +13,15 @@ the endpoint gets a model. The gate fails in both directions:
     (new gap), and
   * an allowlisted entry that is no longer missing (stale line).
 
-Scope: routes reachable in the personal app. Enterprise-only endpoints that
-are not mounted here stay out of ``matched`` by construction.
+Scope: every router the personal server tries to mount — as mounted here, or,
+when a router cannot be imported in this environment (it needs the commercial
+overlay), read from its source the same way the enterprise gate does. Without
+that fallback the routers that fail to import disappear from both ratchets at
+once: measured on a clean checkout, ``/api/notifications`` alone holds 17
+frontend-called endpoints and the personal app exposes none of them.
+
+Enterprise-only endpoints that are not mounted here stay out of ``matched`` by
+construction.
 
 Seeing the calls is the part that has to be right, so extraction is not one
 regex: ``api.get('/api/x')`` is easy, ``const url = '/api/x' + qs`` followed
@@ -51,7 +58,7 @@ from pathlib import Path
 
 import pytest
 
-from maop.dashboard.server import app
+from tests.dashboard_app_profiles import personal_route_map
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_SRC = REPO_ROOT / "dashboard-enterprise" / "src"
@@ -80,8 +87,6 @@ _REF_RE = re.compile(
     r"|\s*\[\s*(?:(?P<q>['\"])(?P<brack>[^'\"]*)(?P=q)\s*\]|(?P<dynamic>[^\]]*\]))?)?",
 )
 _PARAM_RE = re.compile(r"^\s*([A-Za-z_$][\w$]*)\s*(?:=[^,)]*)?$")
-_METHODS = ("get", "post", "put", "patch", "delete")
-
 
 def normalize_path(raw: str) -> str:
     """Make frontend literals and FastAPI templates comparable.
@@ -368,14 +373,14 @@ def frontend_calls() -> set[tuple[str, str]]:
 
 
 def route_schema() -> dict[tuple[str, str], dict]:
-    schema = app.openapi()
-    routes: dict[tuple[str, str], dict] = {}
-    for path, methods in schema.get("paths", {}).items():
-        for method, op in methods.items():
-            if method not in _METHODS:
-                continue
-            routes[(method.upper(), normalize_path(path))] = op
-    return routes
+    """The audited personal surface — mounted here, or read from source where not.
+
+    Returns pseudo-operations for routers that need the commercial overlay, in
+    the same shape the imported view uses, so ``has_typed_response`` cannot tell
+    the two apart. A router that fails to import for any other reason raises
+    inside ``personal_route_map`` instead of being downgraded to a source view.
+    """
+    return personal_route_map(normalize_path)
 
 
 def has_typed_response(op: dict) -> bool:
@@ -558,10 +563,14 @@ def test_non_json_exemptions_are_real_routes() -> None:
     assert typed == [], f"exempted endpoints that DO declare a model: {typed}"
 
 
-def test_notification_router_is_fully_typed():
-    # The router imports its models from maop-enterprise and is not mounted
-    # in a personal-only install (CI); the generic ratchet still applies there.
-    pytest.importorskip("maop.enterprise", reason="notifications router needs maop-enterprise")
+def test_notification_router_is_fully_typed_in_both_environments():
+    """这条此前用 importorskip 自我豁免，并且注释谎报覆盖面。
+
+    旧注释写"the generic ratchet still applies there"——事实相反：CI 里这个
+    router 不在 ``app.openapi()`` 里，``matched`` 恒空，17 条前端在用的端点
+    两条棘轮都看不见。现在两种环境都判（装了企业包走导入视图，没装走源码视图），
+    路由数在两边都是 26。
+    """
     routes = route_schema()
     notification_routes = [key for key in routes if key[1].startswith("/api/notifications")]
     assert len(notification_routes) == 26, len(notification_routes)
@@ -600,3 +609,67 @@ def test_only_allowlisted_frontend_endpoints_lack_models():
     )
     # Burn-down ratchet: the allowlist may only shrink (see RATCHET_CAP).
     assert len(allowlist) <= RATCHET_CAP, len(allowlist)
+
+
+# ── 导入盲区：装了企业包才存在的 router，CI 里也要被审计 ──────────
+
+
+def _overlay_only_personal_routers() -> dict[str, str]:
+    """``{router: 缺失模块}`` —— 注册了、但没有企业包就导入不了的 router。
+
+    用 ``overlay_probe`` 在**子进程里遮蔽企业包**去问，所以装了 MAOS 的开发机与
+    纯净 CI 得到同一个答案；清单从 ``_register_routes`` 解析出来，不靠测试文件
+    里再抄一份名字。
+    """
+    from tests.dashboard_app_profiles import (
+        ENTERPRISE_ROUTER_MODULES,
+        overlay_only_modules,
+        overlay_probe,
+        personal_registered_router_modules,
+    )
+
+    probe = overlay_probe(personal_registered_router_modules())
+    assert probe, "注册清单解析为空——这条判据就成了空转"
+    return overlay_only_modules(probe, ENTERPRISE_ROUTER_MODULES)
+
+
+def test_the_blindspot_is_measured_and_closed() -> None:
+    """每一个"没有企业包就导入不了"的个人版 router，都必须仍在校验面里。
+
+    判据不是"notifications 在清单上"这种复述，而是逐个模块比对：源码视图声明的
+    路由集合必须整体出现在审计面里，且"有没有类型"的判定两视图一致。新增一个
+    依赖企业包的 router 若忘了兜底，这里会直接点名。
+    """
+    from tests.dashboard_app_profiles import static_route_map
+
+    blocked = _overlay_only_personal_routers()
+    assert blocked, "本机与遮蔽企业包后都能导入——这条判据失去了被测对象"
+    routes = route_schema()
+    for name in sorted(blocked):
+        source = static_route_map(name, normalize_path)
+        assert source, f"{name} 解析不出任何路由，扫描器在它身上失明"
+        absent = sorted(set(source) - set(routes))
+        assert absent == [], (name, absent[:5])
+        disagree = sorted(
+            key for key in source
+            if has_typed_response(routes[key]) != has_typed_response(source[key])
+        )
+        assert disagree == [], (name, disagree[:5])
+
+
+def test_a_non_overlay_import_failure_is_never_downgraded() -> None:
+    """兜底只对"企业包不在"这一种原因生效——判据本身要能被反向证伪。
+
+    真的导入坏了（拼写、循环依赖、缺依赖）如果被同一套源码视图吞掉，门禁就会
+    在"口径被悄悄换掉"的情况下继续绿。这条用合成探针把三种输入各钉一遍。
+    """
+    from tests.dashboard_app_profiles import OVERLAY_IMPORT, overlay_only_modules
+
+    assert overlay_only_modules({"health": "ok"}) == {}
+    assert set(overlay_only_modules({"notifications": OVERLAY_IMPORT + ".notification.models"})) == {
+        "notifications",
+    }
+    # 企业版棘轮自有的模块，不该进个人版兜底面（两边会重复记账）。
+    assert overlay_only_modules({"sso": OVERLAY_IMPORT + ".sso_store"}, ("sso",)) == {}
+    with pytest.raises(RuntimeError):
+        overlay_only_modules({"broken_router": "some_other_package"})

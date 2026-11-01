@@ -386,6 +386,44 @@ CI 里这条门禁正处于"被连坐跳过"状态，所以没人看见。**已�
   - 测试夹具从"页面字段形状"改成后端真实线缆形状（原来的 mock 会把翻译缺失掩盖掉），
     新增派生字段、审计历史、只读版本三个用例；变异反证 4 例全红。
 
+### 个人版棘轮补上"导入盲区"：17 条通知端点此前两条门禁都不看（2026-10-31）
+
+`tests/test_frontend_response_models.py` 判的是 `app.openapi()` 里的路由。纯净 CI 检出里没有
+商业 overlay，于是**任何模块级导入企业包的 router 整个消失**：服务端尝试注册 65 个 router，
+其中 5 个导入失败（`sso / n8n / licenses` 已由企业版棘轮的源码视图兜底，
+`notifications / relay_platform` 两边都不管）。实测遮蔽企业包后跑一遍：
+`[server] Router MISSING: notifications`，而前端在调的 `/api/notifications*` 有 **17 条**
+（该 router 共 26 条路由）—— `matched` 恒空，棘轮"全绿"只是因为没人被检查。更糟的是
+`test_notification_router_is_fully_typed` 用 `importorskip` 自我豁免，注释还写着
+"the generic ratchet still applies there"，那句话与事实相反。
+
+改动（方案 C：只关盲区 + 把假话改成真话，不改产品行为）：
+
+- `tests/dashboard_app_profiles.py` 新增 `personal_registered_router_modules()`（从
+  `_register_routes` **AST 解析**注册清单，不在测试文件里再抄一份名字）、
+  `personal_import_failures()`、`overlay_only_modules()`、`personal_route_map()`：注册了但
+  本机导入不了的 router，改用 `static_route_map` 的源码视图补进个人版面。
+- **只有"企业包不在"这一种原因允许降级成源码视图**；其他 `ModuleNotFoundError`（拼错、
+  缺依赖、循环导入）一律 raise —— 否则"口径被换掉"会伪装成一条更松的门禁继续绿。
+- `route_schema()` 换成审计面（导入视图 ∪ 源码视图）；通知用例去掉 `importorskip`，
+  两环境都判 26 条且要求全部有类型；新增两条结构守卫：
+  `test_the_blindspot_is_measured_and_closed`（逐模块比对两视图的键集合与类型判定）、
+  `test_a_non_overlay_import_failure_is_never_downgraded`（合成探针钉住"原因"过滤）。
+- 顺带修一个**空壳类型**：`relay_platform.py` 的 `GET /{name}/models` 写的是
+  `response_model=list`，OpenAPI 只得到 `{"type":"array"}`、没有任何条目类型 —— 源码视图看见
+  关键字判"有类型"，导入视图看 schema 判"没类型"，两视图唯一分歧就在这条。改成
+  `list[RelayModelInfo]`（与紧邻两行的 `list[PriceComparison]` 同法；服务层返回的正是
+  `RelayModelInfo.model_dump()`，响应 JSON 不变）。
+- 注释修正：`_register_routes/_routers.py` 的 "available in both editions" 与它引用的
+  `docs/prd-notification-center.md`（MAOP / MAOS 两处都不存在）改为如实描述——没有企业包时
+  整块端点不存在，而侧边栏仍给入口；`notifications._require_feature` 自相矛盾的 docstring
+  （称注册处按 MULTI_USER 门控）一并改写。**产品口径未动**：个人版该不该有通知中心仍待裁决。
+
+验证：开发机（装企业包）70 passed；纯净 CI 复刻 68 passed / 2 skipped（跳过的是需要真企业包
+模型的逐字段对账）；变异反证 4 例全红 —— 去掉一条通知端点的 `response_model`、把
+relay_platform 改回空壳 `list`、撤掉兜底、把"非 overlay 原因"改成静默放行；文件按 SHA256
+复原，ruff 0 条。
+
 ### 分层收官批：middleware 子包化 + lifespan 接线（2026-10-28）
 
 - **`core/security/middleware.py` 1188 行 → 六文件子包**：`_auth`（AuthMiddleware

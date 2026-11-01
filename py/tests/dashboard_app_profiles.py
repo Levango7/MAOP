@@ -56,6 +56,9 @@ _METHODS = ("get", "post", "put", "patch", "delete")
 
 _ROUTERS_DIR = Path(inspect.getfile(importlib.import_module("maop.dashboard.routers"))).parent
 
+#: Where the dashboard app decides which routers to mount.
+_REGISTER_DIR = _ROUTERS_DIR.parent / "_register_routes"
+
 #: Import path contributed by the commercial overlay (ADR-017: a second,
 #: private repository that injects into the ``maop`` namespace).
 #: Kept in this non-test module on purpose: ``tests/conftest.py`` refuses to
@@ -224,9 +227,83 @@ def enterprise_route_map(normalize: Callable[[str], str]) -> dict[tuple[str, str
     return routes
 
 
+def personal_registered_router_modules() -> tuple[str, ...]:
+    """Router modules the personal server tries to import — parsed, not restated.
+
+    The list is read out of ``_register_routes`` (every
+    ``from maop.dashboard.routers import X``), so a new router cannot quietly
+    leave the audited surface by not being named in a test file.
+    """
+    found: set[str] = set()
+    for path in sorted(_REGISTER_DIR.glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == "maop.dashboard.routers":
+                found.update(alias.name for alias in node.names)
+    return tuple(sorted(found))
+
+
+def personal_import_failures() -> tuple[tuple[str, str], ...]:
+    """``(module, missing_name)`` for registered routers that cannot import here."""
+    failures: list[tuple[str, str]] = []
+    for name in personal_registered_router_modules():
+        try:
+            importlib.import_module(f"maop.dashboard.routers.{name}")
+        except ModuleNotFoundError as exc:
+            failures.append((name, str(exc.name or "")))
+    return tuple(failures)
+
+
+def overlay_only_modules(
+    probe: dict[str, str], owned: tuple[str, ...] = ()
+) -> dict[str, str]:
+    """Filter ``{router: missing_module}`` down to failures caused by the overlay.
+
+    Routers owned by another profile are excluded. Anything that fails for a
+    *different* reason raises: a genuine import breakage must not be downgraded
+    into "just read its source instead", which would change what is measured
+    while looking green.
+    """
+    blocked = {
+        name: why for name, why in probe.items()
+        if why != "ok" and name not in owned
+    }
+    wrong = {
+        name: why for name, why in blocked.items()
+        if not (why == OVERLAY_IMPORT or why.startswith(OVERLAY_IMPORT + "."))
+    }
+    if wrong:
+        raise RuntimeError(
+            f"routers unimportable for a non-overlay reason: {sorted(wrong.items())}"
+        )
+    return blocked
+
+
+def personal_overlay_router_modules() -> tuple[str, ...]:
+    """Registered routers that exist only because the commercial overlay does.
+
+    They drop out of ``app.openapi()`` in a clean CI checkout, so their
+    frontend-called endpoints are judged by neither ratchet unless the source
+    view covers them.
+    """
+    return tuple(
+        overlay_only_modules(
+            dict(personal_import_failures()), ENTERPRISE_ROUTER_MODULES
+        )
+    )
+
+
+def personal_route_map(normalize: Callable[[str], str]) -> dict[tuple[str, str], dict[str, Any]]:
+    """The personal surface: mounted here, or read from source where it cannot mount."""
+    routes = route_map(personal_app(), normalize)
+    for module in personal_overlay_router_modules():
+        routes.update(static_route_map(module, normalize))
+    return routes
+
+
 def all_route_map(normalize: Callable[[str], str]) -> dict[tuple[str, str], dict[str, Any]]:
     """Both profiles merged — what a route-referencing fixture must match."""
-    routes = route_map(personal_app(), normalize)
+    routes = personal_route_map(normalize)
     routes.update(enterprise_route_map(normalize))
     return routes
 
