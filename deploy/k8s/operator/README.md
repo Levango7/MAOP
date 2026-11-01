@@ -22,6 +22,12 @@
   one dispatch attempt). Token usage is reported back into `status.tokensUsed`
   / `status.tokensSource` (M3.3; `measured` for LLM-direct usage, `estimated`
   for CLI drivers — estimates are never presented as measured).
+- Quota gate (M3.2): an injectable `QuotaChecker` is consulted before launch
+  and reported usage after the run; a denial sets the terminal
+  `QuotaExceeded` phase (reserved in the CRD enum) **without launching**.
+  **Mechanism only** — the real multi-tenant quota policy lives in the MAOS
+  enterprise quota domain (cross-repo, ADR-016/017); the community edition
+  ships no quota policy and, un-injected, behaves exactly as before.
 - Tests: `py/tests/test_k8s_operator.py` remains the structure/layering suite
   (with skip placeholders); M0/M1 add mock-chain and guard tests (see above).
 

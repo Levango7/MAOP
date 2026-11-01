@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M-T3.3 Operator M3.2 —— 配额门接线（QuotaExceeded，检查器注入式，2026-11-01）
+
+M-T3.3 收官刀。社区版只提供**机制**，不内置配额策略（多租户聚合属
+MAOS 企业版配额域——ADR-016/017 边界，跨仓事项）：
+
+- ``gateway.QuotaChecker`` 协议（``check_quota`` / ``record_usage`` 双方法）
+  + controller 构造注入；拉起**前**过配额门——拒绝则终态
+  ``QuotaExceeded``（CRD enum 预留相位，``reconcile.plan_quota_exceeded``），
+  **不拉起子进程**；终态后回报实测用量（缺 ``[USAGE]`` 行的旧版不回报）。
+- 未注入配额门：行为与 M0 逐字节一致（不拒绝、不回报）。
+- 测试：``test_operator_quota.py`` 4 例（拒绝不拉起 + 条件携带
+  tenant / 终态重放幂等 / 放行 + 用量回报 / 未注入保持 M0 行为）；
+  operator 五套共 48 passed。
+
 ### M-T3.3 Operator M3.3 —— 用量会计回写 CRD（tokensUsed / tokensSource，2026-11-01）
 
 M3.1 的 ``[USAGE] turns=N tokens=M source=S`` 协议行闭合到 CRD：

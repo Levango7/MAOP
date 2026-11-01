@@ -91,6 +91,29 @@ def plan_launch(
     )
 
 
+def plan_quota_exceeded(
+    *,
+    tenant: str,
+    reason: str,
+    when: str | None = None,
+) -> Transition:
+    """配额门拒绝（M3.2）：终态 ``QuotaExceeded``（CRD enum 预留相位）.
+
+    在子进程拉起**之前**补丁——任务未执行；``reason`` 由注入的配额门给出
+    （如 ``tenant quota exceeded: turns``）。未注入配额门时本转换不会被调用。
+    """
+    when = when or now_iso()
+    detail = f"tenant {tenant!r} quota check denied: {reason}"
+    return Transition(
+        phase="QuotaExceeded",
+        patch={
+            "phase": "QuotaExceeded",
+            "completionTime": when,
+            "conditions": [_condition("Completed", "QuotaExceeded", detail, when)],
+        },
+    )
+
+
 def _with_usage(
     t: Transition,
     turns: int | None,

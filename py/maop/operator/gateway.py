@@ -24,6 +24,25 @@ class StatusGateway(Protocol):
     ) -> None: ...
 
 
+class QuotaChecker(Protocol):
+    """配额门接口（M3.2，可注入替换；不注入 = 不强制执行，M0 行为不变）。
+
+    切入点：MaopTask 拉起前查询、终态后回报。真实实现（按租户聚合
+    turns/tokensUsed 用量并与配额比较）在 MAOS 侧（企业版配额域）——
+    社区版只提供机制与 ``QuotaExceeded`` 相位（CRD enum 预留），不内置
+    配额策略。
+    """
+
+    async def check_quota(
+        self, *, tenant: str, max_turns: int, prompt: str
+    ) -> tuple[bool, str]: ...
+    """返回 (是否放行, 拒绝原因)；放行时原因为空串。"""
+
+    async def record_usage(
+        self, *, tenant: str, turns: int, tokens_used: int
+    ) -> None: ...
+
+
 class AgentResolver(Protocol):
     """MaopAgent CR 解析接口（M1，可注入替换）。解析不到返回 ``None``。"""
 
