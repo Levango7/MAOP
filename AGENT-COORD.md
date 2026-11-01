@@ -150,6 +150,17 @@
   `routers/*_schemas.py` 面。**他线注意**：`ws_blackboard_bridge.py` 内部两处
   `except Exception` 属该批候选，如你方先行收窄请在本表回一行，我 rebase 跟随。
 
+## 领地登记（Qoder-CN 会话 17ef022a，2026-10-31：CI 串行腿可观测性）
+
+- **进行中 / 领地**：`.github/workflows/ci.yml` 的 `test` job 里
+  `Run serial tests (fixed port / shared state)` 步骤 + 紧随的 `Upload test results`
+  步骤。只加可见性（`set +e` + `PIPESTATUS` 透传退码、串行腿 junit 出 annotation、
+  重试计数进 notice、artifact 收两份 xml 与日志），**不改任何判据阈值**。
+- **他线注意**：若你也要动 `test` job 的 step 顺序/名称，请先在本表回一行——
+  step 名是 `Required checks satisfiability canary` 与 `ci_merge_gate` 读取的锚点。
+- **不碰**：`.github/workflows/nightly.yml`（它的 `--reruns=0` 是 flake 复现腿，
+  与 CI 的 `--reruns=3` 口径相反属设计）、发布类 job、branch protection。
+
 ## 领地登记（Qoder-CN 会话 17ef022a，2026-10-30：response_model 棘轮线）
 
 补登记：2026-10-28 17:15 那批 `routers/*_schemas.py` 就是本线产物（上表已注意到）。
