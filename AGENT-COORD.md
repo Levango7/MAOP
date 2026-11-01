@@ -152,10 +152,15 @@
 
 ## 领地登记（Qoder-CN 会话 17ef022a，2026-10-31：CI 串行腿可观测性）
 
-- **进行中 / 领地**：`.github/workflows/ci.yml` 的 `test` job 里
+- **已完成（PR #193 → 合并提交 `bc083563`）**：`.github/workflows/ci.yml` 的 `test` job 里
   `Run serial tests (fixed port / shared state)` 步骤 + 紧随的 `Upload test results`
-  步骤。只加可见性（`set +e` + `PIPESTATUS` 透传退码、串行腿 junit 出 annotation、
+  步骤。只加可见性（`PIPESTATUS` 透传退码、串行腿 junit 出 annotation、
   重试计数进 notice、artifact 收两份 xml 与日志），**不改任何判据阈值**。
+  该领地**已释放**，他线可动 `test` job。
+- **踩坑留痕（给改 workflow 的人）**：第一版在取证段前写了 `set -e`，GitHub 的
+  `shell: bash` 默认 `-eo pipefail` ⇒ `reruns=$(grep … | tail -1)` 在"本轮无重试"时
+  退码 1，把**测试全绿**的 9 条腿一起掐红。自测必须按同样的 shell 选项跑
+  （`bash --noprofile --norc -eo pipefail`），否则会漏掉这类失败。
 - **他线注意**：若你也要动 `test` job 的 step 顺序/名称，请先在本表回一行——
   step 名是 `Required checks satisfiability canary` 与 `ci_merge_gate` 读取的锚点。
 - **不碰**：`.github/workflows/nightly.yml`（它的 `--reruns=0` 是 flake 复现腿，
@@ -184,9 +189,15 @@
     （含"服务层产出 vs 模型"对账、必填键缺失必须 500 的反向守卫）；overlay 14 条
     （sso 5 / n8n 4 / licenses 5）**留批**——需改 MAOS `maop/enterprise/*` 并重签
     完整性清单，须与持私钥会话协调。
-- **已知遗留（未立项，下一批再登记）**：① CI 串行腿的 junit 未上传、失败不 annotate，
+- **已知遗留（2026-11-02 状态更新，原文照录不删）**：① CI 串行腿的 junit 未上传、失败不 annotate，
   且 `--reruns=3` 与 nightly 同腿的 `--reruns=0` 口径相反；② `/api/notifications` 注册处
   注释称"双版本可用"，但其 schema 模块级依赖 overlay（个人版整块缺失），属产品边界待裁。
+  - ① **已收口**（PR #193 → `bc083563`）：annotate + artifact + 退码透传都补上；`--reruns`
+    经核是**设计而非漂移**（nightly 是 flake 复现腿），所以改成把重试次数暴露成 check-run
+    notice，不统一两侧取值。
+  - ② **一半已收口**（PR #200 → `0009ef09`）：假注释改如实；17 条通知端点两条门禁都不看的
+    盲区由源码视图兜底关掉。**剩下的是产品决定**：个人版该不该有通知中心（A：显式按企业能力
+    门控 + 前端守卫；B：引擎从 MAOS 搬进仓内，需重签完整性清单）。
 - **进展（2026-10-31，尾批已随 PR #187 合并，见上方「已完成」）**：分支 `fix/enterprise-response-models-overlay`
   （自 `78254584`，1 提交）：sso 5 / n8n 4 / licenses 5 共 14 条补 `response_model`，
   镜像模型仓内新建 `routers/{sso,n8n,licenses}_schemas.py`；棘轮 allowlist 14 → 0。
@@ -215,7 +226,7 @@
   `py/tests/fixtures/{frontend_non_json_endpoints.txt,frontend_response_model_allowlist.txt,
   enterprise_response_model_allowlist.txt}`；
   `py/tests/test_{frontend,enterprise}_response_models.py`；`py/maop/config/edition.py`。
-- **在途（2026-10-31 第二批，方案 C）**：分支 `fix/ratchet-import-blindspot`。
+- **已完成（2026-11-02，PR #200 → 合并提交 `0009ef09`，方案 C）**：分支 `fix/ratchet-import-blindspot`。
   个人版棘轮补"导入盲区兜底"：注册清单从 `_register_routes` **AST 解析**，注册了但本机
   导入不了的 router 走 `static_route_map` 源码视图（实测 notifications 26 条 / 前端在用 17 条
   此前两条门禁都不看）；**非 overlay 原因的导入失败一律 raise**，不许降级成源码视图。
@@ -227,7 +238,8 @@
   **产品口径仍未决**：owner 只批了 C（关盲区 + 改假话），"个人版该不该有通知中心"（A：按企业
   能力门控 + 前端守卫 / B：把引擎搬进仓内）等你再拍。
 - **下一步（动前会先在本表再登记）**：企业版 response_model 棘轮已归零，本线该主题收口。
-  候选：`/api/notifications` 的产品边界裁决（见上方遗留②）。
+  2026-11-02 再收两项：CI 串行腿可见性（#193）与个人版棘轮导入盲区（#200），棘轮线彻底收口。
+  候选：`/api/notifications` 产品边界 A/B —— 需要 owner 先答"个人版该不该有通知中心"。
 - **不碰**：`py/maop/dashboard/server.py` 与 lifespan 接线面（ZCode 第四轮）、
   `core/**` 宽口径异常收窄批（ADR-023 D8）、`dashboard-enterprise/src/**`。
 
