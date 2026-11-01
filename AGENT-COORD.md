@@ -237,7 +237,7 @@
   冲突面小；你方若再动请在本表回一行）。
   **产品口径仍未决**（2026-11-02 已拍 A，见下条）：owner 只批了 C（关盲区 + 改假话），
   "个人版该不该有通知中心"（A：按企业能力门控 + 前端守卫 / B：把引擎搬进仓内）等你再拍。
-- **已完成（2026-11-02，分支 `fix/notifications-enterprise-gate`，待开 PR）**：
+- **已完成（2026-11-02，分支 `fix/notifications-enterprise-gate`，PR #204）**：
   `/api/notifications` 产品边界 **owner 选 A**。后端不改行为（模块级导入即门控），
   前端把承诺改成与实现一致：`nav.js` 两个通知入口加 `enterprise: true`（个人版由
   `filterNavByEdition` 隐藏），`router/index.js` 两条路由加 `meta.requiresEnterprise`
