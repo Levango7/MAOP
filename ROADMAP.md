@@ -398,29 +398,46 @@
   与 CRD YAML 机器对齐）。结构断言现状修正：既有测试并非"仅文件存在性"——
   2026-09-28 起已有分层套件（28 passed/8 skipped 当时），skip 为缺
   helm/kubectl/集群的环境条件，multi-tenant/plugin/RLS 占位属 planned 特性。
-- M0 余量：~~`spec.agent` → MaopAgent CR 解析~~（**M1 已交付**）；turn 预算、
-  配额/多租户 = 后续里程碑（M2/M3）。
+- M0 余量：~~`spec.agent` → MaopAgent CR 解析~~（**M1 已交付**）；~~turn 预算~~
+  （**M2 已交付**）；配额/多租户 = M3。
 - 里程碑进展（2026-10-30 晚）：
   - **M0.1（#188 已合）**：operator 镜像构建两处缺陷修复 —— 缺 `COPY config/`
     （wheel 的 hatch_build 把 `../config` 当必需资产）+ `useradd` 同名组冲突
     （基镜像自带 operator 组）；由本地复刻 CI 构建逮到，本地复刻构建已绿。
-  - **M1（本批）**：`spec.agent` → MaopAgent CR 解析 + agent pinning —— CR 存在
+  - **M1（PR #189）**：`spec.agent` → MaopAgent CR 解析 + agent pinning —— CR 存在
     → `maop run --agent`（F6a forced_agent）+ `AgentResolved=True` 条件；未声明 →
-    M0 行为 + 注记；CLI 增 `--agent`。maxTurns/turns 会计与配额 = M2/M3。
+    M0 行为 + 注记；CLI 增 `--agent`。
+  - **M2（本批）**：`spec.maxTurns` → 命令恒带 `--max-turns`（loop 侧硬上限：
+    一个 turn = 一次 dispatch 尝试）+ `[USAGE] turns=N` 协议行 → 终态补丁
+    `status.turns`；`cli.py` 按先例拆出 `cli_run.py`。
+  - **M3.1（本批）**：实测 token 计量打通——发现成本对账一直读空值
+    （`MaopResult` 无 `usage` 字段 → M-X3 成本归因的 token 维度全是启发式
+    估算）；`MaopResult.usage` + react_loop 回填 + `LoopResult.tokens_used`/
+    `tokens_source` + `[USAGE]` 行扩展。CLI 驱动路径本身不产出 token
+    （来源标 estimated，不冒充）。
+  - **M3.3（本批）**：用量会计回写 CRD——`status.tokensUsed` /
+    `status.tokensSource`（measured/estimated）+ 协议行解析扩展（legacy
+    `turns=` 行兼容）。
+  - 余量：**M3.2** 配额/多租户（依赖 M3.1 真实值）。
 - M0 验收：mock 链路（MaopTask→子进程→status 回写）测试全绿 ✅；结构对齐
-  哨兵上线 ✅；operator 镜像在 CI 构建成功 —— M0.1 修复后随 master 全矩阵
-  开跑（docker 作业内 operator build-only 腿）。**真集群 kind 验证不进 M0**（外部条件）。
+  哨兵上线 ✅；**operator 镜像在 CI 构建成功 ✅**（2026-10-30，master run
+  `41118378867`：`Build operator image (build-only): success`）。
+  **真集群 kind 验证不进 M0**（外部条件）。
 - 阻碍位置：无外部依赖，纯工程量。已知本地环境干扰：可达其他项目的 kind
   集群时既有集成用例会误连（详见 CHANGELOG 2026-10-30 条目）。
 
 ### M-X1 Agent Marketplace 签名校验（M0 章程）
 
-- 现状：v5.1.0 Skill 市场只做基础导入/导出；社区共享与签名校验仍待排期。
-- M0 范围：sign/verify 工具链（Ed25519，与 MAOS 激活链同构算法）+ 发布与
-  校验入口（CLI 或 API）+ 威胁模型文档。
-- M0 验收：篡改清单 / 缺失签名两方向判红；构建→签名→校验→拒绝四态冒烟。
-- 阻碍位置：**密钥治理**——生产签发流程需与部署侧确认（与 T1.5 phase 2 产物
-  签名同一条治理链，MAOS 侧已有先例可复用）。
+- 现状（2026-10-31 更新）：**M0 已交付（接线式）**——Ed25519 工具链
+  （``core/marketplace/signing.py``，2026-09 起已存在但零接线）接入
+  ``MCPMarketplace`` 安装路径：``verifier``/``key_mgmt``/``require_signature``
+  注入 + 目录条目验签（fail-closed）+ ``MAOP_MARKETPLACE_VERIFY_KEY`` 配置面 +
+  CLI ``--require-signature`` + 威胁模型文档
+  （``docs/marketplace-signing-threat-model.md``）。验收：篡改/缺失签名判红、
+  四态冒烟 = ``test_mcp_marketplace.py::TestSignatureGate``（5 例）✅。
+- 余量：密钥治理呈批（生产签发流程：公钥分发通道 / operator 私钥保管 /
+  轮换吊销 SLA / ``require_signature`` 默认值演进）——**不阻塞 M0 验收**；
+  Skill 包分发面的签名扩展另批。
 
 ### M-X2 多后端编排器适配（Temporal/Airflow，M0 章程）
 

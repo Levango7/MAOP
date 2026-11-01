@@ -9,9 +9,14 @@ M0 边界（章程见 ROADMAP「M-T3.3」）：
 - **M1 已实现**：``spec.agent`` → MaopAgent CR 解析 + agent pinning（``resolver``
   注入；CR 存在 → 命令带 ``--agent``（MaopLoop forced_agent）并置
   ``AgentResolved=True`` 条件；未声明 → M0 行为 + ``False`` 条件注记）。
-  解析到的 maxTurns/model/tools 暂不消费（turn 会计=M2、配额=M3）。
-- **未实现（章程明示顺延）**：真集群 kind 验证；turn 会计（status.turns）与
-  配额/多租户；插件（CRD 标注 planned）。
+- **M2 已实现**：``spec.maxTurns`` → 命令恒带 ``--max-turns``（一个 turn = 一次
+  dispatch 尝试；loop 侧硬上限 + 计数）；子进程 ``[USAGE] turns=N`` 解析回写
+  ``status.turns``。MaopAgent 解析到的 model/tools 仍不消费。
+- **M3.3 已实现**：``[USAGE] ... tokens=M source=S`` 段解析回写
+  ``status.tokensUsed`` / ``status.tokensSource``（measured/estimated；
+  legacy 行兼容）。配额/多租户（M3.2）仍待排。
+- **未实现（章程明示顺延）**：真集群 kind 验证；tokensUsed 与配额/多租户；
+  插件（CRD 标注 planned）。
 
 分层：``spec``/``reconcile`` 是纯函数（无 k8s 依赖）；``controller`` 用注入的
 gateway/runner/resolver（测试用 fake）；``handlers``/``__main__`` 是 kopf 薄层。

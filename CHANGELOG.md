@@ -39,6 +39,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M-T3.3 Operator M3.3 —— 用量会计回写 CRD（tokensUsed / tokensSource，2026-11-01）
+
+M3.1 的 ``[USAGE] turns=N tokens=M source=S`` 协议行闭合到 CRD：
+
+- controller 解析扩展（``_parse_usage`` 三元组；旧版只有 ``turns=`` 的行
+  保持兼容——缺段不写字段）；终态补丁写入 ``status.turns`` /
+  ``status.tokensUsed`` / ``status.tokensSource``（``tokens_used=0`` 是合法
+  观测值，与"缺段"由 None 区分）。
+- ``maoptask.yaml`` status 增 ``tokensSource``（enum: measured/estimated，
+  机器对齐哨兵同步）；CLI 驱动路径来源为 estimated——**估算值不伪装成实测**。
+- 测试：``test_operator_m3.py`` 9 例（协议行三形态 / 终态补丁三态 /
+  controller 端到端 measured 与 legacy 两路 / CRD 对齐哨兵）。
+
+### M-T3.3 Operator M3.1 —— 实测 token 计量打通（2026-11-01）
+
+侦察发现成本对账一直在读空值：``MaopResult`` 没有 ``usage`` 字段，
+``_budget_reconciliation`` 的 ``getattr(exec_result, "usage", None)`` 永远得
+``None``——**M-X3 已合的成本归因，token 维度全部是启发式估算值**（provider
+明明已解析真实 usage：OpenAI ``prompt_tokens``/Anthropic ``input_tokens``，
+却在 react_loop 转 ``MaopResult`` 处被丢弃）。本批打通真实值通道：
+
+- ``MaopResult`` 增 ``usage`` 字段（measured prompt/completion/total；
+  ``None`` = CLI 子进程路径不产出 token）；``new_result()`` 透传。
+- ``react_loop`` LLM 直连路径回填实测 usage（丢弃点修复）；
+  ``_budget_reconciliation`` 的真实值分支随之生效——usage 存在时记录真实
+  token、不再落启发式、不再告警 UNKNOWN（该函数零改动，字段接线即通）。
+- loop 累计：``LoopResult.tokens_used``（实测和）+ ``tokens_source``
+  （measured/estimated）；``[USAGE]`` 行扩展为
+  ``turns=N tokens=M source=S``（operator 既有 ``turns=`` regex 兼容）。
+- 边界（诚实登记）：CLI 驱动路径（claude/codex 等外部 CLI）本身不产出
+  token——该路径继续估算（来源标 estimated），不冒充实测；配额多租
+  （M3.2）依赖本批真实值；operator ``status.tokensUsed`` 回写 = M3.3。
+
+### M-X1 Marketplace 签名 M0 —— Ed25519 验签接入安装路径（2026-10-31）
+
+``core/marketplace/signing.py``（Ed25519 工具链，2026-09 起功能完整但零接线、
+在 ``check_wiring`` ``KNOWN_UNWIRED`` 在册）自本批起接入运行时：
+
+- ``MCPMarketplace`` 增 ``verifier`` / ``key_mgmt`` / ``require_signature`` 注入；
+  安装路径对携带 ``signature_hex`` 的目录条目验签——签名覆盖注册表发布的
+  **原始条目 dict**（canonical JSON；narrowed model 会丢未知键，故安装链保留
+  raw entry），任何失败 fail-closed 拒绝安装；轮换/黑名单多钥路径经
+  ``key_mgmt=KeyManagement(...)`` 注入启用（``verify_with_key_management``，
+  ``signer_key_id`` 作 tool_id）。
+- 公钥经 ``MAOP_MARKETPLACE_VERIFY_KEY``（settings 助手
+  ``marketplace_verify_key_path()``）配置，CLI 与 plugin_service 两个构造点
+  均接线；CLI ``maop mcp marketplace install --require-signature`` 强制
+  缺失即拒。
+- ``check_wiring``：signing 销账（已接线）；key_management 更新为"可选注入
+  路径已备、完整密钥治理仍待排期"。威胁模型见
+  ``docs/marketplace-signing-threat-model.md``。
+- ``cli.py`` 按先例拆出 ``cli_mcp_marketplace.py``（``mcp marketplace`` 子命令
+  族；cli.py 810 → 694，远离 800 门禁线）。
+- 边界（诚实登记）：未注入 verifier 的部署信任模型不变（checksum + trusted）；
+  生产签发流程（密钥治理呈批）不阻塞 M0。
+
+### M-T3.3 Operator M2 —— turn 预算透传 + status.turns 会计（2026-10-30）
+
+``spec.maxTurns`` 从"校验透传"变为真正生效：
+
+- **loop**：``MaopLoop.run(max_turns=)`` 新增；一个 turn = 一次
+  ``dispatcher.dispatch`` 尝试（含重试迭代与并行子任务），预算耗尽即停止派发
+  （原样返回最后一个结果，或合成失败 ``turn budget exhausted``）；消耗计数经
+  ``LoopResult.turns`` 返回。``None`` = 不设上限（既有行为逐字节不变）。
+- **CLI**：``maop run --max-turns N``（0 = 不限）+ 稳定协议行
+  ``[USAGE] turns=N``（与 ``[TRACE]`` 同款单行，成功/失败都打印）。
+  ``cli.py`` 按 ``cli_evolution`` 先例拆出 ``cli_run.py``（``cmd_run`` 迁移；
+  门面 re-export 保持 ``maop.cli.cmd_run`` 的 patch 面不变）——cli.py 曾在
+  file-size 800 线（M1 时 803 → 压缩回 799），此次净减。
+- **operator**：命令恒带 ``--max-turns <spec.maxTurns>``；终态补丁解析
+  ``[USAGE] turns=N`` 写入 ``status.turns``（缺行不写——与未打该行的旧版
+  ``maop run`` 前向兼容）。
+- 边界：tokensUsed 与配额/多租户 = M3。
+
 ### M-T3.3 Operator M1 —— MaopAgent CR 解析 + agent pinning（2026-10-30）
 
 ``spec.agent`` 从"校验透传"变为真正参与执行路由：
@@ -72,6 +146,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 `test_operator_dockerfile_build_invariants` 静态钉住两条不变量（COPY config/
 且早于 pip install /app/py；useradd 带 --gid）——PR 上 docker 腿不跑
 （`if: push && (main||master)`），静态守卫是 PR 期唯一防线。
+
+**CI 首验（2026-10-30）：master run `41118378867` 全绿 —— `Build operator
+image (build-only): success`** —— M0 验收「operator 镜像在 CI 构建成功」落定。
 
 ### CI 串行腿的可观测性加固（2026-10-31）
 

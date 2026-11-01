@@ -678,6 +678,11 @@ class PhasesMixin:
             analysis=ctx.analysis_dict,
             parallel_executed=ctx.parallel_executed,
             block_reason=ctx.block_reason,
+            turns=int(getattr(self, "_turns_used", 0)),
+            tokens_used=int(getattr(self, "_tokens_used_measured", 0)),
+            tokens_source=(
+                "measured" if int(getattr(self, "_tokens_used_measured", 0)) > 0 else "estimated"
+            ),
         )
 
     # ── Phase implementations ─────────────────────────────

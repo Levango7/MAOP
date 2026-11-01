@@ -31,6 +31,20 @@ class ExecuteMixin:
     _loop_config: Any
     _log: Any
 
+    # M2: turn 预算（一个 turn = 一次 dispatcher.dispatch 尝试）。
+    # 类属性给缺省值；MaopLoop.run() 每次运行重置为实例属性。
+    _max_turns: int | None = None
+    _turns_used: int = 0
+    # M3.1: 实测 token 累计（仅 usage 非空的 LLM 直连结果计入；CLI 路径 usage
+    # 为 None 不计入——估算值由 cost_tracker 按 dispatch 单独记录，不冒充实测）。
+    _tokens_used_measured: int = 0
+
+    def _turn_budget_remaining(self) -> int | None:
+        """剩余 turn 预算；未设上限（``None``）时返回 ``None``（不限制）。"""
+        if self._max_turns is None:
+            return None
+        return self._max_turns - self._turns_used
+
     @staticmethod
     def _should_execute_parallel(analysis, worker_pool):
         """NOTE: mirrors PhasesMixin._should_execute_parallel in maop_loop_phases.py.
@@ -321,6 +335,24 @@ class ExecuteMixin:
                 if iteration > 0:
                     await asyncio.sleep(backoff_ms / 1000)
 
+                # M2: turn 预算——预算耗尽即停止派发，以最后一个结果（或一个
+                # 合成失败）返回，交由既有收尾路径处理（不改变历史行为：
+                # 未设上限时该分支永不触发）。
+                remaining = self._turn_budget_remaining()
+                if remaining is not None and remaining <= 0:
+                    logger.info(
+                        "[loop-executor] turn budget exhausted (max_turns=%s) — stop dispatching",
+                        self._max_turns,
+                    )
+                    if result is None:
+                        result = new_result(
+                            agent=agent, task=task, exit_code=1,
+                            error=f"turn budget exhausted (max_turns={self._max_turns})",
+                            trace_id=trace_id,
+                        )
+                    return cast(MaopResult | None, result)
+                self._turns_used += 1
+
                 try:
                     dispatch_result = await self._dispatcher.dispatch(
                         agent=agent, task=task,
@@ -329,6 +361,13 @@ class ExecuteMixin:
                         dry_run=dry_run,
                     )
                     result = dispatch_result.result
+
+                    # M3.1: 累计实测 token（usage=None 的 CLI 路径不计入）。
+                    usage = getattr(result, "usage", None)
+                    if isinstance(usage, dict):
+                        self._tokens_used_measured += int(
+                            usage.get("total_tokens", 0) or 0
+                        )
 
                     if result.is_success():
                         return cast(MaopResult | None, result)

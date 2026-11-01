@@ -277,15 +277,73 @@
   ② `useradd --gid operator`（基镜像 Debian slim 自带 `operator` 组 GID 37，
   裸 useradd 同名组冲突 exit 9）。**均由本地复刻 CI 构建逮到（未等 master 红）**；
   守卫测试 `test_operator_dockerfile_build_invariants`。
-- **验证现状**：其 code 合并的 master run 正跑 docker 作业 —— operator
-  build-only 腿**首次真实 CI 构建**（此前 PR 上 skip、master 首跑 41097523007
-  被 cancel-in-progress 顶掉）。
-- **M1 进行中（2026-10-30 晚）**：MaopAgent CR 解析 + agent pinning ——
-  `spec.agent` 真正参与路由：CR 存在 → 命令带 `--agent`（MaopLoop forced_agent/
-  F6a）+ `AgentResolved=True` 条件；未声明 → M0 行为 + `False` 注记；CLI 增
-  `--agent`。裁决记录：maxTurns/turns 会计=M2、配额多租=M3（解析字段暂不消费）。
-  分支 `feat/operator-m1-agent-resolution`；守卫/测试 `test_operator_m1.py` 10 例
-  + cli 传递 + CR 坐标与 CRD 机器对齐哨兵。
+- **✅ M0 验收落定（2026-10-31）**：master run `41118378867`（#188 合并后）全绿
+  —— `Build operator image (build-only): success`（此前 PR 上 skip、master 首跑
+  41097523007 被 cancel-in-progress 顶掉）。
+- **✅ M1 已合并（PR #189 → master `66de7773`）**：MaopAgent CR 解析 + agent
+  pinning（`spec.agent` 真正参与路由：CR 存在 → `--agent`（F6a forced_agent）+
+  `AgentResolved` 条件；未声明 → M0 行为 + 注记；CLI 增 `--agent`）。
+  插曲：首跑 docs-gate 红 = file-size（cli.py 803>800）——压缩 M1 注释回 799。
+- **M2（PR #190，堆叠于 M1）**：`spec.maxTurns` → 命令恒带 `--max-turns`
+  （loop 侧硬上限：一个 turn = 一次 dispatch 尝试；耗尽即停派发）+ `[USAGE]
+  turns=N` 协议行 → 终态补丁 `status.turns`；`cli.py` 按 `cli_evolution` 先例
+  拆出 `cli_run.py`（净减行数，远离 800 线）。裁决记录：tokensUsed/配额多租
+  = M3。
+
+## 领地登记（ZCode session_f62ccbe…，2026-10-31 第八轮：MAOS 协调收尾 + M-X1/M-X2 立项）
+
+- **MAOS 协调收尾（用户已授权 MAOS 侧改动+重签）**：三域核实后实现 n8n 边界
+  建模（MAOS PR #26，529 全绿 + 清单重签）并开出；**期间棘轮线 #187 已把
+  14 条全部收口**（`routers/{sso,n8n,licenses}_schemas.py` 镜像建模 +
+  reconciliation 契约测试，allowlist 14→0，#191 登记）——其 `n8n_schemas`
+  明言「本仓无权收窄」n8n API 键集合，与本 PR 的边界强校验冲突 → **遵从
+  已落地裁决撤回 MAOS #26**（分支/worktree 已清，master 清单未动）。
+  核实结论仍有效：licenses/sso 域无需 MAOS 改动；n8n 类型化由 MAOP router
+  层承担。MAOS 仓板面已留撤回记录。
+- **M-X1 Marketplace 签名（用户授权立项）**：按 #177 章程推进 M0——Ed25519
+  sign/verify 工具链 + 发布/校验入口 + 威胁模型文档；**密钥治理前置路线**：
+  先以 dev/test key 落工具链与四态冒烟（构建→签名→校验→拒绝），生产签发
+  流程单独呈批、不阻塞 M0。
+- **M-X1 M0 交付（2026-10-31，接线式）**：核实时发现 Ed25519 工具链
+  （`core/marketplace/signing.py` + `key_management.py`）2026-09 起已存在且
+  测试全绿、但零运行时导入（KNOWN_UNWIRED 在册）——M0 真工作=接线：
+  `MCPMarketplace(verifier/key_mgmt/require_signature)` + 安装路径对原始目录
+  条目验签（fail-closed）+ `MAOP_MARKETPLACE_VERIFY_KEY` 配置面（settings
+  助手）+ CLI `--require-signature` + 两个运行时构造点（cli/plugin_service）
+  接线 + 威胁模型 `docs/marketplace-signing-threat-model.md`。顺带按先例拆出
+  `cli_mcp_marketplace.py`（cli.py 810→694）。分支
+  `feat/mx1-marketplace-signing-m0`。
+- **M-X2 Temporal（用户授权立项，前置 M0 路线）**：adapter 接口先行 + demo
+  workflow（3 节点）在 Temporal dev server 跑通一次；企业侧生产运行时供给
+  未定不阻塞 M0（只证明编译与连通）。开工前另行登记分支。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-01 第九轮：M-T3.3 M3.1 实测 token 计量）
+
+- **进行中**：成本对账真实值通道——侦察发现 `MaopResult` 无 `usage` 字段，
+  `_budget_reconciliation` 永远读 `None`（**M-X3 成本归因的 token 维度全部是
+  启发式估算**，provider 侧明明已解析真实 usage 却在 react_loop 转
+  `MaopResult` 处丢弃）。本批：`MaopResult.usage` + react_loop 回填 +
+  `LoopResult.tokens_used`/`tokens_source` + `[USAGE]` 行扩展
+  （`turns=N tokens=M source=S`）。领地=``core/reliability/error_schema.py``、
+  ``core/agent/llm_chat/react_loop.py``、``loop_executor.py``、``loop_models.py``、
+  ``maop_loop.py``、``maop_loop_phases.py``（``_build_loop_result``）、
+  ``cli_run.py``、``tests/test_turn_budget.py``。分支
+  `feat/operator-m3-tokens-used`。
+- **裁决记录**：CLI 驱动路径（claude/codex 等外部 CLI）本身不产出 token——
+  来源标 `estimated`，不冒充实测；配额多租（M3.2）依赖真实值；operator
+  `status.tokensUsed` 回写 = M3.3。
+- **不碰**：他线的 cost_attribution schemas 面（M-X3 领地）、前端面。
+- **⚠️ 全仓通报（2026-11-01）**：runner 镜像夜间滚动后，Playwright **浏览器
+  缓存错配**（旧镜像构建的 webkit-2370 在新镜像启动即
+  `libicudata.so.74: cannot open shared object file`）——**所有分支的
+  Playwright E2E 腿都会 37/37 全灭于 `browserType.launch`**（与本批 Python
+  改动无关；他线 `test/adapter-consistency` 同症）。**修复已合并**（PR #198 →
+  master `24fe010f`：缓存键加入 runner 镜像版本 + restore-keys 收紧）——
+  自该提交起 E2E 恢复；更早的 E2E 红均可归因到本通报。
+- **M3.3 进行中（2026-11-01）**：用量会计回写 CRD——`_parse_usage` 三元组
+  （legacy `turns=` 行兼容）+ 终态补丁 `status.tokensUsed`/`status.tokensSource`
+  + CRD status 增 `tokensSource`（enum measured/estimated）+ 机器对齐哨兵。
+  分支 `feat/operator-m3-3-tokens-used-status`。
 - **不碰**：`deploy/k8s/operator/` 既有 Chart/CRD（只加 Dockerfile）；
   他线的宽口径异常收窄批与前端面。
 - **已知环境干扰**：本机可达 FlintSpark k4 e2e 的 kind 集群时，既有
