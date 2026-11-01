@@ -7,13 +7,17 @@
 3. （M1）``resolver`` 注入时解析 ``spec.agent`` 的 MaopAgent CR —— 存在即
    pin（命令带 ``--agent``，``AgentResolved=True`` 条件）；未声明则按 M0
    行为不 pin（``AgentResolved=False`` 条件），两者都继续执行；
-4. 否则补丁 Running（``plan_launch``）→ runner 执行 ``command_for(spec)``
+4. （M3.2）``quota_checker`` 注入时过配额门 —— 拒绝则终态 ``QuotaExceeded``
+   （不拉起子进程）；社区版不注入配额门 = 行为不变；
+5. 否则补丁 Running（``plan_launch``）→ runner 执行 ``command_for(spec)``
    （M2：恒带任务级 ``--max-turns``）→ 按结果补丁终态（``plan_finish``；
    M2/M3.3：解析 ``[USAGE] turns=N [tokens=M] [source=S]`` 写入
    ``status.turns`` / ``status.tokensUsed`` / ``status.tokensSource``——
-   旧版只有 ``turns=`` 的行同样兼容）；任务被取消 → Cancelled 后原样上抛。
+   旧版只有 ``turns=`` 的行同样兼容；M3.2：注入配额门时回报用量）；
+   任务被取消 → Cancelled 后原样上抛。
 
-gateway/runner/resolver 全部构造注入 —— 测试用 fake 驱动全链路，不需要 k8s。
+gateway/runner/resolver/quota_checker 全部构造注入 —— 测试用 fake 驱动
+全链路，不需要 k8s。
 """
 
 from __future__ import annotations
@@ -23,9 +27,25 @@ import logging
 import re
 from typing import Any
 
-from maop.operator.gateway import AgentResolver, RunOutcome, StatusGateway, SubprocessRunner
-from maop.operator.reconcile import is_terminal, plan_finish, plan_launch
-from maop.operator.spec import InvalidSpecError, command_for, parse_task_spec
+from maop.operator.gateway import (
+    AgentResolver,
+    QuotaChecker,
+    RunOutcome,
+    StatusGateway,
+    SubprocessRunner,
+)
+from maop.operator.reconcile import (
+    is_terminal,
+    plan_finish,
+    plan_launch,
+    plan_quota_exceeded,
+)
+from maop.operator.spec import (
+    InvalidSpecError,
+    MaopTaskSpec,
+    command_for,
+    parse_task_spec,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +79,13 @@ class OperatorController:
         gateway: StatusGateway,
         runner: SubprocessRunner,
         resolver: AgentResolver | None = None,
+        quota_checker: QuotaChecker | None = None,
         timeout_s: float | None = None,
     ) -> None:
         self._gateway = gateway
         self._runner = runner
         self._resolver = resolver
+        self._quota_checker = quota_checker
         self._timeout_s = timeout_s
 
     async def handle_task(
@@ -96,7 +118,22 @@ class OperatorController:
             ) is not None
         pin = agent_resolved is True
 
-        # 4. Running + 拉起。
+        # 4. M3.2: 配额门（注入才生效）——拒绝则终态 QuotaExceeded，不拉起。
+        if self._quota_checker is not None:
+            allowed, reason = await self._quota_checker.check_quota(
+                tenant=spec.tenant, max_turns=spec.max_turns, prompt=spec.prompt
+            )
+            if not allowed:
+                logger.info(
+                    "[operator] %s/%s quota denied: %s", namespace, name, reason
+                )
+                await self._patch(
+                    name, namespace,
+                    plan_quota_exceeded(tenant=spec.tenant, reason=reason),
+                )
+                return {"phase": "QuotaExceeded", "launched": False, "reason": reason}
+
+        # 5. Running + 拉起。
         await self._patch(
             name, namespace, plan_launch(agent=spec.agent, agent_resolved=agent_resolved)
         )
@@ -113,10 +150,10 @@ class OperatorController:
         except asyncio.CancelledError:
             await self._patch(name, namespace, plan_finish(cancelled=True))
             raise
-        return await self._finalize(name, namespace, outcome)
+        return await self._finalize(name, namespace, outcome, spec)
 
     async def _finalize(
-        self, name: str, namespace: str, outcome: RunOutcome
+        self, name: str, namespace: str, outcome: RunOutcome, spec: MaopTaskSpec
     ) -> dict[str, Any]:
         turns, tokens_used, tokens_source = _parse_usage(outcome.stdout_tail)
         finish = plan_finish(
@@ -127,6 +164,14 @@ class OperatorController:
             tokens_used=tokens_used,
             tokens_source=tokens_source,
         )
+
+        # M3.2: 用量回报（注入配额门时）——缺协议行（旧版 maop run）则不回报。
+        if self._quota_checker is not None and turns is not None:
+            await self._quota_checker.record_usage(
+                tenant=spec.tenant,
+                turns=turns,
+                tokens_used=tokens_used or 0,
+            )
         await self._patch(name, namespace, finish)
         logger.info(
             "[operator] %s/%s finished: phase=%s exit=%s timed_out=%s",

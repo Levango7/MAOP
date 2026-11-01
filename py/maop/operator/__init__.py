@@ -14,7 +14,11 @@ M0 边界（章程见 ROADMAP「M-T3.3」）：
   ``status.turns``。MaopAgent 解析到的 model/tools 仍不消费。
 - **M3.3 已实现**：``[USAGE] ... tokens=M source=S`` 段解析回写
   ``status.tokensUsed`` / ``status.tokensSource``（measured/estimated；
-  legacy 行兼容）。配额/多租户（M3.2）仍待排。
+  legacy 行兼容）。
+- **M3.2 已实现（收官）**：配额门接线——``QuotaChecker`` 注入（拉起前
+  ``check_quota`` / 终态后 ``record_usage``），拒绝则终态
+  ``QuotaExceeded`` 且不拉起。**社区版只提供机制**：真实多租户配额
+  策略在 MAOS 企业版配额域（跨仓，ADR-016/017）。
 - **未实现（章程明示顺延）**：真集群 kind 验证；tokensUsed 与配额/多租户；
   插件（CRD 标注 planned）。
 

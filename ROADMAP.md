@@ -418,7 +418,13 @@
   - **M3.3（本批）**：用量会计回写 CRD——`status.tokensUsed` /
     `status.tokensSource`（measured/estimated）+ 协议行解析扩展（legacy
     `turns=` 行兼容）。
-  - 余量：**M3.2** 配额/多租户（依赖 M3.1 真实值）。
+  - **M3.2（收官刀）**：配额门接线——``QuotaChecker`` 注入（拉起前询问/
+    终态后回报用量），拒绝则终态 ``QuotaExceeded``（CRD enum 预留）。
+    **社区版只提供机制**：真实多租户配额策略在 MAOS 企业版配额域
+    （``maop/enterprise/quota.py``，ADR-016/017 跨仓，待与持私钥会话
+    协调的下一步）。
+  - ~~配额/多租户~~ → **M-T3.3 社区侧至此收官**（M0/M0.1/M1/M2/M3.1/
+    M3.2/M3.3 全落地；kind 真集群验证为外部条件）。
 - M0 验收：mock 链路（MaopTask→子进程→status 回写）测试全绿 ✅；结构对齐
   哨兵上线 ✅；**operator 镜像在 CI 构建成功 ✅**（2026-10-30，master run
   `41118378867`：`Build operator image (build-only): success`）。
