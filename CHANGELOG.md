@@ -39,6 +39,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### M-X2 多后端编排器 —— Temporal M0（adapter 接口先行 + dev server 实跑验收，2026-11-01）
+
+章程（ROADMAP「M-X2 多后端编排器适配」）M0 全兑现：**adapter 接口先行
+定义 + demo workflow（3 节点）在 Temporal dev server 上跑通一次**。
+不承诺生产集成（企业侧运行时供给未定，章程明示）：
+
+- ``maop/orchestration/base.py``：后端无关 ``OrchestrationAdapter`` 协议 +
+  编译产物形状（``CompiledWorkflow``：nodes/levels/artifact）+ 共享 DAG
+  预处理（``plan_levels`` 拓扑分层，与 ``engine_utils`` 同契约——steps 按
+  索引串寻址）。**编译期失败优于运行期失败**：环 / 未知依赖 /
+  ``condition`` 字段（条件执行语义 = M0 明示边界，宁拒不昧）三种形态在
+  编译期即拒绝。
+- ``maop/orchestration/temporal_adapter.py``：``WorkflowDef`` DAG → Temporal
+  workflow 定义编译。``artifact`` 是可审阅的静态展开**定义文本**（ast
+  语法哨兵）；运行体是**数据驱动的通用 workflow**（``MaopDagWorkflow``，
+  DAG 结构作为入参 payload）——真 temporalio 拒绝本地类上的
+  ``@workflow.run``（dev server 实证），动态构造类属注入面（Mimosa 高危
+  实拦），故不按名字生成类、不 exec 文本。temporalio 为可选依赖（同
+  kopf/kubernetes 先例，不进 pyproject）：定义面用恒等占位兜底（缺席可
+  import/可测），``run`` 入口真检 + 带安装指引的报错。不读环境变量
+  （config-drift 棘轮零增量）；节点执行体经 ``executor`` 注入。
+- ``scripts/temporal_m0_demo.py``：验收 demo（3 节点 DAG：规划 → 分支
+  A∥B 同层并行）。**真连通实证**：Temporal CLI 1.9.1（Server 1.32.0）
+  dev server，``levels=2``，三节点全部 ``success``，退出码 0。
+- 测试 15 例（base 纯逻辑 + adapter stub 编译/缺包指引），ruff/mypy 绿；
+  ``maop.orchestration.temporal_adapter`` 按"先行定义"口径登记
+  KNOWN_ORPHANS（消费接线 = 生产集成里程碑）。
+
 ### M-T3.3 Operator —— kind 真集群验证（七缺陷实证修复，2026-11-01）
 
 **M0 章程的"真集群 kind 验证为外部条件"就此解除**：本地 kind v0.31 +
