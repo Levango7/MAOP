@@ -87,10 +87,39 @@
   从企业生产签名私钥（``F:/Keys/maos/``，仅导出**公钥半**）提取的 Ed25519
   验签公钥，随产品分发（wheel 经既有 ``COPY config/`` 资产链进入构建）。
   部署侧 ``MAOP_MARKETPLACE_VERIFY_KEY`` 可指向该文件启用 fail-closed 验签。
-- **待落地（触发条件未齐，非阻塞）**：D1 的首次**目录签名**（待生产
-  marketplace 目录就位）；D2③ HTTPS 拉取通道（M1）；D3 的 7 天双钥宽限
-  try 顺序验签（M1 小扩展）；D4 步骤 2 切默认（三个触发条件齐备后一个
-  minor 版本）。
+- **已落地（2026-11-03，D1 首签——触发条件①满足）**：
+  ``py/scripts/sign_marketplace_catalog.py``（签名管线，合同与消费侧
+  ``_verify_catalog_signature`` 严格镜像，fail-closed 自验证）+
+  ``deploy/marketplace/``（catalog.json 源 + **catalog.signed.json 首签
+  工件**，`marketplace-prod` 键 3 条目 3/3 签发+自验证；消费侧
+  ``MCPMarketplace(require_signature=True)`` 独立验证 3/3 OK）。
+  证据与复签配方见 ``deploy/marketplace/README.md``。
+- **D4 切默认备批（条件③=发布窗口到了即落）**：三触发现状——①签名方
+  存在 ✅（本次首签）②公钥内置 ✅ ③存量安装带钥升级 = 随下一次 minor
+  发布。切默认的精确改动（随该发布同批落地，勿提前合入 master）：
+
+  ```diff
+  --- a/py/maop/cli_mcp_marketplace.py
+  +++ b/py/maop/cli_mcp_marketplace.py
+  @@  install 子命令参数默认值
+  -    parser.add_argument("--require-signature", action="store_true",
+  -                        help="Verify Ed25519 signature before install (M-X1)")
+  +    parser.add_argument("--require-signature", dest="require_signature",
+  +                        action="store_true", default=True,
+  +                        help="Verify Ed25519 signature before install "
+  +                        "(D4 step 2: default ON; opt out with "
+  +                        "--no-require-signature)")
+  +    parser.add_argument("--no-require-signature", dest="require_signature",
+  +                        action="store_false",
+  +                        help="Opt out of signature verification "
+  +                        "(enterprise internal registries)")
+  ```
+
+  （同批更新 ``test_mcp_marketplace.py`` 的默认值断言与观测面 warn——
+  D4 步骤 3 的安装计数埋点随后续批次。）
+- **待落地（非阻塞）**：D2③ HTTPS 拉取通道（M1）；D3 的 7 天双钥宽限
+  try 顺序验签（M1 小扩展）；D4 步骤 2 随发布切默认（见上）；npm 两条目
+  的版本钉死 + checksum 补齐（见 deploy/marketplace/README.md 边界）。
 
 ## 批准记录
 

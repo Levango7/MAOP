@@ -1,0 +1,63 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: temporal-light-root
+      MYSQL_USER: temporal
+      MYSQL_PASSWORD: temporal-light
+      MYSQL_DATABASE: temporal
+    volumes:
+      # 持久化（E1-a 轻生产与 dev server 的核心差异：重启存活）
+      - temporal-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-utemporal", "-ptemporal-light"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mysql-setup:
+    # 一次性授权：auto-setup 需要 temporal + temporal_visibility 两库
+    image: mysql:8.0
+    depends_on:
+      mysql:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "until mysql -h mysql -uroot -ptemporal-light-root -e 'SELECT 1' >/dev/null 2>&1; do sleep 2; done;
+      mysql -h mysql -uroot -ptemporal-light-root -e \"
+      CREATE DATABASE IF NOT EXISTS temporal_visibility;
+      GRANT ALL PRIVILEGES ON temporal.* TO 'temporal'@'%';
+      GRANT ALL PRIVILEGES ON temporal_visibility.* TO 'temporal'@'%';\""
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    depends_on:
+      mysql-setup:
+        condition: service_completed_successfully
+    environment:
+      DB: mysql8
+      DB_PORT: "3306"
+      MYSQL_SEEDS: mysql
+      MYSQL_USER: temporal
+      MYSQL_PWD: temporal-light
+      MYSQL_DB: temporal
+    ports:
+      - "7233:7233"
+    healthcheck:
+      # server 绑定容器 IP（非 loopback）——healthcheck 经服务名寻址
+      test: ["CMD", "sh", "-c", "TEMPORAL_ADDRESS=temporal:7233 temporal operator namespace describe -n default"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    depends_on:
+      temporal:
+        condition: service_healthy
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - "8088:8080"
+
+volumes:
+  temporal-mysql:

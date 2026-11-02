@@ -503,3 +503,21 @@
   `dashboard-enterprise/src/i18n/view-licenses.js`（这三个文件此前由本会话 #187 批
   登记过，仍在同一口径内）。**不碰** `nav.js` / `router/index.js`（通知门控批
   PR #204 的领地）。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-03 第十四轮：条件触发项清账批——用户批准执行序）
+
+- **用户批准四批执行序**（M-X1 签名管线+首签 → E1 本机轻生产 → MAOS T1.6
+  签发脚本+拓扑扩展 → D4 切默认备批）。本轮认领 MAOP 侧批 1/2/4：
+- **批 1（M-X1 首签）领地**：``py/scripts/sign_marketplace_catalog.py``
+  （新建）、``deploy/marketplace/``（新建：catalog.json 源 +
+  catalog.signed.json 首签工件 + README 格式/复签配方）、
+  ``docs/marketplace-signing-key-governance.md``（实施记录回写）。
+  签名合同镜像 ``core/mcp/mcp_marketplace._verify_catalog_signature``
+  （entry 去 signature_hex 的 canonical JSON，Ed25519）。
+- **批 2（E1 轻生产）领地**：``deploy/temporal-light/``（新建：
+  compose + README 配方 + 实跑证据）。
+- **批 4（D4 切默认备批）**：不挂孤儿分支——把切默认的精确 diff 写进
+  governance 文档实施记录，随发布窗口落地（避免搁置分支债）。
+- **批 3（MAOS 侧）**：MAOS 板面另行登记（T1.6 激活 token 签发脚本 +
+  staging 拓扑扩展，独立 worktree）。
+- **不碰**：他线在途 PR 领地；MAOS 主工作树（SAML 线活跃）。
