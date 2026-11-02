@@ -454,3 +454,33 @@
   均已在该文档「实施记录」节列明，非阻塞。
 - **领地**：上列呈批件 + config 公钥文件 + ROADMAP M-X1 段。
 - **不碰**：MAOS 侧清单签名域（无改动）；他线领地照旧。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-01 第十三轮：E 批准落地——M-X2 生产接线第一批 E2-a/E3-a）
+
+- **用户已批 E 决策包（E1-a+E2-a+E3-a+E4-a 按推荐）**，本轮认领 E2-a 领地。
+- **冲突排查记录**：master 无新动静；开放 PR（#204/#196/#195/#180/dependabot×2）
+  逐一核对改动文件，与本批零交集；**避开 CommandCodeBot 历史领地**
+  （`py/maop/core/scheduling|reliability|engine_utils.py`，板面第 94 行）——
+  本批**不碰 engine.py / maop_plan.py**（侦察实证：execute_workflow 是
+  纯规划合同"不执行任何 agent"且零生产调用方，maop_execute 在册孤儿；
+  故生产接线落点=新建入口而非内嵌旧路径）。
+- **认领领地**：``py/maop/orchestration/wiring.py``（新建）、
+  ``py/maop/cli_workflow.py``（新建）+ cli.py 仅加 2-3 行子命令注册
+  （当前 694 行，余量充足）、``py/maop/config/settings.py``（env 助手，
+  M-X1 同款模式）、``.env.example``（MAOP_ORCHESTRATION_BACKEND 登记）、
+  ``config/agents.yaml``（追加 m0-demo 验收 workflow，纯增量）、
+  ``py/tests/test_orchestration_wiring.py``（新建）、
+  ``py/tests/test_dead_wiring_inventory.py``（销 temporal_adapter 条目）。
+- **不碰**：engine.py / maop_plan.py / maop_execute.py / core/scheduling /
+  core/reliability / engine_utils / dashboard 前端 / 他线在途分支。
+
+- **E2-a/E3-a 已完成并验收（同轮补记）**：``MAOP_ORCHESTRATION_BACKEND``
+  flag（settings 收敛 + .env.example 登记）+ ``wiring.run_workflow``
+  生产入口 + ``maop workflow run`` CLI（cli.py +5 行，639 行）+
+  ``m0-demo`` 验收样例入 config/agents.yaml + KNOWN_ORPHANS 销
+  temporal_adapter 条目。**真机双验**：flag 开=经生产入口 3 节点真 codex
+  子进程全 success（completed 3/3，exit 0）；flag 关=exit 0 且
+  planned=3/completed=0（legacy 规划合同如实呈现）。测试 11 例全绿。
+  **宿主机新坑**：主树 editable 安装的 ``maop`` console script 对
+  ``run`` 子命令静默 exit 1（``maop health`` 却正常）；``python -m maop``
+  同机同参正常——wiring 执行体因此走 ``sys.executable -m maop``。
