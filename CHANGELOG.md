@@ -46,14 +46,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   端点全部不存在；但侧边栏仍无条件给出 `/notifications` 与 `/notifications/config`
   两个入口，点进去必然 404。
 - **口径（A）**：明确把通知中心画成企业版能力。后端不改行为（导入即门控），只让 UI
-  的承诺与实现一致：两个导航项加 `enterprise: true`（个人版由 `filterNavByEdition`
-  隐藏），两条路由加 `meta.requiresEnterprise`（深链由既有守卫送回 `/home`）。
-- **守卫**：`nav-coverage.test.js` 新增「导航 enterprise 标记 ⇔ 路由
-  requiresEnterprise」双向一致性用例，防止以后只改一边。
+  的承诺与实现一致：个人版不再给出这两个入口，深链送回 `/home`。
+- **收件箱不按 edition 判断**：`/api/info/edition` 是 admin-only，企业版安装上的普通
+  用户拿 403 后按安全默认回落 `personal`；而收件箱的读端点（list / unread-count /
+  preferences）本来就对任何已登录用户开放（见 `routers/notifications.py` 的 docstring）。
+  凭 edition 判断会把这类用户本来能用的入口也藏掉。所以收件箱改用**能力探针**：App 启动
+  与进入页面各探一次 `GET /api/notifications/unread-count`（结果在 store 缓存，只发一次），
+  404 判"引擎没装"，401/403 保持未知并下次再探，5xx 说明端点已注册算可用。判定不可用时
+  收件箱不再发 `/list`，直接说明需要企业版——与 Integrations / AlertRules 同款处理。
+- **配置页继续按 edition 门禁**：channels/rules/templates 的端点全部 `require_admin`，
+  普通用户进去也只会 403，隐藏符合实际。
+- **守卫**：`nav-coverage.test.js` 钉住「导航 `enterprise:true` ⇔ 路由
+  `requiresEnterprise`」「导航 `capability` ⇔ 路由 `requiresCapability`」双向一致；
+  `router.test.js` 覆盖守卫的三条路径（未知放行 / 判死挡回 / 可用放行）；
+  `stores.test.js` 钉探针的四种状态码语义与"只发一次"缓存。
 - **未选 B**：不把 `NotificationManager`/`EventBus` 从 MAOS 搬进 MAOP——跨 ADR-017
   双仓边界、授权资产进开放核、MAOS 完整性清单需重签，爆炸半径远大于收益。
-- **已知口径代价**：`/api/info/edition` 是 admin-only，非 admin 用户在企业版安装上按
-  安全默认回落 personal，因而也看不到入口——与 Integrations / AlertRules 的门控一致。
 
 ### M-X2 生产接线 E2-a（Temporal 后端 flag 化接入 + workflow CLI，2026-11-01）
 

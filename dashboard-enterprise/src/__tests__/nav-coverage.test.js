@@ -124,36 +124,43 @@ describe('nav coverage', () => {
   });
 
   /**
-   * 企业版标记必须两边同步：只标导航会让个人版"看得到入口、点进去被踢回"，
-   * 只标路由会让企业版"手输 URL 能进、侧边栏却找不到"。
-   * 通知中心（/notifications 与 /notifications/config）是这条规则的实例：
-   * 后端整块在商业 overlay 里，个人版端点不存在。
+   * 门禁标记必须两边同步：只标导航会让用户"看得到入口、点进去被踢回"，
+   * 只标路由会让"手输 URL 能进、侧边栏却找不到"。
+   * 两种门禁各有依据：enterprise 按 edition 隐藏（管理页与通知配置页的端点
+   * 全部 require_admin），capability 按探针隐藏（收件箱的读端点任何登录用户
+   * 都能用，只有"router 没注册"才是它不可用的理由）。
    */
-  function parseEnterpriseMarks() {
-    const navEnterprise = new Set();
+  function parseGateMarks() {
+    const navMarks = new Map();
     for (const line of fs.readFileSync(NAV, 'utf-8').split('\n')) {
       const m = line.match(/to:\s*'([^']+)'/);
-      if (m && /enterprise:\s*true/.test(line)) navEnterprise.add(m[1]);
+      if (!m) continue;
+      const cap = line.match(/capability:\s*'([^']+)'/);
+      navMarks.set(m[1], { enterprise: /enterprise:\s*true/.test(line), capability: cap ? cap[1] : null });
     }
     const routeMarks = new Map();
     for (const line of fs.readFileSync(ROUTER, 'utf-8').split('\n')) {
       const m = line.match(/path:\s*'([^']+)'/);
-      if (m) routeMarks.set(m[1], /requiresEnterprise:\s*true/.test(line));
+      if (!m) continue;
+      const cap = line.match(/requiresCapability:\s*'([^']+)'/);
+      routeMarks.set(m[1], { enterprise: /requiresEnterprise:\s*true/.test(line), capability: cap ? cap[1] : null });
     }
-    return { navEnterprise, routeMarks };
+    return { navMarks, routeMarks };
   }
 
-  it('enterprise nav entries and enterprise route guards stay in lockstep', () => {
-    const { navEnterprise, routeMarks } = parseEnterpriseMarks();
-    const navWithoutGuard = [...navEnterprise].filter((p) => !routeMarks.get(p));
-    const guardedWithoutNav = [...routeMarks]
-      .filter(([, gated]) => gated)
-      .map(([p]) => p)
-      .filter((p) => !navEnterprise.has(p));
+  it('nav gates and route gates stay in lockstep', () => {
+    const { navMarks, routeMarks } = parseGateMarks();
+    const problems = [];
+    for (const [p, n] of navMarks) {
+      const r = routeMarks.get(p) || { enterprise: false, capability: null };
+      if (n.enterprise !== r.enterprise) problems.push(`${p}: 导航 enterprise=${n.enterprise}，路由 requiresEnterprise=${r.enterprise}`);
+      if (n.capability !== r.capability) problems.push(`${p}: 导航 capability=${n.capability}，路由 requiresCapability=${r.capability}`);
+    }
+    expect(problems, `导航与路由的门禁标记不一致：\n  ${problems.join('\n  ')}`).toEqual([]);
 
-    expect(navWithoutGuard, `这些导航项标了 enterprise:true，但路由没有 requiresEnterprise 守卫：\n  ${navWithoutGuard.join('\n  ')}`).toEqual([]);
-    expect(guardedWithoutNav, `这些路由有 requiresEnterprise 守卫，但导航项没标 enterprise:true：\n  ${guardedWithoutNav.join('\n  ')}`).toEqual([]);
-    // 防正则失效后空转变绿：当前是 8 条管理页 + 2 个通知中心入口
-    expect(navEnterprise.size).toBeGreaterThanOrEqual(10);
+    // 标记本身也得被解析到，否则上面的比对会空转变绿
+    expect([...navMarks.values()].filter((v) => v.enterprise).length).toBeGreaterThanOrEqual(9);
+    expect(navMarks.get('/notifications')).toEqual({ enterprise: false, capability: 'notifications' });
+    expect(navMarks.get('/notifications/config').enterprise).toBe(true);
   });
 });

@@ -239,18 +239,29 @@
   "个人版该不该有通知中心"（A：按企业能力门控 + 前端守卫 / B：把引擎搬进仓内）等你再拍。
 - **已完成（2026-11-02，分支 `fix/notifications-enterprise-gate`，PR #204）**：
   `/api/notifications` 产品边界 **owner 选 A**。后端不改行为（模块级导入即门控），
-  前端把承诺改成与实现一致：`nav.js` 两个通知入口加 `enterprise: true`（个人版由
-  `filterNavByEdition` 隐藏），`router/index.js` 两条路由加 `meta.requiresEnterprise`
-  （深链由既有守卫送回 `/home`）；`nav-coverage.test.js` 新增「导航 enterprise 标记 ⇔
-  路由 requiresEnterprise」双向一致性用例。**不选 B**：把 `NotificationManager`/`EventBus`
-  从 MAOS 搬进仓内要跨 ADR-017 双仓边界、授权资产进开放核、MAOS 完整性清单需重签。
-  实测：前端 75 文件 / 669 用例全绿，eslint 干净；`filterNavByEdition` 探针
-  personal=0 个通知入口、enterprise=2 个。**领地新增（本批）**：
-  `dashboard-enterprise/src/{nav.js,router/index.js}`、
-  `dashboard-enterprise/src/__tests__/nav-coverage.test.js`（Examples 会话的 nav 守卫
-  PR #178 已合并，无冲突）。已知口径代价：`/api/info/edition` 是 admin-only，非 admin
-  在企业版安装按安全默认回落 personal，因而也看不到入口——与 Integrations/AlertRules
-  现有门控一致。
+  前端把承诺改成与实现一致。两条门禁按各自的真实依据分开：
+  - **配置页**（`/notifications/config`）按 edition 门禁 —— channels/rules/templates
+    的端点全部 `require_admin`，普通用户进去也只会 403；
+  - **收件箱**（`/notifications`）按**能力探针**门禁 —— `/api/info/edition` 是
+    admin-only，企业版安装上的普通用户只会拿到 `personal`，而收件箱的读端点
+    （list / unread-count / preferences）本来就对任何已登录用户开放
+    （`notifications.py` docstring）。凭 edition 判断会把他该用的入口也藏掉，
+    所以改问端点自己：`GET /api/notifications/unread-count` 404 = 引擎没装，
+    401/403 = 未知（下次再探），其他 = 可用。结果在 edition store 缓存。
+    判定不可用时收件箱不发 `/list`，直接给"需要企业版"的如实空态（Integrations /
+    AlertRules 同款）。
+  - 守卫：`nav-coverage.test.js` 钉「导航 enterprise ⇔ 路由 requiresEnterprise」
+    与「导航 capability ⇔ 路由 requiresCapability」双向一致；`router.test.js` 覆盖
+    未知放行/判死挡回/可用放行三条路径；`stores.test.js` 钉探针四种状态码语义与缓存。
+  - 变异反证 4 例全部转红（导航漏标 capability / 视图不认探针 / 探针认错状态码 /
+    守卫放行一切）。实测：前端 75 文件 / 676 用例全绿，`eslint src/` 0 error，
+    `check_docs_consistency --gate` OK。**不选 B**：把 `NotificationManager`/`EventBus`
+    从 MAOS 搬进仓内要跨 ADR-017 双仓边界、授权资产进开放核、MAOS 完整性清单需重签。
+  **领地（本批）**：`dashboard-enterprise/src/{nav.js,App.vue,router/index.js,
+  stores/edition.js,views/Notifications.vue,i18n/view-notifications.js}` 与
+  `src/__tests__/{nav-coverage,router,stores,Notifications}.test.js`。
+  其中 `App.vue` / `stores/edition.js` 属 Examples 会话登记过的宽口径面（其 PR #178
+  已合并），本批只加不改其语义；他线若要再动 `filterNavByEdition` 的签名，请先在本表回一行。
 - **下一步（动前会先在本表再登记）**：企业版 response_model 棘轮已归零，本线该主题收口。
   2026-11-02 再收两项：CI 串行腿可见性（#193）与个人版棘轮导入盲区（#200），棘轮线彻底收口。
   通知边界已拍 A（见上条），本线无遗留产品决定。

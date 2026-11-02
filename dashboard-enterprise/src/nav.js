@@ -103,22 +103,31 @@ export const nav = [
   { to: '/licenses', label: 'nav.licenses', icon: 'shield', subtitle: 'nav.licenses.subtitle', enterprise: true },
 
   // ── 设置（TopBar 齿轮直达；侧边栏保留入口方便直达）────────────
-  // 通知中心依赖商业 overlay 的通知引擎，个人版整块端点不存在，
-  // 因此两个入口按企业版隐藏；深链由路由守卫送回 /home。
+  // 通知引擎在商业 overlay 里：个人版没装企业包时，notifications router
+  // 导入失败、整块端点不注册。收件箱对任何已登录用户都开放（读操作不限
+  // admin），所以按"能力探针"隐藏而不是按 edition 隐藏 —— 企业版安装上的
+  // 普通用户 edition 只能回落 personal，用 edition 判断会把他该用的入口也藏掉。
+  // 配置页的端点全部 require_admin，继续按企业版入口隐藏。
   { section: 'nav.group.system' },
   { to: '/settings', label: 'nav.settings', icon: 'gear', subtitle: 'nav.settings.subtitle' },
-  { to: '/notifications', label: 'nav.notifications', icon: 'message-square', subtitle: 'nav.notifications.subtitle', enterprise: true },
+  { to: '/notifications', label: 'nav.notifications', icon: 'message-square', subtitle: 'nav.notifications.subtitle', capability: 'notifications' },
   { to: '/notifications/config', label: 'nav.notificationConfig', icon: 'gear', subtitle: 'nav.notificationConfig.subtitle', enterprise: true },
   { to: '/docs', label: 'nav.docs', icon: 'book-open', subtitle: 'nav.docs.subtitle' },
 ];
 
 /**
- * nav 过滤: 个人版隐藏 enterprise:true 的项（含整组 section）。
- * 新结构里企业项集中在"管理"组，个人版整组消失。
+ * nav 过滤:
+ *   - enterprise:true —— 非企业版隐藏（含整组 section，个人版"管理"组整组消失）；
+ *   - capability:'x' —— 只在探针明确判定不可用（false）时隐藏，未知（null）保持可见。
+ *
+ * @param {Array<object>} navList
+ * @param {string} edition
+ * @param {{[name: string]: (boolean|null|undefined)}} [capabilities={}] 探针结果
  */
-export function filterNavByEdition(navList, edition) {
-  if (edition === 'enterprise') return navList;
-  const filtered = navList.filter((item) => !item.enterprise);
+export function filterNavByEdition(navList, edition, capabilities = {}) {
+  const keep = (item) => !(item.enterprise && edition !== 'enterprise')
+    && !(item.capability && capabilities[item.capability] === false);
+  const filtered = navList.filter(keep);
   const result = [];
   for (let i = 0; i < filtered.length; i++) {
     const item = filtered[i];

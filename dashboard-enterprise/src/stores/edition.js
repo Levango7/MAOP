@@ -5,6 +5,13 @@ import { useI18n } from '../i18n/index.js';
 
 // L3 fix: 提取硬编码的 API 路径为命名常量，便于统一维护与路径变更。
 const API_ENDPOINT_EDITION = '/api/info/edition';
+// 通知中心的能力探针。unread-count 是"任何已登录用户都能读"的端点
+// （notifications router 的 docstring 明示：读操作不限 admin，写操作才 require_admin），
+// 而个人版没装企业包时整个 router 导入失败、一块都不注册 —— 404 就是
+// "这项能力不存在"的权威信号。按 edition 猜会误判：/api/info/edition 是
+// admin-only，普通用户拿 403 后按安全默认回落 personal，明明装了企业包却被
+// 当成没有企业能力。
+const API_ENDPOINT_NOTIFICATIONS_PROBE = '/api/notifications/unread-count';
 
 function persistEdition(edition, features, backends, degradations) {
   try {
@@ -45,6 +52,9 @@ export const useEditionStore = defineStore('edition', () => {
   const features = ref({});
   const backends = ref({});
   const degradations = ref([]);
+  // 通知中心可用性：null=未知（探针还没回，导航保持现状）、true=端点在、
+  // false=404（router 整块没注册）。三态而非布尔，是为了"没证据不藏入口"。
+  const notificationsAvailable = ref(null);
   const loading = ref(false);
   const switching = ref(false);
   const switchError = ref('');
@@ -183,12 +193,31 @@ export const useEditionStore = defineStore('edition', () => {
     persistEdition(edition.value, features.value, backends.value, degradations.value);
   }
 
+  /**
+   * 一次性探测通知中心是否可用（判定为可用/不可用后缓存，不再发请求）。
+   * 只有 404 判死；401/403 保持未知（登录态问题不是"能力不存在"的证据，
+   * 而且下次还会再探）；5xx 说明端点已注册、只是这次失败，算可用。
+   * @returns {Promise<boolean|null>}
+   */
+  async function checkNotificationsAvailability() {
+    if (notificationsAvailable.value !== null) return notificationsAvailable.value;
+    try {
+      const res = await fetchWithTimeout(API_ENDPOINT_NOTIFICATIONS_PROBE, withAuth({}, {}));
+      if (res.status === 404) notificationsAvailable.value = false;
+      else if (res.status !== 401 && res.status !== 403) notificationsAvailable.value = true;
+    } catch {
+      // 探不到就当未知：导航保持现状，下一次再试
+    }
+    return notificationsAvailable.value;
+  }
+
   return {
     // state
     edition,
     features,
     backends,
     degradations,
+    notificationsAvailable,
     loading,
     switching,
     switchError,
@@ -201,5 +230,6 @@ export const useEditionStore = defineStore('edition', () => {
     fetchEdition,
     switchEdition,
     hydrateEdition,
+    checkNotificationsAvailability,
   };
 });

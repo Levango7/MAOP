@@ -10,8 +10,8 @@
       :search-placeholder="t('view.notifications.filterKeyword')"
       :results-label="`${visibleNotifications.length} / ${notifications.length}`"
       :error-title="t('view.notifications.loadError')"
-      :empty-title="t('view.notifications.empty')"
-      :empty-desc="t('view.notifications.emptyDesc')"
+      :empty-title="engineMissing ? t('view.notifications.notInstalled') : t('view.notifications.empty')"
+      :empty-desc="engineMissing ? t('view.notifications.notInstalledDesc') : t('view.notifications.emptyDesc')"
       :loading-lines="6"
     >
       <template #badges>
@@ -219,6 +219,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useApiStore } from '../stores/api.js';
+import { useEditionStore } from '../stores/edition.js';
 import { useToast } from '../composables/useToast.js';
 import { useConfirm } from '../composables/useConfirm.js';
 import { useI18n } from '../i18n';
@@ -230,8 +231,14 @@ import StatCard from '../components/StatCard.vue';
 
 const { t } = useI18n();
 const api = useApiStore();
+const edition = useEditionStore();
 const toast = useToast();
 const { showConfirm } = useConfirm();
+
+// 通知引擎随商业 overlay 分发；没装企业包时 notifications router 导入失败，
+// 整块端点不注册（实测是 404）。探针判定不可用时不再发无意义的请求，直接把
+// 需要企业版讲清楚 —— 与 Integrations.vue / AlertRules.vue 同款处理。
+const engineMissing = computed(() => edition.notificationsAvailable === false);
 
 
 // ── State ──
@@ -405,6 +412,12 @@ async function loadAll() {
   loading.value = true;
   error.value = '';
   offset.value = 0;
+  if (engineMissing.value) {
+    notifications.value = [];
+    hasMore.value = false;
+    loading.value = false;
+    return;
+  }
   try {
     // 分页参数必须进 URL：api.get 的第二个参数是 fetch init（只有 .headers 会被读），
     // 传 { limit, offset } 等于没传 —— 后端按 limit=100 返回整页，"加载更多"
@@ -539,7 +552,12 @@ async function savePreferences() {
   }
 }
 
-onMounted(loadAll);
+onMounted(async () => {
+  // 深链直达本页时 App 的启动探针可能还没跑（或登录态刚变化）；这里补一次，
+  // 结果在 store 里缓存，不会每次挂载都发请求。
+  await edition.checkNotificationsAvailability();
+  await loadAll();
+});
 </script>
 
 <style scoped>
