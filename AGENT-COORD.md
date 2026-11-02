@@ -443,3 +443,14 @@
   F:/tmp 会被外部清理，配方已在 demo docstring）。
 - **不碰**：engine/dispatch 侧（生产集成 = 后续里程碑，章程明示）；
   Airflow 侧（章程"另议"）；他线领地照旧。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-01 第十二轮：M-X1 治理四项批准落地）
+
+- **用户已批**（原话「那就按照你的推荐？」）：呈批件
+  ``docs/marketplace-signing-key-governance.md`` D1–D4 全部按推荐批准，
+  批准记录已回写。**实施落点**：``config/marketplace_verify_key.pub``
+  （从企业生产私钥仅导出公钥半，D2① 内置通道）+ ROADMAP M-X1 余量段
+  更新。剩余触发条件项（首次目录签名/HTTPS 通道/双钥宽限/D4 切默认）
+  均已在该文档「实施记录」节列明，非阻塞。
+- **领地**：上列呈批件 + config 公钥文件 + ROADMAP M-X1 段。
+- **不碰**：MAOS 侧清单签名域（无改动）；他线领地照旧。

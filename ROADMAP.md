@@ -443,9 +443,13 @@
   CLI ``--require-signature`` + 威胁模型文档
   （``docs/marketplace-signing-threat-model.md``）。验收：篡改/缺失签名判红、
   四态冒烟 = ``test_mcp_marketplace.py::TestSignatureGate``（5 例）✅。
-- 余量：密钥治理呈批（生产签发流程：公钥分发通道 / operator 私钥保管 /
-  轮换吊销 SLA / ``require_signature`` 默认值演进）——**不阻塞 M0 验收**；
-  Skill 包分发面的签名扩展另批。
+- 余量：~~密钥治理呈批~~ → **已批（2026-11-01，四项按推荐）**——口径与
+  实施记录见 ``docs/marketplace-signing-key-governance.md``（D1 复用企业
+  生产钥为目录签名根 / D2 三通道分发且 ``config/marketplace_verify_key.pub``
+  已内置 / D3 例行 12 个月 + 泄露 24h 换钥 + 7 天双钥宽限 /
+  D4 ``require_signature`` 三步演进）。剩余：首次目录签名（待生产目录
+  就位）、HTTPS 拉取通道与双钥宽限 try 验签（M1）、D4 步骤 2 切默认
+  （触发条件齐备后）；Skill 包分发面的签名扩展另批。
 
 ### M-X2 多后端编排器适配（Temporal/Airflow，M0 章程）
 
