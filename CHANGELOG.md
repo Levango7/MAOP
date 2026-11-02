@@ -39,6 +39,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 许可证页去掉永远匹配不到的"版本"筛选（2026-11-02）
+
+- **事实**：MAOS `maop/enterprise/license_manager.py` 在签发时把 `edition` 写死成
+  `enterprise` —— 模型默认值（`:94`）、INSERT 字面量（`:475` / `:490`）、建表
+  `DEFAULT 'enterprise'`（`:345`）三处同向；`LicenseCreateRequest` 里也没有
+  edition/version 字段可传。
+- **后果**：筛选器的 `personal` / `team` 两个取值永远匹配不到任何行，`enterprise`
+  又恒真 —— 这是"看起来能选、选了只会把列表清空"的死控件。
+- **处置**：控件连同 `filters.version` 与比对分支一起删除；版本列继续按真实
+  `edition` 渲染（`versionLabel` 保留，它是线缆字段的映射而不是猜测）。i18n 只删
+  随之失效的 `view.licenses.allVersions`，`versionPersonal`/`versionTeam` 仍被映射使用。
+- **守卫**：`Licenses.test.js` 新增用例，断言筛选器不提供线缆上不可能出现的取值
+  （同时断言状态筛选的 `trial` 仍在，防用例空转）。变异反证：把死筛选塞回去必红。
+
 ### M-X2 生产接线 E2-a（Temporal 后端 flag 化接入 + workflow CLI，2026-11-01）
 
 用户批准 E 决策包（E1-a 零供给两段式 / E2-a 薄接线 / E3-a 子进程执行体 /

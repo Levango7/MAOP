@@ -267,9 +267,12 @@ const form = ref({
   valid_days: 365,
 });
 
-const filters = reactive({ status: '', version: '', expiry: '', query: '' });
+const filters = reactive({ status: '', expiry: '', query: '' });
 
 // ── Filters ────────────────────────────────────────────────────
+// 这里不再提供"版本"筛选：LicenseManager 签发时把 edition 写死成
+// enterprise（MAOS `license_manager.py` 的 model 默认值、INSERT 硬编码
+// 与建表 DEFAULT 三处同向），个人版/团队版两个取值永远匹配不到任何行。
 const filterSchema = computed(() => [
   {
     key: 'status',
@@ -279,15 +282,6 @@ const filterSchema = computed(() => [
       { value: 'active', label: t('view.licenses.statusActive') },
       { value: 'expired', label: t('view.licenses.statusExpired') },
       { value: 'revoked', label: t('view.licenses.statusRevoked') },
-    ],
-  },
-  {
-    key: 'version',
-    label: t('view.licenses.allVersions'),
-    options: [
-      { value: 'personal', label: t('view.licenses.versionPersonal') },
-      { value: 'team', label: t('view.licenses.versionTeam') },
-      { value: 'enterprise', label: t('view.licenses.versionEnterprise') },
     ],
   },
   {
@@ -390,7 +384,6 @@ const visibleRows = computed(() => {
   const fq = (filters.query || '').trim().toLowerCase();
   return tableRows.value.filter((row) => {
     if (filters.status && row.status !== filters.status) return false;
-    if (filters.version && row.version !== filters.version) return false;
     if (filters.expiry) {
       if (filters.expiry === 'active' && (isExpired(row) || isExpiringSoon(row))) return false;
       if (filters.expiry === 'soon' && !isExpiringSoon(row)) return false;

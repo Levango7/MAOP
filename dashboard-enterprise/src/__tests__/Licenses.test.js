@@ -119,6 +119,20 @@ describe('Licenses.vue', () => {
     wrapper.unmount();
   });
 
+  it('offers no edition filter values the backend can never produce', async () => {
+    // MAOS LicenseManager 签发时把 edition 写死成 enterprise（模型默认值、
+    // INSERT 字面量、建表 DEFAULT 三处同向），所以"版本"筛选里的个人版/
+    // 团队版永远匹配不到任何行。整个控件连同两个取值一起删掉；这条用例
+    // 钉住"筛选器不得提供线缆上不可能出现的取值"。
+    mockFetch(defaultRoutes());
+    const wrapper = await mountLicenses();
+    const optionValues = wrapper.findAll('option').map((o) => o.attributes('value'));
+    expect(optionValues).toContain('trial');   // 状态筛选仍在，用例不是空转
+    expect(optionValues).not.toContain('personal');
+    expect(optionValues).not.toContain('team');
+    wrapper.unmount();
+  });
+
   it('leaves derived fields empty instead of showing undefined', async () => {
     mockFetch(defaultRoutes({
       '/api/licenses/list': {
