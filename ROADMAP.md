@@ -443,17 +443,29 @@
   CLI ``--require-signature`` + 威胁模型文档
   （``docs/marketplace-signing-threat-model.md``）。验收：篡改/缺失签名判红、
   四态冒烟 = ``test_mcp_marketplace.py::TestSignatureGate``（5 例）✅。
-- 余量：密钥治理呈批（生产签发流程：公钥分发通道 / operator 私钥保管 /
-  轮换吊销 SLA / ``require_signature`` 默认值演进）——**不阻塞 M0 验收**；
-  Skill 包分发面的签名扩展另批。
+- 余量：~~密钥治理呈批~~ → **已批（2026-11-01，四项按推荐）**——口径与
+  实施记录见 ``docs/marketplace-signing-key-governance.md``（D1 复用企业
+  生产钥为目录签名根 / D2 三通道分发且 ``config/marketplace_verify_key.pub``
+  已内置 / D3 例行 12 个月 + 泄露 24h 换钥 + 7 天双钥宽限 /
+  D4 ``require_signature`` 三步演进）。剩余：首次目录签名（待生产目录
+  就位）、HTTPS 拉取通道与双钥宽限 try 验签（M1）、D4 步骤 2 切默认
+  （触发条件齐备后）；Skill 包分发面的签名扩展另批。
 
 ### M-X2 多后端编排器适配（Temporal/Airflow，M0 章程）
 
-- M0 范围：只做 Temporal 一侧（Airflow 另议）：plan/DAG → Temporal workflow
-  定义编译 + 一个可跑的 demo workflow；MAOP 侧 adapter 接口先行定义。
-- M0 验收：demo workflow（3 节点）在 Temporal dev server 上跑通一次。
-- 阻碍位置：**企业侧运行时供给未定**（谁提供生产 Temporal server）——M0 只证明
-  编译与连通，不承诺生产集成。
+- 现状（2026-11-01，**M0 + E2-a 生产接线均已交付**，PR 见 CHANGELOG 同日
+  两条目）：``maop/orchestration/``（后端无关协议 + DAG 预处理 +
+  ``TemporalAdapter`` + **wiring 接线层**）；``MAOP_ORCHESTRATION_BACKEND``
+  flag（空=legacy 逐字节不变，temporal=适配器执行）；生产入口
+  ``wiring.run_workflow`` + CLI ``maop workflow run <name>``；验收样例
+  ``m0-demo``（3 节点）真机双验：M0 dev server 实跑 ✅ + E2-a 经生产
+  入口 3 节点真 codex 子进程全 success ✅。
+- 余量：E1-a 轻生产 server（腾讯云 Lighthouse docker-compose，待用户给
+  云资源）；E2-b 深集成（dashboard 提交源 + 状态回写）；Airflow 另议；
+  条件执行（``condition``）语义扩展（M0 明示边界）；并发活动的
+  to_thread 化（小扩展）。
+- M0 验收：demo workflow（3 节点）在 Temporal dev server 上跑通一次 ✅
+  （2026-11-01，配方见 ``scripts/temporal_m0_demo.py`` 模块 docstring）。
 
 ### M-X3 细粒度成本归因（M0 章程）
 

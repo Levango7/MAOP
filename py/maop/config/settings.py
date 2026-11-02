@@ -55,6 +55,18 @@ def marketplace_verify_key_path() -> str:
     return os.environ.get("MAOP_MARKETPLACE_VERIFY_KEY", "").strip()
 
 
+def orchestration_backend() -> str:
+    """``MAOP_ORCHESTRATION_BACKEND``：workflow 执行后端选择（M-X2 E2-a）.
+
+    空串（默认）= legacy 路径（``maop_plan.execute_workflow`` 纯规划语义，
+    行为与 M-X2 接线前逐字节一致）；``"temporal"`` = workflow 经
+    ``orchestration.wiring.run_workflow`` 提交 Temporal 适配器（E1-a：
+    flag 关闭时零行为变化，供给就绪后打开 flag 即用）。其他值在调用方
+    显式拒绝（诚实报错，不静默回退）。config-drift 收敛点，调用方走这里。
+    """
+    return os.environ.get("MAOP_ORCHESTRATION_BACKEND", "").strip().lower()
+
+
 def _default_auth_enabled() -> bool:
     """默认认证策略（High 安全修复：secure-by-default）。
 

@@ -432,3 +432,70 @@
   排队）已手动 cancel 腾账号额度（≈20 作业/小时上限）。
 - **不碰**：他线 cost_attribution 面与前端面；MAOS 侧无新改动
   （quota_operator 桥此前已合）。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-01 第十一轮：M-X2 Temporal M0 交付 + M-X1 呈批件）
+
+- **已完成（M-X2 M0，用户授权"确定没人认领，确定有意义就做"，板面查证
+  无他认领）**：``maop/orchestration/``（base 协议 + ``plan_levels`` 拓扑
+  分层/环检测/边界拒绝 + ``TemporalAdapter`` 编译器）+ 15 例测试 +
+  ``scripts/temporal_m0_demo.py``。**章程验收达成**：3 节点 demo（规划→
+  分支 A∥B）在 Temporal dev server（CLI 1.9.1 / Server 1.32.0，
+  `temporal server start-dev`）实跑一次全 success，`levels=2`。
+  temporalio 可选依赖不进 pyproject（定义期恒等占位兜底，run 入口真检）；
+  不读 env（config-drift 零增量）；运行体=数据驱动通用 workflow
+  （DAG 结构作为入参 payload）——真 temporalio 拒本地类 @workflow.run
+  （dev server 实证）、动态类构造被 Mimosa 拦（高危），两个坑都绕开。
+  ``temporal_adapter`` 按"先行定义"登记 KNOWN_ORPHANS。
+- **M-X1 治理呈批件已起草**：``docs/marketplace-signing-key-governance.md``
+  （D1 私钥角色分配 / D2 公钥分发通道 / D3 轮换吊销 SLA /
+  D4 require_signature 默认值演进，各带推荐口径）——**待用户批**，
+  批准一项落一项；私钥本身一直在持钥会话（F:/Keys/maos/）。
+- **领地**：``py/maop/orchestration/``、``py/tests/test_orchestration_*.py``、
+  ``py/scripts/temporal_m0_demo.py``、``py/tests/test_dead_wiring_inventory.py``
+  （KNOWN_ORPHANS 登记）、CHANGELOG/ROADMAP 本批段、上列呈批件文档。
+- **验收环境记录**：temporalio 1.35.0（本机 pip，非仓库依赖）；Temporal
+  CLI 1.9.1 解压在 ``F:/tmp/temporal-cli/``（dev server 后台进程用毕即弃，
+  F:/tmp 会被外部清理，配方已在 demo docstring）。
+- **不碰**：engine/dispatch 侧（生产集成 = 后续里程碑，章程明示）；
+  Airflow 侧（章程"另议"）；他线领地照旧。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-01 第十二轮：M-X1 治理四项批准落地）
+
+- **用户已批**（原话「那就按照你的推荐？」）：呈批件
+  ``docs/marketplace-signing-key-governance.md`` D1–D4 全部按推荐批准，
+  批准记录已回写。**实施落点**：``config/marketplace_verify_key.pub``
+  （从企业生产私钥仅导出公钥半，D2① 内置通道）+ ROADMAP M-X1 余量段
+  更新。剩余触发条件项（首次目录签名/HTTPS 通道/双钥宽限/D4 切默认）
+  均已在该文档「实施记录」节列明，非阻塞。
+- **领地**：上列呈批件 + config 公钥文件 + ROADMAP M-X1 段。
+- **不碰**：MAOS 侧清单签名域（无改动）；他线领地照旧。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-01 第十三轮：E 批准落地——M-X2 生产接线第一批 E2-a/E3-a）
+
+- **用户已批 E 决策包（E1-a+E2-a+E3-a+E4-a 按推荐）**，本轮认领 E2-a 领地。
+- **冲突排查记录**：master 无新动静；开放 PR（#204/#196/#195/#180/dependabot×2）
+  逐一核对改动文件，与本批零交集；**避开 CommandCodeBot 历史领地**
+  （`py/maop/core/scheduling|reliability|engine_utils.py`，板面第 94 行）——
+  本批**不碰 engine.py / maop_plan.py**（侦察实证：execute_workflow 是
+  纯规划合同"不执行任何 agent"且零生产调用方，maop_execute 在册孤儿；
+  故生产接线落点=新建入口而非内嵌旧路径）。
+- **认领领地**：``py/maop/orchestration/wiring.py``（新建）、
+  ``py/maop/cli_workflow.py``（新建）+ cli.py 仅加 2-3 行子命令注册
+  （当前 694 行，余量充足）、``py/maop/config/settings.py``（env 助手，
+  M-X1 同款模式）、``.env.example``（MAOP_ORCHESTRATION_BACKEND 登记）、
+  ``config/agents.yaml``（追加 m0-demo 验收 workflow，纯增量）、
+  ``py/tests/test_orchestration_wiring.py``（新建）、
+  ``py/tests/test_dead_wiring_inventory.py``（销 temporal_adapter 条目）。
+- **不碰**：engine.py / maop_plan.py / maop_execute.py / core/scheduling /
+  core/reliability / engine_utils / dashboard 前端 / 他线在途分支。
+
+- **E2-a/E3-a 已完成并验收（同轮补记）**：``MAOP_ORCHESTRATION_BACKEND``
+  flag（settings 收敛 + .env.example 登记）+ ``wiring.run_workflow``
+  生产入口 + ``maop workflow run`` CLI（cli.py +5 行，639 行）+
+  ``m0-demo`` 验收样例入 config/agents.yaml + KNOWN_ORPHANS 销
+  temporal_adapter 条目。**真机双验**：flag 开=经生产入口 3 节点真 codex
+  子进程全 success（completed 3/3，exit 0）；flag 关=exit 0 且
+  planned=3/completed=0（legacy 规划合同如实呈现）。测试 11 例全绿。
+  **宿主机新坑**：主树 editable 安装的 ``maop`` console script 对
+  ``run`` 子命令静默 exit 1（``maop health`` 却正常）；``python -m maop``
+  同机同参正常——wiring 执行体因此走 ``sys.executable -m maop``。
