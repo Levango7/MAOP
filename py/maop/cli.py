@@ -595,6 +595,11 @@ def main() -> Any:
 
         cmd_eval(argv[1:])
         return
+    if argv and argv[0] == "workflow":
+        from maop.cli_workflow import cmd_workflow
+
+        cmd_workflow(argv[1:])
+        return
 
     parser = argparse.ArgumentParser(description="MAOP - Agent Orchestration Framework")
     parser.add_argument("action", nargs="?", default="start",

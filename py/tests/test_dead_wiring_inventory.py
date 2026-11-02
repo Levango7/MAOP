@@ -160,13 +160,10 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.maop_execute": ("unwired", "全仓零生产调用方（权限门已改由 dispatch_gate 承担）"),
     "maop.maop_loop_config": ("unwired", "主循环配置走 loop_models.LoopConfig，本模块为并存实现"),
     "maop.memory.unified": ("unwired", "统一记忆协议未接入读路径"),
-    # M-X2 M0（章程明示"不承诺生产集成"）：adapter 接口与 Temporal 编译器
-    # 先行落地，消费接线（engine/dispatch 侧）属生产集成里程碑；demo 验收
-    # 走 scripts/temporal_m0_demo.py（dev server 实跑）。
-    "maop.orchestration.temporal_adapter": (
-        "unwired",
-        "M-X2 M0 adapter 先行定义（章程不承诺生产集成），消费接线属后续里程碑",
-    ),
+    # M-X2 E2-a（2026-11-01）：orchestration 包已接线——temporal_adapter 经
+    # wiring.run_workflow 被 cli_workflow（maop workflow run）生产消费，
+    # 此前"先行定义"孤儿条目随之销除；base/temporal_adapter/wiring 三件
+    # 均有生产导入方，无需再登记。
 }
 
 
