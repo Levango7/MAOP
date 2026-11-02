@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "description": "MAOP 官方 Marketplace 目录 v1（M-X1 D1 批准：企业发布签名根签发；签名合同见 py/scripts/sign_marketplace_catalog.py 模块 docstring）",
+  "signed_entry_count": 3,
+  "servers": [
+    {
+      "name": "omniroute",
+      "description": "OmniRoute 本地 AI 网关（160+ LLM 提供商、自动 failover、MCP/A2A 协议、OpenAI 兼容 API）——MAOP 官方配套网关",
+      "version": "1.0.0",
+      "author": "Levango7",
+      "homepage": "http://localhost:20128",
+      "download_url": "",
+      "transport_type": "streamable_http",
+      "default_config": {
+        "url": "http://localhost:20128/mcp",
+        "headers": {
+          "Authorization": "Bearer ${OMNIROUTE_API_KEY}"
+        },
+        "auto_reconnect": true,
+        "max_reconnect_attempts": 3,
+        "reconnect_delay_s": 5.0,
+        "timeout": 30,
+        "allowed_users": [
+          "*"
+        ],
+        "allowed_roles": [
+          "admin",
+          "read"
+        ]
+      },
+      "checksum": null,
+      "tags": [
+        "gateway",
+        "official",
+        "llm"
+      ],
+      "verified": true,
+      "install_count": 0,
+      "signer_key_id": "marketplace-prod",
+      "signature_hex": "e4d4f7c8d499c9ac9da508af2f375098c53a325d5fcaf262defe6ad820d1e0f94368174410c2954ea57f1595cbe16b09845e8845cf1734957de04cefce7c7908"
+    },
+    {
+      "name": "filesystem",
+      "description": "MCP 官方 filesystem server（受控目录文件读写）",
+      "version": "1.0.0",
+      "author": "modelcontextprotocol",
+      "homepage": "https://www.npmjs.com/package/@modelcontextprotocol/server-filesystem",
+      "download_url": "https://registry.npmjs.org/@modelcontextprotocol/server-filesystem",
+      "transport_type": "stdio",
+      "default_config": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-filesystem",
+          "/tmp"
+        ],
+        "auto_connect": false,
+        "timeout": 30
+      },
+      "checksum": null,
+      "tags": [
+        "filesystem",
+        "official-mcp"
+      ],
+      "verified": false,
+      "install_count": 0,
+      "signer_key_id": "marketplace-prod",
+      "signature_hex": "c49af7147e44b09f0b0ac02952a95a6ae226476f3d2b304bdc0f33a3186e119926691ff3e21ce3254242aae8f33db609d22598890b0b1157cfae2b68b023a207"
+    },
+    {
+      "name": "github",
+      "description": "MCP 官方 github server（仓库/Issue/PR 只读到读写工具面）",
+      "version": "1.0.0",
+      "author": "modelcontextprotocol",
+      "homepage": "https://www.npmjs.com/package/@modelcontextprotocol/server-github",
+      "download_url": "https://registry.npmjs.org/@modelcontextprotocol/server-github",
+      "transport_type": "stdio",
+      "default_config": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-github"
+        ],
+        "env": {
+          "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+        },
+        "auto_connect": false,
+        "timeout": 30
+      },
+      "checksum": null,
+      "tags": [
+        "github",
+        "official-mcp"
+      ],
+      "verified": false,
+      "install_count": 0,
+      "signer_key_id": "marketplace-prod",
+      "signature_hex": "23684df8ceb1b0577eafe78669ab4d98d437c1ad07aa0cb9b38eec228a5a714b74f2307673d8d8650e7e2db8a1fd14d047ed333452ae46cf7f93eba2ca983007"
+    }
+  ]
+}
