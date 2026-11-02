@@ -63,6 +63,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **未选 B**：不把 `NotificationManager`/`EventBus` 从 MAOS 搬进 MAOP——跨 ADR-017
   双仓边界、授权资产进开放核、MAOS 完整性清单需重签，爆炸半径远大于收益。
 
+### 条件触发项清账批 1+2 —— M-X1 首签落地 + E1-a 轻生产（2026-11-03，用户批准执行序）
+
+**D4 触发条件①正式满足**（"生产目录已有签名方"——不再是等来的，是做出来的）：
+
+- **M-X1 首签**：``py/scripts/sign_marketplace_catalog.py``（签名管线，
+  被签载荷=条目去 ``signature_hex`` 的 canonical JSON，与消费侧
+  ``_verify_catalog_signature`` 严格镜像；fail-closed 自验证——全部条目
+  过内置验签公钥才产出文件）+ ``deploy/marketplace/``：
+  ``catalog.json``（源，3 条目：omniroute 官方配套网关 + filesystem/github
+  官方 MCP server）+ **``catalog.signed.json``（首签工件，
+  `marketplace-prod` 键，2026-11-01→11-03 有效）** + README（合同/复签
+  配方/密钥轮换指针/checksum 边界）。证据：签发 3/3 verified；消费侧
+  ``MCPMarketplace(require_signature=True)`` 独立验证 3/3 OK。
+- **E1-a 轻生产（本机形态）**：``deploy/temporal-light/docker-compose.yml``
+  （MySQL 持久化 + temporalio/auto-setup 完整栈 + UI，与 dev server 的
+  三本质差异）+ README 配方。**实跑证据**：三服务健康起 → 3 节点
+  workflow 全 success → **``down && up -d`` 重启后再次全 success 且重启前
+  的 workflow 历史仍可查（持久化分界线证据）**。云上形态（Lighthouse
+  单机）即本 compose 原样上云，配方零差异。
+- **D4 切默认备批**：三触发现状 ①✅（本次首签）②✅（公钥已内置）
+  ③=发布窗口；切默认的精确 diff 已写入
+  ``docs/marketplace-signing-key-governance.md`` 实施记录（随该发布同批
+  落地，勿提前合入）。
+- 实撞三坑（compose 首跑）：auto-setup 需 ``temporal_visibility`` 库授权
+  （一次性 init 服务 + 连接重试环）；``TEMPORAL_BROADCAST_ADDRESS`` 不能
+  只给主机名（ringpop config malformed——不设让 auto-setup 自探测）；
+  server 绑定容器 IP 非 loopback（healthcheck 须按服务名寻址）。
+
 ### M-X2 生产接线 E2-a（Temporal 后端 flag 化接入 + workflow CLI，2026-11-01）
 
 用户批准 E 决策包（E1-a 零供给两段式 / E2-a 薄接线 / E3-a 子进程执行体 /
