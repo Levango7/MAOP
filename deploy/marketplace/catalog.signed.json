@@ -42,16 +42,16 @@
     {
       "name": "filesystem",
       "description": "MCP 官方 filesystem server（受控目录文件读写）",
-      "version": "1.0.0",
+      "version": "2.1.0",
       "author": "modelcontextprotocol",
       "homepage": "https://www.npmjs.com/package/@modelcontextprotocol/server-filesystem",
-      "download_url": "https://registry.npmjs.org/@modelcontextprotocol/server-filesystem",
+      "download_url": "",
       "transport_type": "stdio",
       "default_config": {
         "command": "npx",
         "args": [
           "-y",
-          "@modelcontextprotocol/server-filesystem",
+          "@modelcontextprotocol/server-filesystem@2.1.0",
           "/tmp"
         ],
         "auto_connect": false,
@@ -65,21 +65,21 @@
       "verified": false,
       "install_count": 0,
       "signer_key_id": "marketplace-prod",
-      "signature_hex": "c49af7147e44b09f0b0ac02952a95a6ae226476f3d2b304bdc0f33a3186e119926691ff3e21ce3254242aae8f33db609d22598890b0b1157cfae2b68b023a207"
+      "signature_hex": "7195352ba14754a4c1f6e372ed5515ec6df727ab16e18e6ef83cd06aa37e14d53d5e18f2c712dd2082dea3bc7fc1fe7d1578fcd4d44bed08ac3b3443c161ba0b"
     },
     {
       "name": "github",
       "description": "MCP 官方 github server（仓库/Issue/PR 只读到读写工具面）",
-      "version": "1.0.0",
+      "version": "2025.4.8",
       "author": "modelcontextprotocol",
       "homepage": "https://www.npmjs.com/package/@modelcontextprotocol/server-github",
-      "download_url": "https://registry.npmjs.org/@modelcontextprotocol/server-github",
+      "download_url": "",
       "transport_type": "stdio",
       "default_config": {
         "command": "npx",
         "args": [
           "-y",
-          "@modelcontextprotocol/server-github"
+          "@modelcontextprotocol/server-github@2025.4.8"
         ],
         "env": {
           "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
@@ -95,7 +95,7 @@
       "verified": false,
       "install_count": 0,
       "signer_key_id": "marketplace-prod",
-      "signature_hex": "23684df8ceb1b0577eafe78669ab4d98d437c1ad07aa0cb9b38eec228a5a714b74f2307673d8d8650e7e2db8a1fd14d047ed333452ae46cf7f93eba2ca983007"
+      "signature_hex": "59f923780ff71ebca350fb0e0cc5d70254a670623eb4807a73129eb07231375fc44c73ec37e895e24f1e1ed6610e15563562089e2c5808182a5cc04f2d7eb208"
     }
   ]
 }

@@ -44,7 +44,18 @@ python py/scripts/sign_marketplace_catalog.py \
 
 ## 已知边界（诚实登记）
 
-- `checksum` 字段当前为 `null`：签名保证**条目内容**完整性；`checksum`
-  保护的是 `download_url` 载荷本身（omniroute 为本地网关无下载载荷；
-  npm 两条目待版本钉死后补 sha256）——不可信注册表安装路径对无 checksum
-  条目另有门槛（见 `mcp_marketplace` 模块 docstring）。
+- **`checksum` 字段为 `null`，这是刻意的**：消费侧 `checksum` 语义是
+  `download_url` 载荷的 **SHA-256**（`install(verify_checksum=True)` 时校验
+  下载内容）。本目录三条目均为 **stdio + `npx` 拉包**型，没有 MAOP 自己
+  下载的载荷——硬填 npm 的 `sha512-…` tarball integrity 会**语义错位**
+  （算法不同、对象不同），故保持 `null` 并在此说明。
+- **版本已钉死**（2026-11-03）：`server-filesystem@2.1.0`、
+  `server-github@2025.4.8`（npm latest 实测值）。钉版本消除了
+  "npx 拉到任意新版本" 的漂移风险——这是签名目录能给的确定收益。
+  **升级 = 改 `catalog.json` 的 version + args 两处 → 复签 → 复审**（README
+  复签配方）。
+- 若将来某条目改为 MAOP 自己下载载荷（`download_url` 非空），则必须同时
+  填 SHA-256 `checksum`（可用 npm `dist.shasum`=SHA-1 之外的 官方
+  `dist.integrity` sha512→换算，或直接对下载物算 SHA-256）。
+- 不可信注册表（`trusted: false`）对无 checksum 条目的安装另有门槛
+  （需 `confirm_untrusted`），见 `mcp_marketplace` 模块 docstring。
