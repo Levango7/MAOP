@@ -64,12 +64,13 @@ import inspect
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 import maop.core.agent.adapters as adapters_pkg
 from maop.core.agent.adapters import (
