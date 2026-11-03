@@ -76,9 +76,12 @@ const routes = [
   { path: '/users', name: 'users', component: () => import('../views/Users.vue'), meta: { requiresEnterprise: true } },
 
   // ── 设置 ──
+  // 通知中心的后端（notifications router + schemas）在商业 overlay 里，没有企业包
+  // 时整块端点不存在。收件箱的读端点对任何已登录用户开放，所以按"能力探针"挡
+  // （只有实测 404 才挡）；配置页的端点全部 require_admin，继续按企业版守卫。
   { path: '/settings', name: 'settings', component: () => import('../views/Settings.vue') },
-  { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue') },
-  { path: '/notifications/config', name: 'notification-config', component: () => import('../views/NotificationConfig.vue') },
+  { path: '/notifications', name: 'notifications', component: () => import('../views/Notifications.vue'), meta: { requiresCapability: 'notifications' } },
+  { path: '/notifications/config', name: 'notification-config', component: () => import('../views/NotificationConfig.vue'), meta: { requiresEnterprise: true } },
   { path: '/docs', name: 'docs', component: () => import('../views/Docs.vue') },
 
   // ═══ 旧路径 301 重定向（书签/深链/外部链接兼容，零断链）═══
@@ -211,6 +214,20 @@ router.beforeEach((to) => {
   //     const loggedIn = !!localStorage.getItem('maop_user');
   //     if (!loggedIn) return { name: 'login' };
   //   }
+
+  // 能力门（目前只有通知收件箱）：探针判定"端点整块不存在"才挡，未知放行
+  // 并顺手补一次探针——结果在 store 里缓存，不会每次导航都发请求。
+  // 不能套用下面的 edition 判断：edition 端点是 admin-only，企业版的普通
+  // 用户只会拿到 personal，可他读收件箱的权限本来就有。
+  if (to.meta.requiresCapability) {
+    let available = null;
+    try {
+      const st = useEditionStore();
+      available = st.notificationsAvailable;
+      if (available === null) st.checkNotificationsAvailability();
+    } catch { /* ignore */ }
+    if (available === false) return '/home';
+  }
 
   if (!to.meta.requiresEnterprise) return true;
   // 安全默认: 'personal' —— 冷加载/后端未就绪时不放行企业版路由
