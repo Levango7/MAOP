@@ -28,14 +28,14 @@
     {
       "name": "filesystem",
       "description": "MCP 官方 filesystem server（受控目录文件读写）",
-      "version": "1.0.0",
+      "version": "2.1.0",
       "author": "modelcontextprotocol",
       "homepage": "https://www.npmjs.com/package/@modelcontextprotocol/server-filesystem",
-      "download_url": "https://registry.npmjs.org/@modelcontextprotocol/server-filesystem",
+      "download_url": "",
       "transport_type": "stdio",
       "default_config": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+        "args": ["-y", "@modelcontextprotocol/server-filesystem@2.1.0", "/tmp"],
         "auto_connect": false,
         "timeout": 30
       },
@@ -47,14 +47,14 @@
     {
       "name": "github",
       "description": "MCP 官方 github server（仓库/Issue/PR 只读到读写工具面）",
-      "version": "1.0.0",
+      "version": "2025.4.8",
       "author": "modelcontextprotocol",
       "homepage": "https://www.npmjs.com/package/@modelcontextprotocol/server-github",
-      "download_url": "https://registry.npmjs.org/@modelcontextprotocol/server-github",
+      "download_url": "",
       "transport_type": "stdio",
       "default_config": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "args": ["-y", "@modelcontextprotocol/server-github@2025.4.8"],
         "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"},
         "auto_connect": false,
         "timeout": 30
