@@ -49,14 +49,21 @@ const mbStyle = computed(() => {
 .card {
   position: relative;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-lg);
-  /* JB 精修: 卡片不再带常驻阴影 — 层级由 1px 描边 + 明度差承担 */
+  /* 2026-10-29 用户反馈修正：原注释写"卡片不再带常驻阴影 — 层级由 1px 描边 +
+   * 明度差承担"，但实测这两个依据都不成立 —— 描边 1.49:1、--surface 与 --bg
+   * 明度差 1.09:1，都低于可辨识阈值，三者叠加等于没有分层。现在描边提到
+   * 1.89:1（--border-card）并补一层克制阴影，保留"静止感"但边界看得见。 */
+  box-shadow: var(--shadow-surface);
   overflow: visible;
-  transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease);
+  transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease),
+    box-shadow var(--motion) var(--ease);
 }
-/* hover 只加深描边, 不再上浮/投影 — "静止感"是工具感与模板感的分水岭 */
-.card:hover { border-color: var(--border-strong); }
+/* hover 只加深描边, 不再上浮/投影 — "静止感"是工具感与模板感的分水岭。
+ * 2026-10-29: 指向 --border-card-hover 而非 --border-strong —— 后者的 #4e545f
+ * 与常态 #4a4f59 亮度几乎相同，会让 hover 看起来没有反应。 */
+.card:hover { border-color: var(--border-card-hover); }
 .card--clickable { cursor: pointer; }
 .card--clickable:hover { border-color: var(--brand); background: var(--surface-2); }
 .card--clickable:active { transform: scale(0.99); }

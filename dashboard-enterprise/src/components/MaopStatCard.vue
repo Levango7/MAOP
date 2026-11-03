@@ -61,17 +61,20 @@ const isDown = computed(() => props.trend !== null && props.trend !== undefined 
   flex-direction: column;
   gap: var(--sp-2);
   padding: var(--sp-4);
-  /* 1px 描边, 不用阴影 —— JetBrains 式层级语言 */
-  border: 1px solid var(--border);
+  /* 2026-10-29 用户反馈修正：原为"1px 描边, 不用阴影 —— JetBrains 式层级语言"，
+   * 但描边仅 1.49:1 且与 --bg 明度差仅 1.09:1，实测分不出卡片与底布。
+   * 改用卡片专用描边（1.89:1）+ 克制阴影；仍不上浮、不做飘浮 hover。 */
+  border: 1px solid var(--border-card);
   border-radius: var(--r-lg);
   background: var(--surface);
-  /* 描边过渡 —— JetBrains New UI 无飘浮设计语言 */
-  transition: border-color var(--motion-normal) var(--ease);
+  box-shadow: var(--shadow-surface);
+  transition: border-color var(--motion-normal) var(--ease), box-shadow var(--motion-normal) var(--ease);
 }
 
-/* 悬浮: 仅描边加深, 不抬升不阴影 —— 与 StatCard 一致 */
+/* 悬浮: 仅描边加深, 不抬升不阴影 —— 与 StatCard 一致。
+ * 2026-10-29: 改用 --border-card-hover，理由见 Card.vue 同名注释。 */
 .maop-stat:hover {
-  border-color: var(--border-strong);
+  border-color: var(--border-card-hover);
 }
 
 /* 标题行: 标题 + 单位 */
