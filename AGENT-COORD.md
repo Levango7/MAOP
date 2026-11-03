@@ -557,3 +557,29 @@
 - **批 3（MAOS 侧）**：MAOS 板面另行登记（T1.6 激活 token 签发脚本 +
   staging 拓扑扩展，独立 worktree）。
 - **不碰**：他线在途 PR 领地；MAOS 主工作树（SAML 线活跃）。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-03 第十五轮：自驱项——Marketplace 目录版本钉死 PR #211）
+
+- **背景**：首签目录的两条 stdio 条目原为**未钉版本**的 `npx -y <pkg>`，
+  每次安装拉 npm 最新版——签名只保护条目内容，不保护拉到的
+  代码。落在本会话已认领领地（第十四轮 `deploy/marketplace/`），无碰撞。
+- **完成（PR #211 → 合并提交 `596bf706`，master run 复跑中）**：
+  `server-filesystem@2.1.0`、`server-github@2025.4.8`（npm latest 实测）
+  钉进 `default_config.args` 与 `version`；**复签 + 消费侧
+  `PackageVerifier(config/marketplace_verify_key.pub)` 验证 3/3**（omniroute
+  本地网关无需钉）。`checksum` 保持 `null` 并
+  在 README 写明语义（消费侧该字段是 `download_url`
+  载荷的 SHA-256；stdio+npx 条目无自下载载荷，硬填 npm
+  sha512 tarball integrity 属算法与对象双错位）。
+- **CI 红灯事件（已解）**：首跑 CI 内容侧 24 绿，唯一红
+  = `Required checks satisfiability canary` 报 `mergeStateStatus=DIRTY`
+  （开 PR 后 master 前进 6 提交，#212/#209 合入）。
+  rebase 到 origin/master，CHANGELOG.md 同锚点冲突按
+  「两节并存、时间倒序」解（我 11-03 在前、
+  #209 11-02 在后），marketplace 文件逐字节不变、
+  树一致性核对通过（仅 4 文件差异、零
+  merge 提交），`--force-with-lease` 重推后 24 绿、
+  canary 转绿、CLEAN 合并。
+- **领地**：`deploy/marketplace/`（README/catalog/catalog.signed）、
+  CHANGELOG.md 本批段。合并后远端分支已删。
+- **不碰**：他线在途 PR 领地；MAOS 主工作树（SAML 线活跃）。
