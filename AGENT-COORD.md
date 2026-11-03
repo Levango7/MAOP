@@ -511,6 +511,25 @@
   ``run`` 子命令静默 exit 1（``maop health`` 却正常）；``python -m maop``
   同机同参正常——wiring 执行体因此走 ``sys.executable -m maop``。
 
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-02：许可证页"版本"死筛选清理）
+
+- **在修什么**：`Licenses.vue` 的版本筛选器提供 `personal` / `team` / `enterprise`
+  三个取值，而 MAOS `maop/enterprise/license_manager.py` 签发时把 `edition` 写死成
+  `enterprise`（模型默认值 `:94`、INSERT 字面量 `:475`/`:490`、建表
+  `DEFAULT 'enterprise'` `:345` 三处同向，`LicenseCreateRequest` 也没有该字段）。
+  前两个取值永远匹配不到任何行，第三个恒真 —— 选了只会把列表清空。
+- **处置**：控件连同 `filters.version` 与比对分支删除；版本列继续按真实 `edition`
+  渲染（`versionLabel` 保留）。i18n 只删随之失效的 `view.licenses.allVersions`
+  （en/zh 同步），`versionPersonal`/`versionTeam` 仍被映射使用所以留着。
+- **守卫**：`Licenses.test.js` 新增"筛选器不得提供线缆上不可能出现的取值"用例，
+  并同时断言状态筛选的 `trial` 仍在（防用例空转）。本机变异反证：把死筛选塞回去必红；
+  `vitest run src/__tests__/Licenses.test.js` 19 例全绿、`i18n-coverage` 4 例全绿。
+- **领地**：`dashboard-enterprise/src/views/Licenses.vue`、
+  `dashboard-enterprise/src/__tests__/Licenses.test.js`、
+  `dashboard-enterprise/src/i18n/view-licenses.js`（这三个文件此前由本会话 #187 批
+  登记过，仍在同一口径内）。**不碰** `nav.js` / `router/index.js`（通知门控批
+  PR #204 的领地）。
+
 ## 领地登记（ZCode session_f62ccbe…，2026-11-03 第十四轮：条件触发项清账批——用户批准执行序）
 
 - **用户批准四批执行序**（M-X1 签名管线+首签 → E1 本机轻生产 → MAOS T1.6
