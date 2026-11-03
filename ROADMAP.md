@@ -485,6 +485,31 @@
 - 阻碍位置：**仓库领地**（`maop/enterprise/*` 归 CommandCodeBot/企业线；MAOS 板
   有载）+ 模型选型/存储口径属企业侧产品决策。MAOP 侧不含新工作。
 
+### M-SIM 模拟业务场景预生产演练（M0 章程，2026-11-04 用户授权立项）
+
+- 动机：GA 前两类缺口——「真生产运维数据」与「跨里程碑栈（operator/
+  marketplace/orchestration/成本归因）的集成验证」——都无法等真实客户/云资源；
+  用本地模拟业务负载把证据造出来、把集成缝隙暴露出来。
+- M0 范围：**确定性 stub 驱动**（agents.yaml 增 `sim-*` 条目，`cli` 指向本地
+  stub 脚本，零外部 LLM/网络）+ **3 个业务剧本**（客服工单分诊处置 / 日报生成
+  流水线 / 代码审查流水线，各为多节点 plan）经**生产入口**（`wiring.run_workflow`
+  legacy 后端 = `maop run` 子进程）实跑 N 轮 + **运维证据采集**：turn/token 计量
+  （tokensSource 区分）、cost_tracker 记录与 M-X3 聚合对齐、quota 门注入
+  （低阈值触发一次 QuotaExceeded 终态）、alert_ingest 越阈告警送达、
+  db_backup 备份+恢复演练。产出 `docs/audits/business-sim-evidence-<date>.md`。
+- M0 验收：3 剧本生产入口全 success；证据报告五类记录与原始数据逐条对齐；
+  至少暴露并记录 1 个真实集成缺口（演练的价值就是找茬）；stub 驱动确定性
+  （同输入同输出，可重复）。
+- M1（另批）：kind operator CR 腿（MaopTask 承载剧本节点）+ Temporal 后端腿
+  （dev server）+ 48h soak 串联。
+- 阻碍位置：无外部依赖，纯工程量。
+
+### 立项登记（2026-11-04 用户授权，排期待 M-SIM M0 之后）
+
+- **M-X1 M1**：HTTPS 拉取通道 + 双钥宽限 try 验签（章程既有余量项）。
+- **M-X2 E2-b**：深集成——dashboard 提交 workflow 源 + 状态回写。
+- **M2.2 B2 余项**：异步队列的进程间接线（章程既有顺延项）。
+
 ## 维护规则
 
 1. 本文件由文档负责人在每个版本发布后更新：已发布版本移至"当前状态"或归档，进行中版本上移。
