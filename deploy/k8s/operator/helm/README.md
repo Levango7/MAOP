@@ -1,9 +1,10 @@
 # MAOP Operator Helm Chart — Packaging Guide
 
-> **Status: PLANNED — NOT IMPLEMENTED.** 本目录与父目录（`deploy/k8s/operator/`）
-> 只是规划中的 API 形状：仓库内没有 controller 实现，`ghcr.io/maop/operator`
-> 镜像也没有构建来源（未构建）。下列 `helm package` / `helm install` 步骤是
-> **目标流程**，当前执行不会得到可工作的 operator。详见 `../README.md §Status`。
+> **Status: PARTIALLY IMPLEMENTED（部分实现，M-T3.3）.** controller 已实现
+> （`py/maop/operator/`），镜像有构建来源（`../Dockerfile`，本地构建并在 kind
+> 集群实证 2026-11-01，PR #203 链）。kind 烟测走的是 `helm template` +
+> `kubectl apply` 路径；下列 `helm package` / `helm install` 流程本身未单独
+> 实证，registry 发布仍属呈批项。详见 `../README.md §Status`。
 
 This directory documents how to package and distribute the MAOP operator Helm
 chart. The chart source lives in the parent directory (`deploy/k8s/operator/`);

@@ -1,13 +1,12 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# ⚠ 未实现 / 不可部署（NOT IMPLEMENTED / NOT DEPLOYABLE）
+# ⚠ PARTIALLY IMPLEMENTED（部分实现，M-T3.3）
 #
-# 本文件（以及整个 deploy/k8s/operator/ 目录）只是规划中的 API 形状
-# （planned API shape）与目标清单，不是可用的安装方式：
-#   - 仓库内没有任何 kopf / kubernetes-client / watch 的 controller 实现代码；
-#   - 镜像 ghcr.io/maop/operator 没有构建来源（无 Dockerfile、无构建 workflow），
-#     该镜像不存在、未构建（详见下方 image 行注释）。
-# 结构测试仅断言本文件存在（py/tests/test_k8s_operator.py），不代表功能可用。
-# `kubectl apply -f controller.yaml` 不会得到一个可工作的 operator。
+# controller 已实现（py/maop/operator/，kopf-based MaopTask controller），
+# 镜像有构建来源（../Dockerfile，本地构建并在 kind 集群实证 2026-11-01，
+# PR #203 链）。本文件是 Helm-free 的静态部署清单（Namespace/SA/RBAC/
+# Deployment），形状与 templates/ 渲染结果一致；kind 烟测走的是 helm
+# template + kubectl apply 路径，本静态清单本身未单独 apply 实证。
+# 结构测试仅断言本文件存在（py/tests/test_k8s_operator.py）。
 # Status 说明见 deploy/k8s/operator/README.md §Status。
 # ═══════════════════════════════════════════════════════════════════════════
 #

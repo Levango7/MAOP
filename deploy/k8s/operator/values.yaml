@@ -1,9 +1,10 @@
 # Default values for maop-operator.
 # This file is intentionally documented to guide production overrides.
 #
-# ⚠ PLANNED — NOT IMPLEMENTED. These values describe the intended operator
-# configuration only; the repository contains no controller implementation and
-# the image below has never been built. See README.md §Status.
+# ⚠ PARTIALLY IMPLEMENTED (M-T3.3). These values configure the implemented
+# kopf-based controller (py/maop/operator/) and the image buildable via
+# ../Dockerfile (built locally and verified on kind 2026-11-01, PR #203 chain;
+# pushing to a registry remains a release decision). See README.md §Status.
 
 # ── Operator controller image ──────────────────────────────────────
 image:

@@ -1,7 +1,8 @@
 {{/*
-PodDisruptionBudget for MAOP Operator — planned: keep quorum during voluntary
-disruptions. NOTE (PLANNED — NOT IMPLEMENTED): no operator pods exist today, so
-this template has no effect yet. P1 reliability fix (2026-09-17).
+PodDisruptionBudget for MAOP Operator — keep quorum during voluntary
+disruptions. The operator controller/image exist (py/maop/operator + ../Dockerfile;
+kind-verified 2026-11-01, PR #203 chain), so this template takes effect when the
+chart is installed. P1 reliability fix (2026-09-17).
 */}}
 apiVersion: policy/v1
 kind: PodDisruptionBudget

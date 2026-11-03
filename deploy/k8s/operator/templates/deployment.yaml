@@ -4,8 +4,8 @@ image built via ../Dockerfile). Probe contract: the operator process serves
 GET /healthz on the metrics port via kopf's built-in liveness server
 (py/maop/operator/__main__.py) — kopf serves a single endpoint, so readiness
 shares the /healthz path. Validated against kind (kindest/node v1.35) smoke
-2026-11-01. The other PLANNED banners in this directory (crd.yaml, README,
-networkpolicy) are separately outdated and tracked as docs debt.
+2026-11-01. The remaining banners in this directory were corrected to match
+implemented status on 2026-11-04 (docs debt closed; AGENT-COORD round 16).
 */}}
 apiVersion: apps/v1
 kind: Deployment
