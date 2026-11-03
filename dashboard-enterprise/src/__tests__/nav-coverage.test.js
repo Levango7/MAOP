@@ -122,4 +122,45 @@ describe('nav coverage', () => {
     const stale = Object.keys(EXEMPT).filter((p) => !paths.has(p));
     expect(stale, `豁免清单里有已不存在的路由，请删除对应条目：\n  ${stale.join('\n  ')}`).toEqual([]);
   });
+
+  /**
+   * 门禁标记必须两边同步：只标导航会让用户"看得到入口、点进去被踢回"，
+   * 只标路由会让"手输 URL 能进、侧边栏却找不到"。
+   * 两种门禁各有依据：enterprise 按 edition 隐藏（管理页与通知配置页的端点
+   * 全部 require_admin），capability 按探针隐藏（收件箱的读端点任何登录用户
+   * 都能用，只有"router 没注册"才是它不可用的理由）。
+   */
+  function parseGateMarks() {
+    const navMarks = new Map();
+    for (const line of fs.readFileSync(NAV, 'utf-8').split('\n')) {
+      const m = line.match(/to:\s*'([^']+)'/);
+      if (!m) continue;
+      const cap = line.match(/capability:\s*'([^']+)'/);
+      navMarks.set(m[1], { enterprise: /enterprise:\s*true/.test(line), capability: cap ? cap[1] : null });
+    }
+    const routeMarks = new Map();
+    for (const line of fs.readFileSync(ROUTER, 'utf-8').split('\n')) {
+      const m = line.match(/path:\s*'([^']+)'/);
+      if (!m) continue;
+      const cap = line.match(/requiresCapability:\s*'([^']+)'/);
+      routeMarks.set(m[1], { enterprise: /requiresEnterprise:\s*true/.test(line), capability: cap ? cap[1] : null });
+    }
+    return { navMarks, routeMarks };
+  }
+
+  it('nav gates and route gates stay in lockstep', () => {
+    const { navMarks, routeMarks } = parseGateMarks();
+    const problems = [];
+    for (const [p, n] of navMarks) {
+      const r = routeMarks.get(p) || { enterprise: false, capability: null };
+      if (n.enterprise !== r.enterprise) problems.push(`${p}: 导航 enterprise=${n.enterprise}，路由 requiresEnterprise=${r.enterprise}`);
+      if (n.capability !== r.capability) problems.push(`${p}: 导航 capability=${n.capability}，路由 requiresCapability=${r.capability}`);
+    }
+    expect(problems, `导航与路由的门禁标记不一致：\n  ${problems.join('\n  ')}`).toEqual([]);
+
+    // 标记本身也得被解析到，否则上面的比对会空转变绿
+    expect([...navMarks.values()].filter((v) => v.enterprise).length).toBeGreaterThanOrEqual(9);
+    expect(navMarks.get('/notifications')).toEqual({ enterprise: false, capability: 'notifications' });
+    expect(navMarks.get('/notifications/config').enterprise).toBe(true);
+  });
 });

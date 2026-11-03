@@ -235,13 +235,39 @@
   `py/maop/dashboard/routers/notifications.py` 与 `py/maop/dashboard/_register_routes/_routers.py`
   的**注释面**（ZCode 第六轮也动过 `_register_routes`，我只改 notifications 注册块的文字，
   冲突面小；你方若再动请在本表回一行）。
-  **产品口径仍未决**：owner 只批了 C（关盲区 + 改假话），"个人版该不该有通知中心"（A：按企业
-  能力门控 + 前端守卫 / B：把引擎搬进仓内）等你再拍。
+  **产品口径仍未决**（2026-11-02 已拍 A，见下条）：owner 只批了 C（关盲区 + 改假话），
+  "个人版该不该有通知中心"（A：按企业能力门控 + 前端守卫 / B：把引擎搬进仓内）等你再拍。
+- **已完成（2026-11-02，分支 `fix/notifications-enterprise-gate`，PR #204）**：
+  `/api/notifications` 产品边界 **owner 选 A**。后端不改行为（模块级导入即门控），
+  前端把承诺改成与实现一致。两条门禁按各自的真实依据分开：
+  - **配置页**（`/notifications/config`）按 edition 门禁 —— channels/rules/templates
+    的端点全部 `require_admin`，普通用户进去也只会 403；
+  - **收件箱**（`/notifications`）按**能力探针**门禁 —— `/api/info/edition` 是
+    admin-only，企业版安装上的普通用户只会拿到 `personal`，而收件箱的读端点
+    （list / unread-count / preferences）本来就对任何已登录用户开放
+    （`notifications.py` docstring）。凭 edition 判断会把他该用的入口也藏掉，
+    所以改问端点自己：`GET /api/notifications/unread-count` 404 = 引擎没装，
+    401/403 = 未知（下次再探），其他 = 可用。结果在 edition store 缓存。
+    判定不可用时收件箱不发 `/list`，直接给"需要企业版"的如实空态（Integrations /
+    AlertRules 同款）。
+  - 守卫：`nav-coverage.test.js` 钉「导航 enterprise ⇔ 路由 requiresEnterprise」
+    与「导航 capability ⇔ 路由 requiresCapability」双向一致；`router.test.js` 覆盖
+    未知放行/判死挡回/可用放行三条路径；`stores.test.js` 钉探针四种状态码语义与缓存。
+  - 变异反证 4 例全部转红（导航漏标 capability / 视图不认探针 / 探针认错状态码 /
+    守卫放行一切）。实测：前端 75 文件 / 676 用例全绿，`eslint src/` 0 error，
+    `check_docs_consistency --gate` OK。**不选 B**：把 `NotificationManager`/`EventBus`
+    从 MAOS 搬进仓内要跨 ADR-017 双仓边界、授权资产进开放核、MAOS 完整性清单需重签。
+  **领地（本批）**：`dashboard-enterprise/src/{nav.js,App.vue,router/index.js,
+  stores/edition.js,views/Notifications.vue,i18n/view-notifications.js}` 与
+  `src/__tests__/{nav-coverage,router,stores,Notifications}.test.js`。
+  其中 `App.vue` / `stores/edition.js` 属 Examples 会话登记过的宽口径面（其 PR #178
+  已合并），本批只加不改其语义；他线若要再动 `filterNavByEdition` 的签名，请先在本表回一行。
 - **下一步（动前会先在本表再登记）**：企业版 response_model 棘轮已归零，本线该主题收口。
   2026-11-02 再收两项：CI 串行腿可见性（#193）与个人版棘轮导入盲区（#200），棘轮线彻底收口。
-  候选：`/api/notifications` 产品边界 A/B —— 需要 owner 先答"个人版该不该有通知中心"。
+  通知边界已拍 A（见上条），本线无遗留产品决定。
 - **不碰**：`py/maop/dashboard/server.py` 与 lifespan 接线面（ZCode 第四轮）、
-  `core/**` 宽口径异常收窄批（ADR-023 D8）、`dashboard-enterprise/src/**`。
+  `core/**` 宽口径异常收窄批（ADR-023 D8）。`dashboard-enterprise/src/**` 仅在
+  2026-11-02 通知门控批经 owner 批准例外，其余不动。
 
 ## 领地登记（Examples 会话，2026-10-29：前端可达性 + 三类静默失败守卫）
 

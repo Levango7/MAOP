@@ -34,6 +34,8 @@ export const messages = {
     // ── List ──
     'view.notifications.empty': 'No notifications',
     'view.notifications.emptyDesc': 'You are all caught up — no notifications match the current view.',
+    'view.notifications.notInstalled': 'Notification center requires the Enterprise edition',
+    'view.notifications.notInstalledDesc': 'The notification engine ships with the commercial overlay, so these endpoints are not registered on this install.',
     'view.notifications.loadError': 'Failed to load notifications',
     'view.notifications.markRead': 'Mark as read',
     'view.notifications.markAllRead': 'Mark all as read',
@@ -117,6 +119,8 @@ export const messages = {
     // ── 列表 ──
     'view.notifications.empty': '暂无通知',
     'view.notifications.emptyDesc': '已无待处理通知——当前视图下没有匹配项。',
+    'view.notifications.notInstalled': '通知中心需要企业版',
+    'view.notifications.notInstalledDesc': '通知引擎随商业 overlay 分发，当前安装没有注册这些端点。',
     'view.notifications.loadError': '通知加载失败',
     'view.notifications.markRead': '标记已读',
     'view.notifications.markAllRead': '全部标记已读',
