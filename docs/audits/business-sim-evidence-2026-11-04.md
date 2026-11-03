@@ -106,3 +106,31 @@
 - GAP-1 (code-confirmed): wiring.run_workflow legacy backend lands in maop_plan.execute_workflow which ONLY plans and never executes any agent (maop_plan.py:429 docstring admits the name is a misnomer). Real execution exists only via Dispatcher.dispatch / maop run / Temporal backend; the cross-backend contract gap must be closed in E2-b.
 - GAP-2 (measured): M-X3 attribution tokens=3185 != protocol-line tokens=6924 -- cost attribution vs execution-path metering mismatch.
 - GAP-3 (environment, tooling): 子进程解析 maop 的两颗地雷——(a) py/scripts/business_sim/run_sim.py 曾用 parents[1] 取 py 目录（差一层到 scripts/），(b) 本机 site-packages 存在把 F:\Nexus\MAOP\py（主工作树旧分支）注入 sys.path 的 .pth。两者叠加时子进程解析到旧分支 cli（无 --agent），报 unrecognized arguments。已在 harness 修为 parents[2] 并以 runpy 包装确定性启动；**任何按 repo 约定从脚本目录spawn maop 子进程的工具都有同款风险**。
+
+## GAP-2 根因诊断（人工复核，2026-11-04）
+
+**两层计量、两套 schema、互不相认**：
+
+1. **协议行层**（M3.1/M3.3 合同）：CLI 驱动回填 `[USAGE] turns=N tokens=T source=estimated`
+   ——单一 `tokens=` 总量，被 operator reconcile 与 CLI 出口解析进
+   `status.tokensUsed`（CRD 用量会计的权威值）。
+2. **成本账层**（P2-1 成本双写统一，`maop/maop_loop_phases.py:385-420`）：
+   `CostTracker.record_actual_cost` 读 `usage.prompt_tokens / completion_tokens`
+   ——CLI 驱动路径没有 provider，恒为 0 → 永远落到启发式估算
+   （task 文本 CJK×2 + len//4 与 stdout 同式），账面记的是**文本长度启发式**。
+
+同一 11 次执行：CRD 侧（协议行）= 6924 tokens，成本账侧（启发式）= 3185 tokens，
+两者都标 estimated、互不引用。**后果**：配额门（M3.2 QuotaChecker「终态后回报
+用量」）与 CRD 报表如果各取一侧，配额裁决与用量报表将系统性分歧。
+
+**修复选项（需裁决）**：
+- **A（推荐）**：协议行 schema 升级为 `prompt_tokens=/completion_tokens=`
+  （或 `tokens=` + 约定拆分规则），成本账层按「provider usage → 协议行 →
+  启发式」优先级链取值并标注来源——三层单一真相，改动面 = 协议行 +
+  loop 记账器 + stub/测试，operator reconcile 兼容旧行。
+- B：成本账保持启发式作为对协议行声明的**独立审计源**，两数并存并在
+  聚合视图标注双源——零代码改动，但看板永远有两个数。
+- C：归因行加 `tokens_source` 维度，聚合可按源拆分——折中，改动 M-X3。
+
+**推荐 A**：消除而非解释分歧；M-SIM harness 的对账断言（usage 合计 ==
+attribution 合计）落地后即为该修复的验收门。
