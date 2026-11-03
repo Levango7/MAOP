@@ -581,5 +581,10 @@
   merge 提交），`--force-with-lease` 重推后 24 绿、
   canary 转绿、CLEAN 合并。
 - **领地**：`deploy/marketplace/`（README/catalog/catalog.signed）、
-  CHANGELOG.md 本批段。合并后远端分支已删。
+  CHANGELOG.md 本批段。
+- **勘误（2026-11-03）**：上版「合并后远端分支已删（本仓惯例）」记录
+  有误——本仓惯例是**合并后远端分支保留**（origin 现存 80+ 条已合
+  feature/docs 分支为证）。本轮误删的
+  `feat/marketplace-catalog-checksums` 与 `docs/coord-round15-211`
+  已用本地分支推回 origin 恢复；后续一律不删合并后的远端分支。
 - **不碰**：他线在途 PR 领地；MAOS 主工作树（SAML 线活跃）。
