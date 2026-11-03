@@ -237,7 +237,8 @@
   冲突面小；你方若再动请在本表回一行）。
   **产品口径仍未决**（2026-11-02 已拍 A，见下条）：owner 只批了 C（关盲区 + 改假话），
   "个人版该不该有通知中心"（A：按企业能力门控 + 前端守卫 / B：把引擎搬进仓内）等你再拍。
-- **已完成（2026-11-02，分支 `fix/notifications-enterprise-gate`，PR #204）**：
+- **已完成（2026-11-02，分支 `fix/notifications-enterprise-gate`，PR #204 → 合并提交
+  `787d64ca`）**：
   `/api/notifications` 产品边界 **owner 选 A**。后端不改行为（模块级导入即门控），
   前端把承诺改成与实现一致。两条门禁按各自的真实依据分开：
   - **配置页**（`/notifications/config`）按 edition 门禁 —— channels/rules/templates
@@ -529,6 +530,15 @@
   `dashboard-enterprise/src/i18n/view-licenses.js`（这三个文件此前由本会话 #187 批
   登记过，仍在同一口径内）。**不碰** `nav.js` / `router/index.js`（通知门控批
   PR #204 的领地）。
+- **已完成（2026-11-03，PR #209 → 合并提交 `2a58b3c7`）**：合入前重新基线过一次
+  （被自家 #204 的 CHANGELOG 小节顶成冲突，按「两侧都保留」解决），rebase 后本机
+  复跑全量 75 文件 / 677 用例绿 + docs gate OK，才按 `--match-head-commit` 合。
+  master run 落在含这两批的提交上再验一次镜像/Compose/trivy 那条只在主干跑的腿。
+- **他线注意（#180）**：本会话在 `nav.js` 通知两项上加了 `capability: 'notifications'`
+  / `enterprise: true`，并在 `nav-coverage.test.js` 新增「导航 enterprise/capability ⇔
+  路由 requiresEnterprise/requiresCapability」lockstep 用例。#180（`fix/frontend-polish`，
+  图标去重，10-29 起未更新）改的是同一批文件，**需要 rebase 并重跑 CI**——它现有的
+  24 条绿是 5 天前旧 head 的结论。已在 #204 PR 正文留了同样的提醒。
 
 ## 领地登记（ZCode session_f62ccbe…，2026-11-03 第十四轮：条件触发项清账批——用户批准执行序）
 
