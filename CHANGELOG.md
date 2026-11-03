@@ -38,7 +38,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [Unreleased]
+### Marketplace 目录版本钉死（2026-11-03）
 
+首签目录的实际风险收口：两条 stdio 条目原为**未钉版本**的 `npx -y <pkg>`，
+每次安装会拉到 npm 最新版——签名只保护条目内容，不保护拉到的代码。
+
+- `server-filesystem@2.1.0`、`server-github@2025.4.8`（npm latest 实测）
+  钉进 `default_config.args` 与 `version` 字段；**复签 + 双向验证 3/3**
+  （签发自验证 + 消费侧 `require_signature=True`）。
+- **`checksum` 保持 `null` 并写明原因**：消费侧该字段语义是
+  `download_url` **载荷**的 SHA-256；stdio+npx 条目没有 MAOP 自下载载荷，
+  硬填 npm 的 `sha512-…` tarball integrity 属于算法与对象双错位
+  （README 边界节已记，含将来改载荷型条目的补法）。
+- 升级路径：改 `version` + `args` 两处 → 复签 → 复审。
 ### 许可证页去掉永远匹配不到的"版本"筛选（2026-11-02）
 
 - **事实**：MAOS `maop/enterprise/license_manager.py` 在签发时把 `edition` 写死成
@@ -52,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   随之失效的 `view.licenses.allVersions`，`versionPersonal`/`versionTeam` 仍被映射使用。
 - **守卫**：`Licenses.test.js` 新增用例，断言筛选器不提供线缆上不可能出现的取值
   （同时断言状态筛选的 `trial` 仍在，防用例空转）。变异反证：把死筛选塞回去必红。
+
 
 ### 通知中心按企业版门控（2026-11-02）
 
