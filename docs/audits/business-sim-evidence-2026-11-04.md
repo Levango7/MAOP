@@ -134,3 +134,27 @@
 
 **推荐 A**：消除而非解释分歧；M-SIM harness 的对账断言（usage 合计 ==
 attribution 合计）落地后即为该修复的验收门。
+
+## GAP-4 Windows 编码缺口（CI 复测发现，已修）
+
+四条 windows pytest 腿（3.10–3.13）首跑全红，根因非配额取消而是**真实跨平台
+缺口**：``maop/core/agent/adapters/cli_adapter.py`` 的 ``subprocess.run(...,
+text=True)`` 未指定 encoding，Windows 上管道走 locale 编码（cp1252），
+
+- stub 子进程 ``print()`` 含中文 task 文本 → 子进程侧 ``UnicodeEncodeError``
+  退出码 1（``test_stub_is_deterministic`` 断言 returncode==0 失败）；
+- 经 ``maop.cli run`` 的三节点剧本 3/3 全失败（``test_scenario_end_to_end``
+  ``failed == 3``）。
+
+**影响面**：任何输出非 ASCII 的外部 CLI agent 在 Windows 部署上都会复现——
+这不是演练工具的边角，而是生产路径的跨平台缺陷，恰是 M-SIM 预生产演练
+要抓的那类问题（本机 Windows 控制台默认 UTF-8，故本地全绿、CI 才暴露）。
+
+**修复**（同笔提交）：
+1. ``cli_adapter.py`` subprocess.run 增 ``encoding="utf-8", errors="replace"``
+   （POSIX 本就 UTF-8，无行为变化；Windows 使能非 ASCII 输出）；
+2. ``stub_business_agent.py`` 入口对 stdout/stderr 做 UTF-8 reconfigure，
+   保证被未指定 encoding 的父进程调用时也不炸（防御纵深）。
+
+回归：``tests/test_business_sim.py`` 4/4 本地通过，CI 四条 windows 腿复跑
+即为跨平台验收。

@@ -55,7 +55,11 @@ GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在�
   `run_workflow` 只规划不执行（`maop_plan.execute_workflow` 自认名不副实）；
   GAP-2 双层计量口径分歧（provider 启发式 3185 vs 协议行回填 6924 tokens，
   11 次调用——计费权威口径待裁）；GAP-3 子进程解析 maop 的环境地雷
-  （.pth 注入旧工作树 + 脚本目录取 py 差一层，已在 harness 内收口）。
+  （.pth 注入旧工作树 + 脚本目录取 py 差一层，已在 harness 内收口）；
+  GAP-4 Windows 编码缺口——`cli_adapter` 的 `subprocess.run(text=True)`
+  未指定 encoding，Windows 管道 cp1252 下任何非 ASCII 输出的 CLI agent
+  必炸（本机默认 UTF-8 故本地全绿、CI 才暴露）；已修（cli_adapter 显式
+  UTF-8 + stub 出口 reconfigure），四条 windows 腿复跑为跨平台验收。
 - 章程与 M1（kind operator 腿 / Temporal 腿 / 48h soak 串联）见 ROADMAP
   「M-SIM」节；另登记 M-X1 M1 / M-X2 E2-b / M2.2 B2 余项（用户授权立项）。
 

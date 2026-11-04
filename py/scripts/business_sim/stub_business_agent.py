@@ -27,6 +27,14 @@ def _canned_reply(task: str, role: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Windows 上 stdout 是管道时默认编码为 locale（cp1252），
+    # print() 含中文会 UnicodeEncodeError——强制 UTF-8 保证跨平台一致。
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError, ValueError):
+            pass
+
     parser = argparse.ArgumentParser(description="M-SIM deterministic stub agent")
     parser.add_argument("--task", required=True, help="task text")
     parser.add_argument("--role", default="worker", help="sim role name (for output tag)")
