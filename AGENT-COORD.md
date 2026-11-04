@@ -51,7 +51,6 @@
 - MAOS 本仓已建 `F:/Nexus/MAOS/AGENT-COORD.md` 作为 MAOS 侧留言板，后续 MAOS 工作请在那边登记。
 - 本会话持有生产签名私钥（离线机、不入仓）：enterprise 模块改动需重签完整性清单时可协调代签。
 
-
 ## 已完成的领地操作（2026-10-27）
 
 - **chat_service.py 拆分**（1152 → 482 行）：§2 Stream → `services/chat/streaming.py`（251 行），
@@ -759,3 +758,18 @@
   原样留给他们自己处置——`MAOP-op` 那 9 个后来由该会话提交为 #219/#221，与本会话无关）；
   今天合并的 `docs/coord-round16`、`docs/k8s-operator-status`、`feat/business-sim-m0`
   一条没删。
+
+### 第十八轮交付回执（2026-11-05，PR-B M-X1 M1）
+- **侦察修正**：双钥宽限（`verify_with_key_management`）11-03 复核已有实现
+  +测试，M1 范围收窄为 D2③ HTTPS 拉取通道——立项登记里的「双钥宽限 try 验签」
+  子项按不重复劳动裁撤（与 2026-11-03 自驱 2/3 结论一致）。
+- **交付**：`core/marketplace/key_resolve.py`（env→内置→HTTPS 三通道回退 +
+  bootstrap 指纹钉扎 + SSRF 三闸：https-only/解析边界全公网单播/禁重定向；
+  拉取不落盘，`build_verifier` 程序化注入）+ settings 2 新 env（收敛点）+
+  .env.example 登记 + 消费接线两处（cli_mcp_marketplace / plugin_service
+  单例）+ 治理文档实施记录 + ROADMAP 当前状态头刷新（v5.4.0→v5.5.0 口径，
+  立项清单③并入本 PR）。**Mimosa SSRF 扫描拦截 1 次→补齐三闸后过闸**
+  （扫描要求与实现互证）。测试 19 例全离线（DNS/opener 双打桩 + 真 Ed25519
+  往返）+ 既有 marketplace 族 152 例回归。**残余风险如实登记**：DNS
+  rebinding TOCTOU（模块 docstring），纵深防御接受。
+

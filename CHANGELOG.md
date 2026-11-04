@@ -76,6 +76,31 @@ GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在�
 - 章程与 M1（kind operator 腿 / Temporal 腿 / 48h soak 串联）见 ROADMAP
   「M-SIM」节；另登记 M-X1 M1 / M-X2 E2-b / M2.2 B2 余项（用户授权立项）。
 
+### M-X1 M1 —— 验签公钥三通道解析（D2③ HTTPS 拉取，2026-11-05）
+
+治理文档 D2 的最后一条待落地通道（双钥宽限经 11-03 复核确认
+`verify_with_key_management` 已实现+测试，M1 范围收窄为 HTTPS 拉取）：
+
+- 新模块 `core/marketplace/key_resolve.py`：按运维覆盖语义回退的三通道解析
+  （env 路径/内联 PEM → 安装包内置 `config/marketplace_verify_key.pub` →
+  企业 distribution server HTTPS 端点）；拉取结果只进内存不落盘，经
+  `build_verifier` 程序化注入（`set_public_key`，无需临时文件）。
+- **bootstrap 信任钉扎**（治理文档 D2 预警的落地）：HTTPS 通道仅当
+  `MAOP_MARKETPLACE_VERIFY_KEY_FP`（期望指纹 = 行尾归一化 PEM 的 SHA-256）
+  同时配置才启用；未钉即拒、指纹不符即拒，fail-closed。
+- **SSRF 三闸**（Mimosa 扫描要求，实测）：scheme 必须 https://；主机解析
+  边界=全部 A/AAAA 记录须公网单播（挡内网/云元数据 169.254.169.254/环回）；
+  禁重定向（`_NoRedirectHandler`）。体积上限 64 KiB + 短超时。残余 DNS
+  rebinding TOCTOU 窗口如实登记于模块 docstring（纵深防御接受，攻击者须
+  同时控制 DNS 并持有指纹对应私钥）。
+- 消费接线两处：`cli_mcp_marketplace`（CLI 安装路径）与
+  `dashboard/services/plugin_service`（面板单例）从单一 env 路径升级为
+  三通道解析；HTTPS 失败降级为无验签器（要求验签的安装
+  `require_signature=True` 时照旧 fail-closed，语义自洽）。
+- 新 env：`MAOP_MARKETPLACE_KEY_SERVER_URL` / `MAOP_MARKETPLACE_VERIFY_KEY_FP`
+  （settings 收敛 + .env.example 登记）。测试 19 例（全离线：DNS/opener
+  双打桩 + 真 Ed25519 签发验签往返）。
+
 ### Marketplace 目录版本钉死（2026-11-03）
 
 首签目录的实际风险收口：两条 stdio 条目原为**未钉版本**的 `npx -y <pkg>`，
