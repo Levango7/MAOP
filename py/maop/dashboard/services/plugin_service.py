@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -249,8 +250,30 @@ def _get_marketplace() -> Any:
     with _mcp_marketplace_lock:
         if _mcp_marketplace is not None:  # double-checked locking
             return _mcp_marketplace
+        from maop.config.settings import (
+            marketplace_key_server_url,
+            marketplace_verify_key_fp,
+            marketplace_verify_key_path,
+        )
+        from maop.core.marketplace.key_resolve import (
+            build_verifier,
+            resolve_marketplace_verify_key,
+        )
         from maop.core.mcp.mcp_marketplace import MCPMarketplace
-        _mcp_marketplace = MCPMarketplace()
+
+        # M-X1 M1：三通道解析（env → 内置 → HTTPS 拉取）。root_dir 取仓库/
+        # 安装根（本文件 py/maop/dashboard/services/ 下 parents[4]），内置通道
+        # 指向根的 config/marketplace_verify_key.pub（与 cli 侧 _runtime_root
+        # 同一位置）。
+        key_pem = resolve_marketplace_verify_key(
+            Path(__file__).resolve().parents[4],
+            env_value=marketplace_verify_key_path(),
+            key_server_url=marketplace_key_server_url(),
+            expected_fp=marketplace_verify_key_fp(),
+        )
+        _mcp_marketplace = MCPMarketplace(
+            verifier=build_verifier(key_pem) if key_pem else None,
+        )
         logger.info("[mcp_service] MCPMarketplace singleton initialised")
     return _mcp_marketplace
 

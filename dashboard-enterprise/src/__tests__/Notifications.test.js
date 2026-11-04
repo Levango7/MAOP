@@ -17,6 +17,7 @@ vi.mock('../composables/useConfirm.js', () => ({
 }));
 
 import Notifications from '../views/Notifications.vue';
+import { useI18n } from '../i18n/index.js';
 import ListPageLayout from '../components/ListPageLayout.vue';
 import StatCard from '../components/StatCard.vue';
 import EmptyState from '../components/EmptyState.vue';
@@ -453,6 +454,30 @@ describe('Notifications.vue', () => {
     // 而不是按出现次数 —— 后者一行就命中两次。offset 若没发出去，这里会是 2 行 n1。
     expect(rows.filter((r) => r.text().includes('n1'))).toHaveLength(1);
     expect(rows.filter((r) => r.text().includes('n3'))).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it('explains the enterprise requirement instead of 404-ing at the user', async () => {
+    // 个人版没装商业 overlay 时 notifications router 整块不注册。探针 404 之后
+    // 收件箱不该再去打 /list（那必然又是一条 404），也不该渲染成红色的
+    // "加载失败"——要讲清楚这是企业版能力，与 Integrations.vue 同款处理。
+    const { t } = useI18n();
+    const seen = [];
+    global.fetch = vi.fn((url) => {
+      const u = String(url).split('?')[0];
+      seen.push(u);
+      return Promise.resolve({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve('{}'),
+      });
+    });
+    const wrapper = await mountNotifications();
+    expect(seen).toContain('/api/notifications/unread-count');
+    expect(seen).not.toContain('/api/notifications/list');
+    expect(wrapper.text()).toContain(t('view.notifications.notInstalled'));
+    expect(wrapper.findComponent(EmptyState).exists()).toBe(true);
     wrapper.unmount();
   });
 });

@@ -41,20 +41,26 @@ def _load_yaml(path: Path) -> object:
 
 
 def _helm(*args: str) -> subprocess.CompletedProcess:
+    # 工具输出是 UTF-8（chart 模板注释可含中文，helm 原样透传 # 注释行）；
+    # 不显式 encoding 时 Windows 默认 cp1252 解码必炸（2026-11-01 CI 四腿
+    # windows 实证）。errors=replace 保证断言消息可读、解析容错。
     return subprocess.run(
         ["helm", *args], capture_output=True, text=True, timeout=60, check=False,
+        encoding="utf-8", errors="replace",
     )
 
 
 def _kubectl(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["kubectl", *args], capture_output=True, text=True, timeout=60, check=False,
+        encoding="utf-8", errors="replace",
     )
 
 
 def _kind(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["kind", *args], capture_output=True, text=True, timeout=120, check=False,
+        encoding="utf-8", errors="replace",
     )
 
 
@@ -68,6 +74,7 @@ def _docker_available() -> bool:
     try:
         return subprocess.run(
             ["docker", "info"], capture_output=True, text=True, timeout=2, check=False,
+            encoding="utf-8", errors="replace",
         ).returncode == 0
     except subprocess.TimeoutExpired:
         return False

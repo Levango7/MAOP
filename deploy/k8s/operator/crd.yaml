@@ -1,9 +1,12 @@
 # MAOP Operator CRDs — combined multi-document manifest.
 #
-# ⚠ PLANNED — NOT IMPLEMENTED. These CRD schemas describe the intended API
-# shape only: no controller exists in this repository, so no CR is ever
-# reconciled and no RLS / quota / plugin behavior is enforced. Kept for design
-# reference and structure tests (py/tests/test_k8s_operator.py).
+# ⚠ PARTIALLY IMPLEMENTED (M-T3.3). A kopf-based MaopTask controller exists in
+# this repository (py/maop/operator/) and reconciles MaopTask CRs end-to-end —
+# kind-verified 2026-11-01 (PR #203 chain). MaopAgent is resolved by name;
+# MaopWorkflow remains planned-shape-only. RLS / quota / plugin behavior:
+# quota gate mechanism shipped (M3.2, injectable), policy cross-repo (MAOS);
+# RLS / plugin loading still planned. Kept for design reference and structure
+# tests (py/tests/test_k8s_operator.py).
 #
 # This file is a concatenation of the individual CRDs under crds/. It is provided
 # as a convenience for kubectl apply -f crd.yaml without Helm.

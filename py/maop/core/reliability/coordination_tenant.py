@@ -105,7 +105,15 @@ class RBACEnforcer(Protocol):
 class FallbackRBACEnforcer:
     """Lightweight enforcer used when enterprise RBAC is not installed.
 
-    Allows any operation by default but respects explicit ``deny`` rules.
+    **Fail-closed**: an operation is allowed only when ``ctx`` already carries
+    the permission (or the ``superadmin`` role); an explicit ``deny`` rule for
+    any of the ctx's roles still vetoes an otherwise-granted permission. A
+    context with no permissions is therefore **denied** — the previous docstring
+    promised "allows any operation by default", which the code never did
+    (flagged by the MAOS M3 readiness doc, 待决 #3). Enterprise deployments
+    should not rely on this class: inject
+    ``maop.enterprise.rbac_m3_adapter.create_m3_enforcer()`` instead, so MAOS's
+    grant table decides.
     """
 
     def __init__(self) -> None:

@@ -66,10 +66,9 @@ def tenant_client(tmp_path, monkeypatch):
 
 class TestTenantList:
     def test_list(self, tenant_client):
-        # 恢复显式守卫（原为 importorskip，2026 某次因本机装了企业包被删掉，
-        # 于是个人版 CI 静默跳过该文件后此处从未被验证）。list_tenants 走
-        # tenant_service → maop.enterprise.tenant.TenantStatus，个人版必 500。
-        pytest.importorskip("maop.enterprise.tenant", reason="TenantStatus 在 maop-enterprise（MAOS）")
+        # list_tenants 经 maop.enterprise.tenant.TenantStatus（模块级导入企业包）
+        # 才拿得到枚举；企业包缺席时本用例无从成立。
+        pytest.importorskip("maop.enterprise.tenant")
         resp = tenant_client.get("/api/tenant/list")
         assert resp.status_code == 200
 
@@ -80,8 +79,7 @@ class TestTenantList:
 
 class TestTenantCreate:
     def test_happy(self, tenant_client):
-        # 同上：create_tenant 也经 tenant_service → maop.enterprise.tenant。
-        pytest.importorskip("maop.enterprise.tenant", reason="TenantManager 在 maop-enterprise（MAOS）")
+        pytest.importorskip("maop.enterprise.tenant")
         resp = tenant_client.post(
             "/api/tenant/create",
             json={"tenant_id": "t1", "name": "test"},

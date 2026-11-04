@@ -23,10 +23,10 @@ from pydantic import BaseModel, Field
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.routers.credential_vault_schemas import (
-    CredentialCreateEnvelope,
-    CredentialDeleteEnvelope,
+    CredentialCreatedEnvelope,
+    CredentialDeletedEnvelope,
     CredentialListEnvelope,
-    CredentialRotateEnvelope,
+    CredentialRotatedEnvelope,
 )
 
 # ── Service layer ──────────────────────────────────────────────────
@@ -98,7 +98,7 @@ async def api_get_credential(credential_id: str, request: Request) -> dict[str, 
     return {"status": "ok", "credential": cred}
 
 
-@router.post("/api/credential-vault/credentials", response_model=CredentialCreateEnvelope)
+@router.post("/api/credential-vault/credentials", response_model=CredentialCreatedEnvelope)
 @handle_api_errors(
     "Create credential",
     error_value={"status": "error", "error": "Create failed"},
@@ -129,7 +129,10 @@ async def api_create_credential(
     return {"status": "ok", "credential_id": cred_id}
 
 
-@router.delete("/api/credential-vault/credentials/{credential_id}", response_model=CredentialDeleteEnvelope)
+@router.delete(
+    "/api/credential-vault/credentials/{credential_id}",
+    response_model=CredentialDeletedEnvelope,
+)
 @handle_api_errors(
     "Delete credential",
     error_value={"status": "error", "error": "Delete failed"},
@@ -145,7 +148,7 @@ async def api_delete_credential(credential_id: str, request: Request) -> dict[st
 
 @router.post(
     "/api/credential-vault/credentials/{credential_id}/rotate",
-    response_model=CredentialRotateEnvelope,
+    response_model=CredentialRotatedEnvelope,
 )
 @handle_api_errors(
     "Rotate credential",

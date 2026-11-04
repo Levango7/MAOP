@@ -38,6 +38,754 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [Unreleased]
+### M-SIM 模拟业务场景预生产演练 M0（2026-11-04）
+
+GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在等不来真实客户/云
+资源时的本地替代：用**确定性 stub 驱动**（零外部 LLM/网络）把三个业务剧本
+（工单分诊处置 / 日报生成 / 代码审查扇入）经**生产执行路径**（`maop.cli run`
+子进程，与 operator/Temporal executor 同形）实跑并采集运维证据。
+
+- `py/scripts/business_sim/`：stub 驱动（同输入同输出 + `[USAGE]` 协议行 +
+  `--fail-on` 故障注入）+ 演练编排（Kahn 分波 DAG、隔离 MAOP_ROOT_DIR home）
+  + 证据采集（cost_tracker 落库对账 M-X3 聚合、alert_ingest 写读、
+  db_backup 备份 + `integrity_check` 恢复验证）；`py/tests/test_business_sim.py`
+  4 例（stub 确定性 / 故障注入 / 环检测 / 端到端 3 节点）。
+- **实跑 11/11 全绿**；证据与缺口见
+  `docs/audits/business-sim-evidence-2026-11-04.md`：GAP-1 legacy 后端
+  `run_workflow` 只规划不执行（`maop_plan.execute_workflow` 自认名不副实）；
+  GAP-2 双层计量口径分歧**已收口（方案 A）**——M0 时 provider 启发式 3185
+  vs 协议行 6924 tokens（同 11 次调用、两套口径互不对齐）：协议行 schema
+  升级为 `[USAGE] turns=N tokens=T source=S prompt=P completion=C`（新字段
+  追加在 `source=` 之后，既有解析器向后兼容），`usage_protocol.parse_usage_line`
+  为唯一权威解析点、`delegate/drivers._run_cli`（2 处）与
+  `_run_wrapper`（4 处，2026-11-05 同批接线：JSON 封装路径自 JSON 的
+  stdout 字段解析）成功路径回填 `MaopResult.usage`，取值链 = provider 实测
+  → 协议行 → CJK 启发式；
+  `run_sim.reconcile_usage()` 硬断言两侧总量逐 token 相等（不等即演练退出
+  1）——全量三剧本 **11/11 成功 + 对账 5429==5429** 验证通过；GAP-3 子进程
+  解析 maop 的环境地雷
+  （.pth 注入旧工作树 + 脚本目录取 py 差一层，已在 harness 内收口）；
+  GAP-4 Windows 编码缺口（两层）——(a) `cli_adapter` 的
+  `subprocess.run(text=True)` 未指定 encoding，Windows 管道 cp1252 下任何
+  非 ASCII 输出的 CLI agent 必炸；(b) `maop/cli.py` 入口自身 stdout 同走
+  cp1252，loop 打印含中文的运行/失败信息时连 `[FAIL] run 失败` 报错路径
+  都连带崩溃（本机全局 PYTHONUTF8=1 故本地全绿、CI 才暴露）；已修
+  （cli_adapter 显式 UTF-8 + cli.py 入口 reconfigure + stub/child_env
+  双保险），`PYTHONIOENCODING=cp1252` 最严模拟下 4/4 通过，四条 windows
+  腿复跑为跨平台验收。
+- 章程与 M1（kind operator 腿 / Temporal 腿 / 48h soak 串联）见 ROADMAP
+  「M-SIM」节；另登记 M-X1 M1 / M-X2 E2-b / M2.2 B2 余项（用户授权立项）。
+
+### M-X2 E2-b —— dashboard workflow 提交与状态回写（2026-11-05）
+
+GAP-1 收口面（dashboard 侧）：dashboard 此前无 workflow 提交面、workflow
+运行对 run_events 时间线不可见。本切片打通：
+
+- `GET  /api/workflows`：列出 agents.yaml `workflows:` 段（名称/步骤数/
+  涉及 agent/描述）；
+- `POST /api/workflows/{name}/run`：经**生产入口** `wiring.run_workflow_sync`
+  提交（backend 透传：空=legacy 规划合同、temporal=真实执行——GAP-1 的
+  「只规划」语义在 API 面如实透出，不掩盖），admin-only；
+- **状态回写**：`run.workflow.started/completed/failed` 三事件写入
+  `run_events`，返回 `trace_id`——面板沿既有 `/api/runs/{trace_id}` 时间线
+  即可把工作流事件与子 agent run 事件同轴查看；
+- 注册进 `_register_core_routers`（审计双视图随 registration 生效）；
+- 契约测试 6 例（admin 门禁/列表/成功回写/未知 workflow/失败回写/403，
+  `_runner`/`_load_config` 模块缝注入零真实执行）。
+- M-SIM M1 附带交付：`scripts/business_sim/soak_run.py` 48h soak harness
+  （持久 home + 逐轮 JSONL + 增量对账硬门禁 + stop-file 优雅停 + 连续失败
+  熔断 + 断点续跑；本机已在跑）。
+
+### M-X1 M1 —— 验签公钥三通道解析（D2③ HTTPS 拉取，2026-11-05）
+
+治理文档 D2 的最后一条待落地通道（双钥宽限经 11-03 复核确认
+`verify_with_key_management` 已实现+测试，M1 范围收窄为 HTTPS 拉取）：
+
+- 新模块 `core/marketplace/key_resolve.py`：按运维覆盖语义回退的三通道解析
+  （env 路径/内联 PEM → 安装包内置 `config/marketplace_verify_key.pub` →
+  企业 distribution server HTTPS 端点）；拉取结果只进内存不落盘，经
+  `build_verifier` 程序化注入（`set_public_key`，无需临时文件）。
+- **bootstrap 信任钉扎**（治理文档 D2 预警的落地）：HTTPS 通道仅当
+  `MAOP_MARKETPLACE_VERIFY_KEY_FP`（期望指纹 = 行尾归一化 PEM 的 SHA-256）
+  同时配置才启用；未钉即拒、指纹不符即拒，fail-closed。
+- **SSRF 三闸**（Mimosa 扫描要求，实测）：scheme 必须 https://；主机解析
+  边界=全部 A/AAAA 记录须公网单播（挡内网/云元数据 169.254.169.254/环回）；
+  禁重定向（`_NoRedirectHandler`）。体积上限 64 KiB + 短超时。残余 DNS
+  rebinding TOCTOU 窗口如实登记于模块 docstring（纵深防御接受，攻击者须
+  同时控制 DNS 并持有指纹对应私钥）。
+- 消费接线两处：`cli_mcp_marketplace`（CLI 安装路径）与
+  `dashboard/services/plugin_service`（面板单例）从单一 env 路径升级为
+  三通道解析；HTTPS 失败降级为无验签器（要求验签的安装
+  `require_signature=True` 时照旧 fail-closed，语义自洽）。
+- 新 env：`MAOP_MARKETPLACE_KEY_SERVER_URL` / `MAOP_MARKETPLACE_VERIFY_KEY_FP`
+  （settings 收敛 + .env.example 登记）。测试 19 例（全离线：DNS/opener
+  双打桩 + 真 Ed25519 签发验签往返）。
+
+### Marketplace 目录版本钉死（2026-11-03）
+
+首签目录的实际风险收口：两条 stdio 条目原为**未钉版本**的 `npx -y <pkg>`，
+每次安装会拉到 npm 最新版——签名只保护条目内容，不保护拉到的代码。
+
+- `server-filesystem@2.1.0`、`server-github@2025.4.8`（npm latest 实测）
+  钉进 `default_config.args` 与 `version` 字段；**复签 + 双向验证 3/3**
+  （签发自验证 + 消费侧 `require_signature=True`）。
+- **`checksum` 保持 `null` 并写明原因**：消费侧该字段语义是
+  `download_url` **载荷**的 SHA-256；stdio+npx 条目没有 MAOP 自下载载荷，
+  硬填 npm 的 `sha512-…` tarball integrity 属于算法与对象双错位
+  （README 边界节已记，含将来改载荷型条目的补法）。
+- 升级路径：改 `version` + `args` 两处 → 复签 → 复审。
+### 许可证页去掉永远匹配不到的"版本"筛选（2026-11-02）
+
+- **事实**：MAOS `maop/enterprise/license_manager.py` 在签发时把 `edition` 写死成
+  `enterprise` —— 模型默认值（`:94`）、INSERT 字面量（`:475` / `:490`）、建表
+  `DEFAULT 'enterprise'`（`:345`）三处同向；`LicenseCreateRequest` 里也没有
+  edition/version 字段可传。
+- **后果**：筛选器的 `personal` / `team` 两个取值永远匹配不到任何行，`enterprise`
+  又恒真 —— 这是"看起来能选、选了只会把列表清空"的死控件。
+- **处置**：控件连同 `filters.version` 与比对分支一起删除；版本列继续按真实
+  `edition` 渲染（`versionLabel` 保留，它是线缆字段的映射而不是猜测）。i18n 只删
+  随之失效的 `view.licenses.allVersions`，`versionPersonal`/`versionTeam` 仍被映射使用。
+- **守卫**：`Licenses.test.js` 新增用例，断言筛选器不提供线缆上不可能出现的取值
+  （同时断言状态筛选的 `trial` 仍在，防用例空转）。变异反证：把死筛选塞回去必红。
+
+
+### 通知中心按企业版门控（2026-11-02）
+
+- **问题**：个人版（未安装 MAOS overlay）没有通知引擎——`notifications` router 与其
+  schema 在模块级导入 `maop.enterprise.notification.models`，注册处整块跳过，26 条
+  端点全部不存在；但侧边栏仍无条件给出 `/notifications` 与 `/notifications/config`
+  两个入口，点进去必然 404。
+- **口径（A）**：明确把通知中心画成企业版能力。后端不改行为（导入即门控），只让 UI
+  的承诺与实现一致：个人版不再给出这两个入口，深链送回 `/home`。
+- **收件箱不按 edition 判断**：`/api/info/edition` 是 admin-only，企业版安装上的普通
+  用户拿 403 后按安全默认回落 `personal`；而收件箱的读端点（list / unread-count /
+  preferences）本来就对任何已登录用户开放（见 `routers/notifications.py` 的 docstring）。
+  凭 edition 判断会把这类用户本来能用的入口也藏掉。所以收件箱改用**能力探针**：App 启动
+  与进入页面各探一次 `GET /api/notifications/unread-count`（结果在 store 缓存，只发一次），
+  404 判"引擎没装"，401/403 保持未知并下次再探，5xx 说明端点已注册算可用。判定不可用时
+  收件箱不再发 `/list`，直接说明需要企业版——与 Integrations / AlertRules 同款处理。
+- **配置页继续按 edition 门禁**：channels/rules/templates 的端点全部 `require_admin`，
+  普通用户进去也只会 403，隐藏符合实际。
+- **守卫**：`nav-coverage.test.js` 钉住「导航 `enterprise:true` ⇔ 路由
+  `requiresEnterprise`」「导航 `capability` ⇔ 路由 `requiresCapability`」双向一致；
+  `router.test.js` 覆盖守卫的三条路径（未知放行 / 判死挡回 / 可用放行）；
+  `stores.test.js` 钉探针的四种状态码语义与"只发一次"缓存。
+- **未选 B**：不把 `NotificationManager`/`EventBus` 从 MAOS 搬进 MAOP——跨 ADR-017
+  双仓边界、授权资产进开放核、MAOS 完整性清单需重签，爆炸半径远大于收益。
+
+### 条件触发项清账批 1+2 —— M-X1 首签落地 + E1-a 轻生产（2026-11-03，用户批准执行序）
+
+**D4 触发条件①正式满足**（"生产目录已有签名方"——不再是等来的，是做出来的）：
+
+- **M-X1 首签**：``py/scripts/sign_marketplace_catalog.py``（签名管线，
+  被签载荷=条目去 ``signature_hex`` 的 canonical JSON，与消费侧
+  ``_verify_catalog_signature`` 严格镜像；fail-closed 自验证——全部条目
+  过内置验签公钥才产出文件）+ ``deploy/marketplace/``：
+  ``catalog.json``（源，3 条目：omniroute 官方配套网关 + filesystem/github
+  官方 MCP server）+ **``catalog.signed.json``（首签工件，
+  `marketplace-prod` 键，2026-11-01→11-03 有效）** + README（合同/复签
+  配方/密钥轮换指针/checksum 边界）。证据：签发 3/3 verified；消费侧
+  ``MCPMarketplace(require_signature=True)`` 独立验证 3/3 OK。
+- **E1-a 轻生产（本机形态）**：``deploy/temporal-light/docker-compose.yml``
+  （MySQL 持久化 + temporalio/auto-setup 完整栈 + UI，与 dev server 的
+  三本质差异）+ README 配方。**实跑证据**：三服务健康起 → 3 节点
+  workflow 全 success → **``down && up -d`` 重启后再次全 success 且重启前
+  的 workflow 历史仍可查（持久化分界线证据）**。云上形态（Lighthouse
+  单机）即本 compose 原样上云，配方零差异。
+- **D4 切默认备批**：三触发现状 ①✅（本次首签）②✅（公钥已内置）
+  ③=发布窗口；切默认的精确 diff 已写入
+  ``docs/marketplace-signing-key-governance.md`` 实施记录（随该发布同批
+  落地，勿提前合入）。
+- 实撞三坑（compose 首跑）：auto-setup 需 ``temporal_visibility`` 库授权
+  （一次性 init 服务 + 连接重试环）；``TEMPORAL_BROADCAST_ADDRESS`` 不能
+  只给主机名（ringpop config malformed——不设让 auto-setup 自探测）；
+  server 绑定容器 IP 非 loopback（healthcheck 须按服务名寻址）。
+
+### M-X2 生产接线 E2-a（Temporal 后端 flag 化接入 + workflow CLI，2026-11-01）
+
+用户批准 E 决策包（E1-a 零供给两段式 / E2-a 薄接线 / E3-a 子进程执行体 /
+E4-a MAOS 模拟验收）后的第一批落地（板面第十三轮，冲突排查记录在案）：
+
+- **后端 flag**：``MAOP_ORCHESTRATION_BACKEND``（``config/settings.py``
+  收敛点，同 M-X1 先例；``.env.example`` 已登记）。空（默认）= legacy
+  路径逐字节不变；``"temporal"`` = 经 Temporal 适配器；其他值显式
+  :class:`ValueError`（不静默回退）。
+- **生产入口**：``maop/orchestration/wiring.py`` 的
+  ``run_workflow``——侦察实证后放弃内嵌旧路径（``maop_plan.execute_workflow``
+  是"不执行任何 agent"的纯规划合同且零生产调用方；``maop_execute`` 在册
+  孤儿），改为新建 workflow 执行入口：legacy 透传规划路径；temporal 编译
+  + 提交，节点结果映射回 ``WorkflowResult.step_results``（计数语义沿用）。
+- **CLI**：``maop workflow run <name> [--backend temporal] [--timeout N]``
+  （``cli_workflow.py`` 新模块 + cli.py 早退分派 5 行，遵循 cli_eval 先例；
+  cli.py 639 行余量充足）。退出码按后端语义：legacy 规划完成即 0
+  （JSON 如实呈现 completed=0）；temporal 以 completed==planned 判成功。
+- **E3-a 执行体**：``maop_run_executor`` =
+  ``sys.executable -m maop run --agent … --task …`` 子进程（隔离 + 超时
+  硬界；与 operator M3 同构）。走 ``-m`` 而非 console script——宿主机
+  editable 安装的 ``maop`` 入口曾静默 exit 1（E2-a 验收实撞，``python -m``
+  同机同参正常）。同步 ``subprocess.run`` 的并发局限如实登记（to_thread
+  化属生产化小扩展）。
+- **验收样例**：``config/agents.yaml`` 追加 ``m0-demo``（3 节点 DAG，
+  分支并行）。**真机验收**：``MAOP_ORCHESTRATION_BACKEND=temporal maop
+  workflow run m0-demo`` → Temporal dev server → 3 节点真 codex 子进程
+  全部 ``success``，``completed 3/3``，退出码 0；flag 关 sanity：exit 0、
+  ``steps_planned=3 / steps_completed=0``（规划合同如实呈现）。
+- 测试 11 例（后端决议/双模分发/结果映射/执行体三形态/CLI 退出码）+
+  KNOWN_ORPHANS 销 ``temporal_adapter`` 条目（三件套均有生产导入方）；
+  ruff/mypy/全门禁绿。**不碰**（板面领地纪律）：engine.py / maop_plan.py /
+  core/scheduling|reliability / engine_utils。
+
+### M-X2 多后端编排器 —— Temporal M0（adapter 接口先行 + dev server 实跑验收，2026-11-01）
+
+章程（ROADMAP「M-X2 多后端编排器适配」）M0 全兑现：**adapter 接口先行
+定义 + demo workflow（3 节点）在 Temporal dev server 上跑通一次**。
+不承诺生产集成（企业侧运行时供给未定，章程明示）：
+
+- ``maop/orchestration/base.py``：后端无关 ``OrchestrationAdapter`` 协议 +
+  编译产物形状（``CompiledWorkflow``：nodes/levels/artifact）+ 共享 DAG
+  预处理（``plan_levels`` 拓扑分层，与 ``engine_utils`` 同契约——steps 按
+  索引串寻址）。**编译期失败优于运行期失败**：环 / 未知依赖 /
+  ``condition`` 字段（条件执行语义 = M0 明示边界，宁拒不昧）三种形态在
+  编译期即拒绝。
+- ``maop/orchestration/temporal_adapter.py``：``WorkflowDef`` DAG → Temporal
+  workflow 定义编译。``artifact`` 是可审阅的静态展开**定义文本**（ast
+  语法哨兵）；运行体是**数据驱动的通用 workflow**（``MaopDagWorkflow``，
+  DAG 结构作为入参 payload）——真 temporalio 拒绝本地类上的
+  ``@workflow.run``（dev server 实证），动态构造类属注入面（Mimosa 高危
+  实拦），故不按名字生成类、不 exec 文本。temporalio 为可选依赖（同
+  kopf/kubernetes 先例，不进 pyproject）：定义面用恒等占位兜底（缺席可
+  import/可测），``run`` 入口真检 + 带安装指引的报错。不读环境变量
+  （config-drift 棘轮零增量）；节点执行体经 ``executor`` 注入。
+- ``scripts/temporal_m0_demo.py``：验收 demo（3 节点 DAG：规划 → 分支
+  A∥B 同层并行）。**真连通实证**：Temporal CLI 1.9.1（Server 1.32.0）
+  dev server，``levels=2``，三节点全部 ``success``，退出码 0。
+- 测试 15 例（base 纯逻辑 + adapter stub 编译/缺包指引），ruff/mypy 绿；
+  ``maop.orchestration.temporal_adapter`` 按"先行定义"口径登记
+  KNOWN_ORPHANS（消费接线 = 生产集成里程碑）。
+
+### M-T3.3 Operator —— kind 真集群验证（七缺陷实证修复，2026-11-01）
+
+**M0 章程的"真集群 kind 验证为外部条件"就此解除**：本地 kind v0.31 +
+kindest/node v1.35（集群 `maop-mt33`）端到端打通——MaopTask CR → kopf
+事件 → spec 校验 → MaopAgent 解析 → 子进程
+`maop run --agent … --task …` → `[USAGE]` 协议行解析 → status 回写
+`Succeeded / turns=1 / tokensUsed=0 / tokensSource=estimated`，单次
+launch 无循环，`resolved=True pinned=True`。七个缺陷全部真集群实证，
+mock 测不出（PR #203，提交 357601cd / ad1aa922 / fc96c885 / df1dd0e0）：
+
+1. **RBAC**：chart 的 ClusterRole/Role 缺 `maoptasks`（含
+   status/finalizers）读写——kopf watch/patch 直接 403。
+2. **自激循环（最重）**：自己 `plan_launch` 的 Running 补丁回流为事件，
+   无门则 launch→patch→事件→launch 无限重拉子进程——`handle_task` 对
+   `status_phase=Running` 也 no-op。mock 的 FakeGateway 捕不到自激。
+3. **agent 不 pin 必炸**：无 pin 时 `maop run` 落集群默认 agent
+   `'codex'`（不存在）exit 1——`spec.agent` 必填即恒 pin；MaopAgent CR
+   解析结果降为 `AgentResolved` 条件上报。同时补生产布线缺口
+   （`get_controller` 从未注入 resolver，而 `KubernetesStatusGateway`
+   本就实现两协议）。
+4. **`kopf.Body` 非 dict**：真实 kopf 传 Mapping，`isinstance(body, dict)`
+   全拒——spec 校验签名放宽为 `Mapping`。
+5. **裸 prompt 位置参数**：CLI 的 task 走 `--task/-t`，裸位置参数被
+   argparse 拒绝（exit 2）。
+6. **探针无服务可探**：kopf runner 从未起健康服务，liveness 3 连败 →
+   CrashLoopBackOff 13 次（Last State=`Completed` exit 0 的假象——进程是
+   被 SIGTERM 优雅退出的）——`__main__` 经
+   `kopf.run(liveness_endpoint=…)` 在 metrics 口提供 `/healthz`；kopf
+   单端点，chart readiness 同打 `/healthz`。
+7. **运行时卷缺失**：非 root 容器根文件系统只读，子进程熔断器初始化
+   `/data/data` Permission denied（活对象上甚至出现过"卷有挂无"的形态）
+   ——chart 补 emptyDir `runtime-data`（挂 `/data`）+
+   `MAOP_ROOT_DIR=/data`。
+
+测试 50→51（+Running 门回归）；mypy/ruff 绿。部署物与进程能力的契约
+（探针口、运行时卷、RBAC）自此由结构测试与真集群烟测双面钉住。
+
+### M-T3.3 Operator M3.2 —— 配额门接线（QuotaExceeded，检查器注入式，2026-11-01）
+
+M-T3.3 收官刀。社区版只提供**机制**，不内置配额策略（多租户聚合属
+MAOS 企业版配额域——ADR-016/017 边界，跨仓事项）：
+
+- ``gateway.QuotaChecker`` 协议（``check_quota`` / ``record_usage`` 双方法）
+  + controller 构造注入；拉起**前**过配额门——拒绝则终态
+  ``QuotaExceeded``（CRD enum 预留相位，``reconcile.plan_quota_exceeded``），
+  **不拉起子进程**；终态后回报实测用量（缺 ``[USAGE]`` 行的旧版不回报）。
+- 未注入配额门：行为与 M0 逐字节一致（不拒绝、不回报）。
+- 测试：``test_operator_quota.py`` 4 例（拒绝不拉起 + 条件携带
+  tenant / 终态重放幂等 / 放行 + 用量回报 / 未注入保持 M0 行为）；
+  operator 五套共 48 passed。
+- **运行时接线（跨仓桥闭合，MAOS PR #27 已合）**：
+  ``handlers.get_controller()`` 单例构造经
+  ``_enterprise_quota_checker()`` try-import MAOS 侧适配器
+  （``maop.enterprise.quota_operator.OperatorQuotaChecker``，内部要求
+  企业特性门）——企业版部署自动获得配额门；个人版/构造失败 →
+  ``None``（fail-open + 告警可见，行为同基线）。
+
+### M-T3.3 Operator M3.3 —— 用量会计回写 CRD（tokensUsed / tokensSource，2026-11-01）
+
+M3.1 的 ``[USAGE] turns=N tokens=M source=S`` 协议行闭合到 CRD：
+
+- controller 解析扩展（``_parse_usage`` 三元组；旧版只有 ``turns=`` 的行
+  保持兼容——缺段不写字段）；终态补丁写入 ``status.turns`` /
+  ``status.tokensUsed`` / ``status.tokensSource``（``tokens_used=0`` 是合法
+  观测值，与"缺段"由 None 区分）。
+- ``maoptask.yaml`` status 增 ``tokensSource``（enum: measured/estimated，
+  机器对齐哨兵同步）；CLI 驱动路径来源为 estimated——**估算值不伪装成实测**。
+- 测试：``test_operator_m3.py`` 9 例（协议行三形态 / 终态补丁三态 /
+  controller 端到端 measured 与 legacy 两路 / CRD 对齐哨兵）。
+
+### M-T3.3 Operator M3.1 —— 实测 token 计量打通（2026-11-01）
+
+侦察发现成本对账一直在读空值：``MaopResult`` 没有 ``usage`` 字段，
+``_budget_reconciliation`` 的 ``getattr(exec_result, "usage", None)`` 永远得
+``None``——**M-X3 已合的成本归因，token 维度全部是启发式估算值**（provider
+明明已解析真实 usage：OpenAI ``prompt_tokens``/Anthropic ``input_tokens``，
+却在 react_loop 转 ``MaopResult`` 处被丢弃）。本批打通真实值通道：
+
+- ``MaopResult`` 增 ``usage`` 字段（measured prompt/completion/total；
+  ``None`` = CLI 子进程路径不产出 token）；``new_result()`` 透传。
+- ``react_loop`` LLM 直连路径回填实测 usage（丢弃点修复）；
+  ``_budget_reconciliation`` 的真实值分支随之生效——usage 存在时记录真实
+  token、不再落启发式、不再告警 UNKNOWN（该函数零改动，字段接线即通）。
+- loop 累计：``LoopResult.tokens_used``（实测和）+ ``tokens_source``
+  （measured/estimated）；``[USAGE]`` 行扩展为
+  ``turns=N tokens=M source=S``（operator 既有 ``turns=`` regex 兼容）。
+- 边界（诚实登记）：CLI 驱动路径（claude/codex 等外部 CLI）本身不产出
+  token——该路径继续估算（来源标 estimated），不冒充实测；配额多租
+  （M3.2）依赖本批真实值；operator ``status.tokensUsed`` 回写 = M3.3。
+
+### M-X1 Marketplace 签名 M0 —— Ed25519 验签接入安装路径（2026-10-31）
+
+``core/marketplace/signing.py``（Ed25519 工具链，2026-09 起功能完整但零接线、
+在 ``check_wiring`` ``KNOWN_UNWIRED`` 在册）自本批起接入运行时：
+
+- ``MCPMarketplace`` 增 ``verifier`` / ``key_mgmt`` / ``require_signature`` 注入；
+  安装路径对携带 ``signature_hex`` 的目录条目验签——签名覆盖注册表发布的
+  **原始条目 dict**（canonical JSON；narrowed model 会丢未知键，故安装链保留
+  raw entry），任何失败 fail-closed 拒绝安装；轮换/黑名单多钥路径经
+  ``key_mgmt=KeyManagement(...)`` 注入启用（``verify_with_key_management``，
+  ``signer_key_id`` 作 tool_id）。
+- 公钥经 ``MAOP_MARKETPLACE_VERIFY_KEY``（settings 助手
+  ``marketplace_verify_key_path()``）配置，CLI 与 plugin_service 两个构造点
+  均接线；CLI ``maop mcp marketplace install --require-signature`` 强制
+  缺失即拒。
+- ``check_wiring``：signing 销账（已接线）；key_management 更新为"可选注入
+  路径已备、完整密钥治理仍待排期"。威胁模型见
+  ``docs/marketplace-signing-threat-model.md``。
+- ``cli.py`` 按先例拆出 ``cli_mcp_marketplace.py``（``mcp marketplace`` 子命令
+  族；cli.py 810 → 694，远离 800 门禁线）。
+- 边界（诚实登记）：未注入 verifier 的部署信任模型不变（checksum + trusted）；
+  生产签发流程（密钥治理呈批）不阻塞 M0。
+
+### M-T3.3 Operator M2 —— turn 预算透传 + status.turns 会计（2026-10-30）
+
+``spec.maxTurns`` 从"校验透传"变为真正生效：
+
+- **loop**：``MaopLoop.run(max_turns=)`` 新增；一个 turn = 一次
+  ``dispatcher.dispatch`` 尝试（含重试迭代与并行子任务），预算耗尽即停止派发
+  （原样返回最后一个结果，或合成失败 ``turn budget exhausted``）；消耗计数经
+  ``LoopResult.turns`` 返回。``None`` = 不设上限（既有行为逐字节不变）。
+- **CLI**：``maop run --max-turns N``（0 = 不限）+ 稳定协议行
+  ``[USAGE] turns=N``（与 ``[TRACE]`` 同款单行，成功/失败都打印）。
+  ``cli.py`` 按 ``cli_evolution`` 先例拆出 ``cli_run.py``（``cmd_run`` 迁移；
+  门面 re-export 保持 ``maop.cli.cmd_run`` 的 patch 面不变）——cli.py 曾在
+  file-size 800 线（M1 时 803 → 压缩回 799），此次净减。
+- **operator**：命令恒带 ``--max-turns <spec.maxTurns>``；终态补丁解析
+  ``[USAGE] turns=N`` 写入 ``status.turns``（缺行不写——与未打该行的旧版
+  ``maop run`` 前向兼容）。
+- 边界：tokensUsed 与配额/多租户 = M3。
+
+### M3 黑板鉴权接线：企业版 enforcer 显式注入（G2）+ FallbackRBACEnforcer docstring 修正（G3）（2026-10-31）
+
+MAOS 侧对 readiness 文档待决 #2 已按**选项 B** 交付 —— `maop.enterprise.rbac_m3_adapter`
+导出 `create_m3_enforcer()` 工厂，剩下的唯一一步在 MAOP：**构造 `TenantBlackboard`
+时把 enforcer 传进去**。本轮在 `origin/master`（`941c9603`）基线上重建并落地
+（参考实现基于 9 天前 master，未直接复用）。
+
+- `tenant_blackboard_service.resolve_m3_enforcer()`：**懒导入**适配器（模块级不 import
+  enterprise，个人版照样导入本模块）。manager 复用 `rbac_service.get_rbac_manager()`
+  单例 —— 适配器自建会多开一个 RBAC 存储句柄（PG 优先、`data/rbac.db` 兜底），
+  其 docstring 也警告了这点。manager 拿不到时退回 fallback，但**记一条 warning**：
+  鉴权降级不该是静默的。
+- `tenant_blackboard_service.context_for_caller(...)` + `_PRIVILEGED_ROLES`：从调用方
+  上下文构造带权限的 `TenantContext`（个人版据此推导 `blackboard:read`，企业版由
+  MAOS 授权表裁决）。
+- `get_tenant(..., caller=...)`：有身份就按调用者上下文构造并注入 enforcer；
+  没有身份边界（认证关闭时中间件把身份钉成 `anonymous`）保持既有系统上下文，
+  个人版行为逐字不变。
+- 路由 `GET /api/tenant-blackboard/tenants/{tenant_id}`：新增 `_caller_context`，
+  把已认证调用方上下文透传给 service，使企业版 enforcer 对该读生效；`PermissionError`
+  经 `handle_api_errors` 映射为 403。**保留 master 的 `require_admin` HTTP 守卫**
+  （`tests/fixtures/admin_required_read_endpoints.txt` 已登记该端点），
+  构成"admin 角色门 + enforcer 授权"双层；`FallbackRBACEnforcer` docstring 改为
+  **fail-closed** 描述（G3），并指向企业部署应注入 `create_m3_enforcer()`。
+
+**验证**：`test_tenant_blackboard_rbac.py` 全绿（含 G2 注入路径、懒导入 AST 检查、
+单例复用、fallback fail-closed、调用方三态），`test_coordination_m3/m4` 与
+`test_admin_required_reads` 回归通过。
+
+### M-T3.3 Operator M1 —— MaopAgent CR 解析 + agent pinning（2026-10-30）
+
+``spec.agent`` 从"校验透传"变为真正参与执行路由：
+
+- operator：controller 注入 ``resolver`` 后读取同名 MaopAgent CR（gateway 惰性
+  k8s 客户端，404→None）；**CR 存在 → 命令带 ``--agent`` 并置
+  ``AgentResolved=True`` 条件；未声明 → 按 M0 行为不 pin（``AgentResolved=False``
+  注记），任务照常执行**。
+- CLI：``maop run --agent <name>`` → ``cmd_run(agent=)`` → ``MaopLoop.run(agent=)``
+  （复用 F6a ``forced_agent``；默认空字符串保持原行为）。
+- 测试：``test_operator_m1.py`` 10 例（命令形状 / AgentResolved 条件 /
+  解析与不解析 / invalid 不解析 / CR 坐标与 CRD 机器对齐哨兵）+ ``test_cli``
+  ``--agent`` 解析传递；M0 测试面未改断言（默认路径逐字节保持）。
+- 诚实边界：解析到的 ``maxTurns`` / ``model`` / ``tools`` 暂不消费 —— turn 会计
+  （``status.turns``）与配额/多租户是后续里程碑（M2/M3）。
+
+### operator 镜像构建修复 —— 两处 Dockerfile 缺陷（2026-10-30）
+
+`deploy/k8s/operator/Dockerfile`（随 #184 合并）在 CI master build-only 腿上
+必然失败，两处缺陷均由**本地复刻 CI 构建**在合并后数小时内逮到（未等到 master 红）：
+
+1. **缺 `COPY config/`**：只拷了 `py/`，而 wheel 目标经 `hatch_build.py` 把
+   `../config` 视为**必需**构建资产（`dashboard/dist-enterprise` 才可跳过）——
+   报 `metadata-generation-failed` / `FileNotFoundError: required build asset
+   missing: /app/config`。
+2. **`useradd` 同名组冲突**：基镜像（Debian slim）自带 `operator` 组（GID 37），
+   裸 `useradd --create-home operator` 因同名组已存在直接 exit 9。
+
+修复：`COPY config/ /app/config/`（`/app/py/../config` 由此可解析）+
+`useradd --create-home --gid operator operator`（复用既有组）。守卫：
+`test_operator_dockerfile_build_invariants` 静态钉住两条不变量（COPY config/
+且早于 pip install /app/py；useradd 带 --gid）——PR 上 docker 腿不跑
+（`if: push && (main||master)`），静态守卫是 PR 期唯一防线。
+
+**CI 首验（2026-10-30）：master run `41118378867` 全绿 —— `Build operator
+image (build-only): success`** —— M0 验收「operator 镜像在 CI 构建成功」落定。
+
+### CI 串行腿的可观测性加固（2026-10-31）
+
+九平台矩阵里 `-m "not slow and serial"` 那条腿此前是**静默失败面**：步骤没有
+`set +e`，pytest 一红整个 step 当场终止 ⇒ 既不 annotate，也不上传它的 junit
+（`Upload test results` 只收 `py/test-results.xml`）。结果是"串行腿红"这件事
+只剩滚屏，而主腿早就有 annotation + artifact。
+
+- 步骤改为：输出 `tee` 到 `serial-pytest.log` → 用 `PIPESTATUS[0]` 取 pytest
+  自己的退码（不受 `tee` 退码替换）→ 红时按 `test-results-serial.xml` 出
+  annotation 并打日志尾部 → **原样透传退码**。判据没动：红还是红。
+- 重试计数进 check-run notice。`--reruns=3` 会把 flaky 洗成绿，这一点是刻意的
+  （`nightly.yml:135` 用 `--reruns=0` 做同类 flake 的复现腿，两条腿口径相反是
+  设计而不是漂移）——但"这轮洗了几次"必须看得见，否则 CI 绿与"绿得可疑"同形。
+- artifact 路径扩成 `test-results.xml` + `test-results-serial.xml` + 串行腿日志。
+
+验证（跑的是 ci.yml 里那段脚本本身，从 YAML 解析出来执行，不抄第二份）：
+
+| 用例 | 退码 | annotation | notice | 结论 |
+|---|---|---|---|---|
+| 红 + 有重试 | 1 | 有（点名 `test_b`） | 有 `3 rerun` | 红且可归因 |
+| 绿 + 有重试 | 0 | 无 | 有 `3 rerun` | 不谎报，但把重试暴露出来 |
+| 绿 + 无重试 | 0 | 无 | 无 | 判据不是无条件放行 |
+| 旧写法（对照） | 1 | **无** | — | 修复前的形态：红但静默 |
+
+**这一批自己踩出来的第二条（如实记录，不删上面的表）**：上面那套自测当时用
+`bash --noprofile --norc step.sh` 跑，**没有带 GitHub `shell: bash` 的默认 `-eo pipefail`**，
+于是漏掉一个真缺陷 —— 推上去后 9 条平台腿在测试全绿的情况下红（run 41209083375）：step
+打印完 `serial tests exit code: 0`，紧跟 `##[error]Process completed with exit code 1`。
+根因是我在取证段前面写了 `set -e`，而 `reruns=$(grep -oE '...' | tail -1)` 在日志里没有
+"rerun" 时 grep 退码 1，`pipefail` 把整条赋值语句变成失败 ⇒ errexit 直接掐死 step。
+判据本该由最后一行 `exit ${serial_code}` 承载，结果"取证失败"改写了"测试结论"。
+
+修法：不再恢复 errexit，取证三条各自 `|| true` 兜住；自测把 shell 选项改成与 GitHub
+完全一致（`bash --noprofile --norc -eo pipefail`），并加一条"牙齿检查"——把那两行坏写法
+注回去，自测必须红（实测 `green, no retry` 用例 rc=1 vs 期望 0 ⇒ FAIL），注回后文件按
+SHA256 复原。教训：**自测的 shell 选项也属于被测环境**，差一个 `-o pipefail` 就足以让
+一段"看起来跑过三种情形"的自测对真实失败完全失明。
+
+### 纯净 CI 的收集跳过判据改按 AST —— 20 个测试文件此前从未运行过（2026-10-30）
+
+`tests/conftest.py` 与 `tests/e2e/conftest.py` 用「文件文本里出现过 `maop.enterprise`
+字样」推断「该文件需要企业包」，无 MAOS 的检出据此 `collect_ignore` 丢弃 **37** 个测试
+文件。`collect_ignore` 在报告里不留任何痕迹：452 个测试文件的仓库，"全部通过"与"从未
+运行"的输出一模一样。
+
+模拟纯净环境（`sys.meta_path` 挡住 `maop.enterprise`）逐文件实测：
+
+| | 文件数 | 判据 |
+|---|---|---|
+| 真不可收集 | 17 | 模块级 `import maop.enterprise*`，且未被 `try` 包裹 |
+| 本可运行却被连坐 | 20 | 字样只出现在注释 / 文档串 / `importorskip` / mock 目标里 |
+
+被连坐的 20 个里包含 **response_model 棘轮本体** `test_frontend_response_models.py`
+——P1-b 以来"前端在用的端点必须声明 response_model"这条门禁，从未在 CI 上执行过一次。
+
+改动：
+
+- 新增 `tests/_overlay_rule.py`：判据只看模块级、未被 `try` 包裹的 import；函数内的惰性
+  import、`importorskip`、注释都不算（那是运行期依赖，应由用例自己显式 skip）。两个
+  conftest 共用这一份（原先各抄一遍子串规则），`_ENTERPRISE_MARKERS` /
+  `_ENTERPRISE_INDIRECT` 随之删除。
+- 新增 `tests/test_overlay_collection_rule.py`：判据的门禁。6 条「只提及 ⇒ 不得丢弃」
+  反例 + 5 条「模块级 import ⇒ 必须丢弃」正例 + 真实树上的钉（棘轮必须仍在收集面内、
+  4 个不可导入文件必须仍在豁免面内）+ 独立复核（被丢弃的每个文件都要真能解析出模块级
+  import）+ 非空哨兵（判据空转即红）。
+- 10 个测试文件把运行期依赖改成显式 skip，范围取最小：整份需要 → 模块级 `importorskip`；
+  只有一个类需要 → 类内 autouse fixture；个别用例需要 → 用例内 `importorskip`。同文件
+  其余用例照常跑（`test_relay_platform` 24 跑 8 跳、`test_mem_vector_otel_saml_coverage`
+  61 跑 18 跳、`test_router_misc_coverage` 57 跑 2 跳）。
+- `test_the_gate_file_stays_collectible` 从「文件里不许出现该字样」改成「不许有模块级
+  import」——前者是旧规则的产物，会禁掉合法注释。
+
+顺带修掉两处正因"从未跑过"而藏着的缺口：
+
+- `set_edition(ENTERPRISE)` 的「企业包未安装」分支只说 refused without the enterprise
+  package + valid license，不给动作；`test_edition_bypass_guard` 断言报错要点名
+  `MAOP_LICENSE_KEY`，而该断言只在装有 MAOS 的开发机上成立。现在两条分支都指向
+  `maop-enterprise` + `MAOP_LICENSE_KEY`（或 `data/license.key`），断言不再随环境分叉。
+- 4 个文件里留着 `# enterprise installed (maop-enterprise wheel): guard removed`——子串
+  规则替它们兜住了红，于是有人把诚实的 skip 直接删掉了。已复原；skip 的可见性本来就是
+  ci.yml H4 注释想要的东西（"报告中显式统计跳过数"）。
+
+**验证**（载体：Windows / Python 3.14，`sys.meta_path` 挡住企业包）：
+逐文件跑那 37 个 ⇒ 17 收集错误（仍被丢弃，符合预期）· 5 整文件显式 skip · 15 正常运行，其中
+`test_frontend_response_models` 10 passed/1 skipped、`test_router_system` 63 passed/1 skipped、
+`test_mem_vector_otel_saml_coverage` 61 passed/18 skipped、`test_relay_platform` 24 passed/8 skipped、
+`test_router_misc_coverage` 57 passed/2 skipped。新判据自身的 14 例门禁在同一载体下全绿，
+ruff 干净。
+
+整轮复刻 CI 的 unit job（`pytest tests/ --ignore=tests/contract -m "not slow and not serial"
+--timeout=60 -n 2`，同一阻断载体）：改动前在同一基线上是 **3 failed / 10580 passed / 130 skipped**，
+三条红分别是棘轮 13 缺口、config-drift 缺 `MAOP_A2A_GATEWAY` 文档、SAML 用例缺守卫；
+本批收口后 **10608 passed / 131 skipped / 1 xfailed，rc=0（20:40）**。
+e2e 那一腿用 `--confcutdir=tests/e2e` 在同样载体下收集 72 例 0 错（此前该腿把
+`test_delete_operations.py` 整文件静默丢弃）。
+
+遗留一条记账：`test_env_example_drift` 恢复运行后单条用例 51.9s（全树 AST 扫描），
+逼近 CI 的 `--timeout=60`，暂不动、先记录。
+
+**变异反证**（11 个，逐个还原后按 SHA256 回证逐字节相等；基线 40 passed）：
+
+| 变异 | 结果 |
+|---|---|
+| 判据退回子串匹配 | 8 failed |
+| 判据恒 False（自我失明） | 6 failed |
+| 判据只看 `import` 不看 `from-import` | 3 failed |
+| try 保护的 import 也算不可导入 | 1 failed |
+| conftest 的丢弃清单清空 | 收集错误 17 条（保留时 0 条） |
+| 降级信封不声明 `error` | 1 failed |
+| ShareSummary 漏 `cost`（生产者键） | 2 failed |
+| 列清单加一列而模型没跟上 | 6 failed |
+| 给 SSE 路由挂 response_model | 1 failed |
+| 删掉 SSE 的豁免账条目 | 1 failed |
+
+第 4 行有个教训值得记下：第一次写的"去掉 try 豁免"变异（删掉 `if not isinstance(node, ast.Try)`）
+**跑完全绿** —— 因为删掉过滤后 `_imports_overlay(Try 节点)` 本来也返回 False，那是个语义空变异，
+不是守卫没牙。改成"真的下降进 try 体内判"才转红。与既有口径"变异必须编得过"同源：
+一个改完行为等价的变异只能证明变异者写错了。
+
+### 棘轮第一次真跑就抓到的 13 条缺口：12 条建模 + 1 条如实豁免（2026-10-30）
+
+上一笔把收集判据改成按 AST 之后，`test_frontend_response_models.py` 第一次在当前
+master 口径下跑起来，当场点名 **13 条前端在调用、却没有 response_model 的端点**：
+credential-vault 4、agent-versions 4、long-running-tasks 3、share 2。
+
+这些不是本批引入的：用 `git archive 15510ae1` 导出 master 自己的快照现跑，同样红
+（带企业包、不带企业包各跑一次都红），是最近 10 笔合并带进来的 —— 它们合进去的时候
+CI 里这条门禁正处于"被连坐跳过"状态，所以没人看见。**已用 master 快照复现，与本批改动
+无因果关系**，只是本批让它第一次真的执行。
+
+- 12 条建模，按域新增 4 个 schema 模块并挂 `response_model`：
+  `credential_vault_schemas.py`（列表复用领域模型 `CredentialSummary`，不另抄 11 字段）、
+  `share_schemas.py`（`ShareSummary` 逐键对齐 `run_service._summarize`，
+  `started_at/updated_at` 保留 `float | str` 因为无事件时代码回落 `""`）、
+  `agent_versions_schemas.py`（列表 meta=`{total,page,page_size}` 与回滚
+  meta=`{rolled_back_from,rolled_back_to,reason}` 是两种形状，各一个模型）、
+  `long_running_task_schemas.py`（任务体复用 `LongRunningTask`）。
+- `GET /api/long-running-tasks/{id}/progress` **不建模**：它返回 `StreamingResponse`
+  （SSE），而路由一旦返回 `Response` 实例，FastAPI 就完全不执行 `response_model` ——
+  挂上去只会让棘轮以为这条已经建好模。改记入
+  `tests/fixtures/frontend_non_json_endpoints.txt`，并由
+  `test_progress_route_has_no_effective_response_model` 钉住"没有 Pydantic 模型在描述它"
+  **且** OpenAPI 里这条 200 确实没有 JSON 形状（后者是棘轮据以判"未建模"的观测量）。
+- 契约测试 26 例（`test_vault_share_router_contracts.py` 14 + 
+  `test_versions_tasks_router_contracts.py` 12）。判据一律对着**生产者**而不是手抄字段：
+  版本/灰度模型的字段必须等于 `_AGENT_VERSION_COLUMNS` / `_CANARY_COLUMNS`，
+  `ShareSummary` 必须等于 `_summarize` 实际吐出的键，任务条目必须等于
+  `LongRunningTask.model_fields` —— 生产者加字段而模型没跟上时，这里红，而不是在网络上
+  静默少一个键。降级分支（`error_value=`）也走 HTTP 实测：`error` 键不能被判型过滤掉，
+  成功侧的键必须带默认值，否则兜底路径自己变 500。
+
+顺带修掉同批被叫醒的两条存量红：
+
+- `test_env_example_drift` 报 `MAOP_A2A_GATEWAY` 被代码读取（`config/settings.py:45`）
+  却没写进 `.env.example` —— 同样在 master 快照上复现。已补进文档并写明"默认关是
+  部署决策"。
+- `test_enterprise_integration.py::TestSAMLIntegration::test_saml_handler_parses_real_signed_response`
+  也 `from maop.enterprise.saml_handler import ...`，上一笔只给同类另外两条加了守卫
+  （它在按文件跑的复扫里被 `xmlsec` 的 importorskip 顺带跳过，整轮跑才暴露）。补齐。
+### M-T3.3 K8s Operator M0 第一刀（2026-10-30）
+
+- **controller 骨架 `py/maop/operator/`（新包）**：`spec`（MaopTask CR 解析校验，
+  与 `crds/maoptask.yaml` 机器对齐）+ `reconcile`（Pending→Running→
+  Succeeded/Failed/TimedOut/Cancelled 状态机，phase 枚举与 CRD 一致）+
+  `controller`（gateway/runner 全注入，mock 全链路可测）+ `gateway`
+  （KubernetesStatusGateway 惰性导入 + asyncio 子进程 runner）+ `handlers`
+  （kopf 薄层，可选导入带安装指引）+ `__main__`（镜像 ENTRYPOINT）。
+- **镜像构建来源落地**：`deploy/k8s/operator/Dockerfile`（解决 README §Status
+  "ghcr.io/maop/operator 无构建来源"项）；CI docker 作业加 build-only 腿
+  （只构建不推送——推送属发布决策）。
+- **测试 `tests/test_operator_m0.py` 15 例**：mock 链路（MaopTask→子进程→status
+  回写）全绿；`test_spec_matches_crd_schema` 把 spec 校验规则与 CRD YAML 机器
+  对齐（防漂移哨兵）；kopf 缺失报错口径钉死。
+- **诚实边界**：`spec.agent`/tenant/maxTurns 校验并透传，但不参与命令
+  （`maop run` 无这些参数，MaopAgent 解析属后续里程碑）；真集群 kind 验证按
+  章程不进 M0；既有的多租户/插件 skip 占位属 planned 特性，维持不动。
+- 已知本地环境干扰（非本批回归）：本机若可达**其他项目的 kind 集群**（如
+  FlintSpark k4 e2e），`test_k8s_operator.py` 的集群分层用例会误连并红——
+  与 master 逐字一致的环境问题，CI（无 kubectl）不受影响。
+
+### M-X3 细粒度成本归因 M0（后端，2026-10-29）
+
+- **`core/cost_attribution.py`（新）**：按 agent / phase / model 三维聚合
+  （`attribution_summary`，复用 `CostTracker.get_entries`，与原始记录逐条同源）
+  + 预算阈值告警（`check_budget_thresholds` / `emit_budget_alerts`，经
+  `alert_ingest` 通道以 Alertmanager 形状落库，receiver=`cost-attribution`，
+  重复上报按 fingerprint 去重）。phase 缺失显式记 `unattributed` 桶，不摊相位。
+- **归属修线**：`CostTracker.record_actual_cost` 增可选 `agent` / `phase`
+  （旧调用方零改动）；maop_loop 的执行期对账点开始写入 `agent` + `phase="execute"`
+  —— 此前成本条目的 agent/phase 两维在账面上是空的。
+- 测试 `tests/test_cost_attribution.py` 6 例：聚合与手算子集逐条对齐 / 未归属桶 /
+  归属接线（含旧调用零破坏）/ 未配置不告警 / 严重度分档 / 告警落库与去重。
+- **端点切片（2026-10-30 补，routers 面他线批次已落库）**：
+  - `routers/cost_attribution.py`：`GET /api/cost-attribution`（admin-only 三维
+    聚合，start_date/end_date 窗口）+ `POST /api/cost-attribution/check-budget`
+    （**只查不落库**的越阈检查；入库走 `emit_budget_alerts`，由调度/CLI 触发）；
+  - `routers/cost_attribution_schemas.py`：响应模型（`DimensionBucket` 三键与
+    单元对齐断言同源）；`_register_routes` 注册；死接线条目随之移除；
+  - 端点契约测试 `tests/test_cost_attribution_endpoint.py` 5 例（含 admin-only
+    403 两例、check-budget 不落库断言、窗口过滤）。
+- **M0 余量**：前端视图属 dashboard-enterprise 前端线领地（板记已委托，
+  数据源即本端点）。
+
+### 分层收官批 第二刀：黑板→WS 桥接线（问题#9 收口，2026-10-29）
+
+- **`dashboard.ws_blackboard_bridge` 接入 lifespan**（`start_layering_services`）：
+  黑板写入事件实时推 `/ws`（事件驱动路径，与 `_ws_push_loop` 周期快照互补），
+  随后台任务门控启停（多 worker 下 N 条桥无新信息量）；`KNOWN_ORPHANS`
+  对应条目销账；接线测试扩到 6 例。至此分层计划"九大问题"表全部收口。
+
+### 企业版棘轮 31 → 14：tenant / rbac / quotas 17 条端点建模（2026-10-30）
+
+- 三条在仓内企业路由（`FeatureFlag` 门控，不装企业包也能导入）补上
+  `response_model`：tenant 5 / rbac 5 / quotas 7。新增
+  `routers/{tenant,rbac,quotas}_schemas.py` 作为**线缆形状镜像**——企业包在纯净
+  CI 检出里不存在，直接复用它的模型会让 router 不可导入、OpenAPI 反而没有类型。
+- 棘轮：`enterprise_response_model_allowlist.txt` 31 → 14，`RATCHET_CAP` 同步。
+  剩下的 14 条全在 sso / n8n / licenses：那三个 router 模块级导入商业 overlay，
+  改动需要 MAOS 侧提交 + 重签完整性清单，单列一批而不是留着当尾巴。
+- 新增 `tests/test_enterprise_router_contracts.py`（21 例）：
+  - OpenAPI 类型 + "已建模却仍在 allowlist"双向守卫；
+  - 17 条端点**真跑**，逐键比对信封与条目；
+  - **生产端对账**：服务层（真代码）返回的键 vs 镜像模型 —— `response_model`
+    会把未声明的键静默丢掉，只看线缆断言发现不了这种漂移；
+  - 反向守卫：服务少给必填键必须是 500，不许用默认值把空值说成数据；
+  - 装了企业包时逐字段对账镜像模型（纯净 CI 下显式跳过这一条，其余照跑）。
+- 替身边界写清：管理器与枚举用替身（overlay 在 CI 装不上），服务层、路由层、
+  `response_model` 全是真代码；DB 指向 `tmp_path`，不写脏开发机 `data/maop.db`。
+  同一 router 里前端没在调用的 CRUD 端点保持原样，不借这一批顺手改契约。
+- 变异反证 4 例（去掉 response_model / 服务多吐一个键 / 必填键加默认值 /
+  allowlist 回填已建模行）全红，文件按 SHA256 逐字节复原。
+- 验证：新契约 21 例 + 棘轮 7 例绿；纯净 CI 复刻（硬拦 overlay）26 passed /
+  1 skipped；存量 enterprise 相关 115 例 + router smoke 576 例无回归；ruff 0 条。
+
+### 企业版棘轮 14 → 0：sso / n8n / licenses 14 条端点建模（2026-10-31）
+
+- 三条模块级依赖商业 overlay 的 router 补上 `response_model`：sso 5 / n8n 4 /
+  licenses 5。新增 `routers/{sso,n8n,licenses}_schemas.py`，同样是**仓内线缆形状
+  镜像**——直接在仓内建模而不是引用 overlay 的 Pydantic 模型，纯净 CI 检出里
+  OpenAPI 才有可引用的 schema；只有想把 `dict[str, Any]` 换成 overlay 真类型时
+  才需要动 MAOS 并重签完整性清单。
+- 条目模型统一开 `extra="allow"`：这几个形状的持有者要么在另一个仓库（可独立加字段），
+  要么干脆是 n8n 的自由格式 JSON。严格模型会**静默丢键**（前端拿不到、日志无痕、
+  门禁全绿）；放开后新增字段原样透传，改名/删必填字段则因缺键变成 500，属响亮失败。
+- `POST /api/n8n/workflows/{id}/trigger` 与 `GET /api/n8n/executions/{id}` 的响应
+  **没有信封**：router 写的是 `{"status": "ok", **execution}`，执行对象自带的
+  `status` 覆盖了字面量，线上这个键一直是执行状态（running / success / ...），
+  前端也按执行状态读。模型据此按执行对象建模，并用用例钉住这一语义。
+- 棘轮：`enterprise_response_model_allowlist.txt` 14 → 0（只剩表头注释），
+  `RATCHET_CAP` 同步归零。
+- 新增 `tests/test_overlay_router_contracts.py`（14 例）：OpenAPI 类型 +
+  "已建模却仍在 allowlist"反向守卫；14 条端点真跑逐键比对；上游新增键必须透传
+  （`extra="allow"` 的性质守卫）；必填键缺失必须是 500；执行响应不是信封；
+  装了企业包时逐字段对账 `SSOProviderResponse` / `N8nWorkflowExecution` /
+  `LicenseRecord`。overlay 不可导入时注入三个模块替身，让路由能真导入、真跑，
+  纯净 CI 下这套契约不再整份消失。
+- 变异反证 4 例（条目去掉 `extra="allow"` / 去掉 `response_model` / 必填键补默认值 /
+  执行响应改回信封）全红，文件按 SHA256 逐字节复原。
+- 验证：新契约 15 例 + 棘轮 7 例绿；纯净 CI 复刻（硬拦 overlay）50 passed /
+  3 skipped；前端 Licenses 18 例、全量 75 文件 667 例绿；ruff / eslint 0 条、mypy 0 error。
+- 修 `Licenses.vue` 与前端的字段契约缺口（同批发现并收口）：页面读的 `customer_name` /
+  `customer_email` / `version` / `max_agents` / `history`，后端一个都不返回（`LicenseRecord`
+  只有 `customer` / `notes`（`email: ...`）/ `edition` / `features`（`max_agents:N`）），
+  所以「客户」列与详情里的邮箱 / 版本 / Agent 数 / 操作历史一直是空的。
+  - 视图里集中做一次翻译（`normalizeLicense`）：`customer` → `customer_name`、
+    `notes` 里的 `email:` → `customer_email`、`edition` → `version`（顺带本地化标签）、
+    `features` 里的 `max_agents:` → `max_agents`。
+  - 操作历史改走真实端点 `GET /api/licenses/{id}/audit`（前端此前从未调用），
+    该端点随之补 `response_model`（`LicenseAuditListEnvelope`），棘轮仍为 0。
+  - 生成对话框的"版本"下拉框删除：`LicenseCreateRequest` 没有 edition 字段、签发恒为
+    enterprise，选什么都发不出去，改为只读显示；表单里的死字段 `form.version` 一并删除。
+  - 测试夹具从"页面字段形状"改成后端真实线缆形状（原来的 mock 会把翻译缺失掩盖掉），
+    新增派生字段、审计历史、只读版本三个用例；变异反证 4 例全红。
+
+### 个人版棘轮补上"导入盲区"：17 条通知端点此前两条门禁都不看（2026-10-31）
+
+`tests/test_frontend_response_models.py` 判的是 `app.openapi()` 里的路由。纯净 CI 检出里没有
+商业 overlay，于是**任何模块级导入企业包的 router 整个消失**：服务端尝试注册 65 个 router，
+其中 5 个导入失败（`sso / n8n / licenses` 已由企业版棘轮的源码视图兜底，
+`notifications / relay_platform` 两边都不管）。实测遮蔽企业包后跑一遍：
+`[server] Router MISSING: notifications`，而前端在调的 `/api/notifications*` 有 **17 条**
+（该 router 共 26 条路由）—— `matched` 恒空，棘轮"全绿"只是因为没人被检查。更糟的是
+`test_notification_router_is_fully_typed` 用 `importorskip` 自我豁免，注释还写着
+"the generic ratchet still applies there"，那句话与事实相反。
+
+改动（方案 C：只关盲区 + 把假话改成真话，不改产品行为）：
+
+- `tests/dashboard_app_profiles.py` 新增 `personal_registered_router_modules()`（从
+  `_register_routes` **AST 解析**注册清单，不在测试文件里再抄一份名字）、
+  `personal_import_failures()`、`overlay_only_modules()`、`personal_route_map()`：注册了但
+  本机导入不了的 router，改用 `static_route_map` 的源码视图补进个人版面。
+- **只有"企业包不在"这一种原因允许降级成源码视图**；其他 `ModuleNotFoundError`（拼错、
+  缺依赖、循环导入）一律 raise —— 否则"口径被换掉"会伪装成一条更松的门禁继续绿。
+- `route_schema()` 换成审计面（导入视图 ∪ 源码视图）；通知用例去掉 `importorskip`，
+  两环境都判 26 条且要求全部有类型；新增两条结构守卫：
+  `test_the_blindspot_is_measured_and_closed`（逐模块比对两视图的键集合与类型判定）、
+  `test_a_non_overlay_import_failure_is_never_downgraded`（合成探针钉住"原因"过滤）。
+- 顺带修一个**空壳类型**：`relay_platform.py` 的 `GET /{name}/models` 写的是
+  `response_model=list`，OpenAPI 只得到 `{"type":"array"}`、没有任何条目类型 —— 源码视图看见
+  关键字判"有类型"，导入视图看 schema 判"没类型"，两视图唯一分歧就在这条。改成
+  `list[RelayModelInfo]`（与紧邻两行的 `list[PriceComparison]` 同法；服务层返回的正是
+  `RelayModelInfo.model_dump()`，响应 JSON 不变）。
+- 注释修正：`_register_routes/_routers.py` 的 "available in both editions" 与它引用的
+  `docs/prd-notification-center.md`（MAOP / MAOS 两处都不存在）改为如实描述——没有企业包时
+  整块端点不存在，而侧边栏仍给入口；`notifications._require_feature` 自相矛盾的 docstring
+  （称注册处按 MULTI_USER 门控）一并改写。**产品口径未动**：个人版该不该有通知中心仍待裁决。
+
+验证：开发机（装企业包）70 passed；纯净 CI 复刻 68 passed / 2 skipped（跳过的是需要真企业包
+模型的逐字段对账）；变异反证 4 例全红 —— 去掉一条通知端点的 `response_model`、把
+relay_platform 改回空壳 `list`、撤掉兜底、把"非 overlay 原因"改成静默放行；文件按 SHA256
+复原，ruff 0 条。
+
+### 分层收官批：middleware 子包化 + lifespan 接线（2026-10-28）
+
+- **`core/security/middleware.py` 1188 行 → 六文件子包**：`_auth`（AuthMiddleware
+  + owner-mode helpers + require_admin）/ `_scope`（ScopeMiddleware）/ `_csp`
+  （CSPMiddleware + connect-src 信任审计）/ `_protection`（RateLimit / Audit /
+  IPAllowlist / RequestSizeLimit）/ `_setup`（两个 one-call 装配）+ 门面
+  `__init__`。导入路径与全部公开名不变，调用方零改动；AST 机械核对 13 个
+  搬移实体与原文逐树等价。`check_file_size.py` ALLOWED_OVERSIZE 移除最后一条，
+  全仓文件规模门禁保持**"无豁免"**。
+- **dashboard lifespan 接上阶段1/阶段3 服务**（销 KNOWN_ORPHANS 两条"接线在途"）：
+  - `HealthService` 随后台任务门控自动启停（多 worker 只让单 worker 跑探测循环）；
+  - `A2AGateway` 由 `MAOP_A2A_GATEWAY=1` 显式开启（默认关——门户 HTTP 传输层
+    对外监听属部署决策），起停对称、句柄挂 `app.state`；
+  - 新增 `tests/test_layering_lifespan_wiring.py` 4 例锁定上述约定。
 
 ### 宽口径异常：`dashboard/` 模块第四批（2026-10-29）
 

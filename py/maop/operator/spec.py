@@ -1,0 +1,115 @@
+"""MaopTask spec 解析与校验（纯函数，与 CRD schema 对齐）.
+
+对齐对象：``deploy/k8s/operator/crds/maoptask.yaml`` v1alpha1 ——
+required ``[agent, prompt]``、``maxTurns >= 1``（默认 20）、``tools`` 数组、
+``tenant`` 可选。CRD 后续改动必须同步本模块与
+``tests/test_operator_m0.py::test_spec_matches_crd_schema``。
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from typing import Any
+
+#: 与 CRD 对齐的默认 maxTurns（crds/maoptask.yaml 的 default）。
+DEFAULT_MAX_TURNS = 20
+
+#: CRD 的 required 字段。
+REQUIRED_FIELDS = ("agent", "prompt")
+
+
+class InvalidSpecError(ValueError):
+    """MaopTask spec 缺必填字段或字段值不合法。"""
+
+
+@dataclass(frozen=True)
+class MaopTaskSpec:
+    """已校验的 MaopTask 执行规格。"""
+
+    name: str
+    namespace: str
+    agent: str
+    prompt: str
+    tenant: str = ""
+    max_turns: int = DEFAULT_MAX_TURNS
+    tools: tuple[str, ...] = field(default=())
+
+
+def _require_str(spec: Mapping[str, Any], key: str) -> str:
+    value = spec.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise InvalidSpecError(f"spec.{key} is required and must be a non-empty string")
+    return value.strip()
+
+
+def _positive_int(spec: Mapping[str, Any], key: str, default: int) -> int:
+    value = spec.get(key, default)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise InvalidSpecError(f"spec.{key} must be an integer >= 1, got {value!r}")
+    return int(value)
+
+
+def _str_list(spec: Mapping[str, Any], key: str) -> tuple[str, ...]:
+    value = spec.get(key) or []
+    if not isinstance(value, list) or not all(isinstance(t, str) for t in value):
+        raise InvalidSpecError(f"spec.{key} must be a list of strings")
+    return tuple(value)
+
+
+def parse_task_spec(
+    body: Mapping[str, Any], *, name: str = "", namespace: str = "default"
+) -> MaopTaskSpec:
+    """把 CR body（``Mapping``，dict 或 kopf 的 ``Body`` 包装）解析为已校验的
+    :class:`MaopTaskSpec`.
+
+    CRD 的 additionalProperties 行为交给 k8s，这里只取已知键；未知键忽略
+    （向前兼容小版本）。kind 烟测实证（2026-11-01）：真实 kopf 传的是
+    ``kopf.Body``——``Mapping`` 子类但**不是** ``dict``，``isinstance(body,
+    dict)`` 会把真集群里的每个任务都误判为 InvalidSpec（mock 测试全喂
+    dict，查不出）。
+    """
+    if not isinstance(body, Mapping):
+        raise InvalidSpecError("CR body must be a mapping")
+    spec = body.get("spec")
+    if not isinstance(spec, Mapping):
+        raise InvalidSpecError("spec is required and must be a mapping")
+    metadata = body.get("metadata") or {}
+    return MaopTaskSpec(
+        name=str(name or metadata.get("name") or ""),
+        namespace=str(namespace or (metadata.get("namespace") or "default")),
+        agent=_require_str(spec, "agent"),
+        prompt=_require_str(spec, "prompt"),
+        tenant=str(spec.get("tenant") or ""),
+        max_turns=_positive_int(spec, "maxTurns", DEFAULT_MAX_TURNS),
+        tools=_str_list(spec, "tools"),
+    )
+
+
+def command_for(
+    spec: MaopTaskSpec, *, pin_agent: bool = False, apply_turn_budget: bool = False
+) -> list[str]:
+    """构造执行命令.
+
+    M0 形状：``maop run --task <prompt>``（kind 烟测实证 2026-11-01：CLI 的
+    task 走 ``--task/-t`` 选项，裸 prompt 位置参数会被 argparse 拒绝——
+    exit code 2）；M1 起 ``pin_agent=True`` 插入 ``--agent <spec.agent>`` ——
+    controller 恒 pin（``spec.agent`` 是必填声明；不 pin 会落集群默认 agent，
+    kind 烟测 2026-11-01 实证 'codex' 不存在 → exit 1）。MaopAgent CR 解析
+    结果只作为 ``AgentResolved`` 条件上报，不改变命令形状。
+    ``maop run --agent`` 把该名字落为 MaopLoop 的 forced_agent（F6a），
+    使 ``spec.agent`` 真正参与执行路由。
+
+    M2：``apply_turn_budget=True`` 插入 ``--max-turns <spec.max_turns>`` ——
+    任务级 turn 上限（一个 turn = 一次 dispatch 尝试）；operator 总是透传。
+    实际消耗经 ``[USAGE] turns=N`` 行回写 ``status.turns``。
+
+    诚实边界：``tenant`` 仍只校验与透传记录；tokensUsed/配额是后续里程碑。
+    """
+    command = ["maop", "run"]
+    if pin_agent:
+        command += ["--agent", spec.agent]
+    if apply_turn_budget:
+        command += ["--max-turns", str(spec.max_turns)]
+    command += ["--task", spec.prompt]
+    return command

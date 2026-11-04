@@ -108,7 +108,9 @@ import { useI18n } from './i18n/index.js';
 import { nav, filterNavByEdition } from './nav.js';
 
 // 个人版隐藏企业版菜单项 (RFC-001 修正): 所见即所得, 不再"点了被弹走"
-const visibleNav = computed(() => filterNavByEdition(nav, edition.edition));
+// 通知收件箱这类"装了企业包才有端点"的入口走能力探针，探针没回之前保持可见。
+const visibleNav = computed(() =>
+  filterNavByEdition(nav, edition.edition, { notifications: edition.notificationsAvailable }));
 
 const edition = useEditionStore();
 const api = useApiStore();
@@ -294,6 +296,9 @@ onMounted(async () => {
   await checkAuthEnabled();
   if (showLoginIfRequired()) return;
   await edition.fetchEdition();
+  // 通知引擎装没装，只有问它自己的端点才算数（edition 端点是 admin-only）。
+  // 不 await：入口先按"未知"渲染，探针回来后响应式收掉。
+  edition.checkNotificationsAvailability();
   computeAdmin();
   try {
     const d = await api.get('/api/health');

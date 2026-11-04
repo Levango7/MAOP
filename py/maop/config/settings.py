@@ -36,6 +36,56 @@ def trust_proxy_enabled() -> bool:
     return os.environ.get("MAOP_TRUST_PROXY", "0") == "1"
 
 
+def a2a_gateway_enabled() -> bool:
+    """``MAOP_A2A_GATEWAY=1`` 判定（阶段3 A2A 门户在 dashboard 生命周期内的开关）。
+
+    默认关：门户的 HTTP 传输层会对外监听，是否打开是**部署决策**，不该由
+    升级默认值替运维做。env 直读收敛点，见 config-drift 门禁口径。
+    """
+    return os.environ.get("MAOP_A2A_GATEWAY", "0") == "1"
+
+
+def marketplace_verify_key_path() -> str:
+    """``MAOP_MARKETPLACE_VERIFY_KEY``：Marketplace 包签名校验公钥（PEM 路径）.
+
+    非空时 marketplace 安装路径对带 ``signature_hex`` 的目录条目做 Ed25519
+    验签（见 ``core/marketplace/signing.py``，M-X1）；空串 = 未配置（不验签，
+    信任模型维持 checksum + trusted 现状）。config-drift 收敛点，调用方走这里。
+    """
+    return os.environ.get("MAOP_MARKETPLACE_VERIFY_KEY", "").strip()
+
+
+def marketplace_key_server_url() -> str:
+    """``MAOP_MARKETPLACE_KEY_SERVER_URL``：验签公钥 HTTPS 拉取端点（D2③，M-X1 M1）.
+
+    企业 distribution server 的 PEM 端点；仅当同时配置了
+    ``MAOP_MARKETPLACE_VERIFY_KEY_FP``（期望指纹钉扎）时通道才启用——
+    未钉指纹的拉取通道是 bootstrap 信任漏洞，fail-closed 拒绝。
+    """
+    return os.environ.get("MAOP_MARKETPLACE_KEY_SERVER_URL", "").strip()
+
+
+def marketplace_verify_key_fp() -> str:
+    """``MAOP_MARKETPLACE_VERIFY_KEY_FP``：HTTPS 拉取公钥的期望指纹（SHA-256）.
+
+    对行尾归一化（``\\r\\n`` → ``\\n``）后的 PEM 字节做 SHA-256 的十六进制
+    小写摘要；与拉取结果不符即拒绝该钥（见 ``core/marketplace/key_resolve.py``）。
+    """
+    return os.environ.get("MAOP_MARKETPLACE_VERIFY_KEY_FP", "").strip()
+
+
+def orchestration_backend() -> str:
+    """``MAOP_ORCHESTRATION_BACKEND``：workflow 执行后端选择（M-X2 E2-a）.
+
+    空串（默认）= legacy 路径（``maop_plan.execute_workflow`` 纯规划语义，
+    行为与 M-X2 接线前逐字节一致）；``"temporal"`` = workflow 经
+    ``orchestration.wiring.run_workflow`` 提交 Temporal 适配器（E1-a：
+    flag 关闭时零行为变化，供给就绪后打开 flag 即用）。其他值在调用方
+    显式拒绝（诚实报错，不静默回退）。config-drift 收敛点，调用方走这里。
+    """
+    return os.environ.get("MAOP_ORCHESTRATION_BACKEND", "").strip().lower()
+
+
 def _default_auth_enabled() -> bool:
     """默认认证策略（High 安全修复：secure-by-default）。
 

@@ -86,6 +86,8 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     # "孤儿导入了它" 也算作有生产导入方，而它唯一的导入方 visual_builder 自己就在下面（孤儿→孤儿链）。
     # 按真实可达性它到不了运行时；要改判据就得先求不动点，会一次性掀出全仓一批同形态模块，
     # 所以这里保留工具现有口径，把缺陷与影响面单独转交（见 CHANGELOG 2026-10-17 条目）。
+    # 2026-10-30 注：maop.core.cost_attribution 的临时登记已移除——端点切片
+    # （routers/cost_attribution.py）上线后有了生产导入方。
     "maop.core.evolution.prompt_version": ("unwired", "prompt 版本链未接入演化闭环的回滚路径"),
     "maop.core.evolution.regression": ("unwired", "Persona 回归未接入演化闭环"),
     "maop.core.marketplace.key_management": ("unwired", "marketplace 密钥管理未接线"),
@@ -95,7 +97,7 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
             "core/security/sandbox.py 是在跑的沙箱；本模块的 env 白名单已于 2026-10-05 移植过去，"
             "剩下的 SandboxManager 是重复实现"
         ),
-    ),    "maop.core.marketplace.signing": ("unwired", "marketplace 签名未接线"),
+    ),
     "maop.core.mcp.mcp_adapter": ("unwired", "MCPAdapter 仅测试实例化；adapter_factory 不产出它"),
     "maop.core.memory.hybrid_search": ("unwired", "混合检索未接入记忆读路径"),
     "maop.core.memory.knowledge_graph_reasoning": (
@@ -112,20 +114,9 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
         "unwired",
         "黑板↔M0 分布式执行后端的桥，DistributedTaskBackend 未构造它",
     ),
-    "maop.core.coordination.a2a_gateway": (
-        "unwired",
-        (
-            "阶段3 A2A 统一门户（PLAN_SCHEDULING_LAYERING.md 问题#7）："
-            "集成测试已覆盖，dashboard lifespan 接线在途"
-        ),
-    ),
-    "maop.core.scheduling.health_service": (
-        "unwired",
-        (
-            "阶段1 统一健康探测（PLAN_SCHEDULING_LAYERING.md 任务1.2）："
-            "联邦 e2e 测试已覆盖，dashboard 启动接线在途"
-        ),
-    ),
+    # 2026-10-28 移出清单：a2a_gateway 与 health_service 已由 dashboard lifespan
+    # 接线（server.start_layering_services；health 随后台门控自动启停，
+    # gateway 由 MAOP_A2A_GATEWAY=1 显式开启），不再是孤儿。
     "maop.core.reliability.dag_scheduler": ("unwired", "DAG 调度器未接线"),
     "maop.core.reliability.distributed_checkpoint": (
         "unwired",
@@ -161,15 +152,18 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.dashboard.provider": ("unwired", "dashboard 旧 provider 入口（v4.0.0 起 create_app 已废弃）"),
     "maop.dashboard.routers.error_handler": ("unwired", "路由层错误处理未挂到 app"),
     "maop.dashboard.static": ("unwired", "静态文件挂载未接入 server.py"),
-    "maop.dashboard.ws_blackboard_bridge": (
-        "unwired",
-        "黑板写入→WS 推送的桥，lifespan 未启动它（模块 docstring 已同步改为'需显式启动'）",
-    ),
+    # 2026-10-29 移出清单：ws_blackboard_bridge 已由 lifespan 接线
+    # （server.start_layering_services，随后台门控启停；见
+    # tests/test_layering_lifespan_wiring.py 的桥启停两例）。
     "maop.dashboard.ws_dag": ("unwired", "DAG WebSocket 未挂到 app"),
     "maop.delegate.doc_pipeline_adapter": ("unwired", "doc-pipeline 适配器未接线"),
     "maop.maop_execute": ("unwired", "全仓零生产调用方（权限门已改由 dispatch_gate 承担）"),
     "maop.maop_loop_config": ("unwired", "主循环配置走 loop_models.LoopConfig，本模块为并存实现"),
     "maop.memory.unified": ("unwired", "统一记忆协议未接入读路径"),
+    # M-X2 E2-a（2026-11-01）：orchestration 包已接线——temporal_adapter 经
+    # wiring.run_workflow 被 cli_workflow（maop workflow run）生产消费，
+    # 此前"先行定义"孤儿条目随之销除；base/temporal_adapter/wiring 三件
+    # 均有生产导入方，无需再登记。
 }
 
 

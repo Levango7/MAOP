@@ -27,9 +27,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# 被测对象是 maop.enterprise.pg_persist（MAOS 私有仓）。个人版环境显式跳过并计入
-# skip 数，而不是被 conftest 静默忽略（见 tests/conftest.py 的说明）。
-pytest.importorskip("maop.enterprise", reason="企业能力在 maop-enterprise（MAOS）")
+# 每个用例都在 patch maop.enterprise.pg_persist 的内部函数，企业包缺席时收集之后
+# 必然全红。模块级显式 skip：报告里能看到这条 skip，而不是被 collect_ignore 连文件
+# 一起吞掉（那样这些用例在任何环境下都没跑过）。
+pytest.importorskip("maop.enterprise.pg_persist")
 
 # -- Fixtures -------------------------------------------------------
 

@@ -266,6 +266,11 @@ class CLIAdapter(AgentAdapter):
                 input=stdin_input,
                 capture_output=True,
                 text=True,
+                # Windows 管道默认 locale 编码（cp1252）无法承载非 ASCII 输出：
+                # 外部 CLI agent 输出中文时会触发 UnicodeEncodeError/UnicodeDecodeError。
+                # 显式 UTF-8 + replace 使跨平台行为一致（POSIX 本就 UTF-8，无行为变化）。
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.config.timeout_s,
                 cwd=cwd,
                 env=env,

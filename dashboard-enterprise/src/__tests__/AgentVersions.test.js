@@ -110,6 +110,27 @@ describe('AgentVersions.vue', () => {
     const lastUrl = mockGet.mock.calls.at(-1)[0];
     expect(lastUrl).toContain('agent_id=codex');
     expect(lastUrl).toContain('status=draft');
+    // A bare `@click="load"` used to pass the DOM Event as `page`, producing
+    // `page=[object PointerEvent]` -> backend 422 with no console error.
+    expect(lastUrl).toContain('page=1');
+  });
+
+  it('keeps a numeric page for all three filter-triggered reloads', async () => {
+    mockList();
+    const wrapper = mountView();
+    await flushPromises();
+    mockGet.mockClear();
+
+    await wrapper.find('input[type="text"]').trigger('keyup.enter');
+    await wrapper.find('select').trigger('change');
+    await wrapper.findAll('button').find((b) => b.text() === 'Refresh').trigger('click');
+    await flushPromises();
+
+    expect(mockGet).toHaveBeenCalledTimes(3);
+    for (const [url] of mockGet.mock.calls) {
+      expect(url).toContain('page=1');
+      expect(url).not.toMatch(/page=%5B|page=\[|page=undefined/i);
+    }
   });
 
   // ── 回滚 ──────────────────────────────────────────────────────

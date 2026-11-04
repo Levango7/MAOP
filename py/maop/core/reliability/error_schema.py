@@ -48,6 +48,9 @@ class MaopResult(BaseModel):
     start_time: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     model: str | None = None
     structured_output: dict[str, Any] | None = None
+    # M3.1: 实测 token 用量（LLM 直连路径回填；键 prompt_tokens/completion_tokens/
+    # total_tokens）。None = 未知（CLI 子进程路径不产出 token，成本侧走启发式估算）。
+    usage: dict[str, int] | None = None
 
     # ── helpers ──────────────────────────────────────────────
 
@@ -86,6 +89,7 @@ def new_result(
     driver: str | None = None,
     model: str | None = None,
     structured_output: dict[str, Any] | None = None,
+    usage: dict[str, int] | None = None,
 ) -> MaopResult:
     """Create a MaopResult with ``ok`` derived from exit_code + error."""
     ok = exit_code == 0 and not error
@@ -103,4 +107,5 @@ def new_result(
         driver=driver,
         model=model,
         structured_output=structured_output,
+        usage=usage,
     )

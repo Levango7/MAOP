@@ -50,10 +50,10 @@ from maop.dashboard.routers.agent_versions_helpers import (
     _user_id_from_request,
 )
 from maop.dashboard.routers.agent_versions_schemas import (
-    AgentVersionEnvelope,
-    AgentVersionListEnvelope,
-    CanaryEnvelope,
-    RollbackEnvelope,
+    CanaryConfigEnvelope,
+    VersionActivateEnvelope,
+    VersionListEnvelope,
+    VersionRollbackEnvelope,
 )
 from maop.dashboard.services import agent_versions_service
 
@@ -89,7 +89,7 @@ async def create_version(
 # ── Endpoints: 列出版本 ──────────────────────────────────────────
 
 
-@router.get("", response_model=AgentVersionListEnvelope)
+@router.get("", response_model=VersionListEnvelope)
 @handle_api_errors
 async def list_versions(
     request: Request,
@@ -195,7 +195,7 @@ async def delete_version(version_id: str, request: Request) -> dict[str, Any]:
 # ── Endpoints: 激活版本 (全量切换) ───────────────────────────────
 
 
-@router.post("/{version_id}/activate", response_model=AgentVersionEnvelope)
+@router.post("/{version_id}/activate", response_model=VersionActivateEnvelope)
 @handle_api_errors
 async def activate_version(version_id: str, request: Request) -> dict[str, Any]:
     """激活版本 — 全量切换. 同一 agent 的其他 active 版本自动转为 retired."""
@@ -218,7 +218,10 @@ async def activate_version(version_id: str, request: Request) -> dict[str, Any]:
 # ── Endpoints: 回滚到指定版本 ────────────────────────────────────
 
 
-@router.post("/{version_id}/rollback", response_model=RollbackEnvelope)
+@router.post(
+    "/{version_id}/rollback",
+    response_model=VersionRollbackEnvelope,
+)
 @handle_api_errors
 async def rollback_version(
     version_id: str,
@@ -249,7 +252,7 @@ async def rollback_version(
 # ── Endpoints: 配置灰度发布 ──────────────────────────────────────
 
 
-@router.post("/{version_id}/canary", response_model=CanaryEnvelope)
+@router.post("/{version_id}/canary", response_model=CanaryConfigEnvelope)
 @handle_api_errors
 async def configure_canary(
     version_id: str,

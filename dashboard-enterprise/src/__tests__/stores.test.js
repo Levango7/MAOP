@@ -191,6 +191,50 @@ describe('useEditionStore', () => {
     // 完成后 switching 应为 false
     expect(store.switching).toBe(false);
   });
+
+  describe('checkNotificationsAvailability', () => {
+    function answer(status) {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: status >= 200 && status < 400,
+        status,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve('{}'),
+      });
+    }
+
+    it('reads 404 as "notification engine absent"', async () => {
+      // 个人版没装商业 overlay 时 notifications router 导入失败，整块端点不注册
+      const store = useEditionStore();
+      answer(404);
+      expect(await store.checkNotificationsAvailability()).toBe(false);
+      expect(store.notificationsAvailable).toBe(false);
+    });
+
+    it('reads a registered endpoint as available', async () => {
+      const store = useEditionStore();
+      answer(200);
+      expect(await store.checkNotificationsAvailability()).toBe(true);
+    });
+
+    it('keeps 401 unknown and probes again next time', async () => {
+      // 登录态问题不是"能力不存在"的证据：企业版安装上的普通用户拿得到 401，
+      // 若据此判死就会把他本来该用的收件箱入口藏起来。
+      const store = useEditionStore();
+      answer(401);
+      expect(await store.checkNotificationsAvailability()).toBe(null);
+      expect(store.notificationsAvailable).toBe(null);
+      answer(404);
+      expect(await store.checkNotificationsAvailability()).toBe(false);
+    });
+
+    it('caches the verdict so the probe fires once', async () => {
+      const store = useEditionStore();
+      answer(200);
+      await store.checkNotificationsAvailability();
+      await store.checkNotificationsAvailability();
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe('useApiStore auth header injection', () => {

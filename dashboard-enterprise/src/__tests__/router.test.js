@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { createPinia, setActivePinia } from 'pinia';
 import router from '../router/index.js';
+import { useEditionStore } from '../stores/edition.js';
 
 // ── 2026-09-01 信息架构重设计（5 组任务流导航）─────────────────────
 // 断言更新为新结构：5 组顶层路径（/home /run /memory /capability /operate）
@@ -78,12 +80,45 @@ describe('Router', () => {
     expect(route?.meta?.requiresEnterprise).toBeFalsy();
   });
 
-  // 2026-10-28：通知中心后端依赖 maop.enterprise（个人版不挂载 /api/notifications/*），
-  // 前端若继续无条件暴露，个人版用户会进入一个必然 500 的页面。这两个页面的守卫
-  // 必须与后端 edition gate 同步，否则就是"前端有入口、后端没路由"的静默退化。
-  it('notification pages are enterprise-gated (backend is enterprise-only)', () => {
-    const byName = Object.fromEntries(router.getRoutes().map((r) => [r.name, r]));
-    expect(byName.notifications?.meta?.requiresEnterprise).toBe(true);
-    expect(byName['notification-config']?.meta?.requiresEnterprise).toBe(true);
+  it('gates the notification inbox by capability and its config page by edition', () => {
+    // 收件箱的读端点任何已登录用户都能用（notifications router docstring），
+    // 所以它只能按"端点在不在"挡，不能按 edition 挡 —— 企业版的普通用户
+    // 拿不到 /api/info/edition，按 edition 判断会把他该用的入口也藏掉。
+    // 配置页的端点全部 require_admin，继续按企业版守卫。
+    const routes = router.getRoutes();
+    const inbox = routes.find((r) => r.name === 'notifications');
+    const config = routes.find((r) => r.name === 'notification-config');
+    expect(inbox?.meta?.requiresCapability).toBe('notifications');
+    expect(inbox?.meta?.requiresEnterprise).toBeFalsy();
+    expect(config?.meta?.requiresEnterprise).toBe(true);
+  });
+
+  it('redirects the inbox home only when the probe says the engine is missing', async () => {
+    // 未知（null）放行 —— 探针还没回就凭猜测挡深链，等于把用户能走的路改掉。
+    setActivePinia(createPinia());
+    const store = useEditionStore();
+    // 守卫在"未知"时会补一次探针；这里把 fetch 钉成"端点在"，
+    // 既不打真网络，也不让那次补测改变结论。
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true, status: 200, json: () => Promise.resolve({}),
+    });
+    try {
+      store.notificationsAvailable = null;
+      await router.push('/notifications');
+      expect(router.currentRoute.value.path).toBe('/notifications');
+
+      store.notificationsAvailable = false;
+      await router.push('/home');
+      await router.push('/notifications');
+      expect(router.currentRoute.value.path).toBe('/home');
+
+      store.notificationsAvailable = true;
+      await router.push('/home');
+      await router.push('/notifications');
+      expect(router.currentRoute.value.path).toBe('/notifications');
+    } finally {
+      fetchSpy.mockRestore();
+      await router.push('/home');
+    }
   });
 });

@@ -1,0 +1,196 @@
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+
+/**
+ * 「有路由、但用户永远到不了」的守卫。
+ *
+ * 2026-10-29 实测：`git grep "capability/examples"` 只命中 router/index.js 本身 ——
+ * 5.5.0 新增的 4 个页面（agent-versions / credential-vault / long-running-tasks /
+ * examples）除了手输 URL 之外没有任何入口，等于没交付。同期还有 3 个成型的 Agent 页
+ * （agent-registry / agent-billing / agent-gateway）同样不可达。
+ *
+ * 这类缺陷不会让任何测试变红：路由能 import、组件能渲染、build 能过，
+ * 只是没人能点进去。所以只能把「可达性」本身钉成断言。
+ */
+
+const SRC = path.resolve(process.cwd(), 'src');
+const ROUTER = path.join(SRC, 'router', 'index.js');
+const NAV = path.join(SRC, 'nav.js');
+
+/**
+ * 豁免：确实不需要导航入口的路由。
+ * 每一条都必须写清理由 —— 无理由的豁免等于把守卫关掉。
+ */
+const EXEMPT = {
+  '/capability/agent-recommend':
+    'AgentRecommend.vue 已作为 AgentRegistry 的 recommend tab 嵌入，独立路由是冗余别名，保留只为深链不断',
+};
+
+/** 从 router/index.js 取出 { path, redirect } 列表。 */
+function parseRoutes() {
+  const text = fs.readFileSync(ROUTER, 'utf-8');
+  const routes = [];
+  // 路由在本文件里都是单行定义，按行取即可（多行会被下面 count 断言暴露）
+  for (const line of text.split('\n')) {
+    const m = line.match(/path:\s*'([^']+)'/);
+    if (!m) continue;
+    routes.push({ path: m[1], isRedirect: /redirect:/.test(line) });
+  }
+  return routes;
+}
+
+/** 从 nav.js 取出所有入口路径：to 与 matchPaths（旧路由别名）。 */function parseNavTargets() {
+  const text = fs.readFileSync(NAV, 'utf-8');
+  const targets = new Set();
+  for (const m of text.matchAll(/to:\s*'([^']+)'/g)) targets.add(m[1]);
+  for (const grp of text.matchAll(/matchPaths:\s*\[([^\]]*)\]/g)) {
+    for (const m of grp[1].matchAll(/'([^']+)'/g)) targets.add(m[1]);
+  }
+  return targets;
+}
+
+/** 全仓（排除 router 自身与测试）里，是否存在指向 path 的跳转。 */
+function linkRefs(pathValue) {
+  const patterns = [
+    `to="${pathValue}"`,
+    `to='${pathValue}'`,
+    `push('${pathValue}')`,
+    `push("${pathValue}")`,
+    `href="${pathValue}"`,
+  ];
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === '__tests__') continue;
+        walk(full);
+      } else if (/\.(vue|js)$/.test(entry.name) && full !== ROUTER) {
+        const text = fs.readFileSync(full, 'utf-8');
+        if (patterns.some((p) => text.includes(p))) {
+          found.push(path.relative(SRC, full).replace(/\\/g, '/'));
+        }
+      }
+    }
+  };
+  walk(SRC);
+  return found;
+}
+
+/** 结构性路由：不需要入口，也不算缺陷。 */
+function isStructural(route) {
+  if (route.isRedirect) return true; // 旧路由 301 兼容，如 /tasks → /home/tasks
+  if (route.path === '/') return true; // 重定向到 /home
+  if (route.path.includes(':')) return true; // 动态段（/share/:token）与 404 兜底
+  return false;
+}
+
+describe('nav coverage', () => {
+  it('every component route is reachable from nav or a link', () => {
+    const routes = parseRoutes();
+    const targets = parseNavTargets();
+
+    const unreachable = routes
+      .filter((r) => !isStructural(r))
+      .filter((r) => !targets.has(r.path) && !EXEMPT[r.path])
+      .filter((r) => linkRefs(r.path).length === 0)
+      .map((r) => r.path);
+
+    expect(
+      unreachable,
+      `以下路由既不在 nav 的 to/matchPaths 里，也没有任何 to=/push()/href= 指向：\n  ${unreachable.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('every nav entry uses a distinct icon', () => {
+    // 2026-10-29 用户反馈："左侧任务栏存在图标未去重，AI 味道严重，有些菜单选项的
+    // 图标和其他菜单选项的图标重合了"。实测 51 个入口只用了 37 个图标，
+    // 14 处重合（message-square 用了 3 次，scroll/route/git-branch/bot/gauge/
+    // plug/share2/activity/clipboard/link/shield/gear 各 2 次）。
+    // 去重后 51 个入口 51 个图标。这条用例防止新增菜单时又随手复用图标。
+    const text = fs.readFileSync(NAV, 'utf-8');
+    const byIcon = new Map();
+    for (const line of text.split('\n')) {
+      const to = line.match(/to:\s*'([^']+)'/);
+      const icon = line.match(/icon:\s*'([^']+)'/);
+      if (!to || !icon) continue;
+      if (!byIcon.has(icon[1])) byIcon.set(icon[1], []);
+      byIcon.get(icon[1]).push(to[1]);
+    }
+    const dupes = [...byIcon.entries()]
+      .filter(([, routes]) => routes.length > 1)
+      .map(([icon, routes]) => `${icon} x${routes.length}: ${routes.join(', ')}`);
+
+    expect(
+      dupes,
+      `侧边栏图标重复会让每个菜单看起来都一样：\n  ${dupes.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('has no dangling nav entry pointing at a nonexistent route', () => {
+    const paths = new Set(parseRoutes().map((r) => r.path));
+    const dangling = [...parseNavTargets()].filter((t) => !paths.has(t));
+    expect(dangling, `导航项指向了不存在的路由：\n  ${dangling.join('\n  ')}`).toEqual([]);
+  });
+
+  it('actually parses a non-trivial number of routes and nav targets', () => {
+    // 防止正则失效导致上面两个用例空转变绿 —— 这类守卫最容易死在"永远为真"上
+    expect(parseRoutes().length).toBeGreaterThan(60);
+    expect(parseNavTargets().size).toBeGreaterThan(50);
+    // 图标去重用例也要真有 50+ 条带图标的项，否则它同样是空转
+    const text = fs.readFileSync(NAV, 'utf-8');
+    const withIcon = text
+      .split('\n')
+      .filter((l) => /to:\s*'/.test(l) && /icon:\s*'/.test(l));
+    expect(withIcon.length).toBeGreaterThan(45);
+  });
+
+  it('every exempt path still exists as a route', () => {
+    // 豁免项不能变成"僵尸白名单"：路由被删了就该把豁免也删掉
+    const paths = new Set(parseRoutes().map((r) => r.path));
+    const stale = Object.keys(EXEMPT).filter((p) => !paths.has(p));
+    expect(stale, `豁免清单里有已不存在的路由，请删除对应条目：\n  ${stale.join('\n  ')}`).toEqual([]);
+  });
+
+  /**
+   * 门禁标记必须两边同步：只标导航会让用户"看得到入口、点进去被踢回"，
+   * 只标路由会让"手输 URL 能进、侧边栏却找不到"。
+   * 两种门禁各有依据：enterprise 按 edition 隐藏（管理页与通知配置页的端点
+   * 全部 require_admin），capability 按探针隐藏（收件箱的读端点任何登录用户
+   * 都能用，只有"router 没注册"才是它不可用的理由）。
+   */
+  function parseGateMarks() {
+    const navMarks = new Map();
+    for (const line of fs.readFileSync(NAV, 'utf-8').split('\n')) {
+      const m = line.match(/to:\s*'([^']+)'/);
+      if (!m) continue;
+      const cap = line.match(/capability:\s*'([^']+)'/);
+      navMarks.set(m[1], { enterprise: /enterprise:\s*true/.test(line), capability: cap ? cap[1] : null });
+    }
+    const routeMarks = new Map();
+    for (const line of fs.readFileSync(ROUTER, 'utf-8').split('\n')) {
+      const m = line.match(/path:\s*'([^']+)'/);
+      if (!m) continue;
+      const cap = line.match(/requiresCapability:\s*'([^']+)'/);
+      routeMarks.set(m[1], { enterprise: /requiresEnterprise:\s*true/.test(line), capability: cap ? cap[1] : null });
+    }
+    return { navMarks, routeMarks };
+  }
+
+  it('nav gates and route gates stay in lockstep', () => {
+    const { navMarks, routeMarks } = parseGateMarks();
+    const problems = [];
+    for (const [p, n] of navMarks) {
+      const r = routeMarks.get(p) || { enterprise: false, capability: null };
+      if (n.enterprise !== r.enterprise) problems.push(`${p}: 导航 enterprise=${n.enterprise}，路由 requiresEnterprise=${r.enterprise}`);
+      if (n.capability !== r.capability) problems.push(`${p}: 导航 capability=${n.capability}，路由 requiresCapability=${r.capability}`);
+    }
+    expect(problems, `导航与路由的门禁标记不一致：\n  ${problems.join('\n  ')}`).toEqual([]);
+
+    // 标记本身也得被解析到，否则上面的比对会空转变绿
+    expect([...navMarks.values()].filter((v) => v.enterprise).length).toBeGreaterThanOrEqual(9);
+    expect(navMarks.get('/notifications')).toEqual({ enterprise: false, capability: 'notifications' });
+    expect(navMarks.get('/notifications/config').enterprise).toBe(true);
+  });
+});

@@ -10,23 +10,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 import argparse
+import io
 import os
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
-from maop.cli_run_outcome import explain_unsuccessful_run
+from maop.cli_mcp_marketplace import cmd_mcp_marketplace
+from maop.cli_run import cmd_run
 from maop.config.home import (
     default_home,
     ensure_runtime_root,
     init_home,
     resolve_maop_root,
 )
-from maop.core.agent.delegation.depth import (
-    MAX_SELF_DELEGATION_DEPTH,
-    current_depth,
-)
+from maop.core.agent.delegation.depth import MAX_SELF_DELEGATION_DEPTH
 
 # Backward-compatible constant; commands that write use _runtime_root() so an
 # installed wheel can bootstrap ~/.maop instead of writing into site-packages.
@@ -200,61 +199,6 @@ def cmd_status() -> Any:
         logger.warning("cmd_status: 查询 MAOP 状态失败（刻意降级，不阻塞退出码），异常: %s", exc, exc_info=True)
 
 
-def cmd_run(task: str, depth: int = 0) -> Any:
-    """Run a task through Python-native MaopLoop.
-
-    Depth arrives from ``--depth`` or from the inherited
-    ``MAOP_DELEGATION_DEPTH`` marker (set by every spawned agent).  A
-    subprocess gets a fresh counter, so the CLI-level cap is what stops
-    a self-referential agent from forking itself indefinitely.  At the
-    cap the run is refused with a non-zero exit instead of re-entering
-    the orchestration loop.
-    """
-    depth = max(depth, current_depth())
-    if depth >= MAX_SELF_DELEGATION_DEPTH:
-        print(
-            f"[BLOCK] self-delegation depth {depth} reached hard cap "
-            f"({MAX_SELF_DELEGATION_DEPTH}); refusing to re-enter orchestration loop",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    start = time.monotonic()
-    try:
-        import asyncio
-
-        from maop.maop_loop import MaopLoop
-        loop = MaopLoop(root_dir=str(_runtime_root()))
-        result = asyncio.run(loop.run(task))
-        elapsed = (time.monotonic() - start) * 1000
-        # 输出执行结果
-        if result.trace_id:
-            # Machine-readable handle: the dashboard parses this line to link a
-            # control job to its run_events timeline (GET /api/runs/{trace_id}).
-            print(f"[TRACE] {result.trace_id}")
-        if result.execution:
-            if result.execution.stdout:
-                print(result.execution.stdout)
-            if result.execution.error:
-                print(f"[stderr] {result.execution.error}", file=sys.stderr)
-        if result.block_reason:
-            print(f"[BLOCK] 任务被阻塞：{result.block_reason}", file=sys.stderr)
-            sys.exit(1)
-        # 2026-10-24：`LoopResult.success` 是权威信号（exec_result 非空 + is_success + verify_ok），
-        # 此前只把 block_reason 当失败，导致 agent 找不到时仍打印 `[OK] run 完成` 并退出 0 ——
-        # 假成功。这里改为 fail-loud：非成功即非零退出，并说明原因。
-        if not result.success:
-            _emit_fail("run", explain_unsuccessful_run(result) or "未提供进一步信息")
-            sys.exit(1)
-        print(f"[OK] run 完成 ({elapsed:.1f}ms)")
-    except ImportError as exc:
-        # 依赖模块验证提示：明确提示缺失模块名称（小修复，不修改核心逻辑）
-        _emit_fail("run", f"缺失依赖模块（可能缺失：maop.migrations.sqlite_to_pg 或相关依赖）: {exc}")
-        sys.exit(1)
-    except Exception as exc:
-        _emit_fail("run", exc)
-        sys.exit(1)
-
-
 def cmd_validate() -> Any:
     """Run config validation using Python-native deploy.validate_config()."""
     start = time.monotonic()
@@ -298,112 +242,6 @@ def cmd_health() -> Any:
     except Exception as exc:
         _emit_fail("health", exc)
         sys.exit(1)
-
-
-def cmd_mcp_marketplace(args: list[str]) -> Any:
-    """Handle ``mcp marketplace <subcommand>`` — registry and server management.
-
-    Subcommands:
-        list-registries                         List configured registries
-        add-registry <name> <url> [--trusted]   Add a registry
-        remove-registry <name>                  Remove a registry
-        search <query> [--tags t1,t2]           Search the catalog
-        install <name> [--registry R] [--no-verify] [--confirm-untrusted]
-        uninstall <name>                        Remove an installed server
-        list-installed                          List installed marketplace servers
-    """
-    parser = argparse.ArgumentParser(
-        prog="maop mcp marketplace",
-        description="MCP Marketplace — discover and install MCP servers from remote registries",
-    )
-    sub = parser.add_subparsers(dest="subcommand", required=True)
-
-    sub.add_parser("list-registries", help="List all configured registries")
-
-    p_add = sub.add_parser("add-registry", help="Add a registry")
-    p_add.add_argument("name", help="Registry name")
-    p_add.add_argument("url", help="Registry URL (HTTP/HTTPS)")
-    p_add.add_argument("--trusted", action="store_true", help="Mark registry as trusted")
-
-    p_remove = sub.add_parser("remove-registry", help="Remove a registry")
-    p_remove.add_argument("name", help="Registry name")
-
-    p_search = sub.add_parser("search", help="Search servers in the catalog")
-    p_search.add_argument("query", help="Search query (matches name/description)")
-    p_search.add_argument("--tags", default="", help="Comma-separated tags to filter by")
-
-    p_install = sub.add_parser("install", help="Install a server from the marketplace")
-    p_install.add_argument("name", help="Server name to install")
-    p_install.add_argument("--registry", default=None, help="Install from a specific registry")
-    p_install.add_argument("--no-verify", action="store_true", help="Skip checksum verification")
-    p_install.add_argument(
-        "--confirm-untrusted", action="store_true",
-        help="Confirm installing from an untrusted registry without a checksum",
-    )
-
-    p_uninstall = sub.add_parser("uninstall", help="Uninstall a marketplace server")
-    p_uninstall.add_argument("name", help="Server name to uninstall")
-
-    sub.add_parser("list-installed", help="List installed marketplace servers")
-
-    parsed = parser.parse_args(args)
-
-    from maop.core.mcp.mcp_marketplace import MCPMarketplace
-    # Use the project-root config dir so reads/writes stay local to the project
-    # (not the package-shipped default, which is read-only).
-    config_path = _runtime_root() / "config" / "mcp_marketplace.yaml"
-    mp = MCPMarketplace(config_path=config_path)
-
-    if parsed.subcommand == "list-registries":
-        regs = mp.list_registries()
-        if not regs:
-            print("[INFO] 未配置任何 registry")
-        for r in regs:
-            trust = "trusted" if r.trusted else "untrusted"
-            status = "enabled" if r.enabled else "disabled"
-            print(f"  {r.name}  {r.url}  [{trust}] [{status}]")
-    elif parsed.subcommand == "add-registry":
-        mp.add_registry(parsed.name, parsed.url, trusted=parsed.trusted)
-        trust = "trusted" if parsed.trusted else "untrusted"
-        print(f"[OK] add-registry 完成 — {parsed.name} {parsed.url} [{trust}]")
-    elif parsed.subcommand == "remove-registry":
-        mp.remove_registry(parsed.name)
-        print(f"[OK] remove-registry 完成 — 已移除 {parsed.name}")
-    elif parsed.subcommand == "search":
-        tags = (
-            [t.strip() for t in parsed.tags.split(",") if t.strip()]
-            if parsed.tags else None
-        )
-        results = mp.search(parsed.query, tags=tags)
-        if not results:
-            print(f"[INFO] 未找到匹配 '{parsed.query}' 的服务器")
-        for s in results:
-            verified = " [verified]" if s.verified else ""
-            tags_str = f" tags={','.join(s.tags)}" if s.tags else ""
-            print(f"  {s.name}  {s.description}{verified}{tags_str}")
-    elif parsed.subcommand == "install":
-        try:
-            _cfg = mp.install(
-                parsed.name,
-                registry_name=parsed.registry,
-                verify_checksum=not parsed.no_verify,
-                confirm_untrusted=parsed.confirm_untrusted,
-            )
-            print(f"[OK] install 完成 — 已安装 {parsed.name}")
-        except ValueError:
-            sys.exit(1)
-    elif parsed.subcommand == "uninstall":
-        if mp.uninstall(parsed.name):
-            print(f"[OK] uninstall 完成 — 已卸载 {parsed.name}")
-        else:
-            print(f"[FAIL] uninstall 失败 — {parsed.name} 未安装或卸载失败", file=sys.stderr)
-            sys.exit(1)
-    elif parsed.subcommand == "list-installed":
-        installed = mp.list_installed()
-        if not installed:
-            print("[INFO] 未安装任何 marketplace 服务器")
-        for s in installed:  # type: ignore
-            print(f"  {s.name}  {s.version}")
 
 
 def cmd_mcp(args: list[str]) -> Any:
@@ -710,6 +548,17 @@ def cmd_config(args: list[str]) -> None:
 
 
 def main() -> Any:
+    # Windows 上 stdout/stderr 是管道时默认 locale 编码（cp1252 等），
+    # 打印含中文的运行/失败信息会 UnicodeEncodeError——连「[FAIL] run 失败」
+    # 报错路径自身都会连带崩溃（M-SIM GAP-4 第二层）。入口处强制 UTF-8，
+    # 与 cli_adapter 的 subprocess 解码侧对称；errors="replace" 保证永不因
+    # 编码中断运行。POSIX 本就 UTF-8，无行为变化。
+    # isinstance 收窄：sys.stdout 在真实管道上是 TextIOWrapper（有
+    # reconfigure）；被 pytest 等替换为捕获对象时跳过，其编码由宿主管理。
+    for _stream in (sys.stdout, sys.stderr):
+        if isinstance(_stream, io.TextIOWrapper):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+
     # Enable JSON structured logging when MAOP_JSON_LOG=1 (for ELK / Loki).
     if os.environ.get("MAOP_JSON_LOG", "0") == "1":
         from maop.core.monitoring.monitoring import setup_json_logging
@@ -758,6 +607,11 @@ def main() -> Any:
 
         cmd_eval(argv[1:])
         return
+    if argv and argv[0] == "workflow":
+        from maop.cli_workflow import cmd_workflow
+
+        cmd_workflow(argv[1:])
+        return
 
     parser = argparse.ArgumentParser(description="MAOP - Agent Orchestration Framework")
     parser.add_argument("action", nargs="?", default="start",
@@ -767,6 +621,10 @@ def main() -> Any:
                         help="Self-delegation depth (also inherited via "
                              "MAOP_DELEGATION_DEPTH; capped at "
                              f"{MAX_SELF_DELEGATION_DEPTH})")
+    parser.add_argument("--agent", "-a", default="",
+                        help="Pin the executing agent (MaopLoop forced_agent)")
+    parser.add_argument("--max-turns", type=int, default=0, dest="max_turns",
+                        help="Cap orchestration turns for run (0 = unlimited)")
     parser.add_argument("--port", "-p", type=int, default=9079, help="Dashboard port (default: 9079)")
     parser.add_argument("--host", default="127.0.0.1", help="Dashboard host (default: 127.0.0.1)")
     args = parser.parse_args()
@@ -782,7 +640,7 @@ def main() -> Any:
     elif args.action == "run":
         if not args.task:
             sys.exit(1)
-        cmd_run(args.task, depth=args.depth)
+        cmd_run(args.task, depth=args.depth, agent=args.agent, max_turns=args.max_turns)
     elif args.action == "validate":
         cmd_validate()
     elif args.action == "health":

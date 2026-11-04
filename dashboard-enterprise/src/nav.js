@@ -28,7 +28,7 @@ export const nav = [
   { section: 'nav.group.run' },
   { to: '/run', label: 'nav.run', icon: 'play', subtitle: 'nav.run.subtitle', matchPaths: ['/control', '/chat'] },
   { to: '/run/agents', label: 'nav.dispatch', icon: 'route', subtitle: 'nav.dispatch.subtitle', matchPaths: ['/agents'] },
-  { to: '/run/workflow', label: 'nav.workflow', icon: 'git-branch', subtitle: 'nav.workflow.subtitle', matchPaths: ['/workflow-editor'] },
+  { to: '/run/workflow', label: 'nav.workflow', icon: 'layers', subtitle: 'nav.workflow.subtitle', matchPaths: ['/workflow-editor'] },
 
   // ── 记忆 ─────────────────────────────────────────────────────
   { section: 'nav.group.memory' },
@@ -41,22 +41,39 @@ export const nav = [
   { to: '/capability/agents', label: 'nav.agents', icon: 'bot', subtitle: 'nav.agents.subtitle' },
   { to: '/capability/skills', label: 'nav.skills', icon: 'beaker', subtitle: 'nav.skills.subtitle', matchPaths: ['/tools', '/skill-editor'] },
   { to: '/capability/market', label: 'nav.skillMarket', icon: 'archive', subtitle: 'nav.skillMarket.subtitle', matchPaths: ['/skill-market'] },
-  { to: '/capability/models', label: 'nav.models', icon: 'gauge', subtitle: 'nav.models.subtitle', matchPaths: ['/models'] },
+  { to: '/capability/models', label: 'nav.models', icon: 'database', subtitle: 'nav.models.subtitle', matchPaths: ['/models'] },
   { to: '/capability/evolve', label: 'nav.evolve', icon: 'sparkles', subtitle: 'nav.evolve.subtitle', matchPaths: ['/evolve', '/evolution-history'] },
   // ── 能力扩展：工具/插件/代理编排 ──
   { to: '/capability/mcp', label: 'nav.mcp', icon: 'plug', subtitle: 'nav.mcp.subtitle' },
   { to: '/capability/plugins', label: 'nav.plugins', icon: 'box', subtitle: 'nav.plugins.subtitle' },
-  { to: '/capability/subagents', label: 'nav.subagents', icon: 'bot', subtitle: 'nav.subagents.subtitle' },
-  { to: '/capability/routing', label: 'nav.routing', icon: 'route', subtitle: 'nav.routing.subtitle' },
+  { to: '/capability/subagents', label: 'nav.subagents', icon: 'cpu', subtitle: 'nav.subagents.subtitle' },
+  { to: '/capability/routing', label: 'nav.routing', icon: 'filter', subtitle: 'nav.routing.subtitle' },
   { to: '/capability/scheduling', label: 'nav.scheduling', icon: 'clock', subtitle: 'nav.scheduling.subtitle' },
-  { to: '/capability/protocols', label: 'nav.protocols', icon: 'share2', subtitle: 'nav.protocols.subtitle' },
+  { to: '/capability/protocols', label: 'nav.protocols', icon: 'radio', subtitle: 'nav.protocols.subtitle' },
   { to: '/capability/worktrees', label: 'nav.worktrees', icon: 'git-compare', subtitle: 'nav.worktrees.subtitle' },
   { to: '/capability/agent-proxy', label: 'nav.agentProxy', icon: 'arrow-left-right', subtitle: 'nav.agentProxy.subtitle' },
+  // ── 2026-10-29 补齐：以下 4 个页面此前只有路由、没有导航入口 ──
+  // 实测 `git grep "capability/examples"` 只命中 router/index.js 本身，
+  // 全仓没有任何 router-link / router.push 指向它们 —— 除了手输 URL，
+  // 用户永远到不了。这几页是 5.5.0 新增能力，不可达等于没交付。
+  { to: '/capability/agent-versions', label: 'nav.agentVersions', icon: 'git-branch', subtitle: 'nav.agentVersions.subtitle' },
+  { to: '/capability/credential-vault', label: 'nav.credentialVault', icon: 'key', subtitle: 'nav.credentialVault.subtitle' },
+  { to: '/capability/long-running-tasks', label: 'nav.longRunningTasks', icon: 'timer', subtitle: 'nav.longRunningTasks.subtitle' },
+  { to: '/capability/examples', label: 'nav.examples', icon: 'file', subtitle: 'nav.examples.subtitle' },
+  // ── 同上：再 3 个成型的 Agent 页同样没有入口 ──
+  // 判定口径见 src/__tests__/ 的不可达路由核查：router 里带 component 的真页面，
+  // 既不在 nav 的 to / matchPaths 里，全仓也没有 to=/push()/href= 指向它。
+  // 注意 /capability/agent-recommend **不补**：AgentRecommend.vue 已被
+  // AgentRegistry.vue 作为 recommend tab 嵌入（第 289 行 `<AgentRecommend />`），
+  // 推荐功能经由本项即可达，独立路由属冗余别名，保留只为深链不断。
+  { to: '/capability/agent-registry', label: 'nav.agentRegistry', icon: 'grid', subtitle: 'nav.agentRegistry.subtitle' },
+  { to: '/capability/agent-billing', label: 'nav.agentBilling', icon: 'chart', subtitle: 'nav.agentBilling.subtitle' },
+  { to: '/capability/agent-gateway', label: 'nav.agentGateway', icon: 'share-nodes', subtitle: 'nav.agentGateway.subtitle' },
 
   // ── 运维 ─────────────────────────────────────────────────────
   { section: 'nav.group.operate' },
-  { to: '/operate', label: 'nav.monitor', icon: 'activity', subtitle: 'nav.monitor.subtitle' },
-  { to: '/operate/logs', label: 'nav.logs', icon: 'scroll', subtitle: 'nav.logs.subtitle' },
+  { to: '/operate', label: 'nav.monitor', icon: 'heart-pulse', subtitle: 'nav.monitor.subtitle' },
+  { to: '/operate/logs', label: 'nav.logs', icon: 'file-text', subtitle: 'nav.logs.subtitle' },
   { to: '/operate/tracing', label: 'nav.observability', icon: 'zap', subtitle: 'nav.observability.subtitle', matchPaths: ['/observability'] },
   { to: '/operate/cost', label: 'nav.cost', icon: 'dollar', subtitle: 'nav.cost.subtitle' },
   // ── 运维扩展：协作/告警/集成 ──
@@ -72,34 +89,45 @@ export const nav = [
 
   // ── 反馈（IA 新增组：用户反馈评价）────────────────────────────
   { section: 'nav.group.feedback' },
-  { to: '/feedback', label: 'nav.feedback', icon: 'message-square', subtitle: 'nav.feedback.subtitle' },
+  { to: '/feedback', label: 'nav.feedback', icon: 'star', subtitle: 'nav.feedback.subtitle' },
 
   // ── 管理（企业版；个人版整组隐藏）─────────────────────────────
   { section: 'nav.group.admin', enterprise: true },
   { to: '/users', label: 'nav.users', icon: 'user', subtitle: 'nav.users.subtitle', enterprise: true },
-  { to: '/audit', label: 'nav.audit', icon: 'clipboard', subtitle: 'nav.audit.subtitle', enterprise: true },
+  { to: '/audit', label: 'nav.audit', icon: 'history', subtitle: 'nav.audit.subtitle', enterprise: true },
   { to: '/rbac', label: 'nav.rbac', icon: 'shield', subtitle: 'nav.rbac.subtitle', enterprise: true },
   { to: '/tenants', label: 'nav.tenants', icon: 'building', subtitle: 'nav.tenants.subtitle', enterprise: true },
   { to: '/quotas', label: 'nav.quotas', icon: 'gauge', subtitle: 'nav.quotas.subtitle', enterprise: true },
-  { to: '/apikeys', label: 'nav.apikeys', icon: 'link', subtitle: 'nav.apikeys.subtitle', enterprise: true },
-  { to: '/sso', label: 'nav.sso', icon: 'plug', subtitle: 'nav.sso.subtitle', enterprise: true },
-  { to: '/licenses', label: 'nav.licenses', icon: 'shield', subtitle: 'nav.licenses.subtitle', enterprise: true },
+  { to: '/apikeys', label: 'nav.apikeys', icon: 'lock', subtitle: 'nav.apikeys.subtitle', enterprise: true },
+  { to: '/sso', label: 'nav.sso', icon: 'log-in', subtitle: 'nav.sso.subtitle', enterprise: true },
+  { to: '/licenses', label: 'nav.licenses', icon: 'check-circle', subtitle: 'nav.licenses.subtitle', enterprise: true },
 
   // ── 设置（TopBar 齿轮直达；侧边栏保留入口方便直达）────────────
+  // 通知引擎在商业 overlay 里：个人版没装企业包时，notifications router
+  // 导入失败、整块端点不注册。收件箱对任何已登录用户都开放（读操作不限
+  // admin），所以按"能力探针"隐藏而不是按 edition 隐藏 —— 企业版安装上的
+  // 普通用户 edition 只能回落 personal，用 edition 判断会把他该用的入口也藏掉。
+  // 配置页的端点全部 require_admin，继续按企业版入口隐藏。
   { section: 'nav.group.system' },
   { to: '/settings', label: 'nav.settings', icon: 'gear', subtitle: 'nav.settings.subtitle' },
-  { to: '/notifications', label: 'nav.notifications', icon: 'message-square', subtitle: 'nav.notifications.subtitle', enterprise: true },
-  { to: '/notifications/config', label: 'nav.notificationConfig', icon: 'gear', subtitle: 'nav.notificationConfig.subtitle', enterprise: true },
+  { to: '/notifications', label: 'nav.notifications', icon: 'inbox', subtitle: 'nav.notifications.subtitle', capability: 'notifications' },
+  { to: '/notifications/config', label: 'nav.notificationConfig', icon: 'wrench', subtitle: 'nav.notificationConfig.subtitle', enterprise: true },
   { to: '/docs', label: 'nav.docs', icon: 'book-open', subtitle: 'nav.docs.subtitle' },
 ];
 
 /**
- * nav 过滤: 个人版隐藏 enterprise:true 的项（含整组 section）。
- * 新结构里企业项集中在"管理"组，个人版整组消失。
+ * nav 过滤:
+ *   - enterprise:true —— 非企业版隐藏（含整组 section，个人版"管理"组整组消失）；
+ *   - capability:'x' —— 只在探针明确判定不可用（false）时隐藏，未知（null）保持可见。
+ *
+ * @param {Array<object>} navList
+ * @param {string} edition
+ * @param {{[name: string]: (boolean|null|undefined)}} [capabilities={}] 探针结果
  */
-export function filterNavByEdition(navList, edition) {
-  if (edition === 'enterprise') return navList;
-  const filtered = navList.filter((item) => !item.enterprise);
+export function filterNavByEdition(navList, edition, capabilities = {}) {
+  const keep = (item) => !(item.enterprise && edition !== 'enterprise')
+    && !(item.capability && capabilities[item.capability] === false);
+  const filtered = navList.filter(keep);
   const result = [];
   for (let i = 0; i < filtered.length; i++) {
     const item = filtered[i];

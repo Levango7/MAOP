@@ -137,6 +137,7 @@ def _register_core_routers(app: FastAPI) -> None:
         runs,
         share,
         system,
+        workflows,
     )
 
     app.include_router(data.router)
@@ -144,6 +145,15 @@ def _register_core_routers(app: FastAPI) -> None:
     app.include_router(runs.router)
     app.include_router(share.router)
     app.include_router(model.router)
+
+    # M-X2 E2-b（2026-11-05）：/api/workflows 提交与状态回写（生产入口 +
+    # run_events 回写，面板沿 trace_id 看既有时间线）
+    app.include_router(workflows.router)
+
+    # M-X3 成本归因（2026-10-29）：/api/cost-attribution 聚合 + 预算越阈检查
+    from maop.dashboard.routers import cost_attribution as cost_attribution_router
+
+    app.include_router(cost_attribution_router.router)
     # F2-01 first: evolution_experiment owns the static /api/evolution/ab/list,
     # while evolve_insights owns /api/evolution/ab/{cycle_id}. Starlette picks
     # the first full match, so the param route must not be registered earlier —
@@ -377,38 +387,26 @@ def _register_audit_router(app: FastAPI) -> None:
 
 def _register_notifications_and_config(app: FastAPI) -> None:
     """Register notifications / config-history / blackboard routers."""
-    # ── Notification Center router（企业版专属，FeatureFlag.NOTIFICATION_CENTER）──
-    # Implements PRD docs/prd-notification-center.md: channels (Email/Webhook/InApp),
-    # rules, templates, event bus, async delivery with retry + dead-letter queue,
-    # and WebSocket real-time push at /api/notifications/ws.
+    # ── Notification Center router ───────────────────────────────────────
+    # Channels (Email/Webhook/InApp), rules, templates, event bus, async
+    # delivery with retry + dead-letter queue, WS push at /api/notifications/ws.
     #
-    # 2026-10-28 修正：此前注释写"available in both editions"，实际
-    # `services/notification_service.py` 惰性 ``from maop.enterprise.notification
-    # import EventBus, NotificationManager``，`notification_schemas.py` 更是
-    # 模块级 import —— 个人版第一次调用就 ImportError（500），前端路由却
-    # 无条件暴露。只有有效 license（ENTERPRISE）时企业包才保证可用，故按
-    # FeatureFlag 统一 gate：个人版不挂载，前端同步隐藏入口（nav.js / 路由
-    # meta.requiresEnterprise）。
-    # 个人版仍保留 /api/alerts（Alertmanager 入站 webhook + 历史查询），
-    # 它只写日志与 alert_ingest 表，不依赖企业包。
-    # 惰性 import 以沿用 tests 对 `_register_routes.has_feature` 的 patch 点。
-    from maop.dashboard._register_routes import FeatureFlag, has_feature
-
-    if has_feature(FeatureFlag.NOTIFICATION_CENTER):
+    # 这不是"双版本可用"：通知引擎本体（NotificationManager / EventBus）在商业
+    # overlay 里，本 router 与它的响应模型都模块级导入 overlay。没有企业包的
+    # 安装会走到下面的 except，整块端点直接不存在（只剩这条 warning 日志），
+    # 而侧边栏仍给出入口。产品口径要改的话是另一个决定，不在这里顺手改。
+    try:
+        from maop.dashboard.routers import notifications as notifications_router
+        app.include_router(notifications_router.router)
+        # Wire the notification manager's broadcaster to the router's WS pool
+        # so InApp notifications are pushed to connected clients in real time.
         try:
-            from maop.dashboard.routers import notifications as notifications_router
-            app.include_router(notifications_router.router)
-            # Wire the notification manager's broadcaster to the router's WS pool
-            # so InApp notifications are pushed to connected clients in real time.
-            try:
-                notifications_router.wire_broadcaster()
-            except Exception as _notif_wire_exc:
-                logger.warning("[server] Notification broadcaster wire failed: %s", _notif_wire_exc)
-            logger.info("[server] Enterprise router: notifications enabled")
-        except ImportError as _e:
-            logger.warning("[server] Router MISSING: notifications (import error: %s)", _e)
-    else:
-        logger.info("[server] Router: notifications skipped (personal edition)")
+            notifications_router.wire_broadcaster()
+        except Exception as _notif_wire_exc:
+            logger.warning("[server] Notification broadcaster wire failed: %s", _notif_wire_exc)
+        logger.info("[server] Router: notifications enabled (edition=%s)", get_edition().value)
+    except ImportError as _e:
+        logger.warning("[server] Router MISSING: notifications (import error: %s)", _e)
 
     # ── Config history & rollback router ────────────────────────────────
     # Provides /api/config/history + /api/config/rollback/{version} so operators

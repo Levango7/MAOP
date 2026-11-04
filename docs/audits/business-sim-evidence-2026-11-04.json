@@ -1,0 +1,290 @@
+{
+  "meta": {
+    "generated_at": "2026-11-04 06:56:18",
+    "sim_home": "F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home",
+    "backend": "production dispatch via maop run (stub driver)"
+  },
+  "scenarios": [
+    {
+      "scenario": "ticket_triage",
+      "desc": "ticket triage pipeline: triage -> resolve -> receipt",
+      "nodes": 3,
+      "rounds": 1,
+      "executions": 3,
+      "success": 3,
+      "failed": 0,
+      "runs": [
+        {
+          "agent": "sim-triage",
+          "task": "工单 1042 分诊：登录令牌失效",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 563,
+            "source": "estimated"
+          },
+          "duration_ms": 1675,
+          "stdout_tail": "[TRACE] dc3cc3016fef418ea327a815e227c33c\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:triage] ack task=23363 :: 工单 1042 分诊：登录令牌失效\n\n[USAGE] turns=1 tokens=563 source=estimated\n[OK] run 完成 (1166.0ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "ticket_triage",
+          "node": "triage",
+          "round": 1
+        },
+        {
+          "agent": "sim-worker",
+          "task": "工单 1042 处置：重置会话并校验刷新链",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 419,
+            "source": "estimated"
+          },
+          "duration_ms": 1521,
+          "stdout_tail": "[TRACE] ad560400a414488a9c76616babb42de1\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:worker] ack task=55519 :: 工单 1042 处置：重置会话并校验刷新链\n\n\n\n[Memory Context]\n\n  sim-triage: 工单 104\n\n[USAGE] turns=1 tokens=419 source=estimated\n[OK] run 完成 (1033.1ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "ticket_triage",
+          "node": "resolve",
+          "round": 1
+        },
+        {
+          "agent": "sim-worker",
+          "task": "工单 1042 回执：发送处置结果摘要",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 743,
+            "source": "estimated"
+          },
+          "duration_ms": 1658,
+          "stdout_tail": "[TRACE] 12dbac29936241c69198ad220b778a82\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:worker] ack task=91643 :: 工单 1042 回执：发送处置结果摘要\n\n\n\n[Memory Context]\n\n  sim-triage: 工单 1042 \n\n[USAGE] turns=1 tokens=743 source=estimated\n[OK] run 完成 (1161.6ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "ticket_triage",
+          "node": "receipt",
+          "round": 1
+        }
+      ]
+    },
+    {
+      "scenario": "daily_report",
+      "desc": "daily report pipeline: collect -> aggregate -> draft -> verify",
+      "nodes": 4,
+      "rounds": 1,
+      "executions": 4,
+      "success": 4,
+      "failed": 0,
+      "runs": [
+        {
+          "agent": "sim-worker",
+          "task": "日报采集：昨日委派与成本原始记录",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 520,
+            "source": "estimated"
+          },
+          "duration_ms": 1561,
+          "stdout_tail": "[TRACE] decd985282c34384b4dd9a5c5eb8160e\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:worker] ack task=23420 :: 日报采集：昨日委派与成本原始记录\n\n\n\n[Memory Context]\n\n  sim-worker: 工单 1042 处置：\n\n[USAGE] turns=1 tokens=520 source=estimated\n[OK] run 完成 (1040.2ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "daily_report",
+          "node": "collect",
+          "round": 1
+        },
+        {
+          "agent": "sim-worker",
+          "task": "日报聚合：按 agent/phase/model 汇总",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 528,
+            "source": "estimated"
+          },
+          "duration_ms": 1572,
+          "stdout_tail": "[TRACE] 7cf0cc6c323a4c5db1acaa2a8adee135\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:worker] ack task=57028 :: 日报聚合：按 agent/phase/model 汇总\n\n\n\n[Memory Context]\n\n  sim-worker: \n\n[USAGE] turns=1 tokens=528 source=estimated\n[OK] run 完成 (1026.3ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "daily_report",
+          "node": "aggregate",
+          "round": 1
+        },
+        {
+          "agent": "sim-reporter",
+          "task": "日报撰写：管理层摘要段落",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 322,
+            "source": "estimated"
+          },
+          "duration_ms": 1507,
+          "stdout_tail": "[TRACE] ef0cc0b89f864d2d934ac5b5fc30736b\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:reporter] ack task=47322 :: 日报撰写：管理层摘要段落\n\n\n\n[Memory Context]\n\n  sim-triage: 工单 1042 分诊：登录令牌\n\n[USAGE] turns=1 tokens=322 source=estimated\n[OK] run 完成 (1013.1ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "daily_report",
+          "node": "draft",
+          "round": 1
+        },
+        {
+          "agent": "sim-reviewer",
+          "task": "日报校验：与原始记录逐条对齐",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 784,
+            "source": "estimated"
+          },
+          "duration_ms": 1524,
+          "stdout_tail": "[TRACE] 7eb2b31388af4356a9fa07f6dd5eb79e\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:reviewer] ack task=6384 :: 日报校验：与原始记录逐条对齐\n\n\n\n[Memory Context]\n\n  sim-worker: 日报采集：昨日委派与成本原\n\n[USAGE] turns=1 tokens=784 source=estimated\n[OK] run 完成 (1022.5ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "daily_report",
+          "node": "verify",
+          "round": 1
+        }
+      ]
+    },
+    {
+      "scenario": "code_review",
+      "desc": "code review pipeline with fan-in: lint -> {scan, review} -> summarize",
+      "nodes": 4,
+      "rounds": 1,
+      "executions": 4,
+      "success": 4,
+      "failed": 0,
+      "runs": [
+        {
+          "agent": "sim-worker",
+          "task": "审查前置：静态检查与格式门",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 583,
+            "source": "estimated"
+          },
+          "duration_ms": 1524,
+          "stdout_tail": "[TRACE] bd942814321443678944bb40f511bc45\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:worker] ack task=46883 :: 审查前置：静态检查与格式门\n\n\n\n[Memory Context]\n\n  sim-reporter: 日报撰写：管理层摘要段落\n\n[USAGE] turns=1 tokens=583 source=estimated\n[OK] run 完成 (1027.6ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "code_review",
+          "node": "lint",
+          "round": 1
+        },
+        {
+          "agent": "sim-worker",
+          "task": "安全扫描：密钥与注入面复核",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 711,
+            "source": "estimated"
+          },
+          "duration_ms": 1575,
+          "stdout_tail": "[TRACE] bbab89570a49429eaf2f5029d65024c2\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:worker] ack task=15111 :: 安全扫描：密钥与注入面复核\n\n\n\n[Memory Context]\n\n  sim-triage: 工单 1042 分诊：登录令\n\n[USAGE] turns=1 tokens=711 source=estimated\n[OK] run 完成 (1057.9ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "code_review",
+          "node": "scan",
+          "round": 1
+        },
+        {
+          "agent": "sim-reviewer",
+          "task": "审查批注：diff 逐段批注",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 788,
+            "source": "estimated"
+          },
+          "duration_ms": 1593,
+          "stdout_tail": "[TRACE] 0416b02d48134ebe9f3c6456a7750535\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:reviewer] ack task=78188 :: 审查批注：diff 逐段批注\n\n\n\n[Memory Context]\n\n  sim-worker: 日报采集：昨日委派与成本原\n\n[USAGE] turns=1 tokens=788 source=estimated\n[OK] run 完成 (1052.2ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "code_review",
+          "node": "review",
+          "round": 1
+        },
+        {
+          "agent": "sim-reporter",
+          "task": "审查汇总：合并扫描与批注",
+          "exit_code": 0,
+          "status": "success",
+          "usage": {
+            "turns": 1,
+            "tokens": 963,
+            "source": "estimated"
+          },
+          "duration_ms": 1698,
+          "stdout_tail": "[TRACE] 1709dcf8faf243ecb4bbdef7ae443e1a\n[USAGE] turns=1 tokens=0 source=estimated\n[sim:reporter] ack task=11463 :: 审查汇总：合并扫描与批注\n\n\n\n[Memory Context]\n\n  sim-worker: 审查前置：静态检查与格式门 >\n\n[USAGE] turns=1 tokens=963 source=estimated\n[OK] run 完成 (1187.2ms)\n",
+          "stderr_tail": "table\n[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\n[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN\nmodels.yaml not found at F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\config\\models.yaml\n",
+          "scenario": "code_review",
+          "node": "summarize",
+          "round": 1
+        }
+      ]
+    }
+  ],
+  "cost": {
+    "db_path": "F:\\Nexus\\MAOP-op\\py\\.sim-final\\sim-home\\data\\maop.db",
+    "exists": true,
+    "tables": [
+      "circuit_breaker_state",
+      "failover_chains",
+      "breaker_events",
+      "sqlite_sequence",
+      "memory_entries",
+      "memory_traces",
+      "memory_trajectory",
+      "memory_fts",
+      "memory_fts_data",
+      "memory_fts_idx",
+      "memory_fts_docsize",
+      "memory_fts_config",
+      "hooks",
+      "hook_logs",
+      "ts_raw",
+      "ts_5min",
+      "ts_1hour",
+      "queue_messages",
+      "queue_dead_letters",
+      "queue_idempotent",
+      "kv_store",
+      "prompt_templates",
+      "prompt_versions",
+      "_migrations",
+      "run_events",
+      "agent_catalog",
+      "cost_entries",
+      "routing_decisions",
+      "agent_performance"
+    ],
+    "attribution_total": {
+      "cost_usd": 0.0,
+      "calls": 11,
+      "tokens": 3185
+    }
+  },
+  "alerts": {
+    "count_before": 0,
+    "count_after": 1,
+    "persisted": true
+  },
+  "backup": {
+    "backups": [
+      "db_name='maop.db' backup_path='F:\\\\Nexus\\\\MAOP-op\\\\py\\\\.sim-final\\\\sim-home\\\\data\\\\backups\\\\maop.db.2026-11-03_225619087900.bak' size_bytes=430080 created_at='2026-11-03T22:56:19.107993+00:00' duration_ms=19"
+    ],
+    "integrity_checks": [
+      {
+        "file": "maop.db.2026-11-03_225619087900.bak",
+        "integrity": "ok"
+      }
+    ]
+  },
+  "gaps": [
+    "GAP-1 (code-confirmed): wiring.run_workflow legacy backend lands in maop_plan.execute_workflow which ONLY plans and never executes any agent (maop_plan.py:429 docstring admits the name is a misnomer). Real execution exists only via Dispatcher.dispatch / maop run / Temporal backend; the cross-backend contract gap must be closed in E2-b.",
+    "GAP-2 (measured): M-X3 attribution tokens=3185 != protocol-line tokens=6924 -- cost attribution vs execution-path metering mismatch.",
+    "GAP-3 (environment, tooling): 子进程解析 maop 的两颗地雷——(a) py/scripts/business_sim/run_sim.py 曾用 parents[1] 取 py 目录（差一层到 scripts/），(b) 本机 site-packages 存在把 F:\\Nexus\\MAOP\\py（主工作树旧分支）注入 sys.path 的 .pth。两者叠加时子进程解析到旧分支 cli（无 --agent），报 unrecognized arguments。已在 harness 修为 parents[2] 并以 runpy 包装确定性启动；**任何按 repo 约定从脚本目录spawn maop 子进程的工具都有同款风险**。"
+  ]
+}

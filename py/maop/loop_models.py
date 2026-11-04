@@ -29,6 +29,9 @@ class LoopResult(BaseModel):
     analysis: dict[str, Any] = Field(default_factory=dict)
     parallel_executed: bool = False
     block_reason: str = ""  # Populated when verify state == "blocked"
+    turns: int = 0  # M2: orchestration turns consumed (= dispatcher.dispatch attempts)
+    tokens_used: int = 0  # M3.1: measured tokens (LLM-direct usage; 0 = all estimated)
+    tokens_source: str = "estimated"  # M3.1: measured | estimated
 
 
 class RequirementAnalysis(BaseModel):

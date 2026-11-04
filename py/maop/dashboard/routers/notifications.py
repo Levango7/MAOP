@@ -250,13 +250,13 @@ def _mask_config_in(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def _require_feature() -> None:
-    """Gate enterprise-only feature. Notifications work in both editions
-    but the router is registered only when MULTI_USER is on (server.py).
-    For personal edition we still allow the router (notifications are
-    useful in single-user mode too) — no-op here.
+    """没有特性开关：本 router 的"版本门槛"来自导入能否成功，不是 FeatureFlag。
+
+    旧 docstring 声称"注册处按 MULTI_USER 门控""个人版也允许本 router"——两处
+    都与代码不符：注册处（``_register_routes/_routers.py``）只有 try/import，
+    没有任何 FeatureFlag 判断；个人版没装企业包时本模块根本导入不了，端点整体
+    不存在。这里保持 no-op 是**行为决定**（不加开关），不是"两版都能用"的承诺。
     """
-    # Intentionally permissive: notifications are available in both editions.
-    # The FeatureFlag check is done at router registration time in server.py.
     return
 
 

@@ -30,6 +30,7 @@ from pydantic import BaseModel
 
 from maop.core.agent.llm_chat.relay_platform import (
     PriceComparison,
+    RelayModelInfo,
     RelayPlatform,
 )
 from maop.core.security.middleware import require_admin
@@ -97,7 +98,7 @@ async def remove_platform(name: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "message": f"平台 {name} 已删除"}
 
 
-@router.get("/{name}/models", response_model=list)
+@router.get("/{name}/models", response_model=list[RelayModelInfo])
 @handle_api_errors("discover relay platform models", error_value=[])
 async def discover_models(
     name: str,

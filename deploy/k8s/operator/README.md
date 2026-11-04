@@ -2,24 +2,43 @@
 
 ## Status
 
-**PLANNED — NOT IMPLEMENTED / 未实现、不可部署。**
+**PARTIALLY IMPLEMENTED / 部分实现（M0/M1，2026-10-30）—— 尚不可作为平台部署。**
 
-This directory is only a *planned API shape*: a chart/metadata skeleton for an
-operator that does not exist yet.
+- Controller: `py/maop/operator/` ships a kopf-based MaopTask controller
+  (spec validation / reconcile state machine / status patches / event layer),
+  covered by mock-chain tests (`py/tests/test_operator_m0.py`,
+  `test_operator_m1.py`). Real-cluster (kind) validation: **done 2026-11-01**
+  (M-T3.3, PR #203 chain — kind v0.31 + kindest/node v1.35, end-to-end
+  MaopTask CR → kopf → `maop run` → status `Succeeded`; seven real-cluster
+  defects found & fixed, see CHANGELOG same-day).
+- Image build source: `deploy/k8s/operator/Dockerfile` builds
+  `ghcr.io/maop/operator` (CI docker job, build-only; pushing to a registry
+  remains a release decision).
+- `MaopAgent` is resolved by name for `MaopTask.spec.agent` (M1: when present,
+  the executing agent is pinned via `maop run --agent`). Reconciling it into
+  workloads (Deployment/Service/RLS, replicas, quotas) is still **planned**;
+  `MaopWorkflow` is not implemented; multi-tenant isolation, plugin loading and
+  RLS-aware data access remain **planned** behavior.
+- Turn budget: `MaopTask.spec.maxTurns` rides along as `maop run --max-turns`
+  and the consumed turns are reported back into `status.turns` (M2; one turn =
+  one dispatch attempt). Token usage is reported back into `status.tokensUsed`
+  / `status.tokensSource` (M3.3; `measured` for LLM-direct usage, `estimated`
+  for CLI drivers — estimates are never presented as measured).
+- Quota gate (M3.2): an injectable `QuotaChecker` is consulted before launch
+  and reported usage after the run; a denial sets the terminal
+  `QuotaExceeded` phase (reserved in the CRD enum) **without launching**.
+  **Mechanism only** — the real multi-tenant quota policy lives in the MAOS
+  enterprise quota domain (cross-repo, ADR-016/017); the community edition
+  ships no quota policy and, un-injected, behaves exactly as before.
+  The operator process wires the enterprise adapter automatically when the
+  MAOS overlay is installed (`handlers.get_controller` →
+  `maop.enterprise.quota_operator.OperatorQuotaChecker`, PR MAOS#27);
+  personal editions and construction failures disable the gate with a
+  logged warning (fail-open).
+- Tests: `py/tests/test_k8s_operator.py` remains the structure/layering suite
+  (with skip placeholders); M0/M1 add mock-chain and guard tests (see above).
 
-- No controller implementation: the repository contains no kopf /
-  kubernetes-client / watch-based operator code.
-- No image build source: `ghcr.io/maop/operator` has no Dockerfile and no build
-  workflow in this repository — the image referenced by `controller.yaml` /
-  `values.yaml` has never been built.
-- Nothing reconciles `MaopAgent` / `MaopTask` / `MaopWorkflow` CRs; multi-tenant
-  isolation, plugin loading and RLS-aware data access are **planned** behavior,
-  not implemented behavior.
-- Tests cover structure only: `py/tests/test_k8s_operator.py` asserts that
-  `Chart.yaml` / `controller.yaml` / `crd.yaml` exist; multi-tenant / plugin /
-  RLS checks are `pytest.skip` placeholders.
-
-The following sections describe the **intended** design, not shipped features.
+The following sections describe the **intended** design, not fully shipped features.
 
 ## Overview (planned)
 

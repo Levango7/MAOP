@@ -6,10 +6,12 @@ this repository but are mounted only under ``FeatureFlag.MULTI_USER`` — were
 never intersected: 31 frontend-called enterprise endpoints returned an untyped
 dict with no line anywhere, and the personal gate reported a clean burn-down.
 
-Measured, not estimated: the enterprise app exposes 74 METHOD/PATH pairs, 32 of
+Measured, not estimated: the enterprise app exposed 74 METHOD/PATH pairs, 32 of
 them referenced by the dashboard, 0 typed. One is exempted as non-JSON (SAML SP
-metadata comes back as ``application/xml``), leaving the 31 lines in
-``fixtures/enterprise_response_model_allowlist.txt``.
+metadata comes back as ``application/xml``). 17 of the 31 were modelled on
+2026-10-30 (tenant / rbac / quotas) and the last 14 on 2026-10-31 (sso / n8n /
+licenses, whose models are mirrored in-repo so they are typed even where the
+commercial overlay is absent). The allowlist is now empty and must stay that way.
 
 Three routers cannot be imported at all in a clean CI checkout: they pull the
 commercial overlay in at module level, and that overlay ships in a second
@@ -29,6 +31,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tests._overlay_rule import needs_overlay
 from tests.dashboard_app_profiles import (
     ENTERPRISE_ROUTER_MODULES,
     OVERLAY_IMPORT,
@@ -54,11 +57,8 @@ NON_JSON = FIXTURES / "frontend_non_json_endpoints.txt"
 PERSONAL_ALLOWLIST = FIXTURES / "frontend_response_model_allowlist.txt"
 
 # Starting ceiling, measured 2026-10-24 — this list may only shrink.
-RATCHET_CAP = 31
-
-#: The other spelling the collection guard matches (package name, as opposed to
-#: import path). Built here so neither literal is written into this file.
-_COLLECT_GUARD_MARKERS = (OVERLAY_IMPORT, OVERLAY_IMPORT.replace(".", "-"))
+# 2026-10-30: 31 → 14 (tenant / rbac / quotas); 2026-10-31: 14 → 0.
+RATCHET_CAP = 0
 
 
 def _routes() -> dict[tuple[str, str], dict]:
@@ -125,15 +125,17 @@ def test_only_three_routers_need_the_commercial_overlay() -> None:
 
 
 def test_the_gate_file_stays_collectible() -> None:
-    """A marker string in this file would disable the gate on CI, silently.
+    """A module-level overlay import here would disable the gate on CI, silently.
 
-    ``tests/conftest.py`` turns any ``test_*.py`` mentioning the overlay into a
-    collection-time skip when the overlay is missing — which is every CI
-    checkout. Green-but-never-run is the failure mode this guard exists to catch.
+    ``tests/conftest.py`` drops any ``test_*.py`` that cannot be imported without
+    ``maop.enterprise`` — which is every CI checkout. Green-but-never-run is the
+    failure mode this guard exists to catch. Mentioning the overlay in prose is
+    fine (the rule is structural, see ``tests/_overlay_rule.py``); importing it
+    at module level is not.
     """
-    source = Path(__file__).read_text(encoding="utf-8")
-    present = [marker for marker in _COLLECT_GUARD_MARKERS if marker in source]
-    assert present == [], f"this gate would stop being collected in a clean CI: {present}"
+    assert not needs_overlay(Path(__file__).read_text(encoding="utf-8")), (
+        "this gate would stop being collected in a clean CI"
+    )
     assert OVERLAY_ROUTER_MODULES, "the split this file depends on moved"
 
 

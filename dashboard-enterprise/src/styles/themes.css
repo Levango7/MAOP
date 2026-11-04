@@ -14,6 +14,12 @@
   --bg3: #dfe2e8;
   --bg4: #ffffff;
   --border: #d4d8e0;
+  /* 2026-10-29 卡片专用描边：--border 在 #fff 上只有 1.43:1（--bg 与 --surface
+   * 的明度差也只有 1.11:1），三者叠加用户看不出卡片边界。提到 #c2c8d4 → 1.68:1。 */
+  --border-card: #c2c8d4;
+  /* 卡片 hover 专用：--border-strong (#b9bfcc) 与 --border-card (#c2c8d4) 亮度
+   * 太近，hover 几乎看不出变化。 #aab2c0 → on #fff 2.13:1。 */
+  --border-card-hover: #aab2c0;
   --border-strong: #b9bfcc;
   --text: #1d2129;
   --text2: #4e5566;
@@ -106,6 +112,10 @@
   --shadow-lg: 0 12px 28px rgba(29, 33, 41, .16);
   --shadow-topbar: 0 1px 0 rgba(29, 33, 41, .08);
   --shadow-pop: 0 8px 24px rgba(29, 33, 41, .14);
+  /* 2026-10-29 页面内卡片专用阴影：白卡片压在 #f2f3f5 上只有 1.11:1，没有阴影等于
+   * 没有分层。亮色下阴影要比暗色更淡，否则脏；只做接触阴影 + 大半径极淡环境阴影。
+   * 不复用 --shadow-card（浮层语义，CoachMarks / NodeDetailPanel 在用）。 */
+  --shadow-surface: 0 1px 2px rgba(29, 33, 41, .07), 0 6px 16px -10px rgba(29, 33, 41, .14);
   --shadow-brand: 0 2px 10px rgba(13, 148, 136, .22);
   --shadow-card: 0 4px 16px rgba(29, 33, 41, .08);
   --shadow-modal: 0 12px 40px rgba(29, 33, 41, .15);

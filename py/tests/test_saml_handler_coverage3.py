@@ -12,9 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# 被测对象是 maop.enterprise.saml_handler（MAOS 私有仓）。个人版环境显式跳过并计入
-# skip 数，而不是被 conftest 静默忽略（见 tests/conftest.py 的说明）。
-pytest.importorskip("maop.enterprise", reason="企业能力在 maop-enterprise（MAOS）")
+# 全部用例都走企业版 SAML handler；企业包缺席时 33 条全红，故模块级显式 skip。
+pytest.importorskip("maop.enterprise.saml_handler")
 
 # ── Helpers ─────────────────────────────────────────────────────────
 

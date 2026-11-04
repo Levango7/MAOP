@@ -41,6 +41,15 @@ from pydantic import BaseModel, Field
 
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.quotas_schemas import (
+    QuotaAlertListEnvelope,
+    QuotaAlertResolvedEnvelope,
+    QuotaEnvelope,
+    QuotaHistoryEnvelope,
+    QuotaOverviewEnvelope,
+    QuotaTrendEnvelope,
+    QuotaUsageListEnvelope,
+)
 from maop.dashboard.services import billing_service, quota_audit, tenant_service
 
 logger = logging.getLogger(__name__)
@@ -109,7 +118,7 @@ class CheckRequest(BaseModel):
 # ── 告警端点(固定段路径,必须先注册) ──────────────────────────────
 
 
-@router.get("/history")
+@router.get("/history", response_model=QuotaHistoryEnvelope)
 @handle_api_errors
 async def list_quota_history(
     request: Request,
@@ -144,7 +153,7 @@ async def list_quota_history(
     return {"status": "ok", **result}
 
 
-@router.post("/alerts/{alert_id}/resolve")
+@router.post("/alerts/{alert_id}/resolve", response_model=QuotaAlertResolvedEnvelope)
 @handle_api_errors
 async def resolve_alert(
     alert_id: str, request: Request,
@@ -159,7 +168,7 @@ async def resolve_alert(
     return {"status": "ok", "resolved": resolved}
 
 
-@router.get("/{tenant_id}/alerts")
+@router.get("/{tenant_id}/alerts", response_model=QuotaAlertListEnvelope)
 @handle_api_errors
 async def list_alerts(
     tenant_id: str, request: Request,
@@ -192,7 +201,7 @@ async def list_alerts(
 # ── 使用量列表端点(固定段路径,必须先注册) ────────────────────────
 
 
-@router.get("/{tenant_id}/usage")
+@router.get("/{tenant_id}/usage", response_model=QuotaUsageListEnvelope)
 @handle_api_errors
 async def list_usage(
     tenant_id: str, request: Request,
@@ -211,7 +220,7 @@ async def list_usage(
 # ── 概览与趋势端点(固定段路径,必须先注册) ────────────────────────
 
 
-@router.get("/overview")
+@router.get("/overview", response_model=QuotaOverviewEnvelope)
 @handle_api_errors
 async def quota_overview(request: Request) -> dict[str, Any]:
     """所有租户的配额总量分布(前端 allocation 饼图).
@@ -225,7 +234,7 @@ async def quota_overview(request: Request) -> dict[str, Any]:
     return {"status": "ok", **quota_audit.quota_overview(tenants)}
 
 
-@router.get("/{tenant_id}/trend")
+@router.get("/{tenant_id}/trend", response_model=QuotaTrendEnvelope)
 @handle_api_errors
 async def quota_usage_trend(
     tenant_id: str,
@@ -241,7 +250,7 @@ async def quota_usage_trend(
 # ── 配额 CRUD 端点(参数段路径) ───────────────────────────────────
 
 
-@router.post("/{tenant_id}/{resource}")
+@router.post("/{tenant_id}/{resource}", response_model=QuotaEnvelope)
 @handle_api_errors
 async def set_quota(
     tenant_id: str, resource: str,

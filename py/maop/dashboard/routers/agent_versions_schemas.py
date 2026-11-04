@@ -1,15 +1,19 @@
-"""Response models for ``/api/agent-versions/*`` — the endpoints the dashboard calls.
+"""MAOP Dashboard — Agent Version API 的响应模型.
 
-The producer is :mod:`maop.dashboard.services.agent_versions_service`: version
-rows go through ``_version_row_to_dict`` and canary rows through
-``_canary_row_to_dict``, both of which only decode the JSON columns of the
-column lists pinned in ``agent_versions_helpers`` (``_AGENT_VERSION_COLUMNS`` /
-``_CANARY_COLUMNS``). The models below mirror those key sets one-for-one: a
-FastAPI ``response_model`` **filters** unknown keys, so a field missed here
-would silently disappear from the wire.
+版本行与灰度行的键由 ``agent_versions_helpers`` 的 ``_AGENT_VERSION_COLUMNS`` /
+``_CANARY_COLUMNS`` 与 ``_version_row_to_dict`` / ``_canary_row_to_dict`` 决定，
+这里逐列照写：可空列（``activated_at`` / ``retired_at`` / ``duration_seconds`` /
+``ended_at``）留 ``| None``，其余 TEXT 列在建表时都是 ``NOT NULL`` 带默认值，
+所以不放宽成 Optional——放宽了就等于不判。
 
-``activated_at`` / ``retired_at`` / ``duration_seconds`` / ``ended_at`` are
-nullable in SQLite and therefore optional here.
+``config_snapshot`` / ``target_user_groups`` 在行转换里已被 ``json.loads`` 解析成
+dict / list（解析失败回落 ``{}`` / ``[]``），因此模型接的是解析后的形状，而不是
+SQLite 里的原始 TEXT。
+
+这几条路由用的是不带 ``error_value=`` 的 ``@handle_api_errors``：异常分支返回
+JSONResponse（ErrorSchema），不经过 response_model，所以模型只描述成功形状。
+
+信封的 ``status`` 一律默认 ``"error"``（与 agent_catalog_schemas 同口径）：处理器漏写 status 时，缺省值不能替它宣称成功。
 """
 
 from __future__ import annotations
@@ -19,12 +23,12 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class AgentVersionView(BaseModel):
-    """One ``agent_versions`` row (``_version_row_to_dict``)."""
+class VersionItem(BaseModel):
+    """``agent_versions`` 一行在 API 上的形状。"""
 
-    version_id: str
-    agent_id: str
-    version_number: str
+    version_id: str = ""
+    agent_id: str = ""
+    version_number: str = ""
     config_snapshot: dict[str, Any] = Field(default_factory=dict)
     changelog: str = ""
     status: str = ""
@@ -36,11 +40,50 @@ class AgentVersionView(BaseModel):
     retired_at: float | None = None
 
 
-class CanaryView(BaseModel):
-    """One ``agent_version_canaries`` row (``_canary_row_to_dict``)."""
+class PageMeta(BaseModel):
+    """``list_versions`` 的分页元信息。"""
 
-    canary_id: str
-    version_id: str
+    total: int = 0
+    page: int = 1
+    page_size: int = 20
+
+
+class VersionListEnvelope(BaseModel):
+    """GET /api/agent-versions 响应。"""
+
+    status: str = "error"
+    data: list[VersionItem] = Field(default_factory=list)
+    meta: PageMeta = Field(default_factory=PageMeta)
+
+
+class VersionActivateEnvelope(BaseModel):
+    """POST /api/agent-versions/{version_id}/activate 响应。"""
+
+    status: str = "error"
+    data: VersionItem
+
+
+class RollbackMeta(BaseModel):
+    """回滚把「从哪个版本、到哪个版本、为什么」原样回给调用方。"""
+
+    rolled_back_from: str = ""
+    rolled_back_to: str = ""
+    reason: str = ""
+
+
+class VersionRollbackEnvelope(BaseModel):
+    """POST /api/agent-versions/{version_id}/rollback 响应。"""
+
+    status: str = "error"
+    data: VersionItem
+    meta: RollbackMeta
+
+
+class CanaryItem(BaseModel):
+    """``agent_version_canaries`` 一行在 API 上的形状。"""
+
+    canary_id: str = ""
+    version_id: str = ""
     percentage: int = 0
     target_user_groups: list[str] = Field(default_factory=list)
     strategy: str = ""
@@ -51,47 +94,20 @@ class CanaryView(BaseModel):
     created_by: str = ""
 
 
-class VersionListMeta(BaseModel):
-    """Pagination metadata of ``list_versions``."""
+class CanaryConfigEnvelope(BaseModel):
+    """POST /api/agent-versions/{version_id}/canary 响应。"""
 
-    total: int
-    page: int
-    page_size: int
-
-
-class AgentVersionListEnvelope(BaseModel):
-    """``GET /api/agent-versions`` — ``{"status": "ok", **result}``."""
-
-    status: str = "ok"
-    data: list[AgentVersionView]
-    meta: VersionListMeta
+    status: str = "error"
+    data: CanaryItem
 
 
-class AgentVersionEnvelope(BaseModel):
-    """``POST /{version_id}/activate`` — the activated version."""
-
-    status: str = "ok"
-    data: AgentVersionView
-
-
-class CanaryEnvelope(BaseModel):
-    """``POST /{version_id}/canary`` — the created canary config."""
-
-    status: str = "ok"
-    data: CanaryView
-
-
-class RollbackMeta(BaseModel):
-    """Who was rolled back to what, and why."""
-
-    rolled_back_from: str
-    rolled_back_to: str
-    reason: str = ""
-
-
-class RollbackEnvelope(BaseModel):
-    """``POST /{version_id}/rollback`` — target version + rollback metadata."""
-
-    status: str = "ok"
-    data: AgentVersionView
-    meta: RollbackMeta
+__all__ = [
+    "CanaryConfigEnvelope",
+    "CanaryItem",
+    "PageMeta",
+    "RollbackMeta",
+    "VersionActivateEnvelope",
+    "VersionItem",
+    "VersionListEnvelope",
+    "VersionRollbackEnvelope",
+]

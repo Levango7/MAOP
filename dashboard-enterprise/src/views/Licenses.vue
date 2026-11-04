@@ -85,14 +85,15 @@
           </label>
         </fieldset>
 
-        <label class="lic-field">
+        <!--
+          后端 LicenseCreateRequest 没有 edition/version 字段，LicenseManager
+          签发的记录 edition 恒为 enterprise。原来这里是三选一的下拉框，选了也
+          不会被发送——改成只读展示，不再让用户以为能选版本。
+        -->
+        <div class="lic-field">
           <span>{{ t('view.licenses.version') }}</span>
-          <select v-model="form.version" class="lic-input">
-            <option value="personal">{{ t('view.licenses.versionPersonal') }}</option>
-            <option value="team">{{ t('view.licenses.versionTeam') }}</option>
-            <option value="enterprise">{{ t('view.licenses.versionEnterprise') }}</option>
-          </select>
-        </label>
+          <span class="lic-static">{{ t('view.licenses.versionEnterprise') }}</span>
+        </div>
 
         <fieldset class="lic-fieldset">
           <legend>{{ t('view.licenses.quotaSettings') }}</legend>
@@ -171,7 +172,7 @@
             <dt>{{ t('view.licenses.customerEmail') }}</dt>
             <dd>{{ detail.customer_email || '—' }}</dd>
             <dt>{{ t('view.licenses.version') }}</dt>
-            <dd>{{ detail.version || '—' }}</dd>
+            <dd>{{ detail.versionText || '—' }}</dd>
             <dt>{{ t('view.licenses.status') }}</dt>
             <dd>
               <Badge :tone="statusTone(detail.status)">{{ statusText(detail.status) }}</Badge>
@@ -261,15 +262,17 @@ const renewDays = ref(365);
 const form = ref({
   customer_name: '',
   customer_email: '',
-  version: 'enterprise',
   max_agents: 10,
   max_users: 50,
   valid_days: 365,
 });
 
-const filters = reactive({ status: '', version: '', expiry: '', query: '' });
+const filters = reactive({ status: '', expiry: '', query: '' });
 
 // ── Filters ────────────────────────────────────────────────────
+// 这里不再提供"版本"筛选：LicenseManager 签发时把 edition 写死成
+// enterprise（MAOS `license_manager.py` 的 model 默认值、INSERT 硬编码
+// 与建表 DEFAULT 三处同向），个人版/团队版两个取值永远匹配不到任何行。
 const filterSchema = computed(() => [
   {
     key: 'status',
@@ -279,15 +282,6 @@ const filterSchema = computed(() => [
       { value: 'active', label: t('view.licenses.statusActive') },
       { value: 'expired', label: t('view.licenses.statusExpired') },
       { value: 'revoked', label: t('view.licenses.statusRevoked') },
-    ],
-  },
-  {
-    key: 'version',
-    label: t('view.licenses.allVersions'),
-    options: [
-      { value: 'personal', label: t('view.licenses.versionPersonal') },
-      { value: 'team', label: t('view.licenses.versionTeam') },
-      { value: 'enterprise', label: t('view.licenses.versionEnterprise') },
     ],
   },
   {
@@ -305,7 +299,7 @@ const filterSchema = computed(() => [
 const cols = computed(() => [
   { key: 'customer_name', label: t('view.licenses.customerName') },
   { key: 'licenseKeyMasked', label: t('view.licenses.licenseKey') },
-  { key: 'version', label: t('view.licenses.version') },
+  { key: 'versionText', label: t('view.licenses.version') },
   {
     key: 'statusText',
     label: t('view.licenses.status'),
@@ -390,7 +384,6 @@ const visibleRows = computed(() => {
   const fq = (filters.query || '').trim().toLowerCase();
   return tableRows.value.filter((row) => {
     if (filters.status && row.status !== filters.status) return false;
-    if (filters.version && row.version !== filters.version) return false;
     if (filters.expiry) {
       if (filters.expiry === 'active' && (isExpired(row) || isExpiringSoon(row))) return false;
       if (filters.expiry === 'soon' && !isExpiringSoon(row)) return false;
@@ -410,13 +403,54 @@ const activeCount = computed(() =>
 
 const expiringSoonCount = computed(() => licenses.value.filter(isExpiringSoon).length);
 
+// ── 后端字段 → 页面字段 ────────────────────────────────────────
+// LicenseRecord 的线缆字段（customer / notes / edition / features）与页面要的
+// 列名（customer_name / customer_email / version / max_agents）不同名，操作
+// 历史则在独立的 /audit 端点。翻译集中在这里，视图层不再各自猜字段。
+function parseFeatureNumber(features, key) {
+  for (const f of features || []) {
+    const m = new RegExp(`^${key}:(\\d+)$`, 'i').exec(String(f).trim());
+    if (m) return Number(m[1]);
+  }
+  return null;
+}
+
+function versionLabel(edition) {
+  if (edition === 'personal') return t('view.licenses.versionPersonal');
+  if (edition === 'team') return t('view.licenses.versionTeam');
+  if (edition === 'enterprise') return t('view.licenses.versionEnterprise');
+  return edition || '';
+}
+
+function normalizeLicense(lic) {
+  if (!lic) return lic;
+  const email = /(?:^|\s)email:\s*(\S+)/i.exec(String(lic.notes || ''));
+  return {
+    ...lic,
+    customer_name: lic.customer || '',
+    customer_email: email ? email[1] : '',
+    version: lic.edition || '',
+    versionText: versionLabel(lic.edition),
+    max_agents: parseFeatureNumber(lic.features, 'max_agents'),
+  };
+}
+
+async function loadHistory(id) {
+  try {
+    const d = await api.get(`/api/licenses/${encodeURIComponent(id)}/audit`);
+    return Array.isArray(d && d.audit_logs) ? d.audit_logs : [];
+  } catch {
+    return [];
+  }
+}
+
 // ── API ────────────────────────────────────────────────────────
 async function load() {
   loading.value = true;
   error.value = '';
   try {
     const d = await api.get('/api/licenses/list');
-    licenses.value = d.licenses || [];
+    licenses.value = (d.licenses || []).map(normalizeLicense);
   } catch (e) {
     error.value = e.message || t('view.licenses.loadFailed');
     licenses.value = [];
@@ -451,17 +485,22 @@ async function generateLicense() {
 }
 
 async function openDetail(row) {
-  detail.value = row;
+  const id = row.license_id || row.license_key;
+  detail.value = { ...normalizeLicense(row), history: [] };
   showDetail.value = true;
-  // 懒加载完整详情（含操作历史）
+  // 懒加载完整详情
   try {
-    const id = row.license_id || row.license_key;
     const d = await api.get(`/api/licenses/${encodeURIComponent(id)}`);
     if (d && d.license) {
-      detail.value = { ...row, ...d.license };
+      detail.value = { ...detail.value, ...normalizeLicense(d.license) };
     }
   } catch {
     // 详情加载失败时保留列表行数据
+  }
+  // 操作历史在独立的 /audit 端点；失败不影响详情本身。
+  const history = await loadHistory(id);
+  if (detail.value && String(detail.value.license_id || detail.value.license_key) === String(id)) {
+    detail.value = { ...detail.value, history };
   }
 }
 
@@ -486,12 +525,17 @@ async function renewLicense() {
     showRenew.value = false;
     renewTarget.value = null;
     await load();
-    // 如详情面板打开，刷新详情
+    // 如详情面板打开，刷新详情与操作历史
     if (showDetail.value && detail.value) {
+      const detailId = detail.value.license_id || detail.value.license_key;
       try {
-        const d = await api.get(`/api/licenses/${encodeURIComponent(detail.value.license_id || detail.value.license_key)}`);
-        if (d && d.license) detail.value = { ...detail.value, ...d.license };
+        const d = await api.get(`/api/licenses/${encodeURIComponent(detailId)}`);
+        if (d && d.license && detail.value) {
+          detail.value = { ...detail.value, ...normalizeLicense(d.license) };
+        }
       } catch { /* ignore */ }
+      const history = await loadHistory(detailId);
+      if (detail.value) detail.value = { ...detail.value, history };
     }
   } catch (e) {
     toast.error(e.message || t('view.licenses.renewFailed'));
@@ -520,7 +564,6 @@ function openGenerate() {
   form.value = {
     customer_name: '',
     customer_email: '',
-    version: 'enterprise',
     max_agents: 10,
     max_users: 50,
     valid_days: 365,
@@ -601,6 +644,10 @@ onMounted(load);
   font-family: inherit; transition: border-color var(--motion) var(--ease);
 }
 .lic-input:focus { outline: none; border-color: var(--brand); }
+.lic-static {
+  background: var(--bg); border: 1px dashed var(--border); border-radius: var(--r-md);
+  padding: var(--sp-2) 10px; color: var(--text); font-size: var(--fs-base);
+}
 .lic-quota-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .lic-form-error { color: var(--fail); font-size: var(--fs-sm); margin: var(--sp-2) 0; }
 .lic-dialog-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-4); }

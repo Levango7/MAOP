@@ -24,6 +24,13 @@ from pydantic import BaseModel
 from maop.config.edition import FeatureFlag, has_feature
 from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
+from maop.dashboard.routers.tenant_schemas import (
+    TenantEnvelope,
+    TenantEnvelopeActivated,
+    TenantEnvelopeDeleted,
+    TenantEnvelopeSuspended,
+    TenantListEnvelope,
+)
 from maop.dashboard.services import tenant_service
 
 logger = logging.getLogger(__name__)
@@ -61,7 +68,7 @@ def _require_tenant_isolation() -> None:
 # ── Endpoints ─────────────────────────────────────────────────────
 
 
-@router.get("/list")
+@router.get("/list", response_model=TenantListEnvelope)
 @handle_api_errors
 async def list_tenants(
     request: Request,
@@ -83,7 +90,7 @@ async def list_tenants(
         )
 
 
-@router.post("/create")
+@router.post("/create", response_model=TenantEnvelope)
 @handle_api_errors
 async def create_tenant(body: CreateTenantRequest, request: Request) -> dict[str, Any]:
     """Create a new tenant. Requires admin."""
@@ -111,7 +118,7 @@ async def get_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
         )
 
 
-@router.post("/{tenant_id}/suspend")
+@router.post("/{tenant_id}/suspend", response_model=TenantEnvelopeSuspended)
 @handle_api_errors
 async def suspend_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Suspend a tenant. Requires admin."""
@@ -124,7 +131,7 @@ async def suspend_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
 
-@router.post("/{tenant_id}/activate")
+@router.post("/{tenant_id}/activate", response_model=TenantEnvelopeActivated)
 @handle_api_errors
 async def activate_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Activate a suspended tenant. Requires admin."""
@@ -137,7 +144,7 @@ async def activate_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
 
-@router.delete("/{tenant_id}")
+@router.delete("/{tenant_id}", response_model=TenantEnvelopeDeleted)
 @handle_api_errors
 async def delete_tenant(tenant_id: str, request: Request) -> dict[str, Any]:
     """Delete a tenant. Requires admin."""

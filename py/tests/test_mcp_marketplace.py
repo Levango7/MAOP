@@ -13,6 +13,7 @@ import hashlib
 import json
 import urllib.error
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -842,3 +843,135 @@ class TestSSRFProtection:
     def test_rejects_no_hostname(self):
         with pytest.raises(ValueError, match="hostname"):
             MCPMarketplace._assert_safe_url("http:///path")
+
+
+# ── TestSignatureGate（M-X1：Ed25519 验签接线，fail-closed） ──
+
+
+def _make_signed_entry(entry: dict[str, Any], tmp_path: Path):
+    """签发一个目录条目：返回 (带 signature_hex 的条目, 公钥 PEM 路径)."""
+    from maop.core.marketplace.signing import (
+        generate_key_pair,
+        public_key_to_pem,
+        sign_payload,
+    )
+
+    priv, pub = generate_key_pair()
+    signature_hex = sign_payload(entry, priv)
+    pub_path = tmp_path / "mp_verify_pub.pem"
+    pub_path.write_bytes(public_key_to_pem(pub))
+    return {**entry, "signature_hex": signature_hex}, pub_path
+
+
+class TestSignatureGate:
+    """验签只在注入 verifier 后生效；require_signature 强制缺失即拒。"""
+
+    def _add_registry(self, mp: MCPMarketplace) -> None:
+        mp.add_registry("official", "https://r.example.com", trusted=True)
+
+    def test_valid_signature_installs_and_records(self, mp, tmp_path: Path):
+        from maop.core.marketplace.signing import PackageVerifier
+
+        entry = {"name": "signed-srv", "version": "1.0.0", "description": "ok"}
+        signed, pub_path = _make_signed_entry(entry, tmp_path)
+        self._add_registry(mp)
+        mp2 = MCPMarketplace(
+            config_path=mp._config_path, cache_dir=mp._cache_dir,
+            verifier=PackageVerifier(pub_path),
+        )
+        with patch.object(
+            mp2, "_fetch_url", side_effect=_make_fetch_side_effect({
+                "https://r.example.com": _catalog_bytes([signed]),
+            }),
+        ):
+            cfg = mp2.install("signed-srv")
+        assert cfg.name == "signed-srv"
+        installed = mp2.list_installed()[0]
+        assert installed["signature_hex"] == signed["signature_hex"]
+
+    def test_tampered_entry_refused(self, mp, tmp_path: Path):
+        from maop.core.marketplace.signing import PackageVerifier
+
+        entry = {"name": "srv", "version": "1.0.0", "description": "original"}
+        signed, pub_path = _make_signed_entry(entry, tmp_path)
+        tampered = {**signed, "description": "modified after signing"}
+        self._add_registry(mp)
+        mp2 = MCPMarketplace(
+            config_path=mp._config_path, cache_dir=mp._cache_dir,
+            verifier=PackageVerifier(pub_path),
+        )
+        with patch.object(
+            mp2, "_fetch_url", side_effect=_make_fetch_side_effect({
+                "https://r.example.com": _catalog_bytes([tampered]),
+            }),
+        ), pytest.raises(ValueError):
+            mp2.install("srv")
+        assert mp2.list_installed() == []
+
+    def test_require_signature_refuses_missing_signature(self, mp):
+        self._add_registry(mp)
+        mp2 = MCPMarketplace(
+            config_path=mp._config_path, cache_dir=mp._cache_dir,
+            require_signature=True,
+        )
+        # 无 verifier + require_signature → 未配置验签器即拒（fail-closed）
+        with patch.object(
+            mp2, "_fetch_url", side_effect=_make_fetch_side_effect({
+                "https://r.example.com": _catalog_bytes([{"name": "plain"}]),
+            }),
+        ), pytest.raises(ValueError, match="signature"):
+            mp2.install("plain")
+
+    def test_signature_without_verifier_keeps_legacy_behaviour(self, mp, tmp_path: Path):
+        """未注入 verifier：不验签（信任模型不变），但条目仍随索引记录。"""
+        from maop.core.marketplace.signing import (
+            generate_key_pair,
+            sign_payload,
+        )
+
+        priv, _pub = generate_key_pair()
+        entry = {"name": "legacy", "version": "1.0.0"}
+        signed = {**entry, "signature_hex": sign_payload(entry, priv)}
+        self._add_registry(mp)
+        with patch.object(
+            mp, "_fetch_url", side_effect=_make_fetch_side_effect({
+                "https://r.example.com": _catalog_bytes([signed]),
+            }),
+        ):
+            mp.install("legacy")
+        installed = mp.list_installed()[0]
+        assert installed["signature_hex"] == signed["signature_hex"]
+
+    def test_key_rotation_overlap_via_key_mgmt(self, mp, tmp_path: Path):
+        """KeyManagement 注入：轮换宽限期内新旧钥均可验签（多钥重叠）。"""
+        from maop.core.marketplace.key_management import KeyManagement
+        from maop.core.marketplace.signing import (
+            PackageVerifier,
+            generate_key_pair,
+            public_key_to_pem,
+            sign_payload,
+        )
+
+        priv_a, pub_a = generate_key_pair()
+        _priv_b, pub_b = generate_key_pair()
+        km = KeyManagement(db_path=str(tmp_path / "keys.db"))
+        pem_a = public_key_to_pem(pub_a).decode("utf-8")
+        pem_b = public_key_to_pem(pub_b).decode("utf-8")
+        kid_a = km.register_key("signed-srv", pem_a)
+        km.rotate_key("signed-srv", pem_b, old_key_id=kid_a, grace_days=30)
+
+        entry = {"name": "signed-srv", "version": "1.0.0", "signer_key_id": "signed-srv"}
+        signed = {**entry, "signature_hex": sign_payload(entry, priv_a)}  # 旧钥签
+        self._add_registry(mp)
+        mp2 = MCPMarketplace(
+            config_path=mp._config_path, cache_dir=mp._cache_dir,
+            verifier=PackageVerifier(),
+            key_mgmt=km,
+        )
+        with patch.object(
+            mp2, "_fetch_url", side_effect=_make_fetch_side_effect({
+                "https://r.example.com": _catalog_bytes([signed]),
+            }),
+        ):
+            cfg = mp2.install("signed-srv")
+        assert cfg.name == "signed-srv"

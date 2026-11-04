@@ -14,39 +14,32 @@ from pathlib import Path
 
 import pytest
 
-from tests.enterprise_test_manifest import ENTERPRISE_ONLY_TEST_FILES
-
 # ── 企业版测试的可选性 ────────────────────────────────────────────
 # `maop.enterprise` 由**独立的 maop-enterprise 包（MAOS 私有仓库）**提供，
 # 通过同命名空间注入到 maop 包里（ADR-017 双仓库物理隔离）。
 #
 # - 本地开发机：通常 editable 安装了 MAOS → maop.enterprise 可导入 →
 #   企业版测试正常收集运行。
-# - 个人版环境（只有 maop，没有 maop-enterprise）：模块顶层 `import
-#   maop.enterprise` 的文件在**收集阶段**就 ImportError，会让整轮 pytest 崩掉。
+# - CI / 纯净环境：只有 maop，没有 maop-enterprise → 模块级 import 企业包的
+#   测试文件在**收集阶段**就 ImportError，会让整轮 pytest 全平台失败
+#   （workflow 注释亦记载：2026-08-30 unit tests failed on ALL 9 platforms
+#    while identical code + env passes locally）。
 #
-# 处理原则（v5.5.1 起，替代此前的「正文含 maop.enterprise 字样就忽略」）：
-#   1. **只有真正在模块顶层 import 企业包的文件才忽略** —— 旧实现按子串扫描，
-#      把仅在注释里提到企业包的正常用例（test_backends.py、test_router_system.py
-#      等）也一并忽略了，个人版 CI 因此长期少跑一批双版可跑的用例（纯盲区）。
-#   2. 清单是**声明式**的：清单在 tests/enterprise_test_manifest.py，必须与真实情况
-#      一致，由 tests/test_enterprise_test_surface.py 用 AST 双向校验（漏登记新文件、
-#      条目过期都判红）—— 从此「哪些企业用例在个人版没跑」是一个可核对的数字，
-#      而不是一份静默的忽略。
-#   3. 其余含企业依赖的用例自行守卫（文件顶部 importorskip / skipif，或按用例
-#      importorskip），在个人版里**被收集并显式 skip**，skip 计入 pytest 汇总。
+# 故企业包不可用时跳过这些文件的收集。判据在 tests/_overlay_rule.py，按 AST
+# 找"模块级直接 import"而不是子串匹配 —— 旧写法把只在注释/文档串/importorskip
+# 里提到企业包的文件也一并跳过，实测纯净环境连坐 37 个文件，其中 20 个本可以
+# 正常跑（含 response_model 棘轮本体，等于该门禁在 CI 里从未执行过）。
 #
-# 注意：find_spec 在模块不可导入时会**抛出** ImportError / ModuleNotFoundError，
-# 而不是返回 None。若不捕获，conftest 自身加载失败会让整轮测试全崩（比不守卫
-# 更糟）。故必须 try/except。
-try:
-    _ent_spec = importlib.util.find_spec("maop.enterprise")
-except (ImportError, ValueError):  # ModuleNotFoundError 是 ImportError 子类
-    _ent_spec = None
+# 按路径加载而非 `from tests._overlay_rule import`：tests/ 是包而 tests/e2e 不是，
+# e2e job 又用 --confcutdir 改写 sys.path，包导入在这两种运行方式下都不可靠。
+_rule_file = Path(__file__).resolve().parent / "_overlay_rule.py"
+_rule_spec = importlib.util.spec_from_file_location("_maop_overlay_rule", _rule_file)
+assert _rule_spec is not None and _rule_spec.loader is not None
+_overlay_rule = importlib.util.module_from_spec(_rule_spec)
+_rule_spec.loader.exec_module(_overlay_rule)
 
-ENTERPRISE_AVAILABLE: bool = _ent_spec is not None
-if not ENTERPRISE_AVAILABLE:
-    collect_ignore = sorted(ENTERPRISE_ONLY_TEST_FILES)
+if not _overlay_rule.enterprise_available():
+    collect_ignore = _overlay_rule.collection_ignores(Path(__file__).resolve().parent)
 
 # ── Force test environment BEFORE any maop import ──────────────────
 # server.py import 时固化 _auth_enabled / _rl_enabled（get_settings 单例、
@@ -652,7 +645,11 @@ def crl_signer(tmp_path, monkeypatch):
 
     凡是要验证「撤销条目真正生效」的用例都必须用它签名 CRL，否则 CRL 会
     被 ``_reject_if_unusable`` 作为不可用数据丢弃。
+
+    企业包缺席时（纯净 CI）信任锚不存在，这些用例无从成立 —— 显式 skip 而不是
+    让它们红：CRL 的校验逻辑本身在 MAOS 仓，本仓只能验「接进来之后」的行为。
     """
+    pytest.importorskip("maop.enterprise.license")
     import base64
     import hashlib
     import json

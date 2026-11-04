@@ -7,9 +7,15 @@
 
 ## 当前状态
 
-- **已发布**：v5.4.0（2026-10-12，minor）— **M2.2 首批**：多模态记忆（文本+图像 / CLIP 空间 / RRF 融合 / `MemoryFacade.store_multimodal` API，ADR-022）+ 三条防复发门禁（静默异常/文件规模/CHANGELOG，ADR-023）+ bandit Medium 债清零与安全修复（B615/B310/B103，CI 门禁恢复 `-ll`）+ T2.1 dry-run 验收达成。范围与顺延项见下方 v5.4.0 节。
-- **上一版**：v5.3.1（2026-10-10，patch）— PyPI 包元数据补全 + 发布链修复 + PyPI 首次上线。
-- **进行中**：v5.4.x/v5.5.0 —— M2.2 后续批次（B2：PG 路径与迁移、异步队列延迟达标；B3：音频/视频企业版；B4：NDCG 评测与可切换模型）+ 治理面（巨型文件拆分、keyring、suppress 语义审查）。
+- **已发布**：v5.5.0（2026-10-27，PyPI）— 社区版阶段三超前全落地
+  （Operator M0-M2.2 / Marketplace 签名 M0+首签 / 成本归因 M-X3 /
+  Temporal M0+E2-a），范围见下方 v5.5.0 节与 CHANGELOG。
+- **上一版**：v5.4.0（2026-10-12，minor）— M2.2 首批：多模态记忆
+  （ADR-022）+ 三条防复发门禁（ADR-023）+ bandit Medium 债清零。
+- **进行中**：GA 前收口——M-SIM 预生产演练（M0 已交付并抓到四真缺口：
+  GAP-2/GAP-4 已收口、GAP-1 归 E2-b）、M-X1 M1（2026-11-05 交付：
+  D2③ HTTPS 拉取）、M-X2 E2-b 深集成、M2.2 B2 余项、M-SIM M1
+  （kind operator 腿 + Temporal 腿 + 48h soak，另批）。
 - **v5.2.0**（2026-09-08，minor）— 自演化闭环 MVP 接入主循环（可观测/可审批/可回滚），闭环 API 面实测为 `evolve_insights.py` 的 6 个 `/api/evolution/*` 端点（旧文案"7 个 evolution API 端点"无出处，2026-10-05 已在下方 v5.2.0 节更正，此处当时漏改）；桌面调度集成；前端可访问性/token 化修复多轮。详见 [CHANGELOG](CHANGELOG.md)。
 - **v5.0.0**（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。
@@ -268,6 +274,13 @@
       > 预演后输出目录必须为空、临时根下无残留，不依赖 fake 的 executed 标志）。
 - [ ] T2.3：连续 7 天 nightly 零假红（修复路线），或止损方案与"未复现条件/复现配方"
       台账化（降级路线）。
+      > **2026-10-29 台账 #1**：修复路线观察窗开启。当日用户手动 dispatch 的
+      > Nightly run `40760685796` 成功（flaky-detection 三平台 ×3 轮全过）——
+      > 此前 10-27/10-28 两次失败为**确定性红**（`test_mcp_router_contracts`
+      > KeyError / `test_visual_builder` 未接线契约 / `test_dead_wiring_inventory`
+      > 已接线条目），均已随 PR #174 round-3/#175 修复进 master，与
+      > `TestCallSyncFallback` flaky 无关。本地同日 ×3 复跑该用例族全过
+      > （8 例/轮）。观察起点记作 2026-10-29 02:00 UTC 定时 run。
 
 ## v5.4.0 (minor) — 已发布 2026-10-12（里程碑 M2.2 **首批**）
 
@@ -378,12 +391,130 @@
 | 阶段二 | Month 4–9（2026-09-05 启动，至 2027-03） | 智能增强 | 进行中 | 自演化闭环、多模态记忆、知识图谱推理、Plan 质量学习 |
 | 阶段三 | Month 10–21 | 生态与平台化 | 待启动 | Agent Marketplace、多后端编排器适配、原生 K8s Operator、细粒度成本归因 |
 
-## 长期方向（未排期）
+## 长期方向（2026-10-29 立项章程化，未排期）
 
-- **多后端编排器适配**：支持把 MAOP 编排目标导出为 Temporal / Airflow DAG，便于嵌入企业现有调度体系。
-- **Agent Marketplace**：社区共享 agent 配置与 prompt 模板，带版本与签名校验。（v5.1.0 Skill 市场已实现基础导入/导出，社区共享与签名校验仍待排期。）
-- **细粒度成本归因**：按 agent / phase / model 维度的实时成本归因与预算告警。
-- **原生 K8s Operator**：以 CRD 形式声明 MAOP 编排任务，由 Operator 调度执行。（**未实现 / planned**：`deploy/k8s/operator/` 目前只有规划中的 API 形状——无 kopf/kubernetes-client/watch controller 实现，`ghcr.io/maop/operator` 镜像无构建来源、未构建；结构测试仅断言文件存在，多租户/插件/RLS 均为 skip 占位，详见该目录 README §Status。）
+> 按维护规则 #2 补齐"范围与验收标准"，每条标注**阻碍位置**；待裁决项 TBD。
+
+### M-T3.3 原生 K8s Operator（M0 章程）
+
+- 现状（2026-10-30 更新）：**M0 第一刀已交付**——controller 骨架
+  `py/maop/operator/`（spec 校验/状态机/注入式 controller/kopf 薄层）+
+  `deploy/k8s/operator/Dockerfile`（解决镜像无构建来源）+ CI build-only 腿 +
+  `tests/test_operator_m0.py` 15 例（mock 链路全绿；`test_spec_matches_crd_schema`
+  与 CRD YAML 机器对齐）。结构断言现状修正：既有测试并非"仅文件存在性"——
+  2026-09-28 起已有分层套件（28 passed/8 skipped 当时），skip 为缺
+  helm/kubectl/集群的环境条件，multi-tenant/plugin/RLS 占位属 planned 特性。
+- M0 余量：~~`spec.agent` → MaopAgent CR 解析~~（**M1 已交付**）；~~turn 预算~~
+  （**M2 已交付**）；配额/多租户 = M3。
+- 里程碑进展（2026-10-30 晚）：
+  - **M0.1（#188 已合）**：operator 镜像构建两处缺陷修复 —— 缺 `COPY config/`
+    （wheel 的 hatch_build 把 `../config` 当必需资产）+ `useradd` 同名组冲突
+    （基镜像自带 operator 组）；由本地复刻 CI 构建逮到，本地复刻构建已绿。
+  - **M1（PR #189）**：`spec.agent` → MaopAgent CR 解析 + agent pinning —— CR 存在
+    → `maop run --agent`（F6a forced_agent）+ `AgentResolved=True` 条件；未声明 →
+    M0 行为 + 注记；CLI 增 `--agent`。
+  - **M2（本批）**：`spec.maxTurns` → 命令恒带 `--max-turns`（loop 侧硬上限：
+    一个 turn = 一次 dispatch 尝试）+ `[USAGE] turns=N` 协议行 → 终态补丁
+    `status.turns`；`cli.py` 按先例拆出 `cli_run.py`。
+  - **M3.1（本批）**：实测 token 计量打通——发现成本对账一直读空值
+    （`MaopResult` 无 `usage` 字段 → M-X3 成本归因的 token 维度全是启发式
+    估算）；`MaopResult.usage` + react_loop 回填 + `LoopResult.tokens_used`/
+    `tokens_source` + `[USAGE]` 行扩展。CLI 驱动路径本身不产出 token
+    （来源标 estimated，不冒充）。
+  - **M3.3（本批）**：用量会计回写 CRD——`status.tokensUsed` /
+    `status.tokensSource`（measured/estimated）+ 协议行解析扩展（legacy
+    `turns=` 行兼容）。
+  - **M3.2（收官刀）**：配额门接线——``QuotaChecker`` 注入（拉起前询问/
+    终态后回报用量），拒绝则终态 ``QuotaExceeded``（CRD enum 预留）。
+    **社区版只提供机制**：真实多租户配额策略在 MAOS 企业版配额域
+    （``maop/enterprise/quota.py``，ADR-016/017 跨仓，待与持私钥会话
+    协调的下一步）。
+  - ~~配额/多租户~~ → **M-T3.3 社区侧至此收官**（M0/M0.1/M1/M2/M3.1/
+    M3.2/M3.3 全落地）。
+- M0 验收：mock 链路（MaopTask→子进程→status 回写）测试全绿 ✅；结构对齐
+  哨兵上线 ✅；**operator 镜像在 CI 构建成功 ✅**（2026-10-30，master run
+  `41118378867`：`Build operator image (build-only): success`）。
+  **真集群 kind 验证 ✅**（2026-11-01，原"外部条件"解除：kind v0.31 +
+  kindest/node v1.35 端到端 Succeeded + usage 回写，七缺陷实证修复，
+  详见 CHANGELOG 同日条目与 PR #203）。
+- 阻碍位置：无外部依赖，纯工程量。已知本地环境干扰：可达其他项目的 kind
+  集群时既有集成用例会误连（详见 CHANGELOG 2026-10-30 条目）。
+
+### M-X1 Agent Marketplace 签名校验（M0 章程）
+
+- 现状（2026-10-31 更新）：**M0 已交付（接线式）**——Ed25519 工具链
+  （``core/marketplace/signing.py``，2026-09 起已存在但零接线）接入
+  ``MCPMarketplace`` 安装路径：``verifier``/``key_mgmt``/``require_signature``
+  注入 + 目录条目验签（fail-closed）+ ``MAOP_MARKETPLACE_VERIFY_KEY`` 配置面 +
+  CLI ``--require-signature`` + 威胁模型文档
+  （``docs/marketplace-signing-threat-model.md``）。验收：篡改/缺失签名判红、
+  四态冒烟 = ``test_mcp_marketplace.py::TestSignatureGate``（5 例）✅。
+- 余量：~~密钥治理呈批~~ → **已批（2026-11-01，四项按推荐）**——口径与
+  实施记录见 ``docs/marketplace-signing-key-governance.md``（D1 复用企业
+  生产钥为目录签名根 / D2 三通道分发且 ``config/marketplace_verify_key.pub``
+  已内置 / D3 例行 12 个月 + 泄露 24h 换钥 + 7 天双钥宽限 /
+  D4 ``require_signature`` 三步演进）。剩余：首次目录签名（待生产目录
+  就位）、HTTPS 拉取通道与双钥宽限 try 验签（M1）、D4 步骤 2 切默认
+  （触发条件齐备后）；Skill 包分发面的签名扩展另批。
+
+### M-X2 多后端编排器适配（Temporal/Airflow，M0 章程）
+
+- 现状（2026-11-01，**M0 + E2-a 生产接线均已交付**，PR 见 CHANGELOG 同日
+  两条目）：``maop/orchestration/``（后端无关协议 + DAG 预处理 +
+  ``TemporalAdapter`` + **wiring 接线层**）；``MAOP_ORCHESTRATION_BACKEND``
+  flag（空=legacy 逐字节不变，temporal=适配器执行）；生产入口
+  ``wiring.run_workflow`` + CLI ``maop workflow run <name>``；验收样例
+  ``m0-demo``（3 节点）真机双验：M0 dev server 实跑 ✅ + E2-a 经生产
+  入口 3 节点真 codex 子进程全 success ✅。
+- 余量：E1-a 轻生产 server（腾讯云 Lighthouse docker-compose，待用户给
+  云资源）；E2-b 深集成（dashboard 提交源 + 状态回写）；Airflow 另议；
+  条件执行（``condition``）语义扩展（M0 明示边界）；并发活动的
+  to_thread 化（小扩展）。
+- M0 验收：demo workflow（3 节点）在 Temporal dev server 上跑通一次 ✅
+  （2026-11-01，配方见 ``scripts/temporal_m0_demo.py`` 模块 docstring）。
+
+### M-X3 细粒度成本归因（M0 章程）
+
+- 现状：cost_tracker 已有调用级成本数据；缺按 agent / phase / model 的聚合
+  视图与预算告警落点。
+- M0 范围：三维聚合查询 + dashboard 聚合视图 + 阈值告警接线（复用
+  alert_ingest 通道）。
+- M0 验收：聚合数值与 cost_tracker 原始记录逐条对齐（测试钉死）；越阈告警
+  真实送达。
+- 阻碍位置：无。可随时立项，与阶段二主线无耦合。
+
+### MAOS 侧 B3 音频/视频（跨仓，章程待企业侧）
+
+- 现状：MAOP 侧扩展契约（`core/memory/multimodal_spaces.py` 空间注册表）已
+  交付；MAOS 侧音频（Whisper）/视频（关键帧）实现未交付，跨空间融合检索
+  （B3+）未排期。
+- 阻碍位置：**仓库领地**（`maop/enterprise/*` 归 CommandCodeBot/企业线；MAOS 板
+  有载）+ 模型选型/存储口径属企业侧产品决策。MAOP 侧不含新工作。
+
+### M-SIM 模拟业务场景预生产演练（M0 章程，2026-11-04 用户授权立项）
+
+- 动机：GA 前两类缺口——「真生产运维数据」与「跨里程碑栈（operator/
+  marketplace/orchestration/成本归因）的集成验证」——都无法等真实客户/云资源；
+  用本地模拟业务负载把证据造出来、把集成缝隙暴露出来。
+- M0 范围：**确定性 stub 驱动**（agents.yaml 增 `sim-*` 条目，`cli` 指向本地
+  stub 脚本，零外部 LLM/网络）+ **3 个业务剧本**（客服工单分诊处置 / 日报生成
+  流水线 / 代码审查流水线，各为多节点 plan）经**生产入口**（`wiring.run_workflow`
+  legacy 后端 = `maop run` 子进程）实跑 N 轮 + **运维证据采集**：turn/token 计量
+  （tokensSource 区分）、cost_tracker 记录与 M-X3 聚合对齐、quota 门注入
+  （低阈值触发一次 QuotaExceeded 终态）、alert_ingest 越阈告警送达、
+  db_backup 备份+恢复演练。产出 `docs/audits/business-sim-evidence-<date>.md`。
+- M0 验收：3 剧本生产入口全 success；证据报告五类记录与原始数据逐条对齐；
+  至少暴露并记录 1 个真实集成缺口（演练的价值就是找茬）；stub 驱动确定性
+  （同输入同输出，可重复）。
+- M1（另批）：kind operator CR 腿（MaopTask 承载剧本节点）+ Temporal 后端腿
+  （dev server）+ 48h soak 串联。
+- 阻碍位置：无外部依赖，纯工程量。
+
+### 立项登记（2026-11-04 用户授权，排期待 M-SIM M0 之后）
+
+- **M-X1 M1**：HTTPS 拉取通道 + 双钥宽限 try 验签（章程既有余量项）。
+- **M-X2 E2-b**：深集成——dashboard 提交 workflow 源 + 状态回写。
+- **M2.2 B2 余项**：异步队列的进程间接线（章程既有顺延项）。
 
 ## 维护规则
 

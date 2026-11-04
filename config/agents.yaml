@@ -765,3 +765,19 @@ workflows:
     model: auto
     model_display: 'Doc-Pipeline v2 (Python workflow: 5 agents, 11 steps)'
     timeout_s: 300
+  # M-X2 E2-a 验收样例（Temporal 后端 demo；3 节点 DAG，分支并行）——
+  # 前置依赖见 scripts/temporal_m0_demo.py 配方（temporalio + dev server）。
+  m0-demo:
+    description: 'M-X2 M0 acceptance DAG: planner -> (worker-a || worker-b).'
+    steps:
+    - agent: codex
+      task: '节点 0（规划）：拆解任务并产出两路分支'
+      timeout_s: 120
+    - agent: codex
+      task: '节点 1（分支 A）：输出冒烟结论'
+      depends_on: ['0']
+      timeout_s: 120
+    - agent: codex
+      task: '节点 2（分支 B）：输出验收清单'
+      depends_on: ['0']
+      timeout_s: 120

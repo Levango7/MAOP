@@ -80,6 +80,35 @@ class TestRunCli:
         assert result.trace_id == "t1"
         assert result.duration_ms >= 0
 
+    async def test_cli_without_usage_line_keeps_none(self):
+        """GAP-2：老 agent 不打协议行 → usage=None（行为与既往逐字节一致）。"""
+        config = _config(cli="python", cli_args="-c \"print('ok')\"")
+        result = await _run_cli(config, "test", 10, ".", "t1")
+        assert result.usage is None
+
+    async def test_cli_split_protocol_line_backfills_usage(self):
+        """GAP-2 方案 A：agent stdout 的拆分协议行回填 MaopResult.usage。"""
+        code = (
+            "print('reply'); "
+            "print('[USAGE] turns=2 tokens=100 source=measured "
+            "prompt=70 completion=30')"
+        )
+        config = _config(cli="python", cli_args="-c \"" + code + "\"")
+        result = await _run_cli(config, "test", 10, ".", "t1")
+        assert result.exit_code == 0
+        assert result.usage == {
+            "prompt_tokens": 70,
+            "completion_tokens": 30,
+            "total_tokens": 100,
+        }
+
+    async def test_cli_legacy_protocol_line_backfills_total(self):
+        """旧三段格式：total 记账、拆分未知（成本侧继续走启发式，如实）。"""
+        code = "print('reply'); print('[USAGE] turns=1 tokens=520 source=estimated')"
+        config = _config(cli="python", cli_args="-c \"" + code + "\"")
+        result = await _run_cli(config, "test", 10, ".", "t1")
+        assert result.usage == {"total_tokens": 520}
+
 
 class TestRunCmd:
     @pytest.mark.asyncio
@@ -162,12 +191,101 @@ class TestRunPython:
         assert result.exit_code != 0
 
 
+# 反斜杠与换行一律用 chr() 构造：测试源里不出现转义序列（本仓在 Windows
+# 工具链上屡次被转义层吃字符，见 AGENT-COORD 第十八轮注记）。
+_DQ = chr(34)
+_SQ = chr(39)
+_BS = chr(92)
+_NL = chr(10)
+
+
+async def _ps_probe_or_skip() -> None:
+    """Windows runner 的 PowerShell 可能冷启动超时（test_powershell_success
+    同款环境限制）。预探测 15s，不可用即 skip，避免 CI 空等。"""
+    import asyncio
+
+    proc = await asyncio.create_subprocess_exec(
+        "powershell", "-NoProfile", "-Command", "exit 0",
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=15)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        pytest.skip("PowerShell unavailable on this runner (startup >15s)")
+
+
+def _write_ps(tmp_path, body: str):
+    """写一个声明了 _run_wrapper 全部 -File 命名参数的 .ps1
+    （缺 param 块会因无法绑定 -Prompt 等参数而报错）。"""
+    script = tmp_path / "sim_wrapper.ps1"
+    script.write_text(
+        "param([string]$Prompt, [int]$TimeoutSeconds, "
+        "[string]$AgentName, [string]$TraceID)" + _NL + body,
+        encoding="utf-8",
+    )
+    return str(script)
+
+
 class TestRunWrapper:
     @pytest.mark.asyncio
     async def test_wrapper_missing_script(self):
         config = _config(driver="wrapper", wrapper="nonexistent_script.ps1")
         result = await _run_wrapper(config, "test", 10, ".", "t5")
         assert result.driver == "wrapper"
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(not _IS_WINDOWS, reason="-File 硬编码 powershell，Windows 专属语义")
+    async def test_wrapper_json_schema_backfills_usage(self, tmp_path):
+        """GAP-2 均匀收尾：协议行内嵌 JSON stdout 字段时同样回填 usage。"""
+        await _ps_probe_or_skip()
+        json_body = (
+            "Write-Output " + _SQ + '{"ok": true, "exit_code": 0, "stdout": "reply'
+            + _BS + 'n[USAGE] turns=1 tokens=100 source=measured '
+            'prompt=70 completion=30"}' + _SQ
+        )
+        wrapper = _write_ps(tmp_path, json_body)
+        config = _config(driver="wrapper", wrapper=wrapper)
+        result = await _run_wrapper(config, "test", 60, ".", "t5")
+        assert result.exit_code == 0
+        assert "[USAGE]" in result.stdout
+        assert result.usage == {
+            "prompt_tokens": 70,
+            "completion_tokens": 30,
+            "total_tokens": 100,
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(not _IS_WINDOWS, reason="-File 硬编码 powershell，Windows 专属语义")
+    async def test_wrapper_raw_output_backfills_usage(self, tmp_path):
+        """非 JSON 输出走 raw 回退路径；旧三段格式 total 记账。"""
+        await _ps_probe_or_skip()
+        raw_body = (
+            'Write-Output "reply"' + _NL
+            + 'Write-Output "[USAGE] turns=1 tokens=520 source=estimated"'
+        )
+        wrapper = _write_ps(tmp_path, raw_body)
+        config = _config(driver="wrapper", wrapper=wrapper)
+        result = await _run_wrapper(config, "test", 60, ".", "t5")
+        assert result.exit_code == 0
+        assert result.usage == {"total_tokens": 520}
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(not _IS_WINDOWS, reason="-File 硬编码 powershell，Windows 专属语义")
+    async def test_wrapper_without_usage_line_keeps_none(self, tmp_path):
+        await _ps_probe_or_skip()
+        plain_body = (
+            "Write-Output " + _SQ
+            + '{"ok": true, "exit_code": 0, "stdout": "plain reply no protocol line"}'
+            + _SQ
+        )
+        wrapper = _write_ps(tmp_path, plain_body)
+        config = _config(driver="wrapper", wrapper=wrapper)
+        result = await _run_wrapper(config, "test", 60, ".", "t5")
+        assert result.exit_code == 0
+        assert result.usage is None
 
 
 class TestAgentConfig:

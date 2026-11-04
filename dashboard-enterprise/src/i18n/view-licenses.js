@@ -41,7 +41,6 @@ export const messages = {
 
     // ── Filters ────────────────────────────────────────────────
     'view.licenses.allStatuses': 'All statuses',
-    'view.licenses.allVersions': 'All editions',
     'view.licenses.allExpiry': 'All expiry',
     'view.licenses.expiryActive': 'Active',
     'view.licenses.expiryExpired': 'Expired',
@@ -117,7 +116,6 @@ export const messages = {
 
     // ── Filters ────────────────────────────────────────────────
     'view.licenses.allStatuses': '全部状态',
-    'view.licenses.allVersions': '全部版本',
     'view.licenses.allExpiry': '全部过期范围',
     'view.licenses.expiryActive': '未过期',
     'view.licenses.expiryExpired': '已过期',
