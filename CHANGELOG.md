@@ -76,6 +76,20 @@ GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在�
 - 章程与 M1（kind operator 腿 / Temporal 腿 / 48h soak 串联）见 ROADMAP
   「M-SIM」节；另登记 M-X1 M1 / M-X2 E2-b / M2.2 B2 余项（用户授权立项）。
 
+### M2.2 B2 余项收口 —— Facade 层异步摄入入口（2026-11-05）
+
+立项侦察修正（与 M-X1 M1 双钥宽限同款教训）：「异步队列的进程间接线」主体
+**已由 #160（v5.5.0）交付**——`core/memory/multimodal_ingest_cp.py` 的
+`CrossProcessIngestQueue`（SQLite MessageQueue 传输 + `multimodal_ingest_mode`
+配置切换 + 专属测试）；立项登记时未复核该交付。真余项只有 PR-3 留下的
+「Facade 侧按需再接」尾巴：
+
+- `MemoryFacade.store_multimodal_async(...)`：立即入队不等嵌入（延迟预算
+  路径，ADR-022 D4）；队列关停后返回 `""`（不静默丢数据的显式信号）；
+- `MemoryFacade.drain_multimodal_ingest(timeout)`：显式排空（幂等）；
+- 测试 3 例（双模式 submit→drain→可检索 + 排空幂等）；
+- 进程间接线本体**不做重复建设**——#160 在案即权威。
+
 ### M-X2 E2-b —— dashboard workflow 提交与状态回写（2026-11-05）
 
 GAP-1 收口面（dashboard 侧）：dashboard 此前无 workflow 提交面、workflow
