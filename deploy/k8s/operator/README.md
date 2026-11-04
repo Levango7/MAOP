@@ -7,8 +7,10 @@
 - Controller: `py/maop/operator/` ships a kopf-based MaopTask controller
   (spec validation / reconcile state machine / status patches / event layer),
   covered by mock-chain tests (`py/tests/test_operator_m0.py`,
-  `test_operator_m1.py`). Real-cluster (kind) validation is not done yet
-  (deferred by charter).
+  `test_operator_m1.py`). Real-cluster (kind) validation: **done 2026-11-01**
+  (M-T3.3, PR #203 chain — kind v0.31 + kindest/node v1.35, end-to-end
+  MaopTask CR → kopf → `maop run` → status `Succeeded`; seven real-cluster
+  defects found & fixed, see CHANGELOG same-day).
 - Image build source: `deploy/k8s/operator/Dockerfile` builds
   `ghcr.io/maop/operator` (CI docker job, build-only; pushing to a registry
   remains a release decision).

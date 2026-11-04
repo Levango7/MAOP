@@ -1,8 +1,8 @@
 # MAOP Operator Helm Chart — Release Notes
 
-> **PLANNED — NOT IMPLEMENTED.** 下列条目描述的是规划中的 chart 内容与目标行为；
-> 仓库内没有 controller 实现，`ghcr.io/maop/operator` 镜像从未构建。
-> 详见 `../README.md §Status`。
+> **PARTIALLY IMPLEMENTED（部分实现，M-T3.3）.** controller 已实现（`py/maop/operator/`），
+> 镜像可经 `../Dockerfile` 本地构建并在 kind 集群实证（2026-11-01，PR #203 链）；
+> registry 发布仍属呈批项。详见 `../README.md §Status`。
 
 ## v0.3.0 (appVersion 4.5.0)
 

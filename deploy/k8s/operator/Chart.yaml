@@ -1,12 +1,13 @@
 apiVersion: v2
 name: maop-operator
 description: |
-  PLANNED — NOT IMPLEMENTED. This chart only describes the intended shape of a
+  PARTIALLY IMPLEMENTED (M-T3.3). This chart deploys the implemented kopf-based
   MAOP Kubernetes Operator for MaopAgent / MaopTask / MaopWorkflow custom
-  resources. No controller exists in this repository (no kopf / kubernetes-client
-  / watch code) and there is no container image build source, so nothing
-  reconciles CRs, enforces multi-tenant isolation / RLS, or loads plugins today.
-  `appVersion` names an image that has never been built. See README.md §Status.
+  resources (controller in py/maop/operator/; image buildable via ../Dockerfile).
+  MaopTask reconcile is end-to-end kind-verified (2026-11-01, PR #203 chain).
+  MaopAgent reconcile-into-workloads and MaopWorkflow remain planned; RLS /
+  plugin loading still planned. `appVersion` names an image that is buildable
+  locally but not yet published to a registry. See README.md §Status.
 type: application
 version: 0.3.0
 appVersion: "5.4.0"

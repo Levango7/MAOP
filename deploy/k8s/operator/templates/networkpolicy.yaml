@@ -1,8 +1,8 @@
 {{/*
-NetworkPolicy for MAOP Operator — planned: restricts ingress to webhook + metrics
-ports only. NOTE (PLANNED — NOT IMPLEMENTED): no operator controller/image exists,
-so no pods match this selector today; this manifest only describes intent.
-P1 security fix (2026-09-17).
+NetworkPolicy for MAOP Operator — restricts ingress to webhook + metrics
+ports only. The operator controller/image exist (py/maop/operator + ../Dockerfile;
+kind-verified 2026-11-01, PR #203 chain), so pods match this selector when the
+chart is installed. P1 security fix (2026-09-17).
 */}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
