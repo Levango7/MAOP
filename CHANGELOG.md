@@ -76,6 +76,26 @@ GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在�
 - 章程与 M1（kind operator 腿 / Temporal 腿 / 48h soak 串联）见 ROADMAP
   「M-SIM」节；另登记 M-X1 M1 / M-X2 E2-b / M2.2 B2 余项（用户授权立项）。
 
+### M-X2 E2-b —— dashboard workflow 提交与状态回写（2026-11-05）
+
+GAP-1 收口面（dashboard 侧）：dashboard 此前无 workflow 提交面、workflow
+运行对 run_events 时间线不可见。本切片打通：
+
+- `GET  /api/workflows`：列出 agents.yaml `workflows:` 段（名称/步骤数/
+  涉及 agent/描述）；
+- `POST /api/workflows/{name}/run`：经**生产入口** `wiring.run_workflow_sync`
+  提交（backend 透传：空=legacy 规划合同、temporal=真实执行——GAP-1 的
+  「只规划」语义在 API 面如实透出，不掩盖），admin-only；
+- **状态回写**：`run.workflow.started/completed/failed` 三事件写入
+  `run_events`，返回 `trace_id`——面板沿既有 `/api/runs/{trace_id}` 时间线
+  即可把工作流事件与子 agent run 事件同轴查看；
+- 注册进 `_register_core_routers`（审计双视图随 registration 生效）；
+- 契约测试 6 例（admin 门禁/列表/成功回写/未知 workflow/失败回写/403，
+  `_runner`/`_load_config` 模块缝注入零真实执行）。
+- M-SIM M1 附带交付：`scripts/business_sim/soak_run.py` 48h soak harness
+  （持久 home + 逐轮 JSONL + 增量对账硬门禁 + stop-file 优雅停 + 连续失败
+  熔断 + 断点续跑；本机已在跑）。
+
 ### M-X1 M1 —— 验签公钥三通道解析（D2③ HTTPS 拉取，2026-11-05）
 
 治理文档 D2 的最后一条待落地通道（双钥宽限经 11-03 复核确认
