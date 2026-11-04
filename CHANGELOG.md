@@ -38,6 +38,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [Unreleased]
+### M-SIM 模拟业务场景预生产演练 M0（2026-11-04）
+
+GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在等不来真实客户/云
+资源时的本地替代：用**确定性 stub 驱动**（零外部 LLM/网络）把三个业务剧本
+（工单分诊处置 / 日报生成 / 代码审查扇入）经**生产执行路径**（`maop.cli run`
+子进程，与 operator/Temporal executor 同形）实跑并采集运维证据。
+
+- `py/scripts/business_sim/`：stub 驱动（同输入同输出 + `[USAGE]` 协议行 +
+  `--fail-on` 故障注入）+ 演练编排（Kahn 分波 DAG、隔离 MAOP_ROOT_DIR home）
+  + 证据采集（cost_tracker 落库对账 M-X3 聚合、alert_ingest 写读、
+  db_backup 备份 + `integrity_check` 恢复验证）；`py/tests/test_business_sim.py`
+  4 例（stub 确定性 / 故障注入 / 环检测 / 端到端 3 节点）。
+- **实跑 11/11 全绿**；证据与缺口见
+  `docs/audits/business-sim-evidence-2026-11-04.md`：GAP-1 legacy 后端
+  `run_workflow` 只规划不执行（`maop_plan.execute_workflow` 自认名不副实）；
+  GAP-2 双层计量口径分歧（provider 启发式 3185 vs 协议行回填 6924 tokens，
+  11 次调用——计费权威口径待裁）；GAP-3 子进程解析 maop 的环境地雷
+  （.pth 注入旧工作树 + 脚本目录取 py 差一层，已在 harness 内收口）；
+  GAP-4 Windows 编码缺口（两层）——(a) `cli_adapter` 的
+  `subprocess.run(text=True)` 未指定 encoding，Windows 管道 cp1252 下任何
+  非 ASCII 输出的 CLI agent 必炸；(b) `maop/cli.py` 入口自身 stdout 同走
+  cp1252，loop 打印含中文的运行/失败信息时连 `[FAIL] run 失败` 报错路径
+  都连带崩溃（本机全局 PYTHONUTF8=1 故本地全绿、CI 才暴露）；已修
+  （cli_adapter 显式 UTF-8 + cli.py 入口 reconfigure + stub/child_env
+  双保险），`PYTHONIOENCODING=cp1252` 最严模拟下 4/4 通过，四条 windows
+  腿复跑为跨平台验收。
+- 章程与 M1（kind operator 腿 / Temporal 腿 / 48h soak 串联）见 ROADMAP
+  「M-SIM」节；另登记 M-X1 M1 / M-X2 E2-b / M2.2 B2 余项（用户授权立项）。
+
 ### Marketplace 目录版本钉死（2026-11-03）
 
 首签目录的实际风险收口：两条 stdio 条目原为**未钉版本**的 `npx -y <pkg>`，
