@@ -158,3 +158,26 @@ text=True)`` 未指定 encoding，Windows 上管道走 locale 编码（cp1252）
 
 回归：``tests/test_business_sim.py`` 4/4 本地通过，CI 四条 windows 腿复跑
 即为跨平台验收。
+
+### GAP-4 第二层（复跑定位）：maop.cli 自身打印中文崩溃
+
+首层修复（cli_adapter UTF-8 + stub reconfigure）使 stub 确定性测试转绿，但
+windows 四腿仅剩 ``test_scenario_end_to_end`` 仍红（3/3 节点失败）。本机以
+``PYTHONIOENCODING=cp1252``（本机全局 PYTHONUTF8=1 PYTHONIOENCODING=utf-8
+正是「本地全绿、CI 全红」的成因）复现并打印节点证据，定位到**第二层**：
+
+- ``run_sim.run_node`` 派生的 ``maop.cli`` 子进程自身 stdout 在 Windows 管道
+  走 cp1252；loop 打印含中文的运行/失败信息（``[FAIL] run 失败: ...``）时
+  UnicodeEncodeError——**连异常报告路径自身都连带崩溃**（stderr 里
+  ``[FAIL] run 失败: 'charmap' codec can't encode...`` 即其自证）。
+- 影响面：任何 Windows 部署上 maop CLI 路径输出中文运行信息即中断，属
+  生产入口级跨平台缺陷，比第一层更靠核心。
+
+**修复**（同笔）：
+1. ``maop/cli.py`` ``main()`` 入口对 stdout/stderr 做 UTF-8 reconfigure
+   （errors="replace"，与 cli_adapter 解码侧对称；POSIX 无行为变化）；
+2. ``run_sim.child_env`` 增 ``PYTHONUTF8=1``，覆盖整个子进程树。
+
+**验证**：``PYTHONIOENCODING=cp1252``（比 CI 更严：CI 无此变量、PYTHONUTF8
+会生效；此模拟下 PYTHONIOENCODING 压过 UTF-8 模式，仅靠入口 reconfigure 撑）
+全 4 例通过——即修复在「环境变量全被压制」的最坏情形下依然成立。

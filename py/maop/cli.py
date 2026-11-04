@@ -547,6 +547,17 @@ def cmd_config(args: list[str]) -> None:
 
 
 def main() -> Any:
+    # Windows 上 stdout/stderr 是管道时默认 locale 编码（cp1252 等），
+    # 打印含中文的运行/失败信息会 UnicodeEncodeError——连「[FAIL] run 失败」
+    # 报错路径自身都会连带崩溃（M-SIM GAP-4 第二层）。入口处强制 UTF-8，
+    # 与 cli_adapter 的 subprocess 解码侧对称；errors="replace" 保证永不因
+    # 编码中断运行。POSIX 本就 UTF-8，无行为变化。
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError, ValueError):
+            pass
+
     # Enable JSON structured logging when MAOP_JSON_LOG=1 (for ELK / Loki).
     if os.environ.get("MAOP_JSON_LOG", "0") == "1":
         from maop.core.monitoring.monitoring import setup_json_logging

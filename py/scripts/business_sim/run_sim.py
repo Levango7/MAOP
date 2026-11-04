@@ -116,6 +116,10 @@ def child_env(home: Path, py_dir: Path) -> dict[str, str]:
     env = os.environ.copy()
     env["MAOP_ROOT_DIR"] = str(home)
     env["PYTHONPATH"] = str(py_dir)
+    # Windows 管道默认 locale 编码（cp1252），子进程打印中文即 UnicodeEncodeError
+    # （M-SIM GAP-4：maop.cli run 的 [FAIL] run 失败 报错路径自身连带崩溃）。
+    # 强制 UTF-8 模式覆盖整个子进程树（cli.py 入口另有 reconfigure 双保险）。
+    env["PYTHONUTF8"] = "1"
     return env
 
 
