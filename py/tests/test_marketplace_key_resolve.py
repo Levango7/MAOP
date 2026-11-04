@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Self, cast
+from typing import cast
 
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
 )
+
+# typing.Self 是 3.11+；仓库测试惯例走 typing_extensions（py3.10 矩阵腿必经）。
+from typing_extensions import Self
 
 from maop.core.marketplace.key_resolve import (
     build_verifier,
