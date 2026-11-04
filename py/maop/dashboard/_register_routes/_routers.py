@@ -137,6 +137,7 @@ def _register_core_routers(app: FastAPI) -> None:
         runs,
         share,
         system,
+        workflows,
     )
 
     app.include_router(data.router)
@@ -144,6 +145,10 @@ def _register_core_routers(app: FastAPI) -> None:
     app.include_router(runs.router)
     app.include_router(share.router)
     app.include_router(model.router)
+
+    # M-X2 E2-b（2026-11-05）：/api/workflows 提交与状态回写（生产入口 +
+    # run_events 回写，面板沿 trace_id 看既有时间线）
+    app.include_router(workflows.router)
 
     # M-X3 成本归因（2026-10-29）：/api/cost-attribution 聚合 + 预算越阈检查
     from maop.dashboard.routers import cost_attribution as cost_attribution_router

@@ -813,3 +813,18 @@
   往返）+ 既有 marketplace 族 152 例回归。**残余风险如实登记**：DNS
   rebinding TOCTOU（模块 docstring），纵深防御接受。
 
+## 领地登记（ZCode session_f62ccbe6bb1a78cbe8412a088b6cfa3d，2026-11-05 第十九轮：并行立项批——M-SIM M1 + M-X2 E2-b + M2.2 B2 余项）
+- **授权**：用户「这几个都要等吗？不可以并行做吗？」（2026-11-05）——确认并行
+  模式：**开发/本地验证三线并行，CI/合并串行**（≈20 job/小时账号配额墙，
+  并发 CI 互掐实证）。认领前已核：三域板面均无他线条目。
+- **三线领地**：
+  - M-SIM M1（章程「另批」经用户并行问询激活）：`py/scripts/business_sim/`
+    soak harness + kind operator CR 腿（MaopTask 承载剧本节点，集群名唯一化）
+    + Temporal dev server 腿 + 48h soak。48h soak 为本地长跑，进度 JSONL
+    落盘、支持 stop-file 优雅停、断点续跑（部分结果可用）。
+  - M-X2 E2-b 深集成：dashboard 提交 workflow 源 + 状态回写
+    （`dashboard/` × `orchestration/wiring.py` 面）。
+  - M2.2 B2 余项：异步队列的进程间接线。
+- **合并纪律**：三线各自独立分支，谁先绿谁先进 CI 队列（一次只一个 PR 在
+  CI），逐条 rebase→CI→merge；后进者 rebase 到新 master。
+- **不碰**：他线在途 PR/worktree 领地；MAOS 主工作树（SAML 线活跃）。
