@@ -181,3 +181,43 @@ windows 四腿仅剩 ``test_scenario_end_to_end`` 仍红（3/3 节点失败）�
 **验证**：``PYTHONIOENCODING=cp1252``（比 CI 更严：CI 无此变量、PYTHONUTF8
 会生效；此模拟下 PYTHONIOENCODING 压过 UTF-8 模式，仅靠入口 reconfigure 撑）
 全 4 例通过——即修复在「环境变量全被压制」的最坏情形下依然成立。
+
+
+## GAP-2 计费口径分歧收口（2026-11-04 当日，方案 A 实施并验证）
+
+**分歧**（M0 演练实测）：同一批 11 次调用，M-X3 成本归因表记 **3185** tokens
+（CJK 启发式：`maop_loop_phases._budget_reconciliation` 在 `usage` 缺席时按
+task/stdout 字符数估算），而子进程协议行（stub 申报）合计 **6924** tokens——
+两套口径独立计算、互不对齐，计费权威缺位。
+
+**方案 A（用户「确定没问题再做」授权后实施）**：协议行 schema 升级为
+`[USAGE] turns=N tokens=T source=S prompt=P completion=C`，回填链
+`protocol line → MaopResult.usage → loop_executor/_budget_reconciliation`，
+取值链 = **provider 实测 → 协议行 → CJK 启发式**：
+
+- `py/maop/core/agent/usage_protocol.py`（新）：唯一权威解析点，函数
+  `parse_usage_line(stdout)` 产出 `{prompt_tokens, completion_tokens,
+  total_tokens}`；只有 `turns=` 无任何 token 字段 → `None`。
+- `py/maop/delegate/drivers.py`：`_run_cli` 两处成功路径回填
+  `usage=parse_usage_line(...)`（无协议行 → None，老 agent 行为逐字节不变）。
+- `stub_business_agent.py` / `run_sim.py`：schema 追加拆分组（追加在
+  `source=` 之后，既有解析器正则非行尾锚定，向后兼容且不改写任何存量 agent）。
+- `reconcile_usage()`（run_sim）硬断言：协议行总量 vs 成本表总量必须逐
+  token 相等（protocol==0 视为失配，防 vacuous pass）；不相等 → 演练退出码 1。
+
+**验证（全量三剧本，生产路径）**：11/11 node 成功，**对账 5429 == 5429 →
+True**（修复前的编制 Values 见上段分歧录）；本地 CP1252 最严模拟
+（`PYTHONUTF8=0 PYTHONIOENCODING=cp1252`）32/32 通过；ruff/mypy 无问题；
+`py/tests/test_usage_protocol.py`（13 例）+ `test_drivers.py` 3 例 +
+`test_business_sim.py` e2e 断言增强（`rec["match"]`）。
+
+**为何 5429 ≠ 修复前任何单侧值**：修复前后 stub 的 crc32 token 派生逻辑未变，
+但旧口径下 loop 层 `[USAGE]` 行报 tokens=0（CLI 无计费）而成本表独立算启发式；
+修复后协议行全量回填，两侧同源——5429 即三剧本 11 节点的协议行真值总和，
+成本表现在逐字采纳该口径。**计数口径以修复后对账为准。**
+
+**遗留边界（2026-11-05 更新：wrapper 已接线）**：wrapper 驱动 4 处成功路径
+（JSON 封装从 JSON 的 stdout 字段解析、raw 回退从原文解析）同构回填，
+协议行到 .ps1 脚本后同样被读出；in/out 拆分未知的旧
+agent 打 `tokens=` 三段时，loop 层立即受益（total 记账），成本表侧的
+heuristic 兜底保留（不凭空拆分）。

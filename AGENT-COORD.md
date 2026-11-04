@@ -680,6 +680,64 @@
   无用户指令不动。
 - **不碰**：他线在途 PR 领地；MAOS 主工作树（SAML 线活跃）。
 
+## 领地登记（ZCode session_f62ccbe6bb1a78cbe8412a088b6cfa3d，2026-11-04 第十七轮：自驱项——GAP-2 计费口径收口（方案 A，用户「确定没问题再做」授权后动））
+- **背景/授权**：用户在校对要求（"再校对一遍，要风险可控。确定没问题再做"）下
+  批准 GAP-2 修复；校对三项全过后实施（合并状态/落点爆炸半径/回滚路径，均核对）。
+- **改动**：协议行 schema 升级 `[USAGE] turns=N tokens=T source=S prompt=P
+  completion=C`（追加式，既有解析器正则非行尾锚定、向后兼容）；新模块
+  `py/maop/core/agent/usage_protocol.py`（`parse_usage_line` 唯一权威解析点——
+  放在 core/agent/ 而非 core/reliability/：后者是 CommandCodeBot 板面领地，
+  第 94/532 行两处「不碰」已核）；`delegate/drivers._run_cli` 两处成功路径回填
+  `MaopResult.usage`（无协议行=None，老 agent 行为逐字节不变）；stub/run_sim
+  schema 同升级；`run_sim.reconcile_usage()` **硬门禁**：协议行总量 vs 成本
+  表（M-X3 attribution）总量逐 token 相等，不等即演练退出 1（防 vacuous
+  pass：protocol==0 视为失配）；e2e 测试吃 `rec["match"]` 断言。
+- **验证**：test_usage_protocol 13 例 / test_drivers +3 例 / test_business_sim
+  4 例（e2e 断言增强）/ 邻近 35 例全过；CP1252 最严模拟 32/32；ruff/mypy 无
+  问题；drivers.py 782/800 行内；**全量三剧本 11/11 成功 + 对账
+  5429==5429**（M0 分歧 3185 vs 6924 的口径统一证据）；证据章见
+  `docs/audits/business-sim-evidence-2026-11-04.md` GAP-2 收口节。
+- **为何改了数还要同级校验**：修复轮 5429 是协议行真值总和，与 M0 的 3185
+  （启发式侧）/6924（协议行侧）不同源不可直接比——以修复后对账为准。
+- **遗留边界（如实登记）**：wrapper 驱动（.ps1）本轮未接线（drivers.py 行数
+  预算 + 形态差异，后续同构接入只需同一 import + 2 处 usage=）；旧 agent
+  打三段 `tokens=` 时 loop 层立即受益（total 记账），成本表 heuristic 兜底
+  保留（in/out 拆分未知，不凭空拆分）。
+- **领地**：`py/maop/core/agent/usage_protocol.py`、`py/maop/delegate/drivers.py`
+  （usage 回填两处）、`py/scripts/business_sim/`、`py/tests/test_usage_protocol.py`、
+  `test_drivers.py`/`test_business_sim.py` 本批增例、
+  `docs/audits/business-sim-evidence-2026-11-04.md` GAP-2 节、CHANGELOG 本批段、
+  本登记。
+- **待裁/不做**：GAP-1 legacy 后端收口归 E2-b（M-SIM M1 已入 ROADMAP）；
+  D4/E1/license/MAOS 真机=外部条件；[Unreleased] 切版=发版裁决归用户。
+- **不碰**：他线在途 PR 领地；MAOS 主工作树（SAML 线活跃）。
+
+## 领地登记（ZCode session_f62ccbe6bb1a78cbe8412a088b6cfa3d，2026-11-05 第十八轮：自驱立项批——GAP-2 wrapper 均匀收尾 + M-X1 M1 + ROADMAP 头刷新）
+- **授权**：用户「确定没有其他agent认领，那就你来认领，立项吧」（2026-11-05）。
+  认领前已核：目标域（marketplace=本线第十四轮领地 / wrapper=本线第十七轮遗留 /
+  E2-b=无主）无他线条目；远端无相关在途分支；开放 PR #220（docs/coord-branch-prune，
+  他线 docs）不占本批域。串行链纪律（配额墙）：PR 逐条 CI→merge→下一条。
+- **立项清单**：① wrapper 驱动 usage 回填（GAP-2 均匀收尾，本批 PR-A）；
+  ② M-X1 M1——HTTPS 拉取通道 + 双钥宽限接线核查（PR-B；11-03 自驱批曾判
+  verify_with_key_management 已有实现+测试，动手前先侦察，若已实现则 M1 收窄为
+  HTTPS 拉取 + 消费侧接线/测试补强，避免重复劳动）；③ ROADMAP「当前状态」头
+  刷新（docs 快通道，PR-C 可并入 PR-B）。
+- **PR-A 改动**：`drivers._run_wrapper` 4 处成功路径回填 `usage=`（2 处 JSON
+  封装路径从 JSON 的 stdout 字段解析、2 处 raw 回退路径从原文解析）；drivers.py
+  790/800 行内；usage_protocol 范围注记同步。测试：`TestRunWrapper` +3 例
+  （真 .ps1 夹具，param 块声明全部 -File 命名参数；Windows 专属 skipif +
+  PowerShell 15s 冷启动预探测 skip——沿用 test_powershell_success 的 runner
+  环境守卫）。**工具链注记**：inline python 补丁里的反斜杠转义会被本机执行层
+  吃掉（两次实撞：`\n` 落盘成真换行/单反斜杠）——测试源一律 chr() 构造
+  （`_DQ/_SQ/_BS/_NL`），不复用转义序列。
+- **验证**：test_drivers 35/35（含 wrapper 3 例真执行）+ test_usage_protocol
+  13 例；ruff/mypy 无问题。
+- **领地**：`py/maop/delegate/drivers.py`（wrapper 4 处）、
+  `py/maop/core/agent/usage_protocol.py`（注记）、`py/tests/test_drivers.py`、
+  CHANGELOG GAP-2 段、`docs/audits/business-sim-evidence-2026-11-04.md`
+  遗留边界节、本登记。
+- **不碰**：他线在途 PR 领地（含 #220 分支）；MAOS 主工作树（SAML 线活跃）。
+
 ## 领地登记（Qoder-CN 会话 17ef022a，2026-11-04：已合并分支清理）
 
 - **做了什么**：本地分支 `64 → 32`、远端分支 `85 → 40`。判据三条**同时**成立才删：
@@ -697,6 +755,7 @@
   `941c9603`、`88623431`、`f12f3d5c` 四条全部 `merge-base --is-ancestor` 通过），
   提交永久可达；谁的本地还留着对应分支，`git push -u origin <branch>` 直接重建，
   只剩 sha 的话 `git branch <名字> <sha>` 就能复原，不依赖 reflog 时限。
-- **未做**：没碰任何 worktree 的未提交文件（`MAOP-op` 9 个、`MAOP-nav` 9 个原样）；
+- **未做**：没碰任何 worktree 的未提交文件（登记时 `MAOP-op` 9 个、`MAOP-nav` 9 个，
+  原样留给他们自己处置——`MAOP-op` 那 9 个后来由该会话提交为 #219/#221，与本会话无关）；
   今天合并的 `docs/coord-round16`、`docs/k8s-operator-status`、`feat/business-sim-m0`
   一条没删。

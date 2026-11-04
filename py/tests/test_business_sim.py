@@ -67,5 +67,12 @@ def test_scenario_end_to_end_through_production_entry(tmp_path: Path) -> None:
         assert r["usage"] is not None, r["stdout_tail"]
         assert r["usage"]["source"] in {"estimated", "measured"}
         assert r["usage"]["turns"] >= 1
+    # GAP-2 收口硬门禁：协议行申报总量与成本对账表（M-X3 attribution）总量
+    # 逐 token 相等——方案 A 前实测 3185 vs 6924 分歧，现由同一 usage dict
+    # 派生两侧口径。断言本身即 GAP-2 的验收判据。
+    cost = run_sim.collect_cost_evidence(home, py_dir)
+    rec = run_sim.reconcile_usage([result], cost)
+    assert rec["protocol_line_tokens"] > 0
+    assert rec["match"], rec
     # 隔离性：所有落库都在 sim home 内（cost/alert 表随 MAOP_ROOT_DIR）
     assert (home / "config" / "agents.yaml").exists()
