@@ -12,13 +12,13 @@
         type="text"
         class="input"
         :placeholder="t('view.agentVersions.filter.agentPlaceholder')"
-        @keyup.enter="load"
+        @keyup.enter="load()"
       />
-      <select v-model="status" class="input" @change="load">
+      <select v-model="status" class="input" @change="load()">
         <option value="">{{ t('view.agentVersions.filter.allStatuses') }}</option>
         <option v-for="s in STATUSES" :key="s" :value="s">{{ s }}</option>
       </select>
-      <button class="btn-ghost" :disabled="loading" @click="load">
+      <button class="btn-ghost" :disabled="loading" @click="load()">
         <AppIcon name="refresh" :size="14" />
         <span>{{ t('common.refresh') }}</span>
       </button>
@@ -211,17 +211,21 @@ function statusTone(s) {
 }
 
 async function load(page = 1) {
+  // 事件绑定若写成裸 `@click="load"`，Vue 会把 DOM Event 当首个实参传进来，
+  // 拼出 `page=[object PointerEvent]` → 后端 422 且控制台无报错。这里做类型
+  // 收敛，任何调用方式都只会得到合法页码（守卫见 __tests__/event-handler-args.test.js）。
+  const currentPage = Number.isInteger(page) && page >= 1 ? page : 1;
   loading.value = true;
   error.value = '';
   try {
     const params = new URLSearchParams();
     if (agentId.value.trim()) params.set('agent_id', agentId.value.trim());
     if (status.value) params.set('status', status.value);
-    params.set('page', String(page));
+    params.set('page', String(currentPage));
     params.set('page_size', String(meta.value.page_size));
     const data = await api.get(`/api/agent-versions?${params.toString()}`);
     versions.value = data.data || [];
-    meta.value = data.meta || { total: 0, page, page_size: 20 };
+    meta.value = data.meta || { total: 0, page: currentPage, page_size: 20 };
   } catch {
     // 具体异常进日志；界面上"加载失败"已足够让用户重试。
     error.value = t('view.agentVersions.loadFailed');

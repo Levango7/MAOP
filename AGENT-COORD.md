@@ -308,6 +308,43 @@
 - **注意 `--shadow-card` 是浮层语义**（CoachMarks 遮罩 / NodeDetailPanel 抽屉在用），
   页面内卡片请用 `--shadow-surface`，别混。
 - **不碰**：`py/**`、`.github/**`、`routers/*_schemas.py`、MAOS 仓。
+
+## 领地登记（Examples 会话 / Nex，2026-11-05 第三轮：前端静默失败第五类 —— 事件参数污染）
+
+- **授权**：用户拍板前端下一批走 (c)「可达性 / a11y / 视觉打磨」（2026-10-31）。
+- **动手前核冲突**：直连 GitHub 实时状态 —— #180 已于 11-03 由 ZCode 第十六轮合并
+  （`742ffb3e`），`origin/master` = `2ebc1667`，Open PR 仅 #222
+  （`feat/mx1-m1-key-resolve`，领地 `py/**` + ROADMAP/CHANGELOG + 本表末尾追加段），
+  **不占前端域**。本登记插在本会话第二轮之后，避开 #222 的末尾追加锚点
+  （其两个 hunk 在 `@@ -51` 与 `@@ -759`），三方合并不冲突。
+- **修了什么**：`views/AgentVersions.vue` 三处裸事件绑定
+  （`@keyup.enter="load"` / `@change="load"` / `@click="load"`）把 DOM Event 当
+  `page` 传给 `load(page = 1)`。反向验证实测 URL 为
+  `page=%5Bobject+MouseEvent%5D` 与 `page=%5Bobject+KeyboardEvent%5D`
+  → 后端 422、列表空白且控制台无报错。改为显式 `load()` + 函数内
+  `Number.isInteger(page)` 类型收敛。既有 `AgentVersions.test.js` 的
+  「passes filters」只断言 agent_id/status，故长期漏网。
+- **守卫**：新增 `__tests__/event-handler-args.test.js`（扫 86 个 .vue / 102 处
+  裸绑定，禁止「裸绑定函数形参带默认值」；含自检与防空转）；
+  `__tests__/AgentVersions.test.js` 补 2 条 `page=1` 断言。
+  **反向验证**：还原旧实现 → 静态守卫 1 红、行为断言 2 红；恢复 → 全绿。
+- **验证**：vitest 全量 **77 files / 690 tests 全绿**（`--pool=forks --maxWorkers=2`）、
+  `eslint src/` **0 error**（16 warning 全为存量，均不在本次改动文件）、
+  `npm run build` 成功（3.32s）。
+- **领地**：`dashboard-enterprise/src/views/AgentVersions.vue`、
+  `dashboard-enterprise/src/__tests__/{AgentVersions,event-handler-args}.test.js`、
+  本登记。分支 `fix/agent-versions-pagination`，worktree `F:/Nexus/MAOP-a11y`
+  （基于 `origin/master` `2ebc1667`）。
+- **不碰**：`py/**`、`.github/**`、`ROADMAP.md`、`CHANGELOG.md`、`e2e/`、MAOS 仓；
+  Qoder-CN 登记过的 `nav.js`/`App.vue`/`router/index.js`/`Licenses.vue`/
+  `Notifications.vue`/`stores/edition.js` 及其 4 个测试。
+- **下一批已核实靶点（本 PR 不动）**：全仓 50 个 `v-modal-a11y` 弹窗中 7 个缺
+  `@modal:escape` 监听（AgentVersions 2 / CredentialVault 2 / LongRunningTasks 1 /
+  Settings 2；`Run.vue:42` 有局部 `@keydown.escape`，另案）。且
+  `directives/modalA11y.js:9-10` 注释声称做焦点定向/还原，实现只有
+  `setAttribute`，而 `App.vue:313-320` 才派发 `modal:escape` —— 需先厘清
+  焦点管理归属，再单独一批修，不混入本 PR。
+
 ## 领地登记（ZCode session_f62ccbe…，2026-10-29 第五轮：M-X3 成本归因 M0）
 
 - **进行中**：ROADMAP「M-X3 细粒度成本归因」M0 后端切片（章程见 #177）。
