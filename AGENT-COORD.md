@@ -1,17 +1,20 @@
 ﻿# Agent Coordination（多代理工作区协调）
 
-> 2026-10-10 建立。本仓库（F:\Nexus\MAOP）曾有多个 Agent 会话并行工作。
-> **2026-10-10 更新：WorkBuddy 已关闭，本仓现由 ZCode（本会话）全权负责**——
-> 防撞纪律保留备用（将来若再开并行会话，照此执行）。
+> 2026-10-10 建立。本仓库（F:\Nexus\MAOP）采用多 Agent 会话并行工作。
+> **2026-11-05 更正：本仓为多线并行工作区，不存在「全权」会话**。
+> 原「WorkBuddy 已关闭 / ZCode 全权」是 2026-10-10 的临时状态，已被第十六～十八轮
+> 及本表后续各轮的实际并行登记推翻；防撞纪律对所有会话继续生效。
 
 ## 领地声明（按目录/文件粒度）
 
-| Agent | 状态 | 领地（文件/目录） |
+| Agent / 会话 | 状态 | 领地（以各轮「领地登记」为准） |
 |---|---|---|
-| ZCode（本会话） | **全权**（2026-10-10 起） | 全仓 |
-| WorkBuddy | **已关闭** | — |
+| ZCode `f62ccbe…` | **活跃**（第十八轮，2026-11-05） | `py/**`、`ROADMAP.md`、`CHANGELOG.md`、`docs/audits/**` 等 |
+| Qoder-CN `17ef022a` | **活跃**（response_model 棘轮线已收口） | `routers/*`、`*_schemas.py`、`py/tests/*` 等 |
+| Examples 会话 / Nex | **活跃**（前端 (c) 打磨，第三轮 2026-11-05） | `dashboard-enterprise/src/**` |
+| CommandCodeBot / MAOS 线 | **活跃** | MAOS 仓 `maop/enterprise/*`（SAML 线） |
 
-## 防撞纪律（双方遵守）
+## 防撞纪律（各会话共同遵守）
 
 1. **动工前**：`git fetch && git log --oneline origin/master -3` + `git status --short`——
    发现对方在跟踪文件里的未提交改动，**不要动那些文件**，在本文件追加条目等对方划掉。
