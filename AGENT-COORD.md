@@ -1,17 +1,20 @@
 ﻿# Agent Coordination（多代理工作区协调）
 
-> 2026-10-10 建立。本仓库（F:\Nexus\MAOP）曾有多个 Agent 会话并行工作。
-> **2026-10-10 更新：WorkBuddy 已关闭，本仓现由 ZCode（本会话）全权负责**——
-> 防撞纪律保留备用（将来若再开并行会话，照此执行）。
+> 2026-10-10 建立。本仓库（F:\Nexus\MAOP）采用多 Agent 会话并行工作。
+> **2026-11-05 更正：本仓为多线并行工作区，不存在「全权」会话**。
+> 原「WorkBuddy 已关闭 / ZCode 全权」是 2026-10-10 的临时状态，已被第十六～十八轮
+> 及本表后续各轮的实际并行登记推翻；防撞纪律对所有会话继续生效。
 
 ## 领地声明（按目录/文件粒度）
 
-| Agent | 状态 | 领地（文件/目录） |
+| Agent / 会话 | 状态 | 领地（以各轮「领地登记」为准） |
 |---|---|---|
-| ZCode（本会话） | **全权**（2026-10-10 起） | 全仓 |
-| WorkBuddy | **已关闭** | — |
+| ZCode `f62ccbe…` | **活跃**（第十八轮，2026-11-05） | `py/**`、`ROADMAP.md`、`CHANGELOG.md`、`docs/audits/**` 等 |
+| Qoder-CN `17ef022a` | **活跃**（response_model 棘轮线已收口） | `routers/*`、`*_schemas.py`、`py/tests/*` 等 |
+| Examples 会话 / Nex | **活跃**（前端 (c) 打磨，第三轮 2026-11-05） | `dashboard-enterprise/src/**` |
+| CommandCodeBot / MAOS 线 | **活跃** | MAOS 仓 `maop/enterprise/*`（SAML 线） |
 
-## 防撞纪律（双方遵守）
+## 防撞纪律（各会话共同遵守）
 
 1. **动工前**：`git fetch && git log --oneline origin/master -3` + `git status --short`——
    发现对方在跟踪文件里的未提交改动，**不要动那些文件**，在本文件追加条目等对方划掉。
@@ -307,6 +310,43 @@
 - **注意 `--shadow-card` 是浮层语义**（CoachMarks 遮罩 / NodeDetailPanel 抽屉在用），
   页面内卡片请用 `--shadow-surface`，别混。
 - **不碰**：`py/**`、`.github/**`、`routers/*_schemas.py`、MAOS 仓。
+
+## 领地登记（Examples 会话 / Nex，2026-11-05 第三轮：前端静默失败第五类 —— 事件参数污染）
+
+- **授权**：用户拍板前端下一批走 (c)「可达性 / a11y / 视觉打磨」（2026-10-31）。
+- **动手前核冲突**：直连 GitHub 实时状态 —— #180 已于 11-03 由 ZCode 第十六轮合并
+  （`742ffb3e`），`origin/master` = `2ebc1667`，Open PR 仅 #222
+  （`feat/mx1-m1-key-resolve`，领地 `py/**` + ROADMAP/CHANGELOG + 本表末尾追加段），
+  **不占前端域**。本登记插在本会话第二轮之后，避开 #222 的末尾追加锚点
+  （其两个 hunk 在 `@@ -51` 与 `@@ -759`），三方合并不冲突。
+- **修了什么**：`views/AgentVersions.vue` 三处裸事件绑定
+  （`@keyup.enter="load"` / `@change="load"` / `@click="load"`）把 DOM Event 当
+  `page` 传给 `load(page = 1)`。反向验证实测 URL 为
+  `page=%5Bobject+MouseEvent%5D` 与 `page=%5Bobject+KeyboardEvent%5D`
+  → 后端 422、列表空白且控制台无报错。改为显式 `load()` + 函数内
+  `Number.isInteger(page)` 类型收敛。既有 `AgentVersions.test.js` 的
+  「passes filters」只断言 agent_id/status，故长期漏网。
+- **守卫**：新增 `__tests__/event-handler-args.test.js`（扫 86 个 .vue / 102 处
+  裸绑定，禁止「裸绑定函数形参带默认值」；含自检与防空转）；
+  `__tests__/AgentVersions.test.js` 补 2 条 `page=1` 断言。
+  **反向验证**：还原旧实现 → 静态守卫 1 红、行为断言 2 红；恢复 → 全绿。
+- **验证**：vitest 全量 **77 files / 690 tests 全绿**（`--pool=forks --maxWorkers=2`）、
+  `eslint src/` **0 error**（16 warning 全为存量，均不在本次改动文件）、
+  `npm run build` 成功（3.32s）。
+- **领地**：`dashboard-enterprise/src/views/AgentVersions.vue`、
+  `dashboard-enterprise/src/__tests__/{AgentVersions,event-handler-args}.test.js`、
+  本登记。分支 `fix/agent-versions-pagination`，worktree `F:/Nexus/MAOP-a11y`
+  （基于 `origin/master` `2ebc1667`）。
+- **不碰**：`py/**`、`.github/**`、`ROADMAP.md`、`CHANGELOG.md`、`e2e/`、MAOS 仓；
+  Qoder-CN 登记过的 `nav.js`/`App.vue`/`router/index.js`/`Licenses.vue`/
+  `Notifications.vue`/`stores/edition.js` 及其 4 个测试。
+- **下一批已核实靶点（本 PR 不动）**：全仓 50 个 `v-modal-a11y` 弹窗中 7 个缺
+  `@modal:escape` 监听（AgentVersions 2 / CredentialVault 2 / LongRunningTasks 1 /
+  Settings 2；`Run.vue:42` 有局部 `@keydown.escape`，另案）。且
+  `directives/modalA11y.js:9-10` 注释声称做焦点定向/还原，实现只有
+  `setAttribute`，而 `App.vue:313-320` 才派发 `modal:escape` —— 需先厘清
+  焦点管理归属，再单独一批修，不混入本 PR。
+
 ## 领地登记（ZCode session_f62ccbe…，2026-10-29 第五轮：M-X3 成本归因 M0）
 
 - **进行中**：ROADMAP「M-X3 细粒度成本归因」M0 后端切片（章程见 #177）。
