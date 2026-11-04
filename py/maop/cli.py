@@ -10,6 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 import argparse
+import io
 import os
 import sys
 import time
@@ -552,11 +553,11 @@ def main() -> Any:
     # 报错路径自身都会连带崩溃（M-SIM GAP-4 第二层）。入口处强制 UTF-8，
     # 与 cli_adapter 的 subprocess 解码侧对称；errors="replace" 保证永不因
     # 编码中断运行。POSIX 本就 UTF-8，无行为变化。
+    # isinstance 收窄：sys.stdout 在真实管道上是 TextIOWrapper（有
+    # reconfigure）；被 pytest 等替换为捕获对象时跳过，其编码由宿主管理。
     for _stream in (sys.stdout, sys.stderr):
-        try:
+        if isinstance(_stream, io.TextIOWrapper):
             _stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, OSError, ValueError):
-            pass
 
     # Enable JSON structured logging when MAOP_JSON_LOG=1 (for ELK / Loki).
     if os.environ.get("MAOP_JSON_LOG", "0") == "1":
