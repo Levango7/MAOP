@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from maop.core.agent.delegation.depth import next_depth_env
+from maop.core.agent.usage_protocol import parse_usage_line
 from maop.core.reliability.error_schema import MaopResult, new_result
 from maop.delegate.models import AgentConfig, _escape_for_cmd, _escape_for_ps_command
 
@@ -144,12 +145,15 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
                         trace_id=trace_id, driver="cli", model=config.model,
                     )
                 duration_ms = streamer.duration_ms
+                # GAP-2 方案 A：协议行 → usage 回填（取值链 provider→协议行→启发式
+                # 的第二环）；无协议行时 parse 返回 None，行为与既往逐字节一致。
                 return new_result(
                     agent=config.name, task=prompt,
                     exit_code=exit_code,
                     stdout=streamer.stdout, stderr=streamer.stderr,
                     duration_ms=duration_ms, trace_id=trace_id,
                     driver="cli", model=config.model,
+                    usage=parse_usage_line(streamer.stdout),
                 )
 
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
@@ -163,6 +167,7 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
             stdout=out, stderr=err,
             duration_ms=duration_ms, trace_id=trace_id,
             driver="cli", model=config.model,
+            usage=parse_usage_line(out),
         )
     except asyncio.TimeoutError:
         if proc:

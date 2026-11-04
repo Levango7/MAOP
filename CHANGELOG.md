@@ -53,8 +53,15 @@ GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在�
 - **实跑 11/11 全绿**；证据与缺口见
   `docs/audits/business-sim-evidence-2026-11-04.md`：GAP-1 legacy 后端
   `run_workflow` 只规划不执行（`maop_plan.execute_workflow` 自认名不副实）；
-  GAP-2 双层计量口径分歧（provider 启发式 3185 vs 协议行回填 6924 tokens，
-  11 次调用——计费权威口径待裁）；GAP-3 子进程解析 maop 的环境地雷
+  GAP-2 双层计量口径分歧**已收口（方案 A）**——M0 时 provider 启发式 3185
+  vs 协议行 6924 tokens（同 11 次调用、两套口径互不对齐）：协议行 schema
+  升级为 `[USAGE] turns=N tokens=T source=S prompt=P completion=C`（新字段
+  追加在 `source=` 之后，既有解析器向后兼容），`usage_protocol.parse_usage_line`
+  为唯一权威解析点、`delegate/drivers._run_cli` 成功路径回填
+  `MaopResult.usage`，取值链 = provider 实测 → 协议行 → CJK 启发式；
+  `run_sim.reconcile_usage()` 硬断言两侧总量逐 token 相等（不等即演练退出
+  1）——全量三剧本 **11/11 成功 + 对账 5429==5429** 验证通过；GAP-3 子进程
+  解析 maop 的环境地雷
   （.pth 注入旧工作树 + 脚本目录取 py 差一层，已在 harness 内收口）；
   GAP-4 Windows 编码缺口（两层）——(a) `cli_adapter` 的
   `subprocess.run(text=True)` 未指定 encoding，Windows 管道 cp1252 下任何

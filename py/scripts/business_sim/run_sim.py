@@ -5,7 +5,8 @@ Runs three business-shaped scenarios through the REAL production path
 operator / Temporal executor) with a deterministic stub driver (no external
 LLM, no network), then collects ops evidence:
 
-- per-node ``[USAGE] turns/tokens/source`` protocol line (M3.1/M3.3 contract);
+- per-node ``[USAGE] turns/tokens/source[ prompt=P completion=C]`` protocol
+  line (M3.1/M3.3 + GAP-2 split contract);
 - cost_tracker persistence + M-X3 ``attribution_summary`` alignment;
 - alert_ingest record / read-back / count;
 - db_backup backup + restore openability (integrity_check).
@@ -31,7 +32,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-USAGE_RE = re.compile(r"\[USAGE\] turns=(\d+) tokens=(\d+) source=(\w+)")
+# GAP-2 拆分 schema：prompt/completion 为可选项（追加在 source= 之后）。
+# 旧格式（turns/tokens/source 三段）继续匹配——非行尾锚定，向后兼容。
+USAGE_RE = re.compile(
+    r"\[USAGE\] turns=(\d+) tokens=(\d+) source=(\w+)"
+    r"(?:\s+prompt=(\d+))?(?:\s+completion=(\d+))?"
+)
 
 SCENARIOS: dict[str, dict[str, Any]] = {
     "ticket_triage": {
@@ -152,8 +158,13 @@ def run_node(home: Path, py_dir: Path, agent: str, task: str, timeout_s: int = 1
     if matches:
         # 子进程 stdout 上有两条 [USAGE]：loop 层先行一条（tokens=0，provider
         # 无计费时）+ stub 协议行（真实计量的来源）。取最后一条 = 终态权威值。
-        turns, tokens, source = matches[-1]
+        # GAP-2 拆分组（prompt/completion）为可选——旧格式 stub / 老 agent 不打印。
+        turns, tokens, source, prompt, completion = matches[-1]
         usage = {"turns": int(turns), "tokens": int(tokens), "source": source}
+        if prompt:
+            usage["prompt"] = int(prompt)
+        if completion:
+            usage["completion"] = int(completion)
     return {
         "agent": agent,
         "task": task,
@@ -305,6 +316,28 @@ def collect_backup_evidence(home):
         return {"error": type(exc).__name__ + ": " + str(exc)}
 
 
+def reconcile_usage(scenarios, cost):
+    """GAP-2 收口硬判据：协议行申报总量 vs 成本对账表总量必须逐 token 相等。
+
+    修复前两套口径独立计算、互不对齐（M-SIM M0 实测 3185 vs 6924）；方案 A 把
+    协议行拆分（prompt/completion）回填 ``MaopResult.usage`` 后，
+    ``_budget_reconciliation`` 直接读实测（不再退启发式），两侧由同一 usage dict
+    派生——整数精确相等。protocol==0（全空）视为失配，防 vacuous pass。
+    """
+    protocol = 0
+    for sc in scenarios:
+        for r in sc["runs"]:
+            if r["status"] == "success" and r.get("usage"):
+                protocol += r["usage"].get("tokens", 0)
+    attr = cost.get("attribution_total", {})
+    cost_tokens = int(attr.get("tokens", 0) or 0) if isinstance(attr, dict) else 0
+    return {
+        "protocol_line_tokens": protocol,
+        "cost_table_tokens": cost_tokens,
+        "match": protocol > 0 and protocol == cost_tokens,
+    }
+
+
 def gaps_from_evidence(scenarios, cost):
     """Extract gaps from evidence (GAP-1 is code-confirmed before any run)."""
     gaps = [
@@ -316,25 +349,13 @@ def gaps_from_evidence(scenarios, cost):
             "cross-backend contract gap must be closed in E2-b."
         ),
     ]
-    tokens_from_usage = 0
-    for sc in scenarios:
-        for r in sc["runs"]:
-            if r["status"] == "success" and r.get("usage"):
-                tokens_from_usage += r["usage"].get("tokens", 0)
-    attr = cost.get("attribution_total", {})
-    if isinstance(attr, dict) and attr:
-        attr_tokens = int(attr.get("tokens", 0) or 0)
-        if attr_tokens != tokens_from_usage:
-            gaps.append(
-                "GAP-2 (measured): M-X3 attribution tokens=" + str(attr_tokens)
-                + " != protocol-line tokens=" + str(tokens_from_usage)
-                + " -- cost attribution vs execution-path metering mismatch."
-            )
-    else:
+    if not (isinstance(cost.get("attribution_total", {}), dict)
+            and cost.get("attribution_total")):
         gaps.append(
             "GAP-2 (measured): cost_tracker persistence/aggregation unavailable or "
             "empty (see cost evidence section) -- CostTracker wiring on the plain "
-            "maop-run path needs confirmation."
+            "maop-run path needs confirmation. 口径对齐本身由 "
+            "reconcile_usage() 硬断言把关（见 reconciliation 节）。"
         )
     return gaps + [
         (
@@ -394,6 +415,15 @@ def write_report(out: Path, evidence: dict) -> None:
             "```",
             "",
         ]
+    lines += [
+        "",
+        "## usage reconciliation (GAP-2 closure gate)",
+        "",
+        "```json",
+        json.dumps(evidence.get("reconciliation", {}), ensure_ascii=False, indent=2),
+        "```",
+        "",
+    ]
     lines += ["## exposed gaps", ""]
     for g in evidence["gaps"]:
         lines.append("- " + g)
@@ -432,6 +462,7 @@ def main(argv=None):
         "backup": collect_backup_evidence(home),
     }
     evidence["gaps"] = gaps_from_evidence(scenarios, evidence["cost"])
+    evidence["reconciliation"] = reconcile_usage(scenarios, evidence["cost"])
 
     out = Path(ns.out)
     write_report(out, evidence)
@@ -440,8 +471,15 @@ def main(argv=None):
     )
     total_ok = sum(s["success"] for s in scenarios)
     total = sum(s["executions"] for s in scenarios)
-    print("[business-sim] " + str(total_ok) + "/" + str(total) + " node-executions success; report -> " + str(out))
-    return 0 if total_ok == total else 1
+    rec = evidence["reconciliation"]
+    print("[business-sim] " + str(total_ok) + "/" + str(total) + " node-executions success; "
+          + "usage reconciliation " + str(rec["protocol_line_tokens"])
+          + " vs " + str(rec["cost_table_tokens"]) + " -> " + str(rec["match"])
+          + "; report -> " + str(out))
+    # GAP-2 收口：节点全 success 之外，计量口径对齐也是硬门禁。
+    if total_ok != total or not rec["match"]:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

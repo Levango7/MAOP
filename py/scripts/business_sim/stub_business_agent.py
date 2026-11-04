@@ -5,8 +5,9 @@
 
 - 输出确定性：同 ``--task`` 恒定同输出（token 数 = crc32(task) 取模，
   不用 random / 时间）；
-- 按协议回填计量：``[USAGE] turns=N tokens=T source=estimated``（与
-  ``maop/cli_run.py`` 的协议行同形，供 MaopLoop / operator 解析）；
+- 按协议回填计量：``[USAGE] turns=N tokens=T source=estimated prompt=P
+  completion=C``（GAP-2 拆分 schema；P/C 由同一 crc32 确定性派生，tokens=P+C，
+  供 MaopLoop / operator 与成本对账（取值链第二环）解析）；
 - 故障注入：``--fail-on SUBSTR`` 命中即非零退出（演练失败分支用）。
 
 用法::
@@ -49,7 +50,15 @@ def main(argv: list[str] | None = None) -> int:
 
     tokens = ns.tokens if ns.tokens > 0 else 100 + zlib.crc32(ns.task.encode("utf-8")) % 900
     print(_canned_reply(ns.task, ns.role))
-    print(f"[USAGE] turns={ns.turns} tokens={tokens} source=estimated")
+    # GAP-2 拆分：prompt/completion 由同一 crc32 确定性派生（ratio 60/40），
+    # tokens 恒等于 prompt+completion——成本对账侧（取值链第二环）读拆分，
+    # 总量口径与旧协议行一致。
+    prompt_tokens = tokens * 60 // 100
+    completion_tokens = tokens - prompt_tokens
+    print(
+        f"[USAGE] turns={ns.turns} tokens={tokens} source=estimated "
+        f"prompt={prompt_tokens} completion={completion_tokens}"
+    )
     return 0
 
 
