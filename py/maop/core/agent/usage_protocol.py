@@ -19,8 +19,9 @@ CLI agent 路径存在双层计量口径分歧——loop 层成本对账
 语义约定：prompt+completion 同时在位时 total 取二者之和（拆分是更细的契约，
 优先于粗粒度 ``tokens=``）；仅有 ``tokens=`` 时只申报 total——in/out 拆分
 未知，凭空拆分是不诚实的计费，成本侧继续走启发式并打 accuracy UNKNOWN 警告。
-范围注记：本批只接线 ``delegate/drivers._run_cli``（主派发链）；wrapper 驱动
-（.ps1 形态）后续同构接入。
+范围注记：接线面 = ``delegate/drivers`` 的 ``_run_cli``（2 处成功路径）与
+``_run_wrapper``（4 处：JSON 封装路径从 JSON 的 ``stdout`` 字段解析、raw
+回退路径从原文解析——协议行内嵌 JSON 时同样被读出）。
 """
 
 import re

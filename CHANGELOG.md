@@ -57,8 +57,10 @@ GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在�
   vs 协议行 6924 tokens（同 11 次调用、两套口径互不对齐）：协议行 schema
   升级为 `[USAGE] turns=N tokens=T source=S prompt=P completion=C`（新字段
   追加在 `source=` 之后，既有解析器向后兼容），`usage_protocol.parse_usage_line`
-  为唯一权威解析点、`delegate/drivers._run_cli` 成功路径回填
-  `MaopResult.usage`，取值链 = provider 实测 → 协议行 → CJK 启发式；
+  为唯一权威解析点、`delegate/drivers._run_cli`（2 处）与
+  `_run_wrapper`（4 处，2026-11-05 同批接线：JSON 封装路径自 JSON 的
+  stdout 字段解析）成功路径回填 `MaopResult.usage`，取值链 = provider 实测
+  → 协议行 → CJK 启发式；
   `run_sim.reconcile_usage()` 硬断言两侧总量逐 token 相等（不等即演练退出
   1）——全量三剧本 **11/11 成功 + 对账 5429==5429** 验证通过；GAP-3 子进程
   解析 maop 的环境地雷

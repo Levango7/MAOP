@@ -255,14 +255,18 @@ async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
                 try:
                     wrapper_result = json.loads(raw)
                     if "ok" in wrapper_result:
+                        json_stdout = wrapper_result.get("stdout", "")
                         return new_result(
                             agent=config.name, task=prompt,
                             exit_code=wrapper_result.get("exit_code", exit_code),
-                            stdout=wrapper_result.get("stdout", ""),
+                            stdout=json_stdout,
                             stderr=wrapper_result.get("stderr", ""),
                             error=wrapper_result.get("error"),
                             duration_ms=wrapper_result.get("duration_ms", duration_ms),
                             trace_id=trace_id, driver="wrapper", model=config.model,
+                            # GAP-2 均匀收尾：协议行可能内嵌在 JSON 的 stdout 字段，
+                            # 从最终 stdout 值解析（同 _run_cli 语义）。
+                            usage=parse_usage_line(json_stdout),
                         )
                 except (json.JSONDecodeError, ValueError) as exc:
                     logger.debug("drivers: wrapper streamer JSON parse failed: %s", exc)
@@ -272,6 +276,7 @@ async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
                     stdout=raw,
                     duration_ms=duration_ms, trace_id=trace_id,
                     driver="wrapper", model=config.model,
+                    usage=parse_usage_line(raw),
                 )
 
         stdout, _stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout + 10)
@@ -284,14 +289,16 @@ async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
         try:
             wrapper_result = json.loads(raw)
             if "ok" in wrapper_result:
+                json_stdout = wrapper_result.get("stdout", "")
                 return new_result(
                     agent=config.name, task=prompt,
                     exit_code=wrapper_result.get("exit_code", 0),
-                    stdout=wrapper_result.get("stdout", ""),
+                    stdout=json_stdout,
                     stderr=wrapper_result.get("stderr", ""),
                     error=wrapper_result.get("error"),
                     duration_ms=wrapper_result.get("duration_ms", duration_ms),
                     trace_id=trace_id, driver="wrapper", model=config.model,
+                    usage=parse_usage_line(json_stdout),
                 )
         except (json.JSONDecodeError, ValueError) as exc:
             logger.debug("drivers: wrapper JSON parse failed, falling back to raw output: %s", exc)
@@ -303,6 +310,7 @@ async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,
             stdout=raw,
             duration_ms=duration_ms, trace_id=trace_id,
             driver="wrapper", model=config.model,
+            usage=parse_usage_line(raw),
         )
     except asyncio.TimeoutError:
         if proc:

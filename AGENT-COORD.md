@@ -711,3 +711,29 @@
 - **待裁/不做**：GAP-1 legacy 后端收口归 E2-b（M-SIM M1 已入 ROADMAP）；
   D4/E1/license/MAOS 真机=外部条件；[Unreleased] 切版=发版裁决归用户。
 - **不碰**：他线在途 PR 领地；MAOS 主工作树（SAML 线活跃）。
+
+## 领地登记（ZCode session_f62ccbe6bb1a78cbe8412a088b6cfa3d，2026-11-05 第十八轮：自驱立项批——GAP-2 wrapper 均匀收尾 + M-X1 M1 + ROADMAP 头刷新）
+- **授权**：用户「确定没有其他agent认领，那就你来认领，立项吧」（2026-11-05）。
+  认领前已核：目标域（marketplace=本线第十四轮领地 / wrapper=本线第十七轮遗留 /
+  E2-b=无主）无他线条目；远端无相关在途分支；开放 PR #220（docs/coord-branch-prune，
+  他线 docs）不占本批域。串行链纪律（配额墙）：PR 逐条 CI→merge→下一条。
+- **立项清单**：① wrapper 驱动 usage 回填（GAP-2 均匀收尾，本批 PR-A）；
+  ② M-X1 M1——HTTPS 拉取通道 + 双钥宽限接线核查（PR-B；11-03 自驱批曾判
+  verify_with_key_management 已有实现+测试，动手前先侦察，若已实现则 M1 收窄为
+  HTTPS 拉取 + 消费侧接线/测试补强，避免重复劳动）；③ ROADMAP「当前状态」头
+  刷新（docs 快通道，PR-C 可并入 PR-B）。
+- **PR-A 改动**：`drivers._run_wrapper` 4 处成功路径回填 `usage=`（2 处 JSON
+  封装路径从 JSON 的 stdout 字段解析、2 处 raw 回退路径从原文解析）；drivers.py
+  790/800 行内；usage_protocol 范围注记同步。测试：`TestRunWrapper` +3 例
+  （真 .ps1 夹具，param 块声明全部 -File 命名参数；Windows 专属 skipif +
+  PowerShell 15s 冷启动预探测 skip——沿用 test_powershell_success 的 runner
+  环境守卫）。**工具链注记**：inline python 补丁里的反斜杠转义会被本机执行层
+  吃掉（两次实撞：`\n` 落盘成真换行/单反斜杠）——测试源一律 chr() 构造
+  （`_DQ/_SQ/_BS/_NL`），不复用转义序列。
+- **验证**：test_drivers 35/35（含 wrapper 3 例真执行）+ test_usage_protocol
+  13 例；ruff/mypy 无问题。
+- **领地**：`py/maop/delegate/drivers.py`（wrapper 4 处）、
+  `py/maop/core/agent/usage_protocol.py`（注记）、`py/tests/test_drivers.py`、
+  CHANGELOG GAP-2 段、`docs/audits/business-sim-evidence-2026-11-04.md`
+  遗留边界节、本登记。
+- **不碰**：他线在途 PR 领地（含 #220 分支）；MAOS 主工作树（SAML 线活跃）。
