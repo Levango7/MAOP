@@ -55,6 +55,25 @@ def marketplace_verify_key_path() -> str:
     return os.environ.get("MAOP_MARKETPLACE_VERIFY_KEY", "").strip()
 
 
+def marketplace_key_server_url() -> str:
+    """``MAOP_MARKETPLACE_KEY_SERVER_URL``：验签公钥 HTTPS 拉取端点（D2③，M-X1 M1）.
+
+    企业 distribution server 的 PEM 端点；仅当同时配置了
+    ``MAOP_MARKETPLACE_VERIFY_KEY_FP``（期望指纹钉扎）时通道才启用——
+    未钉指纹的拉取通道是 bootstrap 信任漏洞，fail-closed 拒绝。
+    """
+    return os.environ.get("MAOP_MARKETPLACE_KEY_SERVER_URL", "").strip()
+
+
+def marketplace_verify_key_fp() -> str:
+    """``MAOP_MARKETPLACE_VERIFY_KEY_FP``：HTTPS 拉取公钥的期望指纹（SHA-256）.
+
+    对行尾归一化（``\\r\\n`` → ``\\n``）后的 PEM 字节做 SHA-256 的十六进制
+    小写摘要；与拉取结果不符即拒绝该钥（见 ``core/marketplace/key_resolve.py``）。
+    """
+    return os.environ.get("MAOP_MARKETPLACE_VERIFY_KEY_FP", "").strip()
+
+
 def orchestration_backend() -> str:
     """``MAOP_ORCHESTRATION_BACKEND``：workflow 执行后端选择（M-X2 E2-a）.
 

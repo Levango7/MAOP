@@ -65,16 +65,30 @@ def cmd_mcp_marketplace(args: list[str]) -> Any:
     parsed = parser.parse_args(args)
 
     from maop.cli import _runtime_root  # 延迟导入：cli.py 是本模块的门面（re-export）
-    from maop.config.settings import marketplace_verify_key_path
-    from maop.core.marketplace.signing import PackageVerifier
+    from maop.config.settings import (
+        marketplace_key_server_url,
+        marketplace_verify_key_fp,
+        marketplace_verify_key_path,
+    )
+    from maop.core.marketplace.key_resolve import (
+        build_verifier,
+        resolve_marketplace_verify_key,
+    )
     from maop.core.mcp.mcp_marketplace import MCPMarketplace
     # Use the project-root config dir so reads/writes stay local to the project
     # (not the package-shipped default, which is read-only).
     config_path = _runtime_root() / "config" / "mcp_marketplace.yaml"
-    verify_key = marketplace_verify_key_path()
+    # M-X1 M1：三通道解析（env → 内置 → HTTPS 拉取，D2 优先级），不再是
+    # 单一 env 路径。pem=None = 全通道未配置/失败，验签语义随 require_signature。
+    key_pem = resolve_marketplace_verify_key(
+        _runtime_root(),
+        env_value=marketplace_verify_key_path(),
+        key_server_url=marketplace_key_server_url(),
+        expected_fp=marketplace_verify_key_fp(),
+    )
     mp = MCPMarketplace(
         config_path=config_path,
-        verifier=PackageVerifier(verify_key) if verify_key else None,
+        verifier=build_verifier(key_pem) if key_pem else None,
         require_signature=getattr(parsed, "require_signature", False),
     )
 

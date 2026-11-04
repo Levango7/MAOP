@@ -7,9 +7,15 @@
 
 ## 当前状态
 
-- **已发布**：v5.4.0（2026-10-12，minor）— **M2.2 首批**：多模态记忆（文本+图像 / CLIP 空间 / RRF 融合 / `MemoryFacade.store_multimodal` API，ADR-022）+ 三条防复发门禁（静默异常/文件规模/CHANGELOG，ADR-023）+ bandit Medium 债清零与安全修复（B615/B310/B103，CI 门禁恢复 `-ll`）+ T2.1 dry-run 验收达成。范围与顺延项见下方 v5.4.0 节。
-- **上一版**：v5.3.1（2026-10-10，patch）— PyPI 包元数据补全 + 发布链修复 + PyPI 首次上线。
-- **进行中**：v5.4.x/v5.5.0 —— M2.2 后续批次（B2：PG 路径与迁移、异步队列延迟达标；B3：音频/视频企业版；B4：NDCG 评测与可切换模型）+ 治理面（巨型文件拆分、keyring、suppress 语义审查）。
+- **已发布**：v5.5.0（2026-10-27，PyPI）— 社区版阶段三超前全落地
+  （Operator M0-M2.2 / Marketplace 签名 M0+首签 / 成本归因 M-X3 /
+  Temporal M0+E2-a），范围见下方 v5.5.0 节与 CHANGELOG。
+- **上一版**：v5.4.0（2026-10-12，minor）— M2.2 首批：多模态记忆
+  （ADR-022）+ 三条防复发门禁（ADR-023）+ bandit Medium 债清零。
+- **进行中**：GA 前收口——M-SIM 预生产演练（M0 已交付并抓到四真缺口：
+  GAP-2/GAP-4 已收口、GAP-1 归 E2-b）、M-X1 M1（2026-11-05 交付：
+  D2③ HTTPS 拉取）、M-X2 E2-b 深集成、M2.2 B2 余项、M-SIM M1
+  （kind operator 腿 + Temporal 腿 + 48h soak，另批）。
 - **v5.2.0**（2026-09-08，minor）— 自演化闭环 MVP 接入主循环（可观测/可审批/可回滚），闭环 API 面实测为 `evolve_insights.py` 的 6 个 `/api/evolution/*` 端点（旧文案"7 个 evolution API 端点"无出处，2026-10-05 已在下方 v5.2.0 节更正，此处当时漏改）；桌面调度集成；前端可访问性/token 化修复多轮。详见 [CHANGELOG](CHANGELOG.md)。
 - **v5.0.0**（2026-08-11，major）— 废弃清理 + 配置收敛 + 流式 Agent token 响应增强 + 迁移指南。含不兼容变更，详见 [MIGRATION-5.0.md](docs/migration-5.0.md)。
 - **双版架构**：自 2026-07-20 起采用单代码库 + 运行时 Edition 检测（详见 [ADR-016](docs/adr/016-dual-edition-architecture.md)）。

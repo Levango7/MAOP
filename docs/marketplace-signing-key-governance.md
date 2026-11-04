@@ -117,7 +117,10 @@
 
   （同批更新 ``test_mcp_marketplace.py`` 的默认值断言与观测面 warn——
   D4 步骤 3 的安装计数埋点随后续批次。）
-- **待落地（非阻塞）**：D2③ HTTPS 拉取通道（M1）；D3 的 7 天双钥宽限
+- **已落地（2026-11-05，M-X1 M1）**：D2③ HTTPS 拉取通道——
+  `core/marketplace/key_resolve.py`（运维覆盖语义三通道回退 + bootstrap
+  指纹钉扎 + SSRF 三闸，详见 CHANGELOG M-X1 M1 节）；原「待落地」项中
+- **待落地（非阻塞）**：D2③ ~~HTTPS 拉取通道~~（✅ 上行）；D3 的 7 天双钥宽限
   try 顺序验签（M1 小扩展）；D4 步骤 2 随发布切默认（见上）；npm 两条目
   的版本钉死 + checksum 补齐（见 deploy/marketplace/README.md 边界）。
 
