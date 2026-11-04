@@ -80,6 +80,35 @@ class TestRunCli:
         assert result.trace_id == "t1"
         assert result.duration_ms >= 0
 
+    async def test_cli_without_usage_line_keeps_none(self):
+        """GAP-2：老 agent 不打协议行 → usage=None（行为与既往逐字节一致）。"""
+        config = _config(cli="python", cli_args="-c \"print('ok')\"")
+        result = await _run_cli(config, "test", 10, ".", "t1")
+        assert result.usage is None
+
+    async def test_cli_split_protocol_line_backfills_usage(self):
+        """GAP-2 方案 A：agent stdout 的拆分协议行回填 MaopResult.usage。"""
+        code = (
+            "print('reply'); "
+            "print('[USAGE] turns=2 tokens=100 source=measured "
+            "prompt=70 completion=30')"
+        )
+        config = _config(cli="python", cli_args="-c \"" + code + "\"")
+        result = await _run_cli(config, "test", 10, ".", "t1")
+        assert result.exit_code == 0
+        assert result.usage == {
+            "prompt_tokens": 70,
+            "completion_tokens": 30,
+            "total_tokens": 100,
+        }
+
+    async def test_cli_legacy_protocol_line_backfills_total(self):
+        """旧三段格式：total 记账、拆分未知（成本侧继续走启发式，如实）。"""
+        code = "print('reply'); print('[USAGE] turns=1 tokens=520 source=estimated')"
+        config = _config(cli="python", cli_args="-c \"" + code + "\"")
+        result = await _run_cli(config, "test", 10, ".", "t1")
+        assert result.usage == {"total_tokens": 520}
+
 
 class TestRunCmd:
     @pytest.mark.asyncio
