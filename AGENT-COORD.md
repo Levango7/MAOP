@@ -679,3 +679,24 @@
   D4 发布窗口开关、E1 云资源、真实客户 license、MAOS 真机验证=外部条件，
   无用户指令不动。
 - **不碰**：他线在途 PR 领地；MAOS 主工作树（SAML 线活跃）。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-04：已合并分支清理）
+
+- **做了什么**：本地分支 `64 → 32`、远端分支 `85 → 40`。判据三条**同时**成立才删：
+  tip 是 `origin/master` 祖先（逐条 `merge-base --is-ancestor` 实测）、tip 日期早于
+  2026-11-04（今天刚合的算“未证明陈旧”）、名字未被任何 worktree 检出。本地一律
+  `git branch -d`（未并入删不动，天然带保护），远端 `git push origin --delete` 分 4 批
+  共 46 条，删后逐条核对 0 条漏删。
+- **保留项**：27 条尚未并入 master 的在途基线（含 `main`、`refactor/layering-closeout`、
+  `feat/cost-attribution-m0` 等）、7 条今天刚推的（含我操作期间 ZCode 新推的
+  `feat/gap2-usage-reconciliation`）、4 条虽已并入但正被 worktree 检出的
+  （`feat/alertmanager-persistence`、`feat/mcp-enabled-auto-connect`、
+  `fix/chat-stream-field`、`fix/notifications-pagination-query`）——删它们会让别人的
+  push 丢掉 upstream，属他线状态，我不动。
+- **要回收怎么办**：被删的远端 tip 与本地 tip 都是 master 祖先（抽查 `ce206ce9`、
+  `941c9603`、`88623431`、`f12f3d5c` 四条全部 `merge-base --is-ancestor` 通过），
+  提交永久可达；谁的本地还留着对应分支，`git push -u origin <branch>` 直接重建，
+  只剩 sha 的话 `git branch <名字> <sha>` 就能复原，不依赖 reflog 时限。
+- **未做**：没碰任何 worktree 的未提交文件（`MAOP-op` 9 个、`MAOP-nav` 9 个原样）；
+  今天合并的 `docs/coord-round16`、`docs/k8s-operator-status`、`feat/business-sim-m0`
+  一条没删。
