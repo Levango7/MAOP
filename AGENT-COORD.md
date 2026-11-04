@@ -630,3 +630,52 @@
   `feat/marketplace-catalog-checksums` 与 `docs/coord-round15-211`
   已用本地分支推回 origin 恢复；后续一律不删合并后的远端分支。
 - **不碰**：他线在途 PR 领地；MAOS 主工作树（SAML 线活跃）。
+
+## 领地登记（ZCode session_f62ccbe…，2026-11-04 第十六轮：自驱项——六条已知问题 PR 清盘 + M-SIM M0 预生产演练）
+
+- **背景**：用户授权「自己决策、解决现有的已知的问题」（无他线活动）+
+  「可以立项的就立项」+ 双轨 CI「确定没有风险那就这样做」。本批无任何
+  争用区写入（全部落在既认领/无主文件），未与他线碰撞。
+- **六条已知问题 PR 全部清盘**（merge-commit 风格，master 链
+  `#207 → #216 → #180 → #196 → #195 → #206 → #215 → #217`，
+  收官 tip `f9aa6b27`）：
+  - `#207` npm minor 依赖批；`#216` CodeArts 协调登记（#197 关闭后代合）；
+  - `#180` nav.js 语义冲突=并集解（门控标志+去重图标都保，51 图标唯一）；
+  - `#196` ruff 修复（unittest.mock 归 stdlib）；`#195` 适配器契约一致性
+    测试 93 例；`#206` pytest 全红根因=口径漂移（ci.yml pin 同笔跟进 +
+    lock 镜像 pyproject 上限）；`#215` k8s operator 10 文件横幅
+    PLANNED→PARTIALLY IMPLEMENTED。
+- **M-SIM M0 预生产演练交付（PR #217）**：确定性 stub（零 LLM/网络）×
+  三个业务剧本经生产路径 `maop.cli run` 实跑 11/11 全绿；证据链
+  cost/alert/backup 全通（`docs/audits/business-sim-evidence-2026-11-04.md`）；
+  抓到 4 个真缺口：GAP-1 legacy `run_workflow` 只规划不执行、GAP-2 双层
+  计量口径分歧（待用户裁决修复方案）、GAP-3 子进程解析环境地雷、
+  **GAP-4 两层 Windows 编码缺口（本批最大收益，见下）**。ROADMAP 登记
+  M-X1/M-X2/M2.2 立项 + M-SIM M1 章程。
+- **GAP-4 两层 Windows 编码缺口（生产路径缺陷，已修）**：
+  (a) `cli_adapter` `subprocess.run(text=True)` 无 encoding——Windows
+    管道 cp1252 下任何非 ASCII 输出的 CLI agent 必炸；
+  (b) `maop/cli.py` 入口自身 stdout 同走 cp1252——loop 打印含中文
+    失败信息时连 `[FAIL] run 失败` 报错路径自身连带崩溃（CI stderr
+    自证）。修复=cli_adapter 显式 UTF-8 + cli.py 入口
+    `isinstance(stream, io.TextIOWrapper)` 收窄 reconfigure +
+    stub/child_env 双保险。**教训**：本机全局 `PYTHONUTF8=1`+
+    `PYTHONIOENCODING=utf-8` 是「本地全绿、CI 全红」的成因，复现须
+    `PYTHONIOENCODING=cp1252`；修复在「环境变量全被压制」的最严模拟下
+    4/4 通过才推。
+- **CI 教训（本批实证）**：(1) PR `base.sha` 钉死在开 PR 时刻——head
+    落后 master 时 `base..head` diff 反向计入 master 增量 ⇒ 误判 code
+    跑全矩阵；docs 快通道正确获取=先 rebase 到当前 master 再推（#197→
+    #216 实证）。(2) 账号 ≈20 job/小时配额墙——多 PR 全矩阵并发互掐
+    单 job（runner 侧取消）；对策=串行 CI→merge 或 `rerun --failed`
+    保绿腿补取消腿（双轨 ≤2 并发约 45 job/h，本批全程零浪费）。(3)
+    自驱修 CI 红须先分诊「真红 vs 取消假象」——看 job conclusion 而非
+    run conclusion。
+- **领地**：`py/scripts/business_sim/`、`py/maop/cli.py` 入口段、
+  `cli_adapter.py`、`docs/audits/business-sim-*`、CHANGELOG 本批段、
+  ROADMAP M-SIM 节。
+- **待裁/不做**：GAP-2 计费权威口径（推荐方案 A：协议行 schema 升级
+  prompt/completion 拆分 + provider→协议行→启发式取值链）等用户一句话；
+  D4 发布窗口开关、E1 云资源、真实客户 license、MAOS 真机验证=外部条件，
+  无用户指令不动。
+- **不碰**：他线在途 PR 领地；MAOS 主工作树（SAML 线活跃）。
