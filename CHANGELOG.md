@@ -59,6 +59,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   是否纳入与分期方式交 owner 裁决——本段只登记"测试代码里的边界缺陷没有
   任何类型门禁兜底"这一成因。
 
+### 集成页按能力探针门控（n8n，2026-11-05）
+
+`/operate/integrations` 此前只在页面内用 `!edition.isEnterprise` 挡：个人版
+导航仍显示入口、点进去是"需要企业版"死胡同；企业版但未启用 `N8N_INTEGRATION`
+时 router 整块不注册，管理员也只能看到一串 404。改为与通知收件箱同一套
+能力探针语义：
+
+- `edition` store 抽出 `createAvailabilityProbe`（404=端点未注册；401/403=未知，
+  不能当证据；其它含 5xx=已注册），新增 `n8nAvailable` +
+  `checkN8nAvailability()`（探针 `GET /api/n8n/health`；n8n router 仅在
+  `N8N_INTEGRATION` 打开时注册）。
+- 导航与路由同步标记：`nav.js` 的 integrations 项与 `/operate/integrations`
+  路由均带 `capability: 'n8n'`；路由守卫改为"能力名→探针"查表（不再硬编码
+  notifications），未登记能力名按未知放行。
+- 页面 `onMounted` 先等探针结论：404 显示"n8n 集成未安装"并跳过业务请求；
+  未知/403 保留原有 edition 提示。
+- 测试：store 探针三态与缓存、路由守卫 n8n 分支、导航/路由 lockstep、页面
+  404 不发业务请求。变异反证四项（去 nav 标记 / 守卫忽略能力 / 404 判可用 /
+  页面忽略 engineMissing）全部转红，还原后逐字节一致；前端全量 696 例通过。
+- **边界**：`relay_platform` 后端有 `/api/relay-platforms`，但前端无任何消费面
+  （`git grep relay-platforms --include=*.js --include=*.vue` 0 命中），不满足
+  "页面门控"的适用条件——本批只登记结论，不新建页面。
+
 ### M-SIM 模拟业务场景预生产演练 M0（2026-11-04）
 
 GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在等不来真实客户/云
