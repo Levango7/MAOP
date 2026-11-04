@@ -81,7 +81,7 @@ export const nav = [
   { to: '/operate/blackboard', label: 'nav.blackboard', icon: 'clipboard', subtitle: 'nav.blackboard.subtitle' },
   { to: '/operate/alerts', label: 'nav.alertRules', icon: 'alert', subtitle: 'nav.alertRules.subtitle' },
   { to: '/operate/webhooks', label: 'nav.webhooks', icon: 'link', subtitle: 'nav.webhooks.subtitle' },
-  { to: '/operate/integrations', label: 'nav.integrations', icon: 'share2', subtitle: 'nav.integrations.subtitle' },
+  { to: '/operate/integrations', label: 'nav.integrations', icon: 'share2', subtitle: 'nav.integrations.subtitle', capability: 'n8n' },
 
   // ── 分析（IA 新增组：数据分析仪表盘）──────────────────────────
   { section: 'nav.group.analysis' },

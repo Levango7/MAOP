@@ -26,6 +26,12 @@
               <Skeleton block height="44px" />
             </div>
             <EmptyState
+              v-else-if="engineMissing"
+              icon="lock"
+              :title="t('view.integrations.notInstalled')"
+              :description="t('view.integrations.notInstalledDesc')"
+            />
+            <EmptyState
               v-else-if="requiresEnterprise"
               icon="lock"
               :title="t('view.integrations.requiresEnterprise')"
@@ -84,7 +90,13 @@
           <!-- Stats overview -->
           <Card :title="t('view.integrations.stats.title')" icon="activity" margin-bottom="var(--sp-4)">
             <EmptyState
-              v-if="requiresEnterprise"
+              v-if="engineMissing"
+              icon="lock"
+              :title="t('view.integrations.notInstalled')"
+              :description="t('view.integrations.notInstalledDesc')"
+            />
+            <EmptyState
+              v-else-if="requiresEnterprise"
               icon="lock"
               :title="t('view.integrations.requiresEnterprise')"
               :description="t('view.integrations.requiresEnterpriseDesc')"
@@ -300,9 +312,11 @@ const api = useApiStore();
 const edition = useEditionStore();
 const { t } = useI18n();
 const toast = useToast();
-// n8n 路由由 FeatureFlag 门禁：个人版请求必然 404。与 AlertRules.vue 同款
-// 处理——不发无意义的请求，直接说明需要企业版。
+// n8n router 只在企业 overlay 且 N8N_INTEGRATION 打开时注册：探针 404 就是
+// "这块端点不存在"的权威信号（比 edition 字符串准——企业版也可能没开该特性）。
+// 探针未知/401/403 时不发业务请求，保留原来的 edition 提示。
 const requiresEnterprise = computed(() => !edition.isEnterprise);
+const engineMissing = computed(() => edition.n8nAvailable === false);
 
 // ── Tab state ───────────────────────────────────────────────────
 const activeTab = ref('workflows');
@@ -509,8 +523,9 @@ async function loadAll() {
   loading.value = false;
 }
 
-onMounted(() => {
-  if (requiresEnterprise.value) {
+onMounted(async () => {
+  await edition.checkN8nAvailability();
+  if (requiresEnterprise.value || engineMissing.value) {
     loading.value = false;
     return;
   }

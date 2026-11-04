@@ -20,6 +20,8 @@ export const messages = {
     // ── Edition gate ─────────────────────────────────────────────
     'view.integrations.requiresEnterprise': 'n8n integration requires the Enterprise edition',
     'view.integrations.requiresEnterpriseDesc': 'This feature is gated by the N8N_INTEGRATION capability. Switch to Enterprise to manage workflows and executions.',
+    'view.integrations.notInstalled': 'n8n integration is not installed',
+    'view.integrations.notInstalledDesc': 'The n8n endpoints are registered only when the enterprise overlay is installed and N8N_INTEGRATION is enabled. This install does not expose them.',
 
     // ── Tabs ─────────────────────────────────────────────────────
     'view.integrations.tab.workflows': 'Workflows',
@@ -110,6 +112,8 @@ export const messages = {
     // ── 版本门禁 ─────────────────────────────────────────────────
     'view.integrations.requiresEnterprise': 'n8n 集成需要企业版',
     'view.integrations.requiresEnterpriseDesc': '该功能由 N8N_INTEGRATION 能力门禁。切换到企业版后可管理工作流与执行记录。',
+    'view.integrations.notInstalled': 'n8n 集成未安装',
+    'view.integrations.notInstalledDesc': 'n8n 端点仅在安装企业 overlay 且启用 N8N_INTEGRATION 时注册，当前安装没有暴露这些端点。',
 
     // ── 标签页 ───────────────────────────────────────────────────
     'view.integrations.tab.workflows': '工作流',

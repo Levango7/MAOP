@@ -2,6 +2,13 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { useEditionStore } from '../stores/edition.js';
 import { fetchWithTimeout } from '../stores/api.js';
 
+// 能力名 → edition store 里的探针状态字段 / 补探 action。
+// 未登记的能力名按"未知"放行：宁可多一次 404 体验，也不凭猜测改用户能走的路。
+const CAPABILITY_PROBES = {
+  notifications: { state: 'notificationsAvailable', check: 'checkNotificationsAvailability' },
+  n8n: { state: 'n8nAvailable', check: 'checkN8nAvailability' },
+};
+
 const routes = [
   // ═══ 2026-09-01 信息架构重设计：5 组任务流导航（一号用户驱动）═══
   // 每个顶层路径挂载现有 View（零 View 改动），旧路径全部 301 重定向。
@@ -57,7 +64,7 @@ const routes = [
   { path: '/operate/blackboard', name: 'blackboard', component: () => import('../views/Blackboard.vue') },
   { path: '/operate/alerts', name: 'alert-rules', component: () => import('../views/AlertRules.vue') },
   { path: '/operate/webhooks', name: 'webhooks', component: () => import('../views/Webhooks.vue') },
-  { path: '/operate/integrations', name: 'integrations', component: () => import('../views/Integrations.vue') },
+  { path: '/operate/integrations', name: 'integrations', component: () => import('../views/Integrations.vue'), meta: { requiresCapability: 'n8n' } },
 
   // ── 分析（IA 新增组：数据分析仪表盘）──
   { path: '/analysis', name: 'analysis', component: () => import('../views/Analysis.vue') },
@@ -215,17 +222,20 @@ router.beforeEach((to) => {
   //     if (!loggedIn) return { name: 'login' };
   //   }
 
-  // 能力门（目前只有通知收件箱）：探针判定"端点整块不存在"才挡，未知放行
-  // 并顺手补一次探针——结果在 store 里缓存，不会每次导航都发请求。
-  // 不能套用下面的 edition 判断：edition 端点是 admin-only，企业版的普通
-  // 用户只会拿到 personal，可他读收件箱的权限本来就有。
+  // 能力门：探针判定"端点整块不存在"才挡，未知放行并顺手补一次探针——结果
+  // 在 store 里缓存，不会每次导航都发请求。不能套用下面的 edition 判断：
+  // edition 端点是 admin-only，企业版的普通用户只会拿到 personal，可他读收件箱
+  // 的权限本来就有；n8n 集成同理是 overlay 注册与否的问题，不是 edition 字符串。
   if (to.meta.requiresCapability) {
+    const probe = CAPABILITY_PROBES[to.meta.requiresCapability];
     let available = null;
-    try {
-      const st = useEditionStore();
-      available = st.notificationsAvailable;
-      if (available === null) st.checkNotificationsAvailability();
-    } catch { /* ignore */ }
+    if (probe) {
+      try {
+        const st = useEditionStore();
+        available = st[probe.state];
+        if (available === null) st[probe.check]();
+      } catch { /* ignore */ }
+    }
     if (available === false) return '/home';
   }
 

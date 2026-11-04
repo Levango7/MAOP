@@ -235,6 +235,49 @@ describe('useEditionStore', () => {
       expect(global.fetch).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('checkN8nAvailability', () => {
+    function answer(status) {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: status >= 200 && status < 400,
+        status,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve('{}'),
+      });
+    }
+
+    it('reads 404 as "n8n router not registered"', async () => {
+      // 企业 overlay 未装或 N8N_INTEGRATION 关闭时 n8n router 整块不注册
+      const store = useEditionStore();
+      answer(404);
+      expect(await store.checkN8nAvailability()).toBe(false);
+      expect(store.n8nAvailable).toBe(false);
+    });
+
+    it('reads a registered endpoint as available', async () => {
+      const store = useEditionStore();
+      answer(200);
+      expect(await store.checkN8nAvailability()).toBe(true);
+    });
+
+    it('keeps 403 unknown — n8n endpoints are admin-only', async () => {
+      // 企业版安装上的普通用户会被 require_admin 挡成 403；这不能当"没装"的证据
+      const store = useEditionStore();
+      answer(403);
+      expect(await store.checkN8nAvailability()).toBe(null);
+      expect(store.n8nAvailable).toBe(null);
+      answer(404);
+      expect(await store.checkN8nAvailability()).toBe(false);
+    });
+
+    it('caches the verdict so the probe fires once', async () => {
+      const store = useEditionStore();
+      answer(200);
+      await store.checkN8nAvailability();
+      await store.checkN8nAvailability();
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe('useApiStore auth header injection', () => {

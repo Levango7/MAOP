@@ -192,5 +192,7 @@ describe('nav coverage', () => {
     expect([...navMarks.values()].filter((v) => v.enterprise).length).toBeGreaterThanOrEqual(9);
     expect(navMarks.get('/notifications')).toEqual({ enterprise: false, capability: 'notifications' });
     expect(navMarks.get('/notifications/config').enterprise).toBe(true);
+    // 集成页的端点随 n8n router 注册与否整块出现/消失，不能按 edition 猜
+    expect(navMarks.get('/operate/integrations')).toEqual({ enterprise: false, capability: 'n8n' });
   });
 });
