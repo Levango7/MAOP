@@ -848,3 +848,30 @@
   持久队列的可靠性接线（envelope/重试/毒丸隔离面）。
 - **master push run 教训复证**：b684d70e 的 run 级 queued 长达 30+ min，
   job 视图 11 success/7 in_progress——「run 级 queued ≠ 没跑」再次实证。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-05：A/B 收口 + C 认领 / E 让行）
+
+- **授权**：用户「这几个要是没有人认领，那就都给你认领吧，注意不要和其他 agent
+  产生冲突」。
+- **认领前核查**（origin/master=`e5f3cc7f`，开放 PR 仅 #225）：
+  - A/B 域（`py/tests/dashboard_app_profiles.py`、本批新增测试、CHANGELOG/本板）：
+    板面无他线条目。
+  - **E（M2.2 B2 余项）已由他线认领**：ZCode 第十九轮登记「M2.2 B2 余项：异步队列
+    的进程间接线」，PR #225（`feat/m22b2-queue-wiring`，tip `1e53bab1`；写就时开放中，已合入 `e62bc098`）⇒
+    本线不做，避免重复劳动。
+  - C（capability 门禁推广）板面无主；a11y 会话已声明不碰本线前端文件
+    （`nav.js`/`App.vue`/`router/index.js`/`Licenses.vue`/`Notifications.vue`/
+    `stores/edition.js` 及其测试）⇒ 本线认领，待本 PR 落地后另开分支。
+- **A 交付**：`overlay_probe()` 子进程边界形状校验（形状不符即抛，不把 `Any`
+  递给下游）；新增 `py/tests/test_dashboard_app_profiles.py` 6 例；变异反证
+  （去掉校验 → 4 例转红；还原后逐字节一致）。
+- **B 登记（不动门禁）**：CI mypy 只跑 `maop/`，`tests/` 不在检查面；本机 mypy
+  2.4.0 实测（CI 钉 2.4.1）589 errors / 162 files（checked 495）。量化写进
+  CHANGELOG 本批段，唤醒与否交 owner 裁决。
+- **C 立项**：`integrations`（n8n）与 `relay_platform` 页复刻 notification 的
+  capability 探针门控（404=未安装 / 401·403=未知 / 其余=可用），nav+router 双门
+  + lockstep 测试；分支独立，不改 CI。
+- **领地**：`py/tests/dashboard_app_profiles.py`、
+  `py/tests/test_dashboard_app_profiles.py`、CHANGELOG `[Unreleased]` 本批段、
+  本登记。
+- **不碰**：#225 及 ZCode 第十九轮三线领地、MAOS 主工作树。
