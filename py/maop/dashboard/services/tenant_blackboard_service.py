@@ -2,11 +2,20 @@
 
 Provides tenant management operations that use the M3
 ``TenantBlackboard`` / ``TenantContext`` / ``RBACPermission`` infrastructure.
+
+Authorization: when the enterprise package is installed, the M3 enforcer comes
+from ``maop.enterprise.rbac_m3_adapter.create_m3_enforcer()`` and is injected
+explicitly at construction time (option B in the MAOS readiness doc — MAOS
+exports the factory and MAOP injects it; MAOP imports the adapter lazily, so
+enterprise is never a hard dependency at module scope). Without it,
+``TenantBlackboard`` falls back to ``FallbackRBACEnforcer``, which is
+fail-closed.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from typing import Any
 
 from maop.core.reliability.blackboard import get_blackboard
@@ -18,6 +27,11 @@ from maop.core.reliability.coordination_tenant import (
 
 logger = logging.getLogger(__name__)
 
+#: Roles that MAOP's own auth layer grants to an operator. Used to derive
+#: blackboard permissions in the personal edition, which has no enterprise
+#: grant table; the enterprise enforcer ignores this and consults MAOS.
+_PRIVILEGED_ROLES = frozenset({"admin", "superadmin"})
+
 
 def _admin_ctx(tenant_id: str = "system") -> TenantContext:
     """Create a superadmin TenantContext for backend operations."""
@@ -27,6 +41,61 @@ def _admin_ctx(tenant_id: str = "system") -> TenantContext:
         roles=frozenset({"superadmin"}),
         permissions=frozenset(RBACPermission),
     )
+
+
+def context_for_caller(
+    tenant_id: str,
+    user_id: str,
+    roles: Iterable[str] = (),
+) -> TenantContext:
+    """Build the calling user's ``TenantContext`` for a tenant-scoped read.
+
+    ``permissions`` are only meaningful in the personal edition (the fallback
+    enforcer reads them); with the enterprise enforcer injected, MAOS's own
+    grant table decides. Non-privileged roles therefore get **no permissions at
+    all**, so a missing grant denies rather than defaulting open.
+    """
+    role_set = frozenset(roles)
+    permissions = (
+        frozenset({RBACPermission.BB_READ})
+        if role_set & _PRIVILEGED_ROLES
+        else frozenset()
+    )
+    return TenantContext(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        roles=role_set,
+        permissions=permissions,
+    )
+
+
+def resolve_m3_enforcer() -> Any | None:
+    """Return the enterprise M3 enforcer, or ``None`` to use the fallback.
+
+    Reuses the process-wide ``rbac_service.get_rbac_manager()`` singleton — the
+    adapter's own default would open a *second* RBAC store handle (PG-first with
+    a ``data/rbac.db`` fallback), which is exactly what its docstring warns
+    against. The adapter is imported lazily so a personal build stays importable
+    without the enterprise package.
+    """
+    try:
+        from maop.dashboard.services import rbac_service
+        from maop.enterprise.rbac_m3_adapter import create_m3_enforcer
+    except ImportError:
+        logger.debug(
+            "[tenant-blackboard] 企业版 M3 适配器不可用（个人版），沿用 FallbackRBACEnforcer"
+        )
+        return None
+    try:
+        manager = rbac_service.get_rbac_manager()
+    except Exception as exc:
+        # Feature flag off / store unavailable. Returning None silently degrades
+        # authorization, so say it out loud.
+        logger.warning(
+            "[tenant-blackboard] RBACManager 不可用，M3 鉴权退回 fallback: %s", exc
+        )
+        return None
+    return create_m3_enforcer(manager)
 
 
 def list_tenants() -> list[dict[str, Any]]:
@@ -55,16 +124,28 @@ def list_tenants() -> list[dict[str, Any]]:
     return list(tenants.values())
 
 
-def get_tenant(tenant_id: str) -> dict[str, Any]:
+def get_tenant(tenant_id: str, *, caller: TenantContext | None = None) -> dict[str, Any]:
     """Get detailed info about a single tenant.
 
-    Includes a per-domain snapshot and recent history. The superadmin context
-    here reads *another* tenant's data, which is only safe because the router
-    puts ``require_admin`` in front of it.
+    Includes a per-domain snapshot and recent history.
+
+    ``caller`` is the authenticated user's context; pass ``None`` only when
+    there is no identity boundary at all (auth disabled — personal single-user
+    mode), in which case the historical superadmin context is kept. With a
+    caller, the enterprise enforcer is injected when available, so MAOS's own
+    grant table becomes authoritative — see ``resolve_m3_enforcer``.
+
+    Raises ``PermissionError`` when the caller lacks ``blackboard:read`` on
+    this tenant.
     """
     bb = get_blackboard()
-    ctx = _admin_ctx(tenant_id=tenant_id)
-    tbb = TenantBlackboard(bb, ctx)
+    if caller is None:
+        ctx = _admin_ctx(tenant_id=tenant_id)
+        enforcer: Any | None = None
+    else:
+        ctx = caller
+        enforcer = resolve_m3_enforcer()
+    tbb = TenantBlackboard(bb, ctx, enforcer=enforcer)
 
     # Filter snapshot to this tenant
     snap: dict[str, Any] = dict(tbb.get_snapshot())
