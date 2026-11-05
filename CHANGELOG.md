@@ -95,6 +95,30 @@ GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在�
 - 章程与 M1（kind operator 腿 / Temporal 腿 / 48h soak 串联）见 ROADMAP
   「M-SIM」节；另登记 M-X1 M1 / M-X2 E2-b / M2.2 B2 余项（用户授权立项）。
 
+### M-SIM M1 —— kind operator 腿 + Temporal 后端腿 + 48h soak（2026-11-05）
+
+章程 M1 三腿落地（soak 长跑中，期满补证据节）：
+
+- **kind 腿**：MaopTask CR ×3 全 Succeeded，`tokensUsed=976/1348/639`
+  **tokensSource=measured**——GAP-2 方案 A 在集群形态直接验证（M-T3.3 时代
+  为 0/estimated）。抓到并修复三条真缺口：
+  ① chart RBAC 缺 `apiextensions.k8s.io/customresourcedefinitions` 只读
+  （kopf 启动 403 重试 9 次）—— ClusterRole 补规则；
+  ② `.dockerignore` 排除 `py/scripts/` 致业务模拟 stub 不在镜像——
+  `!py/scripts/business_sim/` 反排除（kind/验收驱动的运行件）；
+  ③ chart webhook TLS Secret 不由 chart 创建、缺失即 Pod 永久
+  ContainerCreating——README 补前置说明（无证书环境
+  `--set webhook.enabled=false`）。
+- **Temporal 腿**：`maop workflow run m1-ticket` 三节点 DAG 经 dev server
+  （CLI v1.10.0/Server 1.32.2）3/3 success；成本台账三 agent 齐全且
+  prompt+completion==total 逐行成立。
+- **GAP-5（新发现，已复现，待修）**：特定英文文本触发 loop 计划/校验
+  分支后 `MaopResult.model/usage` 丢失 ⇒ 成本对账静默缺行（`run_events`
+  无 run.cost）；中文 M0 原文不触发。修法与验收判据见
+  `docs/audits/business-sim-m1-evidence.md`。
+- 证据：`docs/audits/business-sim-m1-evidence.md`（kind 复现配方 +
+  Temporal 结果 + GAP-5 复现条件）。
+
 ### M2.2 B2 余项收口 —— Facade 层异步摄入入口（2026-11-05）
 
 立项侦察修正（与 M-X1 M1 双钥宽限同款教训）：「异步队列的进程间接线」主体
