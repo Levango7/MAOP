@@ -38,6 +38,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [Unreleased]
+
+### 门禁：`overlay_probe` 子进程输出形状校验（2026-11-05）
+
+企业版 profile 棘轮唯一的跨进程输入是 `py/tests/dashboard_app_profiles.py` 的
+`overlay_probe()`：它把探针子进程 stdout 最后一行 `json.loads` 后直接按
+`dict[str, str]` 返回，下游 `overlay_only_modules()` 靠值区分 `'ok'` 与"缺失
+模块名"。子进程输出属于系统边界——JSON 合法但形状漂移（顶层列表/裸字符串/
+数值/null）会被当成"路由可用"或"缺失"，把门禁盲区伪装成通过。
+
+- `overlay_probe()` 解析后校验顶层为 dict 且键值均为 str，否则抛
+  `RuntimeError(unexpected shape)`；非零退出仍是原来的硬错误，不降级成空探针。
+- 新增 `py/tests/test_dashboard_app_profiles.py` 6 例：正常映射（含前置噪音行）、
+  4 种畸形载荷、子进程失败。变异反证：临时去掉校验后 4 例转红，还原后逐字节一致。
+- **类型检查面现状（量化登记，不改动门禁）**：CI 的 mypy 步骤只跑 `mypy maop/`，
+  `tests/` 不在检查面内；本机 mypy 2.4.0 实测（CI 钉 2.4.1）`mypy tests/` =
+  **589 errors / 162 files（checked 495）**。唤醒该门禁会一次性把 CI 打红，
+  是否纳入与分期方式交 owner 裁决——本段只登记"测试代码里的边界缺陷没有
+  任何类型门禁兜底"这一成因。
+
 ### M-SIM 模拟业务场景预生产演练 M0（2026-11-04）
 
 GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在等不来真实客户/云
