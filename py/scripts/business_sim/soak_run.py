@@ -145,6 +145,9 @@ def run_soak(
             "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
             "round": round_id,
             "scenario": name,
+            # 异常路径（failed=-1）的 error 文本一并落盘——2026-11-06 第 541 轮
+            # （机器休眠超时）只有 failed=-1 无 error，事后只能靠时长反推。
+            "error": result.get("error", ""),
             "ok": ok,
             "success": result.get("success", 0),
             "failed": result.get("failed", -1),
