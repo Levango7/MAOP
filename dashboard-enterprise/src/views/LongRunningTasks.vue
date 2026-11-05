@@ -46,7 +46,7 @@
 
     <p class="lrt__note muted">{{ t('view.longRunningTasks.sseNote') }}</p>
 
-    <div v-if="pending" v-modal-a11y class="lrt__overlay" @click.self="pending = null">
+    <div v-if="pending" v-modal-a11y class="lrt__overlay" @click.self="pending = null" @modal:escape="pending = null">
       <div class="lrt__confirm" role="dialog" aria-modal="true">
         <h3>{{ t('view.longRunningTasks.confirm.title') }}</h3>
         <p class="muted">{{ t('view.longRunningTasks.confirm.body', { agent: pending.agent_name }) }}</p>

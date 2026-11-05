@@ -357,7 +357,7 @@
     </div>
 
     <!-- ── Hook create/edit dialog（任务199）────────────────────── -->
-    <div v-if="hookDialogOpen" v-modal-a11y class="hooks-modal-overlay" @click.self="closeHookDialog">
+    <div v-if="hookDialogOpen" v-modal-a11y class="hooks-modal-overlay" @click.self="closeHookDialog" @modal:escape="closeHookDialog">
       <div class="hooks-modal" role="dialog" aria-modal="true">
         <header class="hooks-modal-head">
           <h3>{{ hookDialogMode === 'create' ? t('view.hooks.dialogTitleCreate') : t('view.hooks.dialogTitleEdit') }}</h3>
@@ -415,7 +415,7 @@
     </div>
 
     <!-- ── Snapshot detail modal ────────────────────────────────── -->
-    <div v-if="detailModalOpen" v-modal-a11y class="history-modal-overlay" @click.self="closeDetailModal">
+    <div v-if="detailModalOpen" v-modal-a11y class="history-modal-overlay" @click.self="closeDetailModal" @modal:escape="closeDetailModal">
       <div class="history-modal" role="dialog" aria-modal="true">
         <header class="history-modal-head">
           <h3>{{ t('view.settings.detailTitle') }}</h3>
