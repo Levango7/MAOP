@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.6.0] — 2026-11-05
+
 ### 门禁：`overlay_probe` 子进程输出形状校验（2026-11-05）
 
 企业版 profile 棘轮唯一的跨进程输入是 `py/tests/dashboard_app_profiles.py` 的
