@@ -914,4 +914,22 @@
 - **WorkBuddy 遗留**：`fix/frontend-polish`（d2744262）删否仍待用户；worktree
   `F:/Nexus/MAOP-a11y` 现场保留。留言板回执（#223+分支清理）由本条代登：
   #223 已合 `10cc9525`，其分支/远端清理已由其自行完成。
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-05：C 交付——集成页能力探针门控）
 
+- **授权**：用户「这几个要是没有人认领，那就都给你认领吧」；认领前已核板面
+  无主（E 已由 ZCode 第十九轮 / PR #225 认领，本线让行；本线 A+B 在 #226）。
+- **交付**：`edition` store 抽 `createAvailabilityProbe`（404=未注册 / 401·403=
+  未知 / 其它=已注册；缓存、未知下次再试）+ `n8nAvailable` +
+  `checkN8nAvailability()`；`nav.js` 与 `/operate/integrations` 路由同步
+  `capability: 'n8n'`；路由守卫改为能力名→探针查表（不再硬编码 notifications）；
+  `Integrations.vue` 先等探针，404 显示"未安装"并跳过业务请求，未知/403 保留
+  edition 提示；CHANGELOG 本批段。
+- **验证**：前端全量 700 例通过（基线含 #229）；前端 URL 归属门禁 13/13；`eslint` 0 error（触及文件仅既有 console 警告）；
+  `vue-tsc --noEmit` 通过；变异反证 4/4 转红、逐字节还原。
+- **边界**：`relay_platform` 后端有 `/api/relay-platforms`，前端零消费
+  （`git grep relay-platforms --include=*.js --include=*.vue` 0 命中），不做
+  页面门控，只登记结论。
+- **领地**：`dashboard-enterprise/src/{nav.js,router/index.js,stores/edition.js,
+  views/Integrations.vue,App.vue,i18n/view-integrations.js}` 及对应 4 个测试、
+  CHANGELOG `[Unreleased]` 本批段、本登记。
+- **不碰**：#225 与 ZCode 第十九轮三线领地、MAOS 主工作树；本线 #226 独立串行。
