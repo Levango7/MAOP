@@ -97,7 +97,7 @@
     </Card>
 
     <!-- 回滚：把当前 active 版本置 retired，把选中的目标版本置 active -->
-    <div v-if="rollbackTarget" v-modal-a11y class="av-overlay" @click.self="rollbackTarget = null">
+    <div v-if="rollbackTarget" v-modal-a11y class="av-overlay" @click.self="rollbackTarget = null" @modal:escape="rollbackTarget = null">
       <div class="av-dialog" role="dialog" aria-modal="true">
         <h3>{{ t('view.agentVersions.rollback.title') }}</h3>
         <p class="muted">
@@ -131,7 +131,7 @@
     </div>
 
     <!-- 灰度：percentage / strategy / user_groups / duration -->
-    <div v-if="canaryTarget" v-modal-a11y class="av-overlay" @click.self="canaryTarget = null">
+    <div v-if="canaryTarget" v-modal-a11y class="av-overlay" @click.self="canaryTarget = null" @modal:escape="canaryTarget = null">
       <div class="av-dialog" role="dialog" aria-modal="true">
         <h3>{{ t('view.agentVersions.canary.title') }}</h3>
         <p class="muted">

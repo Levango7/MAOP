@@ -828,3 +828,108 @@
 - **合并纪律**：三线各自独立分支，谁先绿谁先进 CI 队列（一次只一个 PR 在
   CI），逐条 rebase→CI→merge；后进者 rebase 到新 master。
 - **不碰**：他线在途 PR/worktree 领地；MAOS 主工作树（SAML 线活跃）。
+
+### 第十九轮推进回执（2026-11-05，并行三线实况；重放于 #223 板面治理之后）
+- **M-X2 E2-b 已交付并合并**：PR #224 → master `e5f3cc7f`（GET/POST
+  /api/workflows + run_events 三事件回写 + trace_id 接通既有时间线；契约
+  6/6 + dashboard 审计 19/19；CI 23 真实 job 全绿后 canary 收口）。
+- **M-SIM M1**：`soak_run.py` 48h harness 交付并**本机点火**（逐轮 JSONL +
+  增量对账硬门禁 + 熔断/stop-file/断点续跑）。harness 调试修掉两真 bug：
+  ① `build_sim_home` 返回 `base/sim-home` 内层目录（拿外层当 home → 子进程
+  回退包默认配置 cline 熔断）；② **M0 地雷复发实锤**——`parents[1]` 差一层
+  让子进程 cwd 落 scripts/ 经 .pth 解析到主工作树旧 cli（unrecognized
+  arguments，与 M0 记录完全同形）。增量对账口径：持久 home 成本表跨轮累积
+  ⇒ round 前后 attribution 差值 == 当轮协议行（全量口径第 2 轮起必然
+  失配，属口径选择非缺陷）。冒烟 5/5 全绿后点火。
+- **M2.2 B2 侦察结论（实施=本分支 feat/m22b2-queue-wiring）**：现状 =
+  SQLite 落地 `MessageQueue`（get_db_path("queue")）+ `queue_worker`
+  消费者（human approvals / maintenance / queue stats 三 topic 族，`run()`
+  常驻消费 + 信号处理）；「进程间接线」= 提交面与消费面跨进程共享同一
+  持久队列的可靠性接线（envelope/重试/毒丸隔离面）。
+- **master push run 教训复证**：b684d70e 的 run 级 queued 长达 30+ min，
+  job 视图 11 success/7 in_progress——「run 级 queued ≠ 没跑」再次实证。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-05：A/B 收口 + C 认领 / E 让行）
+
+- **授权**：用户「这几个要是没有人认领，那就都给你认领吧，注意不要和其他 agent
+  产生冲突」。
+- **认领前核查**（origin/master=`e5f3cc7f`，开放 PR 仅 #225）：
+  - A/B 域（`py/tests/dashboard_app_profiles.py`、本批新增测试、CHANGELOG/本板）：
+    板面无他线条目。
+  - **E（M2.2 B2 余项）已由他线认领**：ZCode 第十九轮登记「M2.2 B2 余项：异步队列
+    的进程间接线」，PR #225（`feat/m22b2-queue-wiring`，tip `1e53bab1`；写就时开放中，已合入 `e62bc098`）⇒
+    本线不做，避免重复劳动。
+  - C（capability 门禁推广）板面无主；a11y 会话已声明不碰本线前端文件
+    （`nav.js`/`App.vue`/`router/index.js`/`Licenses.vue`/`Notifications.vue`/
+    `stores/edition.js` 及其测试）⇒ 本线认领，待本 PR 落地后另开分支。
+- **A 交付**：`overlay_probe()` 子进程边界形状校验（形状不符即抛，不把 `Any`
+  递给下游）；新增 `py/tests/test_dashboard_app_profiles.py` 6 例；变异反证
+  （去掉校验 → 4 例转红；还原后逐字节一致）。
+- **B 登记（不动门禁）**：CI mypy 只跑 `maop/`，`tests/` 不在检查面；本机 mypy
+  2.4.0 实测（CI 钉 2.4.1）589 errors / 162 files（checked 495）。量化写进
+  CHANGELOG 本批段，唤醒与否交 owner 裁决。
+- **C 立项**：`integrations`（n8n）与 `relay_platform` 页复刻 notification 的
+  capability 探针门控（404=未安装 / 401·403=未知 / 其余=可用），nav+router 双门
+  + lockstep 测试；分支独立，不改 CI。
+- **领地**：`py/tests/dashboard_app_profiles.py`、
+  `py/tests/test_dashboard_app_profiles.py`、CHANGELOG `[Unreleased]` 本批段、
+  本登记。
+- **不碰**：#225 及 ZCode 第十九轮三线领地、MAOS 主工作树。
+### 第十九轮 M1 双腿回执（2026-11-05，kind + Temporal）
+- **kind 腿收官**：MaopTask CR ×3（工单分诊三节点）全 Succeeded；
+  `tokensUsed=976/1348/639 tokensSource=measured`——GAP-2 方案 A 在集群形态
+  直接验证（M-T3.3 时代为 0/estimated）。三真缺口已录证据稿：
+  ① chart webhook TLS Secret 缺失（Pod 永久 ContainerCreating）；
+  ② RBAC 缺 apiextensions/customresourcedefinitions 只读（kopf 403）；
+  ③ .dockerignore 排除 py/scripts/ 致 stub 不在镜像（ConfigMap 挂载绕过，
+  本 PR 以 `!py/scripts/business_sim/` 反排除修根因）。
+- **Temporal 腿收官**：`maop workflow run m1-ticket`（三节点 DAG，dev server
+  v1.10.0/Server 1.32.2）3/3 success，成本台账三 agent 齐全且
+  P+C==total 逐行成立。**GAP-5 新发现（已复现）**：特定英文文本
+  （含 `and verify refresh chain`）触发 loop 计划/校验分支后
+  `MaopResult.model=None/usage=None` ⇒ 成本静默缺行（`run_events` 无
+  run.cost）；中文 M0 原文不触发（soak 100+ 轮全对账佐证）。修法与验收
+  判据见 `docs/audits/business-sim-m1-evidence.md` GAP-5 节。
+- **soak**：48h 继续跑（11-07 04:56 满），期满出 soak 证据补节。
+- **chart/打包修复（本 PR）**：role.yaml ClusterRole 增 CRD 只读规则、
+  .dockerignore 反排除 business_sim、chart README 补 webhook TLS 前置说明。
+
+### 接管回执 + 第二十轮切版（2026-11-05，WorkBuddy/Qoder-CN 双下线交接）
+- **接管执行实录**：#228（WorkBuddy）全绿自动合并 → `4a2fd7b9`；#226（Qoder）
+  全绿自动合并 → `1c8ee198`；#229（本线 M1 双腿）rebase 解板面双追加冲突后
+  全绿 → `4000e67d`。#226 的 CONFLICTING 实为陈旧态（Qoder 已自行 rebase）；
+  #229 的 cancelled 为配额掐单（rerun-failed-jobs 自愈）。
+- **#230 真红根因（已闭环）**：`edition.js` 探针 URL 经参数间接传入工厂 ⇒
+  前端 `/api/` 归属门禁（`test_every_frontend_url_is_attributed_or_exempted`）
+  解析不了间接形态 ⇒ 三平台 pytest 真红。Qoder 下线前已修（`52a9ce9d`：URL
+  常量留 fetchWithTimeout 实参位，保住审计面），本地复验 13/13；修复版 CI
+  重跑中，绿即合。**门禁按设计工作（防审计面静默缩小）——静态守卫族价值
+  再次实证**。
+- **C 分支**：`feat/capability-gate-integrations`（n8n 能力探针门控）Qoder 已
+  自行开 PR #230 并推修复，接管仅剩 merge-on-green。
+- **切版本 PR**：v5.6.0——四站点（pyproject/`__init__`/Dockerfile LABEL/
+  package.json）+ CHANGELOG `[5.6.0] — 2026-11-05` 节 + ROADMAP 当前状态；
+  用户已批（「可以 我同意」切版建议）。合并后 tag `v5.6.0` 推送触发
+  publish 作业 → 验证 PyPI。
+- **WorkBuddy 遗留**：`fix/frontend-polish`（d2744262）删否仍待用户；worktree
+  `F:/Nexus/MAOP-a11y` 现场保留。留言板回执（#223+分支清理）由本条代登：
+  #223 已合 `10cc9525`，其分支/远端清理已由其自行完成。
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-05：C 交付——集成页能力探针门控）
+
+- **授权**：用户「这几个要是没有人认领，那就都给你认领吧」；认领前已核板面
+  无主（E 已由 ZCode 第十九轮 / PR #225 认领，本线让行；本线 A+B 在 #226）。
+- **交付**：`edition` store 抽 `createAvailabilityProbe`（404=未注册 / 401·403=
+  未知 / 其它=已注册；缓存、未知下次再试）+ `n8nAvailable` +
+  `checkN8nAvailability()`；`nav.js` 与 `/operate/integrations` 路由同步
+  `capability: 'n8n'`；路由守卫改为能力名→探针查表（不再硬编码 notifications）；
+  `Integrations.vue` 先等探针，404 显示"未安装"并跳过业务请求，未知/403 保留
+  edition 提示；CHANGELOG 本批段。
+- **验证**：前端全量 700 例通过（基线含 #229）；前端 URL 归属门禁 13/13；`eslint` 0 error（触及文件仅既有 console 警告）；
+  `vue-tsc --noEmit` 通过；变异反证 4/4 转红、逐字节还原。
+- **边界**：`relay_platform` 后端有 `/api/relay-platforms`，前端零消费
+  （`git grep relay-platforms --include=*.js --include=*.vue` 0 命中），不做
+  页面门控，只登记结论。
+- **领地**：`dashboard-enterprise/src/{nav.js,router/index.js,stores/edition.js,
+  views/Integrations.vue,App.vue,i18n/view-integrations.js}` 及对应 4 个测试、
+  CHANGELOG `[Unreleased]` 本批段、本登记。
+- **不碰**：#225 与 ZCode 第十九轮三线领地、MAOS 主工作树；本线 #226 独立串行。

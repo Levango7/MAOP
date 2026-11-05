@@ -31,7 +31,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from fastapi import FastAPI
 
@@ -349,5 +349,12 @@ def overlay_probe(modules: tuple[str, ...]) -> dict[str, str]:
     )
     if probe.returncode != 0:
         raise RuntimeError(f"overlay probe failed: {probe.stderr[-400:]}")
-    return cast(dict[str, Any], json.loads(probe.stdout.strip().splitlines()[-1]))
+    # 子进程输出是系统边界：json.loads 给的是 Any，直接 return 会把没验过的
+    # 形状递给下游（下游按 dict[str, str] 比较 'ok' 与缺失模块名）。
+    raw = json.loads(probe.stdout.strip().splitlines()[-1])
+    if not isinstance(raw, dict) or not all(
+        isinstance(key, str) and isinstance(value, str) for key, value in raw.items()
+    ):
+        raise RuntimeError(f"overlay probe returned an unexpected shape: {type(raw).__name__}")
+    return {key: value for key, value in raw.items()}
 

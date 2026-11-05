@@ -12,6 +12,26 @@ const API_ENDPOINT_EDITION = '/api/info/edition';
 // admin-only，普通用户拿 403 后按安全默认回落 personal，明明装了企业包却被
 // 当成没有企业能力。
 const API_ENDPOINT_NOTIFICATIONS_PROBE = '/api/notifications/unread-count';
+// n8n 集成探针。n8n router 只在企业 overlay 且 N8N_INTEGRATION 特性打开时注册
+// （dashboard/_register_routes/_routers.py），未注册 = 整块 404。所有端点都是
+// admin-only，401/403 只能说明"这次没拿到权限"，不能证明能力不存在。
+const API_ENDPOINT_N8N_PROBE = '/api/n8n/health';
+
+// 能力探针的统一语义：404 = 端点整块不存在；401/403 = 本次没拿到登录/权限，
+// 不能当证据；其它（含 5xx）= 端点已注册、只是这次失败。结论缓存，未知不缓存。
+function createAvailabilityProbe(state, request) {
+  return async function check() {
+    if (state.value !== null) return state.value;
+    try {
+      const res = await request();
+      if (res.status === 404) state.value = false;
+      else if (res.status !== 401 && res.status !== 403) state.value = true;
+    } catch {
+      /* 探不到就当未知：导航保持现状，下一次再试 */
+    }
+    return state.value;
+  };
+}
 
 function persistEdition(edition, features, backends, degradations) {
   try {
@@ -55,6 +75,8 @@ export const useEditionStore = defineStore('edition', () => {
   // 通知中心可用性：null=未知（探针还没回，导航保持现状）、true=端点在、
   // false=404（router 整块没注册）。三态而非布尔，是为了"没证据不藏入口"。
   const notificationsAvailable = ref(null);
+  // n8n 集成的可用性，语义同上（三态），供 integrations 页与导航使用。
+  const n8nAvailable = ref(null);
   const loading = ref(false);
   const switching = ref(false);
   const switchError = ref('');
@@ -193,23 +215,18 @@ export const useEditionStore = defineStore('edition', () => {
     persistEdition(edition.value, features.value, backends.value, degradations.value);
   }
 
-  /**
-   * 一次性探测通知中心是否可用（判定为可用/不可用后缓存，不再发请求）。
-   * 只有 404 判死；401/403 保持未知（登录态问题不是"能力不存在"的证据，
-   * 而且下次还会再探）；5xx 说明端点已注册、只是这次失败，算可用。
-   * @returns {Promise<boolean|null>}
-   */
-  async function checkNotificationsAvailability() {
-    if (notificationsAvailable.value !== null) return notificationsAvailable.value;
-    try {
-      const res = await fetchWithTimeout(API_ENDPOINT_NOTIFICATIONS_PROBE, withAuth({}, {}));
-      if (res.status === 404) notificationsAvailable.value = false;
-      else if (res.status !== 401 && res.status !== 403) notificationsAvailable.value = true;
-    } catch {
-      // 探不到就当未知：导航保持现状，下一次再试
-    }
-    return notificationsAvailable.value;
-  }
+  // 一次性探测（判定后缓存，不再发请求）。语义见 createAvailabilityProbe。
+  // 注意：URL 常量必须留在 fetchWithTimeout 的实参位置——前端的 /api/ 字面量
+  // 归属门禁（tests/test_frontend_response_models.py）按"同文件的常量实参"
+  // 解析；把常量传给一个只收 endpoint 参数的工厂会让两条探针都掉出审计面。
+  const checkNotificationsAvailability = createAvailabilityProbe(
+    notificationsAvailable,
+    () => fetchWithTimeout(API_ENDPOINT_NOTIFICATIONS_PROBE, withAuth({}, {})),
+  );
+  const checkN8nAvailability = createAvailabilityProbe(
+    n8nAvailable,
+    () => fetchWithTimeout(API_ENDPOINT_N8N_PROBE, withAuth({}, {})),
+  );
 
   return {
     // state
@@ -218,6 +235,7 @@ export const useEditionStore = defineStore('edition', () => {
     backends,
     degradations,
     notificationsAvailable,
+    n8nAvailable,
     loading,
     switching,
     switchError,
@@ -231,5 +249,6 @@ export const useEditionStore = defineStore('edition', () => {
     switchEdition,
     hydrateEdition,
     checkNotificationsAvailability,
+    checkN8nAvailability,
   };
 });

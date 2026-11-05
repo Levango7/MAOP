@@ -178,17 +178,36 @@ describe('Integrations.vue', () => {
     wrapper.unmount();
   });
 
-  it('shows the enterprise notice and skips the request in personal edition', async () => {
+  it('probes the endpoint and shows the not-installed state when the router is absent', async () => {
     localStorage.removeItem('maop_edition');
+    const calls = [];
+    global.fetch = vi.fn((url) => {
+      calls.push(String(url));
+      return Promise.resolve({
+        ok: false, status: 404,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve('{}'),
+      });
+    });
+    const wrapper = await mountIntegrations();
+    expect(wrapper.text()).toContain('n8n integration is not installed');
+    expect(wrapper.text()).not.toContain('Failed to load workflows');
+    expect(calls.filter((u) => u.includes('/api/n8n/health'))).toHaveLength(1);
+    expect(calls.filter((u) => u.includes('/api/n8n/workflows'))).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it('shows not-installed in enterprise too when the feature flag keeps the router off', async () => {
+    // edition=enterprise 也可能没开 N8N_INTEGRATION：404 才是安装事实，
+    // edition 字符串只是猜测。
     global.fetch = vi.fn(() => Promise.resolve({
-      ok: true, status: 200,
+      ok: false, status: 404,
       json: () => Promise.resolve({}),
       text: () => Promise.resolve('{}'),
     }));
     const wrapper = await mountIntegrations();
-    expect(wrapper.text()).toContain('requires the Enterprise edition');
-    expect(wrapper.text()).not.toContain('Failed to load workflows');
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('n8n integration is not installed');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });
 

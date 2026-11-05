@@ -110,7 +110,10 @@ import { nav, filterNavByEdition } from './nav.js';
 // 个人版隐藏企业版菜单项 (RFC-001 修正): 所见即所得, 不再"点了被弹走"
 // 通知收件箱这类"装了企业包才有端点"的入口走能力探针，探针没回之前保持可见。
 const visibleNav = computed(() =>
-  filterNavByEdition(nav, edition.edition, { notifications: edition.notificationsAvailable }));
+  filterNavByEdition(nav, edition.edition, {
+    notifications: edition.notificationsAvailable,
+    n8n: edition.n8nAvailable,
+  }));
 
 const edition = useEditionStore();
 const api = useApiStore();

@@ -7,7 +7,7 @@
 
 ## 当前状态
 
-- **已发布**：v5.5.0（2026-10-27，PyPI）— 社区版阶段三超前全落地
+- **已发布**：v5.6.0（2026-11-05，PyPI）— GAP-2/GAP-4 计量与编码收口 + M-X1 M1 三通道密钥解析 + E2-b dashboard workflow 提交面 + B2 Facade 异步入口 + M-SIM M1 双腿（kind/Temporal）+ chart 三修复；上一版 v5.5.0（2026-10-27）— 社区版阶段三超前全落地
   （Operator M0-M2.2 / Marketplace 签名 M0+首签 / 成本归因 M-X3 /
   Temporal M0+E2-a），范围见下方 v5.5.0 节与 CHANGELOG。
 - **上一版**：v5.4.0（2026-10-12，minor）— M2.2 首批：多模态记忆
@@ -514,7 +514,7 @@
 
 - **M-X1 M1**：HTTPS 拉取通道 + 双钥宽限 try 验签（章程既有余量项）。
 - **M-X2 E2-b**：深集成——dashboard 提交 workflow 源 + 状态回写。
-- **M2.2 B2 余项**：异步队列的进程间接线（章程既有顺延项）。
+- **M2.2 B2 余项**：~~异步队列的进程间接线~~——✅ 已收口（2026-11-05）：主体由 #160（v5.5.0）交付（`CrossProcessIngestQueue` + `multimodal_ingest_mode` 配置），Facade 层入口（PR-3 的「Facade 侧按需再接」尾巴）随同批 PR 补齐；立项登记未复核 #160 的教训与双钥宽限同款，已落板。
 
 ## 维护规则
 

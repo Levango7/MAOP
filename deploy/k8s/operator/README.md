@@ -133,4 +133,11 @@ Values are the *planned* API surface; none of them takes effect today.
 | `controller.plugins.strictApi` | `true` | Planned: reject incompatible plugin api_version |
 | `rbac.clusterScope` | `true` | Cluster-scoped RBAC (needed for all-namespace watch) |
 | `webhook.enabled` | `true` | Validating webhook for MaopAgent CRs |
+
+> **已知前置（M1 kind 腿实测，2026-11-05）**：`webhook.enabled=true` 时
+> Deployment 挂载 `secret/maop-operator-webhook-tls`（TLS 证书），该 Secret
+> 不由本 chart 创建——缺失时 Pod 永久 `ContainerCreating`（`FailedMount`）。
+> 无证书环境（kind 烟测/开发）请 `--set webhook.enabled=false`，或先行创建
+> 该 Secret。另：kopf 启动需集群级 `apiextensions.k8s.io/customresourcedefinitions`
+> 只读权限（已入 role.yaml，`rbac.clusterScope=true` 分支）。
 | `crds.keep` | `true` | Keep CRDs on uninstall |

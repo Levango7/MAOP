@@ -121,4 +121,31 @@ describe('Router', () => {
       await router.push('/home');
     }
   });
+
+  it('redirects integrations home only when the n8n probe says the router is missing', async () => {
+    // 同一套能力语义：404 才挡，未知（含非 admin 的 403）放行。
+    setActivePinia(createPinia());
+    const store = useEditionStore();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true, status: 200, json: () => Promise.resolve({}),
+    });
+    try {
+      store.n8nAvailable = null;
+      await router.push('/operate/integrations');
+      expect(router.currentRoute.value.path).toBe('/operate/integrations');
+
+      store.n8nAvailable = false;
+      await router.push('/home');
+      await router.push('/operate/integrations');
+      expect(router.currentRoute.value.path).toBe('/home');
+
+      store.n8nAvailable = true;
+      await router.push('/home');
+      await router.push('/operate/integrations');
+      expect(router.currentRoute.value.path).toBe('/operate/integrations');
+    } finally {
+      fetchSpy.mockRestore();
+      await router.push('/home');
+    }
+  });
 });

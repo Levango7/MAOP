@@ -65,6 +65,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 顺带修掉 `tests/test_supervisor_mixin_boundary.py` 的 4 个 ruff 告警
 （未使用的 `AlertLevel` 导入与 3 个未使用赋值）。
 
+## [5.6.0] — 2026-11-05
+
+### 门禁：`overlay_probe` 子进程输出形状校验（2026-11-05）
+
+企业版 profile 棘轮唯一的跨进程输入是 `py/tests/dashboard_app_profiles.py` 的
+`overlay_probe()`：它把探针子进程 stdout 最后一行 `json.loads` 后直接按
+`dict[str, str]` 返回，下游 `overlay_only_modules()` 靠值区分 `'ok'` 与"缺失
+模块名"。子进程输出属于系统边界——JSON 合法但形状漂移（顶层列表/裸字符串/
+数值/null）会被当成"路由可用"或"缺失"，把门禁盲区伪装成通过。
+
+- `overlay_probe()` 解析后校验顶层为 dict 且键值均为 str，否则抛
+  `RuntimeError(unexpected shape)`；非零退出仍是原来的硬错误，不降级成空探针。
+- 新增 `py/tests/test_dashboard_app_profiles.py` 6 例：正常映射（含前置噪音行）、
+  4 种畸形载荷、子进程失败。变异反证：临时去掉校验后 4 例转红，还原后逐字节一致。
+- **类型检查面现状（量化登记，不改动门禁）**：CI 的 mypy 步骤只跑 `mypy maop/`，
+  `tests/` 不在检查面内；本机 mypy 2.4.0 实测（CI 钉 2.4.1）`mypy tests/` =
+  **589 errors / 162 files（checked 495）**。唤醒该门禁会一次性把 CI 打红，
+  是否纳入与分期方式交 owner 裁决——本段只登记"测试代码里的边界缺陷没有
+  任何类型门禁兜底"这一成因。
+
+### 集成页按能力探针门控（n8n，2026-11-05）
+
+`/operate/integrations` 此前只在页面内用 `!edition.isEnterprise` 挡：个人版
+导航仍显示入口、点进去是"需要企业版"死胡同；企业版但未启用 `N8N_INTEGRATION`
+时 router 整块不注册，管理员也只能看到一串 404。改为与通知收件箱同一套
+能力探针语义：
+
+- `edition` store 抽出 `createAvailabilityProbe`（404=端点未注册；401/403=未知，
+  不能当证据；其它含 5xx=已注册），新增 `n8nAvailable` +
+  `checkN8nAvailability()`（探针 `GET /api/n8n/health`；n8n router 仅在
+  `N8N_INTEGRATION` 打开时注册）。
+- 导航与路由同步标记：`nav.js` 的 integrations 项与 `/operate/integrations`
+  路由均带 `capability: 'n8n'`；路由守卫改为"能力名→探针"查表（不再硬编码
+  notifications），未登记能力名按未知放行。
+- 页面 `onMounted` 先等探针结论：404 显示"n8n 集成未安装"并跳过业务请求；
+  未知/403 保留原有 edition 提示。
+- 测试：store 探针三态与缓存、路由守卫 n8n 分支、导航/路由 lockstep、页面
+  404 不发业务请求。变异反证四项（去 nav 标记 / 守卫忽略能力 / 404 判可用 /
+  页面忽略 engineMissing）全部转红，还原后逐字节一致；前端全量 696 例通过。
+- **边界**：`relay_platform` 后端有 `/api/relay-platforms`，但前端无任何消费面
+  （`git grep relay-platforms --include=*.js --include=*.vue` 0 命中），不满足
+  "页面门控"的适用条件——本批只登记结论，不新建页面。
+
 ### M-SIM 模拟业务场景预生产演练 M0（2026-11-04）
 
 GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在等不来真实客户/云
@@ -102,6 +145,44 @@ GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在�
   腿复跑为跨平台验收。
 - 章程与 M1（kind operator 腿 / Temporal 腿 / 48h soak 串联）见 ROADMAP
   「M-SIM」节；另登记 M-X1 M1 / M-X2 E2-b / M2.2 B2 余项（用户授权立项）。
+
+### M-SIM M1 —— kind operator 腿 + Temporal 后端腿 + 48h soak（2026-11-05）
+
+章程 M1 三腿落地（soak 长跑中，期满补证据节）：
+
+- **kind 腿**：MaopTask CR ×3 全 Succeeded，`tokensUsed=976/1348/639`
+  **tokensSource=measured**——GAP-2 方案 A 在集群形态直接验证（M-T3.3 时代
+  为 0/estimated）。抓到并修复三条真缺口：
+  ① chart RBAC 缺 `apiextensions.k8s.io/customresourcedefinitions` 只读
+  （kopf 启动 403 重试 9 次）—— ClusterRole 补规则；
+  ② `.dockerignore` 排除 `py/scripts/` 致业务模拟 stub 不在镜像——
+  `!py/scripts/business_sim/` 反排除（kind/验收驱动的运行件）；
+  ③ chart webhook TLS Secret 不由 chart 创建、缺失即 Pod 永久
+  ContainerCreating——README 补前置说明（无证书环境
+  `--set webhook.enabled=false`）。
+- **Temporal 腿**：`maop workflow run m1-ticket` 三节点 DAG 经 dev server
+  （CLI v1.10.0/Server 1.32.2）3/3 success；成本台账三 agent 齐全且
+  prompt+completion==total 逐行成立。
+- **GAP-5（新发现，已复现，待修）**：特定英文文本触发 loop 计划/校验
+  分支后 `MaopResult.model/usage` 丢失 ⇒ 成本对账静默缺行（`run_events`
+  无 run.cost）；中文 M0 原文不触发。修法与验收判据见
+  `docs/audits/business-sim-m1-evidence.md`。
+- 证据：`docs/audits/business-sim-m1-evidence.md`（kind 复现配方 +
+  Temporal 结果 + GAP-5 复现条件）。
+
+### M2.2 B2 余项收口 —— Facade 层异步摄入入口（2026-11-05）
+
+立项侦察修正（与 M-X1 M1 双钥宽限同款教训）：「异步队列的进程间接线」主体
+**已由 #160（v5.5.0）交付**——`core/memory/multimodal_ingest_cp.py` 的
+`CrossProcessIngestQueue`（SQLite MessageQueue 传输 + `multimodal_ingest_mode`
+配置切换 + 专属测试）；立项登记时未复核该交付。真余项只有 PR-3 留下的
+「Facade 侧按需再接」尾巴：
+
+- `MemoryFacade.store_multimodal_async(...)`：立即入队不等嵌入（延迟预算
+  路径，ADR-022 D4）；队列关停后返回 `""`（不静默丢数据的显式信号）；
+- `MemoryFacade.drain_multimodal_ingest(timeout)`：显式排空（幂等）；
+- 测试 3 例（双模式 submit→drain→可检索 + 排空幂等）；
+- 进程间接线本体**不做重复建设**——#160 在案即权威。
 
 ### M-X2 E2-b —— dashboard workflow 提交与状态回写（2026-11-05）
 

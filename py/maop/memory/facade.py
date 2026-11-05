@@ -289,6 +289,40 @@ class MemoryFacade:
             ext=ext,
         )
 
+    def store_multimodal_async(
+        self,
+        content: Any,
+        *,
+        modality: str | None = None,
+        caption: str = "",
+        metadata: dict[str, Any] | None = None,
+        entry_id: str | None = None,
+        ext: str | None = None,
+    ) -> str:
+        """异步存储一条多模态记忆（M2.2 B2 余项：Facade 层入口接线）.
+
+        立即入摄入队列返回条目 ID（不等嵌入，延迟预算路径见 ADR-022 D4）；
+        条目在队列 flush（``drain_multimodal_ingest`` 或 flush 间隔）后才可检索。
+        摄入模式（进程内 / 跨进程 ``crossprocess``）由 ``multimodal_ingest_mode``
+        配置决定（#160）。队列已关停时返回 ``""``（不静默丢数据的显式信号）。
+
+        See Also
+        --------
+        :meth:`store_multimodal`（同步嵌入路径）、:meth:`drain_multimodal_ingest`
+        """
+        return self._multimodal().store_async(
+            content,
+            modality=modality,
+            caption=caption,
+            metadata=metadata,
+            entry_id=entry_id,
+            ext=ext,
+        )
+
+    def drain_multimodal_ingest(self, timeout: float = 5.0) -> int:
+        """显式排空多模态摄入队列（返回本批条数），测试/停机钩子用。"""
+        return self._multimodal().drain_ingest(timeout=timeout)
+
     def multimodal_stats(self) -> dict[str, Any]:
         """多模态空间统计（条目数、按模态分组、embedding 模型、degraded 标记）。"""
         return self._multimodal().stats()

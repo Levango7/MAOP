@@ -211,6 +211,23 @@ describe('AgentVersions.vue', () => {
     expect(body).toEqual({ target_version_id: 'v1', reason: 'regression' });
   });
 
+  it('closes dialogs when the global modal:escape event is dispatched', async () => {
+    mockList();
+    const wrapper = mountView();
+    await flushPromises();
+
+    // App.vue 派发冒泡的 modal:escape 到最上层 [data-modal-root]；测试里
+    // 指令未全局注册，所以按 class 取同一个 overlay 元素触发即可。
+    for (const open of ['Rollback', 'Canary']) {
+      await wrapper.findAll('button').find((b) => b.text() === open).trigger('click');
+      await flushPromises();
+      expect(wrapper.find('.av-overlay').exists()).toBe(true);
+
+      await wrapper.find('.av-overlay').trigger('modal:escape');
+      expect(wrapper.find('.av-overlay').exists()).toBe(false);
+    }
+  });
+
   // ── 灰度 ──────────────────────────────────────────────────────
 
   it('rejects an out-of-range canary percentage', async () => {

@@ -64,7 +64,7 @@
     <p class="cv-note muted">{{ t('view.credentialVault.noPlaintextNote') }}</p>
 
     <!-- 二次确认：删除 / 轮换都是不可逆操作 -->
-    <div v-if="pending" v-modal-a11y class="cv-confirm-overlay" @click.self="pending = null">
+    <div v-if="pending" v-modal-a11y class="cv-confirm-overlay" @click.self="pending = null" @modal:escape="pending = null">
       <div class="cv-confirm" role="dialog" aria-modal="true">
         <h3>{{ pending.kind === 'delete' ? t('view.credentialVault.confirm.deleteTitle') : t('view.credentialVault.confirm.rotateTitle') }}</h3>
         <p class="muted">
@@ -86,7 +86,7 @@
     </div>
 
     <!-- 新建凭据：敏感字段按 credential_type 动态显示 -->
-    <div v-if="showForm" v-modal-a11y class="cv-confirm-overlay" @click.self="closeForm">
+    <div v-if="showForm" v-modal-a11y class="cv-confirm-overlay" @click.self="closeForm" @modal:escape="closeForm">
       <div class="cv-confirm cv-form" role="dialog" aria-modal="true">
         <h3>{{ t('view.credentialVault.form.title') }}</h3>
 
