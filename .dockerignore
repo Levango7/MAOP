@@ -111,6 +111,9 @@ maop.ps1
 # Python test + dev files (not needed at runtime)
 py/tests/
 py/scripts/
+# 例外（M-SIM M1 kind 腿，2026-11-05）：业务模拟确定性 stub 是 kind/验收
+# 驱动的运行件（agents.yaml 的 sim-* 条目直接调用），须随镜像分发。
+!py/scripts/business_sim/
 py/.cov_baseline.json
 # P0 fix (4d68569): requirements.lock was excluded here but the builder stage
 # COPYs it (py/requirements.lock) to pip-install the pinned, audited deps —

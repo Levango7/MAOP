@@ -875,3 +875,22 @@
   `py/tests/test_dashboard_app_profiles.py`、CHANGELOG `[Unreleased]` 本批段、
   本登记。
 - **不碰**：#225 及 ZCode 第十九轮三线领地、MAOS 主工作树。
+### 第十九轮 M1 双腿回执（2026-11-05，kind + Temporal）
+- **kind 腿收官**：MaopTask CR ×3（工单分诊三节点）全 Succeeded；
+  `tokensUsed=976/1348/639 tokensSource=measured`——GAP-2 方案 A 在集群形态
+  直接验证（M-T3.3 时代为 0/estimated）。三真缺口已录证据稿：
+  ① chart webhook TLS Secret 缺失（Pod 永久 ContainerCreating）；
+  ② RBAC 缺 apiextensions/customresourcedefinitions 只读（kopf 403）；
+  ③ .dockerignore 排除 py/scripts/ 致 stub 不在镜像（ConfigMap 挂载绕过，
+  本 PR 以 `!py/scripts/business_sim/` 反排除修根因）。
+- **Temporal 腿收官**：`maop workflow run m1-ticket`（三节点 DAG，dev server
+  v1.10.0/Server 1.32.2）3/3 success，成本台账三 agent 齐全且
+  P+C==total 逐行成立。**GAP-5 新发现（已复现）**：特定英文文本
+  （含 `and verify refresh chain`）触发 loop 计划/校验分支后
+  `MaopResult.model=None/usage=None` ⇒ 成本静默缺行（`run_events` 无
+  run.cost）；中文 M0 原文不触发（soak 100+ 轮全对账佐证）。修法与验收
+  判据见 `docs/audits/business-sim-m1-evidence.md` GAP-5 节。
+- **soak**：48h 继续跑（11-07 04:56 满），期满出 soak 证据补节。
+- **chart/打包修复（本 PR）**：role.yaml ClusterRole 增 CRD 只读规则、
+  .dockerignore 反排除 business_sim、chart README 补 webhook TLS 前置说明。
+
