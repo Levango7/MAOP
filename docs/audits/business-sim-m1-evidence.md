@@ -72,7 +72,7 @@ kubectl apply -f <MaopTask CRs>
 - 成本台账（`cost_entries`）：三 agent 均有行，且 **prompt_tokens +
   completion_tokens == total_tokens 逐行成立**（协议行拆分经 GAP-2 链路入账）。
 
-### GAP-5（新发现，已复现，待修）：特定任务文本触发 loop 计划/校验分支后成本静默丢失
+### GAP-5（新发现 → 已修复，2026-11-06）：特定任务文本触发 loop 并行分支后成本静默丢失
 
 - **现象**：任务文本含英文 `and verify refresh chain` 时，该节点 `maop run`
   的 `returncode=0 / [OK]` 且节点 status=success，但
@@ -104,3 +104,22 @@ kubectl apply -f <MaopTask CRs>
 
 （本机 2026-11-05 04:56 点火，逐轮 JSONL `.sim-soak/soak-progress.jsonl`；
 跑满后补终态统计与完整性检查汇总。）
+### GAP-5 修复回执（2026-11-06）
+
+根因精化：触发文本让 analyzer 拆出两个子任务（`reset session` + `verify
+refresh chain`）走 **`_execute_parallel` 并行分支**（`[st-001]` 前缀的聚合
+输出为证），聚合 `new_result` 未透传 model/usage ⇒ 对账早退。
+
+**双层修复**：
+1. `loop_executor._execute_parallel`：聚合结果 model 取首个非空子任务值、
+   usage 按键求和（并累计进 loop 级 `_tokens_used_measured`，与串行路径
+   口径一致；全子任务无实测时保持 None 不冒充）。
+2. `maop_loop_phases._budget_reconciliation` 硬化：早退条件从「model 空
+   即放弃」改为「model 与实测 usage 皆缺才放弃」（model 留空时按启发式
+   路径同形以 "" 归档）。
+
+**验收（判据即 M1 证据稿所立）**：英文触发文本跑 loop →
+`exec_result.usage={808,540,1348}`、成本行在账（`808+540=1348`，与 kind 腿
+`sim-resolve-1` 的 1348 同源互证）；单测 3/3
+（`tests/test_gap5_parallel_usage.py`：聚合求和/无实测保 None/对账硬化）；
+邻近回归 40/40；ruff/mypy 无问题。
