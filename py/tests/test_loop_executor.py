@@ -21,9 +21,11 @@ def _make_result(*, success: bool, agent: str = "a", task: str = "t") -> MaopRes
     )
 
 
-def _make_dispatch_result(*, success: bool, breaker: bool = False):
+def _make_dispatch_result(*, success: bool, breaker: bool = False, agent: str = "a"):
     """Mimic DispatchResult(result=..., breaker_tripped=...)."""
-    return SimpleNamespace(result=_make_result(success=success), breaker_tripped=breaker)
+    return SimpleNamespace(
+        result=_make_result(success=success, agent=agent), breaker_tripped=breaker,
+    )
 
 
 def _make_loop_config(*, max_attempts: int = 3, max_workers: int = 4):
@@ -43,6 +45,11 @@ class _Host(ExecuteMixin):
         self._loop_config = loop_config
         self._worker_pool = worker_pool
         self._log = MagicMock()
+        # PhasesMixin 在 MaopLoop 里才提供；这里记录调用，供并行用例断言逐笔对账。
+        self.reconciled: list[tuple[str | None, str]] = []
+
+    def _budget_reconciliation(self, exec_result, trace_id):
+        self.reconciled.append((getattr(exec_result, "agent", None), trace_id))
 
 
 # ── _execute_with_retry ──────────────────────────────────────────────
@@ -212,8 +219,58 @@ class TestExecuteParallel:
         assert result is not None and result.is_success()
 
     @pytest.mark.asyncio
+    async def test_parallel_group_reconciles_each_subtask_not_the_aggregate(self):
+        # GAP-5：并行聚合结果用 new_result 合成，不带 model/usage——修复前整批
+        # 子任务的派发在成本表里一行都不留。对账必须在每笔真实派发上发生一次。
+        sub_tasks = [
+            SubTask(id="st-000", description="do a", assigned_agent="claude"),
+            SubTask(id="st-001", description="do b", assigned_agent="gemini"),
+        ]
+        analysis = _make_analysis(["st-000", "st-001"], [], sub_tasks)
+        dispatcher = MagicMock()
+        dispatcher.dispatch = AsyncMock(side_effect=[
+            _make_dispatch_result(success=True, agent="claude"),
+            _make_dispatch_result(success=True, agent="gemini"),
+        ])
+        pool = MagicMock(_sem=__import__("asyncio").Semaphore(2))
+        host = _Host(dispatcher, _make_loop_config(max_workers=2), worker_pool=pool)
+
+        result = await host._execute_parallel(
+            task="t", analysis=analysis, fallback_chain=["claude"],
+            routing_key="k", workdir=".", timeout=10, trace_id="tr",
+        )
+        assert len(host.reconciled) == 2, host.reconciled
+        # 并行分支里两笔派发谁先落地不保证——按集合比 agent，按列表比 trace。
+        assert sorted(agent for (agent, _tid) in host.reconciled) == ["claude", "gemini"]
+        assert [tid for (_agent, tid) in host.reconciled] == ["tr", "tr"]
+        # 聚合结果仍不带 model —— _phase_execute 的那一次对账对它是空操作，
+        # 若这里改成透传 model 就会把两笔子任务成本再记一遍。
+        assert result is not None and result.model is None
+
+    @pytest.mark.asyncio
+    async def test_sequential_group_chain_reconciles_each_subtask(self):
+        # 单节点分支（每组一个子任务）同样逐笔对账，不能只靠聚合那一次。
+        sub_tasks = [
+            SubTask(id="st-000", description="first", assigned_agent="a1"),
+            SubTask(id="st-001", description="second", assigned_agent="a2"),
+        ]
+        analysis = _make_analysis(["st-000", "st-001"], [("st-000", "st-001")], sub_tasks)
+        dispatcher = MagicMock()
+
+        async def _echo(**kwargs):
+            return _make_dispatch_result(success=True, agent=str(kwargs.get("agent", "")))
+
+        dispatcher.dispatch = AsyncMock(side_effect=_echo)
+        host = _Host(dispatcher, _make_loop_config(max_workers=2), worker_pool=MagicMock())
+
+        await host._execute_parallel(
+            task="t", analysis=analysis, fallback_chain=["a"],
+            routing_key="k", workdir=".", timeout=10, trace_id="tr2",
+        )
+        assert [agent for (agent, _tid) in host.reconciled] == ["a1", "a2"]
+
+    @pytest.mark.asyncio
     async def test_sequential_groups_single_subtask(self):
-        # edges st-000 → st-001 ⇒ two groups of one subtask each.
         sub_tasks = [
             SubTask(id="st-000", description="first"),
             SubTask(id="st-001", description="second"),

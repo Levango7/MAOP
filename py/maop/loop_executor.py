@@ -24,12 +24,14 @@ class ExecuteMixin:
       - self._worker_pool (WorkerPool | None)
       - self._loop_config (LoopConfig)
       - self._log(phase, level, message, **data)
+      - self._budget_reconciliation(exec_result, trace_id)
     """
 
     _dispatcher: Any
     _worker_pool: Any
     _loop_config: Any
     _log: Any
+    _budget_reconciliation: Any
 
     # M2: turn 预算（一个 turn = 一次 dispatcher.dispatch 尝试）。
     # 类属性给缺省值；MaopLoop.run() 每次运行重置为实例属性。
@@ -186,6 +188,9 @@ class ExecuteMixin:
                             error=f"Exception: {exc}", trace_id=trace_id,
                         )
                     subtask_results[st_id] = result  # type: ignore
+                    # GAP-5: 成本按真实派发逐笔记账。聚合结果不带 model/usage，
+                    # _phase_execute 那一次对账对聚合是空操作，因此不会双记。
+                    self._budget_reconciliation(result, trace_id)
             else:
                 # Multiple independent subtasks — execute in parallel with concurrency limit
                 async def _run_subtask(st_id: str, st_desc: str, st_agent: str) -> tuple[str, MaopResult]:
@@ -204,6 +209,8 @@ class ExecuteMixin:
                                 agent=st_agent, task=st_desc, exit_code=1,
                                 error=f"Exception: {exc}", trace_id=trace_id,
                             )
+                        # GAP-5: 与上面的单节点分支同款——每笔真实派发各自入账。
+                        self._budget_reconciliation(r, trace_id)
                     return st_id, r  # type: ignore
 
                 coros = []
@@ -257,6 +264,8 @@ class ExecuteMixin:
             error="\n".join(r.error for r in combined_errors if r.error) or None,
             duration_ms=max((r.duration_ms for r in subtask_results.values()), default=0),
             trace_id=trace_id, routing_key=routing_key,
+            # model/usage 故意留空：每个子任务已各自对账入账（GAP-5）。
+            # 这里补上 model 会让 _phase_execute 的聚合对账再记一次——双计。
         )
 
     async def _execute_with_retry(
