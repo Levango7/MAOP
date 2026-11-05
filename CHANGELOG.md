@@ -39,6 +39,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### GAP-5 修复：并行子任务的成本逐笔记账（2026-11-05）
+
+M-SIM M1 记录的静默缺行（`docs/audits/business-sim-m1-evidence.md` GAP-5）已复现并修复。
+任务文本被 analyzer 拆成子任务时（英文 `... reset session and verify refresh chain`
+→ st-000/st-001），`ExecuteMixin._execute_parallel` 只返回一个 `new_result` 聚合体，
+`model`/`usage` 全空；而唯一成本对账点 `PhasesMixin._phase_execute →
+_budget_reconciliation` 见 `model` 为空即早退 ⇒ 节点 `exit_code=0/[OK]`，
+成本表 0 行、`run_events` 无 `run.cost`。中文原文不拆子任务，故 soak 百余轮未暴露。
+
+- 对账改到**每笔真实派发**上：`_execute_parallel` 的单节点分支与并行分支各在拿到
+  子任务结果后调用 `_budget_reconciliation`，按该子任务自己的 `agent/model/usage` 入账
+  （`assigned_agent` 不同的并行组不再被聚合体的 `agent=fallback_chain[0]` 吞成一行）。
+- 聚合体继续不带 `model/usage`（它只是展示层结果），并在构造处注明：补上就会与
+  子任务重复记账。
+- 复现与验收（真 `maop.cli run` 子进程 + M-SIM stub 驱动、隔离 home）：触发文本
+  成本表 `calls 0→2 / tokens 0→1039`，与两条 `[USAGE]` 协议行 675+364 逐 token 相等；
+  中文对照文本仍为 `calls=1 / tokens=176`（无重复计）。
+- 归属对照（同一次并行派发，pa→m1 / pb→m2，各 150 tokens）：本方案 **2 行**
+  （pa/m1 150、pb/m2 150，总 300）；把子任务折叠进聚合体的一条记录方案给出
+  **1 行**（pa/m1 名下 300 tokens）——总量对得上，但 `pb` 的成本被记到 `pa`，
+  M-X3 的 agent/model 两维归因仍是错的。
+- 测试：新增 `py/tests/test_parallel_cost_attribution.py` 2 例（逐笔入账 / 聚合不双记）、
+  `py/tests/test_loop_executor.py` 2 例（并行与串行组的对账调用序列 + 聚合 `model is None`）。
+  变异反证：删掉两处对账调用 → 4 例全红；还原后逐字节一致。邻近回归 145 例通过，
+  `mypy maop/` 619 文件无问题，file-size / silent-exception 门禁通过。
+- **相邻缺口，本批不动**：`_phase_feedback` 的 verify-feedback 重派发
+  （`maop_loop_phases.py:504-513`）同样不调 `_budget_reconciliation`，即"重试成功那一笔"
+  也不入账；是否一并收口交 owner 裁决。
+
 ## [5.6.0] — 2026-11-05
 
 ### 门禁：`overlay_probe` 子进程输出形状校验（2026-11-05）

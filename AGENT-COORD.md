@@ -933,3 +933,32 @@
   views/Integrations.vue,App.vue,i18n/view-integrations.js}` 及对应 4 个测试、
   CHANGELOG `[Unreleased]` 本批段、本登记。
 - **不碰**：#225 与 ZCode 第十九轮三线领地、MAOS 主工作树；本线 #226 独立串行。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-05：GAP-5 修复——并行成本逐笔记账）
+
+- **授权**：用户「先修 GAP-5」（板面 GAP-5 无认领条目；ZCode 第十九轮只登记了
+  发现与验收判据，未登记领地）。
+- **与 #232 的关系（如实登记，非隐瞒）**：本线动工后才发现他线已开
+  `fix/gap5-parallel-usage`（PR #232，`fb238279`，做法=把子任务的 model/usage
+  折叠进聚合体 + 硬化 `_budget_reconciliation` 早退条件）。两案都消掉"静默缺行"，
+  差异在归因维度，实测对照（pa→m1、pb→m2，各 150 tokens）：
+  - #232：`cost_entries` 1 行 = `agent=pa, model=m1, tokens=300`（`pb` 无行）；
+  - 本线：2 行 = `pa/m1 150`、`pb/m2 150`（总量同为 300，无重复计）。
+   ⇒ 归 owner 二选一；两 PR 均改 `loop_executor._execute_parallel`，**不可都合**。
+  本线不改 `maop_loop_phases._budget_reconciliation` 的早退语义（爆炸半径更小）。
+- **交付**：`loop_executor._execute_parallel` 两个分支各在子任务结果上调用
+  `_budget_reconciliation`；聚合体注明保持 `model/usage` 为空的原因；
+  `ExecuteMixin` 声明新增的跨 mixin 依赖 `_budget_reconciliation: Any`。
+- **验证**：真 `maop.cli run` + M-SIM stub 的复现脚本——触发文本
+  `calls 0→2 / tokens 0→1039`（== 协议行 675+364），中文对照 `1/176` 不变；
+  新增 4 例测试；变异反证（删两处对账）4 例全红、还原逐字节一致；邻近回归 145 例、
+  `mypy maop/` 619 文件、file-size/silent-exception/docs gate 全过；ruff 触及文件 0 命中
+  （全仓 3 条 DTZ 属本机 0.16.10 vs CI 0.17.3 噪声，文件均非本批）。
+- **领地**：`py/maop/loop_executor.py`、`py/tests/test_loop_executor.py`、
+  `py/tests/test_parallel_cost_attribution.py`、CHANGELOG `[Unreleased]` 本批段、本登记。
+- **不碰**：`docs/audits/business-sim-m1-evidence.md`（ZCode 领地，只在 PR 里引用其
+  GAP-5 判据）、`py/maop/maop_loop_phases.py`（与 #232 重叠面留给 owner 裁决）、
+  #227 领地、MAOS 主工作树。
+- **工具坑记（本机）**：进程内探针若不设 `MAOP_DATA_DIR`，`CostTracker` 会写进仓库
+  `data/maop.db`（`root_dir` 参数只是占位）——多次运行会互相叠加成"看起来重复记账"；
+  本会话已清理自己写入的 6 行 `trace_id=probe` 合成记录（清理前后计数留档）。
