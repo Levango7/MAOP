@@ -19,11 +19,11 @@ const API_ENDPOINT_N8N_PROBE = '/api/n8n/health';
 
 // 能力探针的统一语义：404 = 端点整块不存在；401/403 = 本次没拿到登录/权限，
 // 不能当证据；其它（含 5xx）= 端点已注册、只是这次失败。结论缓存，未知不缓存。
-function createAvailabilityProbe(state, endpoint) {
+function createAvailabilityProbe(state, request) {
   return async function check() {
     if (state.value !== null) return state.value;
     try {
-      const res = await fetchWithTimeout(endpoint, withAuth({}, {}));
+      const res = await request();
       if (res.status === 404) state.value = false;
       else if (res.status !== 401 && res.status !== 403) state.value = true;
     } catch {
@@ -216,10 +216,17 @@ export const useEditionStore = defineStore('edition', () => {
   }
 
   // 一次性探测（判定后缓存，不再发请求）。语义见 createAvailabilityProbe。
+  // 注意：URL 常量必须留在 fetchWithTimeout 的实参位置——前端的 /api/ 字面量
+  // 归属门禁（tests/test_frontend_response_models.py）按"同文件的常量实参"
+  // 解析；把常量传给一个只收 endpoint 参数的工厂会让两条探针都掉出审计面。
   const checkNotificationsAvailability = createAvailabilityProbe(
-    notificationsAvailable, API_ENDPOINT_NOTIFICATIONS_PROBE,
+    notificationsAvailable,
+    () => fetchWithTimeout(API_ENDPOINT_NOTIFICATIONS_PROBE, withAuth({}, {})),
   );
-  const checkN8nAvailability = createAvailabilityProbe(n8nAvailable, API_ENDPOINT_N8N_PROBE);
+  const checkN8nAvailability = createAvailabilityProbe(
+    n8nAvailable,
+    () => fetchWithTimeout(API_ENDPOINT_N8N_PROBE, withAuth({}, {})),
+  );
 
   return {
     // state
