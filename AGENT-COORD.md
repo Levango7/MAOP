@@ -894,3 +894,24 @@
 - **chart/打包修复（本 PR）**：role.yaml ClusterRole 增 CRD 只读规则、
   .dockerignore 反排除 business_sim、chart README 补 webhook TLS 前置说明。
 
+### 接管回执 + 第二十轮切版（2026-11-05，WorkBuddy/Qoder-CN 双下线交接）
+- **接管执行实录**：#228（WorkBuddy）全绿自动合并 → `4a2fd7b9`；#226（Qoder）
+  全绿自动合并 → `1c8ee198`；#229（本线 M1 双腿）rebase 解板面双追加冲突后
+  全绿 → `4000e67d`。#226 的 CONFLICTING 实为陈旧态（Qoder 已自行 rebase）；
+  #229 的 cancelled 为配额掐单（rerun-failed-jobs 自愈）。
+- **#230 真红根因（已闭环）**：`edition.js` 探针 URL 经参数间接传入工厂 ⇒
+  前端 `/api/` 归属门禁（`test_every_frontend_url_is_attributed_or_exempted`）
+  解析不了间接形态 ⇒ 三平台 pytest 真红。Qoder 下线前已修（`52a9ce9d`：URL
+  常量留 fetchWithTimeout 实参位，保住审计面），本地复验 13/13；修复版 CI
+  重跑中，绿即合。**门禁按设计工作（防审计面静默缩小）——静态守卫族价值
+  再次实证**。
+- **C 分支**：`feat/capability-gate-integrations`（n8n 能力探针门控）Qoder 已
+  自行开 PR #230 并推修复，接管仅剩 merge-on-green。
+- **切版本 PR**：v5.6.0——四站点（pyproject/`__init__`/Dockerfile LABEL/
+  package.json）+ CHANGELOG `[5.6.0] — 2026-11-05` 节 + ROADMAP 当前状态；
+  用户已批（「可以 我同意」切版建议）。合并后 tag `v5.6.0` 推送触发
+  publish 作业 → 验证 PyPI。
+- **WorkBuddy 遗留**：`fix/frontend-polish`（d2744262）删否仍待用户；worktree
+  `F:/Nexus/MAOP-a11y` 现场保留。留言板回执（#223+分支清理）由本条代登：
+  #223 已合 `10cc9525`，其分支/远端清理已由其自行完成。
+
