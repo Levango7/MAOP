@@ -828,3 +828,23 @@
 - **合并纪律**：三线各自独立分支，谁先绿谁先进 CI 队列（一次只一个 PR 在
   CI），逐条 rebase→CI→merge；后进者 rebase 到新 master。
 - **不碰**：他线在途 PR/worktree 领地；MAOS 主工作树（SAML 线活跃）。
+
+### 第十九轮推进回执（2026-11-05，并行三线实况；重放于 #223 板面治理之后）
+- **M-X2 E2-b 已交付并合并**：PR #224 → master `e5f3cc7f`（GET/POST
+  /api/workflows + run_events 三事件回写 + trace_id 接通既有时间线；契约
+  6/6 + dashboard 审计 19/19；CI 23 真实 job 全绿后 canary 收口）。
+- **M-SIM M1**：`soak_run.py` 48h harness 交付并**本机点火**（逐轮 JSONL +
+  增量对账硬门禁 + 熔断/stop-file/断点续跑）。harness 调试修掉两真 bug：
+  ① `build_sim_home` 返回 `base/sim-home` 内层目录（拿外层当 home → 子进程
+  回退包默认配置 cline 熔断）；② **M0 地雷复发实锤**——`parents[1]` 差一层
+  让子进程 cwd 落 scripts/ 经 .pth 解析到主工作树旧 cli（unrecognized
+  arguments，与 M0 记录完全同形）。增量对账口径：持久 home 成本表跨轮累积
+  ⇒ round 前后 attribution 差值 == 当轮协议行（全量口径第 2 轮起必然
+  失配，属口径选择非缺陷）。冒烟 5/5 全绿后点火。
+- **M2.2 B2 侦察结论（实施=本分支 feat/m22b2-queue-wiring）**：现状 =
+  SQLite 落地 `MessageQueue`（get_db_path("queue")）+ `queue_worker`
+  消费者（human approvals / maintenance / queue stats 三 topic 族，`run()`
+  常驻消费 + 信号处理）；「进程间接线」= 提交面与消费面跨进程共享同一
+  持久队列的可靠性接线（envelope/重试/毒丸隔离面）。
+- **master push run 教训复证**：b684d70e 的 run 级 queued 长达 30+ min，
+  job 视图 11 success/7 in_progress——「run 级 queued ≠ 没跑」再次实证。
