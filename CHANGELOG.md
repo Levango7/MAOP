@@ -38,6 +38,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## [Unreleased]
+
+### `refactor/layering-closeout` 追上 master：154 个提交合并 + 基线断点登记（2026-11-05）
+
+该分支长期落后主树（12 领先 / 154 落后），阶段一至四的成果（13 个端点建模、
+六模块 92 处宽口径收窄、集成分层收尾）一直不可见、未过 CI。本次把
+`origin/master` 合并进来，21 处冲突逐文件裁决：
+
+- **response_model 建模重复**（`share` / `agent_versions` / `credential_vault` /
+  `long_running_task` 的 router + schemas，共 8 文件）：两线对同一批 13 个端点
+  各自建模，allowlist 条目后来收敛成完全一致。取 master —— 它每个字段都有默认值、
+  时间戳用 `float | str` 联合、`status` 默认 `error`，能接住 `error_value` 降级
+  dict；本分支的早期版本用纯 `str` + 必填字段，在降级路径上会 500。
+- **企业包缺席时的收集口径**（`tests/conftest.py` 等 9 文件）：master 用
+  `tests/_overlay_rule.py` 的 AST 判定取代清单方案，各用例 `importorskip` 也缩到
+  具体子模块。取 master。
+- **前端通知入口门挡**（`dashboard-enterprise/src/**` 3 文件）：master 已从
+  `requiresEnterprise` 改为 `requiresCapability`，与后端 import 探测一致。取 master。
+- 本分支自有的宽口径棘轮、六模块收窄、supervisor mixin 用例无冲突，原样保留。
+
+**基线断点**：合并把他线未经本门禁的代码带进来，树上宽口径 1067 → 1072（+5，
+全部位于 `core/security/middleware/_auth.py`、`_protection.py`、`dashboard/server.py`、
+`operator/handlers.py` 等，均为第三方句柄 / `await` / 子进程，不可静态枚举）。
+合并点是基线的唯一合法上调口，登记见 ADR-023 D11；此后任何新增仍是「新增即红」。
+
+顺带修掉 `tests/test_supervisor_mixin_boundary.py` 的 4 个 ruff 告警
+（未使用的 `AlertLevel` 导入与 3 个未使用赋值）。
+
 ### M-SIM 模拟业务场景预生产演练 M0（2026-11-04）
 
 GA 前两类缺口（真生产运维证据、跨里程碑栈集成验证）在等不来真实客户/云

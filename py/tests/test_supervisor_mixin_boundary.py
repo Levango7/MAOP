@@ -18,7 +18,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from maop.core.scheduling.failure_detector import FailurePatternDetector
 from maop.core.scheduling.supervisor import (
-    AlertLevel,
     Supervisor,
     SupervisorAction,
 )
@@ -46,19 +45,19 @@ class TestSupervisorMixinBoundary(unittest.TestCase):
 
     def test_degrade_factor_zero_clamped(self):
         self.sup.record_result("a", success=True, latency=0.1)
-        record = self._run(self.sup.degrade("a", factor=0.0, reason="edge"))
+        self._run(self.sup.degrade("a", factor=0.0, reason="edge"))
         # 0.0 被 clamp 到 0.01
         self.assertGreaterEqual(self.sup.get_weight("a"), 0.01)
 
     def test_degrade_factor_one_clamped(self):
         self.sup.record_result("a", success=True, latency=0.1)
-        record = self._run(self.sup.degrade("a", factor=1.0, reason="edge"))
+        self._run(self.sup.degrade("a", factor=1.0, reason="edge"))
         # 1.0 被 clamp 到 0.99
         self.assertLessEqual(self.sup.get_weight("a"), 0.99)
 
     def test_degrade_factor_above_one_clamped(self):
         self.sup.record_result("a", success=True, latency=0.1)
-        record = self._run(self.sup.degrade("a", factor=2.0, reason="edge"))
+        self._run(self.sup.degrade("a", factor=2.0, reason="edge"))
         self.assertLessEqual(self.sup.get_weight("a"), 0.99)
 
     # ── Action mixin: terminate force path ─────────────────────────

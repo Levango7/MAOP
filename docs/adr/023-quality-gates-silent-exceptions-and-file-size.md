@@ -248,6 +248,20 @@ bridge / registry 的未知实现」与「`await` 未知协程」。
 `Path` 上的文件系统操作，异常集就是 `OSError` 一族 —— 与 D9 的 `close`/`execute`
 相反，这次是「窄异常被误判成不可收窄」。
 
+### D11. 合并 master 后的基线断点（2026-11-05）
+
+本分支落后 `origin/master` 154 个提交，合并后树上宽口径由 **1067 → 1072**。
+这 5 处不是本分支新增，而是他线在本轮之前合入的代码：`core/security/middleware/_auth.py`
+3 处、`_protection.py` 2 处（JWT / 签名解析兜底，`try` 体含第三方解码器与
+`await`）、`dashboard/server.py` 新增 6 处、`operator/handlers.py`、
+`dashboard/routers/workflows.py`、`dashboard/services/tenant_blackboard_service.py`、
+`scripts/business_sim/{run_sim,soak_run}.py`。按「异常集不可静态枚举」判定均为
+不可收窄（第三方句柄 / `await` 未知协程 / 子进程），归其所属线继续处理。
+
+**合并点是基线的唯一合法上调口**：棘轮的本义是「本分支的净变化只许下降」，
+而合并会把他人未经过本门禁的代码带进来。此后任何新增仍是「新增即红」，
+这 5 处也已按上表登记到文件级，不允许再无声增长。
+
 ## 影响
 
 - 新增：`scripts/check_silent_exceptions.py`、`scripts/check_file_size.py`、

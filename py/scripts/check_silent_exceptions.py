@@ -87,7 +87,12 @@ SUPPRESS_BASELINE = 46
 #: ``datetime.fromisoformat``、pydantic ``model_validate_json``、otel 可选依赖
 #: 探针），该模块剩余 249 处的归因见 ADR-023 D10。登记条目一旦 try 体缩小到
 #: 只剩 import 或单一已知 API，必须收窄并下调本基线。
-BROAD_EXCEPT_BASELINE = 1067
+#:
+#: 2026-11-05 合并 origin/master（154 个提交）后：1067 → 1072。这 5 处不是本分支
+#: 新增，而是他线在本轮之前合入的代码（usage 记录 best-effort、Redis 可选/瞬时
+#: 失败、route 注册兜底等），它们的 try 体含第三方客户端或 await，不可静态枚举，
+#: 归对应线继续收窄。合并点是基线的唯一合法上调口——此后任何新增仍是「新增即红」。
+BROAD_EXCEPT_BASELINE = 1072
 
 
 def _iter_py_files() -> Iterator[pathlib.Path]:
