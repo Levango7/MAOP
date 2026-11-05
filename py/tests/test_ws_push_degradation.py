@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -25,7 +27,7 @@ def app():
 
 def _hello(client: TestClient) -> dict:
     with client.websocket_connect("/ws") as ws:
-        return ws.receive_json()
+        return cast(dict, ws.receive_json())
 
 
 def test_hello_reports_push_enabled_by_default(app):

@@ -451,7 +451,7 @@ class TestOtel:
     def test_inject_trace_context_disabled(self, monkeypatch):
         monkeypatch.delenv("MAOP_OTEL_ENABLED", raising=False)
         from maop.core.monitoring.otel import inject_trace_context
-        carrier = {}
+        carrier: dict[str, str] = {}
         inject_trace_context(carrier)
         # No-op when disabled.
         assert carrier == {}

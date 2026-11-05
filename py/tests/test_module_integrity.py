@@ -76,7 +76,7 @@ def signed_tree(tmp_path, monkeypatch):
             "signature": base64.urlsafe_b64encode(sig).decode("ascii"),
             "algorithm": "Ed25519",
         }
-        mpath = tmp_path / "_integrity_manifest.json"
+        mpath: Path = tmp_path / "_integrity_manifest.json"
         mpath.write_text(json.dumps(manifest), encoding="utf-8")
         return mpath
 

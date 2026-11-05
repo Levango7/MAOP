@@ -16,6 +16,7 @@ import json
 import pathlib
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -31,8 +32,8 @@ import check_release_tag
 import ci_path_scope
 
 
-def _doc() -> dict:
-    return yaml.safe_load(CI.read_text(encoding="utf-8"))
+def _doc() -> dict[str, Any]:
+    return cast(dict[str, Any], yaml.safe_load(CI.read_text(encoding="utf-8")))
 
 
 def _triggers(doc: dict) -> dict:
@@ -105,8 +106,8 @@ class TestTriggerSurface:
 
 
 class TestPublishJobShape:
-    def _publish(self) -> dict:
-        return _doc()["jobs"]["publish"]
+    def _publish(self) -> dict[str, Any]:
+        return cast(dict[str, Any], _doc()["jobs"]["publish"])
 
     def test_condition_targets_version_tags(self) -> None:
         assert "refs/tags/v" in str(self._publish().get("if", ""))
@@ -191,8 +192,8 @@ class TestManualPublishEscapeHatch:
     目标 tag、重建并走同一 OIDC 路径。它必须只在手工 dispatch 时触发。
     """
 
-    def _job(self) -> dict:
-        return _doc()["jobs"]["publish-manual"]
+    def _job(self) -> dict[str, Any]:
+        return cast(dict[str, Any], _doc()["jobs"]["publish-manual"])
 
     def test_dispatch_only(self) -> None:
         cond = str(self._job().get("if") or "")
@@ -281,10 +282,10 @@ class TestReleaseAssets:
 
     JOB = "release-assets"
 
-    def _job(self) -> dict:
-        jobs = _doc()["jobs"]
+    def _job(self) -> dict[str, Any]:
+        jobs = cast(dict[str, Any], _doc()["jobs"])
         assert self.JOB in jobs, f"ci.yml 缺 {self.JOB} 作业 ⇒ 没有 PyPI 账号时又变成无分发路径"
-        return jobs[self.JOB]
+        return cast(dict[str, Any], jobs[self.JOB])
 
     def test_reachable_on_tag_push(self) -> None:
         assert "refs/tags/v" in str(self._job().get("if", "")), "作业条件没锁定 tag，等于永远不跑或每次都跑"

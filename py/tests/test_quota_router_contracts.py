@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -127,7 +127,7 @@ def _resolve(schema: dict, components: dict) -> dict:
     ref = schema.get("$ref")
     if not ref:
         return schema
-    return components[ref.rsplit("/", 1)[-1]]
+    return cast(dict[str, Any], components[ref.rsplit("/", 1)[-1]])
 
 
 def _records_block(source: str) -> str:

@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import textwrap
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -232,9 +233,9 @@ class TestStaticCRValidation:
     """Validate sample MaopAgent CRs against the CRD schema in pure Python."""
 
     @pytest.fixture
-    def crd_schema(self) -> dict:
-        crd = _load_yaml(CHART_DIR / "crds" / "maopagent.yaml")  # type: ignore[return-value]
-        return crd["spec"]["versions"][0]["schema"]["openAPIV3Schema"]
+    def crd_schema(self) -> dict[str, Any]:
+        crd = cast(dict[str, Any], _load_yaml(CHART_DIR / "crds" / "maopagent.yaml"))
+        return cast(dict[str, Any], crd["spec"]["versions"][0]["schema"]["openAPIV3Schema"])
 
     SAMPLE_CR = {  # noqa: RUF012
         "apiVersion": "maop.io/v1alpha1",

@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -46,12 +47,12 @@ TRUNK_ONLY_PATTERNS = (
 SCOPE_COND = "needs.scope.outputs.code"
 
 
-def _doc() -> dict:
-    return json.loads(LIST_FILE.read_text(encoding="utf-8"))
+def _doc() -> dict[str, Any]:
+    return cast(dict[str, Any], json.loads(LIST_FILE.read_text(encoding="utf-8")))
 
 
-def _entries() -> list[dict]:
-    return _doc()["contexts"]
+def _entries() -> list[dict[str, Any]]:
+    return cast(list[dict[str, Any]], _doc()["contexts"])
 
 
 def _workflow(filename: str) -> tuple[dict, dict]:

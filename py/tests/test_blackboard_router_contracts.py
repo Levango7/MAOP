@@ -14,7 +14,7 @@ declare the success shape only, with a required ``status``.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -64,7 +64,7 @@ def _write(client: TestClient, domain: str = "problem", **kw: Any) -> dict[str, 
     payload.update(kw)
     resp = client.post("/api/blackboard/write", json=payload)
     assert resp.status_code == 200, resp.text
-    return resp.json()["data"]
+    return cast(dict[str, Any], resp.json()["data"])
 
 
 def _assert_keeps_every_payload_field(body: Any, payload: Any) -> None:

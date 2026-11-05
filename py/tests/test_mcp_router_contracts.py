@@ -14,7 +14,7 @@ Two purposes:
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -248,7 +248,7 @@ def combined(monkeypatch):
 
 
 async def _masking_probe(combined, servers: list[dict[str, Any]]) -> dict[str, Any]:
-    return await combined(servers)
+    return cast(dict[str, Any], await combined(servers))
 
 
 def test_combined_redacts_header_and_token_values(combined) -> None:

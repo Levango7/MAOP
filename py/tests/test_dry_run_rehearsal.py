@@ -26,7 +26,7 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -319,7 +319,7 @@ def _dispatch(tmp_path: Path, *, declared: bool, dry_run: bool) -> dict[str, Any
     asyncio.run(
         dispatcher.dispatch(agent="probe-agent", task="REAL-TASK", dry_run=dry_run),
     )
-    return json.loads((tmp_path / "probe.json").read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads((tmp_path / "probe.json").read_text(encoding="utf-8")))
 
 
 @pytest.fixture

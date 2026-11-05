@@ -27,6 +27,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -48,19 +49,19 @@ REQUIRED_LEGS = {
 }
 
 
-def _load(path: Path) -> dict:
+def _load(path: Path) -> dict[str, Any]:
     # 工作区在 Windows 上是 CRLF 检出；YAML 块标量会把 \r 一起带进 run 脚本，
     # 所以统一归一化后再断言（提交进 git 的 blob 本来就是 LF，见 core.autocrlf）。
     text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
-    return yaml.safe_load(text)
+    return cast(dict[str, Any], yaml.safe_load(text))
 
 
-def _flaky_job() -> dict:
-    return _load(NIGHTLY)["jobs"][JOB_ID]
+def _flaky_job() -> dict[str, Any]:
+    return cast(dict[str, Any], _load(NIGHTLY)["jobs"][JOB_ID])
 
 
-def _legs() -> list[dict]:
-    return _flaky_job()["strategy"]["matrix"]["include"]
+def _legs() -> list[dict[str, Any]]:
+    return cast(list[dict[str, Any]], _flaky_job()["strategy"]["matrix"]["include"])
 
 
 def _run_steps() -> list[dict]:

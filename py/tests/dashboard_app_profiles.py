@@ -31,7 +31,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI
 
@@ -349,5 +349,5 @@ def overlay_probe(modules: tuple[str, ...]) -> dict[str, str]:
     )
     if probe.returncode != 0:
         raise RuntimeError(f"overlay probe failed: {probe.stderr[-400:]}")
-    return json.loads(probe.stdout.strip().splitlines()[-1])
+    return cast(dict[str, Any], json.loads(probe.stdout.strip().splitlines()[-1]))
 

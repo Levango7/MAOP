@@ -14,7 +14,7 @@ import json
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from cryptography import x509
@@ -147,7 +147,7 @@ def _build_saml_response(
     issuer_idx = list(assertion_elem).index(issuer_elem)
     assertion_elem.insert(issuer_idx + 1, signature_elem)
 
-    return etree.tostring(root, xml_declaration=False, encoding="unicode")
+    return cast(str, etree.tostring(root, xml_declaration=False, encoding="unicode"))
 
 
 # ═══════════════════════════════════════════════════════════════════════

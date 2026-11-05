@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -38,7 +38,7 @@ def qm(tmp_path: Path) -> Any:
 
 
 def _history(tenant_id: str) -> list[dict[str, Any]]:
-    return billing_service.list_quota_history(tenant_id=tenant_id)["history"]
+    return cast(list[dict[str, Any]], billing_service.list_quota_history(tenant_id=tenant_id)["history"])
 
 
 class TestQuotaChangeHistory:

@@ -12,6 +12,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -113,8 +114,8 @@ def test_skipped_counts_as_satisfied() -> None:
 # ── 归因前置：本轮 run 说的话还代表这个 PR 吗 ─────────────────────────
 
 
-def _entries() -> list[dict]:
-    return canary.read_manifest_entries()
+def _entries() -> list[dict[str, Any]]:
+    return cast(list[dict[str, Any]], canary.read_manifest_entries())
 
 
 def _needs(**overrides: str) -> dict[str, dict]:
@@ -427,12 +428,12 @@ def test_main_without_attribution_inputs_is_unverified(monkeypatch, capsys) -> N
 # ── ci.yml 接线 / 清单 / 文档 三方一致 ───────────────────────────────
 
 
-def _ci_jobs() -> dict:
-    return yaml.safe_load(CI_YML.read_text(encoding="utf-8")).get("jobs") or {}
+def _ci_jobs() -> dict[str, Any]:
+    return cast(dict[str, Any], yaml.safe_load(CI_YML.read_text(encoding="utf-8")).get("jobs") or {})
 
 
-def _manifest_entries() -> list[dict]:
-    return json.loads(MANIFEST.read_text(encoding="utf-8"))["contexts"]
+def _manifest_entries() -> list[dict[str, Any]]:
+    return cast(list[dict[str, Any]], json.loads(MANIFEST.read_text(encoding="utf-8"))["contexts"])
 
 
 def _as_list(value) -> list[str]:

@@ -296,7 +296,7 @@ class TestWorkerRegistryBatchReads:
         client = _CountingRedis(fakeredis.FakeRedis())
         registry = WorkerRegistry(client, heartbeat_timeout=15.0)
         for i in range(n_workers):
-            caps = (caps_of or (lambda _i: set()))(i)
+            caps: set[str] = (caps_of or (lambda _i: set()))(i)
             registry.register(worker_id=f"w{i}", capabilities=caps)
         client.calls = 0  # 注册后的调用不计入测量
         return registry, client

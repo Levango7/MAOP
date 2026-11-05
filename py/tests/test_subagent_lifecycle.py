@@ -9,6 +9,7 @@ The _invoke_llm hook is patched to avoid real LLM calls.
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -195,7 +196,7 @@ async def test_cancel_returns_false_for_completed_agent(mgr):
 async def test_spawn_and_wait_all_returns_all_results(mgr):
     """spawn_and_wait_all() runs agents in parallel and collects results."""
     with patch.object(mgr, "_invoke_llm", new=AsyncMock(return_value="ok")):
-        tasks = [
+        tasks: list[tuple[AgentConfig, str, dict[str, Any]]] = [
             (_config(name="a"), "task A", {}),
             (_config(name="b"), "task B", {}),
             (_config(name="c"), "task C", {}),
@@ -218,7 +219,7 @@ async def test_spawn_and_wait_all_handles_mixed_success_failure(mgr):
         return f"ok-{call_count}"
 
     with patch.object(mgr, "_invoke_llm", new=flaky_llm):
-        tasks = [
+        tasks: list[tuple[AgentConfig, str, dict[str, Any]]] = [
             (_config(name="a"), "task A", {}),
             (_config(name="b"), "task B", {}),
         ]

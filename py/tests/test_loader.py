@@ -221,7 +221,7 @@ guards:
 
 
 @pytest.fixture
-def project_root(tmp_path, agents_yaml_content, rules_yaml_content) -> Path:
+def project_root(tmp_path: Path, agents_yaml_content, rules_yaml_content) -> Path:
     config_dir = tmp_path / "config"
     config_dir.mkdir(parents=True)
     (config_dir / "agents.yaml").write_text(agents_yaml_content, encoding="utf-8")

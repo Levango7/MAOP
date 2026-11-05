@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
+from typing import Any, cast
 from unittest.mock import patch
 
 import fakeredis
@@ -195,7 +195,7 @@ class TestDispatchSelection:
         def counting(required: Any = None) -> list[str]:
             nonlocal calls
             calls += 1
-            return orig(required)
+            return cast(list[str], orig(required))
 
         registry.capable_workers = counting  # type: ignore[method-assign]
         try:

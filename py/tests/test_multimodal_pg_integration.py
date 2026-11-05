@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -55,7 +56,7 @@ _skip = pytest.mark.skipif(not _HAS_PG, reason="PostgreSQL + psycopg2 not availa
 
 
 def _gold() -> dict:
-    return json.loads(GOLD.read_text(encoding="utf-8"))
+    return cast(dict, json.loads(GOLD.read_text(encoding="utf-8")))
 
 
 def _pg_vector(vec: list[float]) -> str:

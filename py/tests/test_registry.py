@@ -109,7 +109,7 @@ quota:
 
 
 @pytest.fixture
-def project_root(tmp_path, models_yaml_content) -> Path:
+def project_root(tmp_path: Path, models_yaml_content) -> Path:
     config_dir = tmp_path / "config"
     config_dir.mkdir(parents=True)
     (config_dir / "models.yaml").write_text(models_yaml_content, encoding="utf-8")
