@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.6.1] — 2026-11-06
+
 ### GAP-5 修复——并行分支成本台账静默缺行（2026-11-06）
 
 M-SIM M1 Temporal 腿发现（证据稿 GAP-5 节）：任务文本触发 analyzer 拆子任务
