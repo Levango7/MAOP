@@ -64,6 +64,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 顺带修掉 `tests/test_supervisor_mixin_boundary.py` 的 4 个 ruff 告警
 （未使用的 `AlertLevel` 导入与 3 个未使用赋值）。
+### GAP-1 收口 —— legacy run_workflow 真实执行（2026-11-06）
+
+M-SIM M0 演练抓到的最后一条真缺口：`wiring.run_workflow` 在默认（legacy）
+后端下走 `maop_plan.execute_workflow`——**纯规划，一个 agent 都不跑**；而
+`maop workflow run` 与 dashboard `POST /api/workflows/{name}/run` 两个生产
+入口都指向它，用户看到「提交成功、零节点执行」（静默假成功，最伤生产力）。
+
+修复：legacy 后端自此按编译层序**真实执行**——复用 TemporalAdapter 的编译
+（拓扑分层 + 环/未知依赖校验），逐层并行 dispatch 节点（每节点走 `maop run`
+子进程，与 operator/Temporal 同一条执行体），结果聚合为 `WorkflowResult`
+（`steps_completed` 反映真实成功数），节点事件回写 `run_events`
+（`run.workflow.step.started/success|failed`）——面板可沿 trace_id 把工作流
+事件与子 agent 事件同轴查看。纯规划语义仍保留在 `maop_plan.execute_workflow`
+（公开 API，规划调用方继续使用）。
+
+测试：3 例（真实 dispatch 两节点全 success + 事件回写 + 未知 workflow 诚实
+空结果）；ruff/mypy 无问题。
 
 ## [5.6.1] — 2026-11-06
 
