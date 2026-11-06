@@ -216,6 +216,7 @@ class TestSelectAgent:
     def test_driver_warning_on_unknown_driver(self, scorer: RouteScorer, caplog):
         """P1 fix: unknown driver should produce a warning."""
         # Patch the config to have an agent with unknown driver
+        assert scorer.config is not None
         scorer.config.agents["claude"].driver = "unknown_driver"
         route = RouteEntry(primary="claude", fallback="kimi")
         import logging

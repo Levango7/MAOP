@@ -75,7 +75,8 @@ class TestApiKeyVault:
         vault = ApiKeyVault(root_dir=tmp_path)
         vault.store("openai", "sk-test")
         new_key = Fernet.generate_key()
-        assert vault.rotate_master_key(new_key=new_key.decode()) is True
+        # 故意传 str：验证实现会拒绝/兼容非 bytes 入参
+        assert vault.rotate_master_key(new_key=new_key.decode()) is True  # type: ignore[arg-type]
         assert vault.retrieve("openai") == "sk-test"
 
     def test_rotate_master_key_empty_vault(self, tmp_path):

@@ -10,6 +10,8 @@ loop 级 ``_tokens_used_measured``，与串行路径口径一致）；对账入�
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 from maop.core.agent.analyzer import AnalysisResult, DependencyDAG, SubTask
@@ -21,7 +23,7 @@ from maop.loop_models import LoopConfig
 class _Harness:
     """最小宿主：只提供 ``_execute_parallel`` 触及的属性与方法。"""
 
-    def __init__(self, results_by_task: dict[str, object]) -> None:
+    def __init__(self, results_by_task: dict[str, Any]) -> None:
         self._loop_config = LoopConfig()
         self._worker_pool = None
         self._tokens_used_measured = 0
@@ -36,7 +38,7 @@ class _Harness:
         return None
 
 
-def _harness_with_mixin(results_by_task: dict[str, object]) -> object:
+def _harness_with_mixin(results_by_task: dict[str, Any]) -> Any:
     """把 ExecuteMixin 的 ``_execute_parallel`` 挂到最小宿主上。
 
     MRO 注意：``_Harness`` 必须在 ``ExecuteMixin`` 之前——宿主的
@@ -129,7 +131,7 @@ def test_budget_reconciliation_records_usage_without_model(tmp_path) -> None:
         agent="sim-worker",
         stdout="ok",
     )
-    PhasesMixin._budget_reconciliation(host, result, "gap5-trace-rec")
+    PhasesMixin._budget_reconciliation(cast(PhasesMixin, host), result, "gap5-trace-rec")
     db = get_db_path("cost_tracker")
     with sqlite3.connect(str(db)) as conn:
         rows = conn.execute(

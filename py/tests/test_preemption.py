@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from typing import Any
 
 import pytest
 
@@ -25,6 +26,14 @@ from maop.core.monitoring.monitoring import (
 )
 from maop.core.reliability.priority_queue import PriorityTask, PriorityTaskQueue
 from tests.thread_join_guard import join_all
+
+
+def _pop_payload(q: PriorityTaskQueue) -> Any:
+    """Pop one task (asserting the queue is non-empty) and return its payload."""
+    task = q.pop()
+    assert task is not None
+    return task.payload
+
 
 # ── PriorityTaskQueue ──────────────────────────────────────────
 
@@ -54,8 +63,7 @@ class TestPriorityTaskQueue:
         assert peeked.payload == "x"
         assert len(q) == 1
         # pop still returns the same item
-        popped = q.pop()
-        assert popped.payload == "x"
+        assert _pop_payload(q) == "x"
 
     def test_priority_ordering_lower_runs_first(self):
         """priority 1 (highest) is popped before priority 5 (lowest)."""
@@ -63,9 +71,9 @@ class TestPriorityTaskQueue:
         q.push(PriorityTask(payload="low", priority=5))
         q.push(PriorityTask(payload="high", priority=1))
         q.push(PriorityTask(payload="mid", priority=3))
-        assert q.pop().payload == "high"
-        assert q.pop().payload == "mid"
-        assert q.pop().payload == "low"
+        assert _pop_payload(q) == "high"
+        assert _pop_payload(q) == "mid"
+        assert _pop_payload(q) == "low"
 
     def test_fifo_tiebreak_same_priority(self):
         """Among equal-priority tasks, earlier push pops first."""
@@ -73,9 +81,9 @@ class TestPriorityTaskQueue:
         q.push(PriorityTask(payload="first", priority=3))
         q.push(PriorityTask(payload="second", priority=3))
         q.push(PriorityTask(payload="third", priority=3))
-        assert q.pop().payload == "first"
-        assert q.pop().payload == "second"
-        assert q.pop().payload == "third"
+        assert _pop_payload(q) == "first"
+        assert _pop_payload(q) == "second"
+        assert _pop_payload(q) == "third"
 
     def test_deadline_urgency_score(self):
         """Earlier deadline => smaller score => more urgent.
@@ -99,17 +107,17 @@ class TestPriorityTaskQueue:
         q.push(PriorityTask(payload="early-dl", priority=3, deadline_ms=1_000))
         q.push(PriorityTask(payload="no-dl", priority=3))
         # early (1000) < late (10000) < no-deadline (inf)
-        assert q.pop().payload == "early-dl"
-        assert q.pop().payload == "late-dl"
-        assert q.pop().payload == "no-dl"
+        assert _pop_payload(q) == "early-dl"
+        assert _pop_payload(q) == "late-dl"
+        assert _pop_payload(q) == "no-dl"
 
     def test_priority_beats_deadline(self):
         """Priority dominates: a high-prio task with a far deadline still wins."""
         q = PriorityTaskQueue()
         q.push(PriorityTask(payload="p5-urgent-dl", priority=5, deadline_ms=1))
         q.push(PriorityTask(payload="p1-far-dl", priority=1, deadline_ms=1_000_000))
-        assert q.pop().payload == "p1-far-dl"
-        assert q.pop().payload == "p5-urgent-dl"
+        assert _pop_payload(q) == "p1-far-dl"
+        assert _pop_payload(q) == "p5-urgent-dl"
 
     def test_clear(self):
         q = PriorityTaskQueue()
@@ -146,9 +154,9 @@ class TestPriorityTaskQueue:
         q.push(PriorityTask(payload="c", priority=3))
         n = q.reorder()
         assert n == 3
-        assert q.pop().payload == "a"
-        assert q.pop().payload == "b"
-        assert q.pop().payload == "c"
+        assert _pop_payload(q) == "a"
+        assert _pop_payload(q) == "b"
+        assert _pop_payload(q) == "c"
 
     def test_reorder_empty_returns_zero(self):
         q = PriorityTaskQueue()
@@ -161,7 +169,7 @@ class TestPriorityTaskQueue:
         # pops first among equal priority/deadline.
         q.push(PriorityTask(payload="natural", priority=3, enqueue_order=100))
         q.push(PriorityTask(payload="forced-first", priority=3, enqueue_order=1))
-        assert q.pop().payload == "forced-first"
+        assert _pop_payload(q) == "forced-first"
 
 
 class TestPriorityTaskQueueConcurrency:

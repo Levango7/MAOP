@@ -61,8 +61,10 @@ class TestCreateGet:
         mgr.create("tpl1", content="v1", version="1.0")
         mgr.create("tpl1", content="v2", version="2.0")
         ver = mgr.get("tpl1", version="1.0")
+        assert ver is not None
         assert ver.content == "v1"
         ver2 = mgr.get("tpl1", version="2.0")
+        assert ver2 is not None
         assert ver2.content == "v2"
 
     def test_get_nonexistent(self, mgr: PromptManager):
@@ -76,6 +78,7 @@ class TestCreateGet:
         mgr.create("tpl1", content="first", name="First")
         mgr.create("tpl1", content="second", name="Second", category="updated")
         ver = mgr.get("tpl1")
+        assert ver is not None
         assert ver.content == "second"
         templates = mgr.list_templates()
         assert len(templates) == 1

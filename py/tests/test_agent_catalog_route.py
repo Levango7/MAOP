@@ -248,7 +248,9 @@ class TestUpdateAgent:
         assert agent["display_name"] == "Claude Code"
         assert agent["vendor"] == "Anthropic"
         assert agent["capabilities"] == ["code_generation", "tool_use"]
-        assert catalog.get("claude-code").enabled is False
+        desc = catalog.get("claude-code")
+        assert desc is not None
+        assert desc.enabled is False
 
     def test_update_fallback_chain_persisted(
         self, client: TestClient, catalog: AgentCatalog
@@ -261,7 +263,9 @@ class TestUpdateAgent:
         )
         assert resp.status_code == 200
         assert resp.json()["agent"]["fallback_agents"] == ["gpt-4"]
-        assert catalog.get("claude-code").fallback_agents == ["gpt-4"]
+        desc = catalog.get("claude-code")
+        assert desc is not None
+        assert desc.fallback_agents == ["gpt-4"]
 
     def test_update_rejects_self_fallback(
         self, client: TestClient, catalog: AgentCatalog
@@ -273,7 +277,9 @@ class TestUpdateAgent:
             json={"fallback_agents": ["claude-code"]},
         )
         assert resp.status_code == 400
-        assert catalog.get("claude-code").fallback_agents == []
+        desc = catalog.get("claude-code")
+        assert desc is not None
+        assert desc.fallback_agents == []
 
     def test_update_invalid_adapter_type(
         self, client: TestClient, catalog: AgentCatalog
@@ -324,7 +330,9 @@ class TestUpdateHealth:
         resp = client.put("/api/agent-catalog/agents/claude-code/health", json={"healthy": True})
         assert resp.status_code == 200
         assert resp.json()["healthy"] is True
-        assert catalog.get("claude-code").healthy is True
+        desc = catalog.get("claude-code")
+        assert desc is not None
+        assert desc.healthy is True
 
     def test_update_health_false(self, client: TestClient, catalog: AgentCatalog) -> None:
         """更新健康状态为 False。"""
@@ -332,7 +340,9 @@ class TestUpdateHealth:
         resp = client.put("/api/agent-catalog/agents/claude-code/health", json={"healthy": False})
         assert resp.status_code == 200
         assert resp.json()["healthy"] is False
-        assert catalog.get("claude-code").healthy is False
+        desc = catalog.get("claude-code")
+        assert desc is not None
+        assert desc.healthy is False
 
     def test_update_health_not_found(self, client: TestClient) -> None:
         """更新不存在的 Agent 健康状态返回 404。"""

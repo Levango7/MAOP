@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import fakeredis.aioredis as fake_aioredis
@@ -491,6 +491,7 @@ class TestDistributedCheckpointCoordinator:
         await coord._save_checkpoint(cp)
 
         loaded = await coord._load_checkpoint("layer-test")
+        assert loaded is not None
         assert len(loaded.completed_layers) == 1
         assert loaded.completed_layers[0].duration_ms == 42
 
@@ -690,6 +691,7 @@ class TestCoordMCPHubBridge:
     async def test_async_find_tools_fallback(self):
         """async_find_tools falls back to manual iteration when no search method."""
         from maop.core.coordination.mcp_coord_bridge import CoordMCPHubBridge
+        from maop.core.mcp.mcp_hub import MCPHub
 
         class _StubHub:
             _servers: ClassVar[dict[str, Any]] = {"srv1": type("S", (), {"name": "MyServer"})()}
@@ -697,7 +699,7 @@ class TestCoordMCPHubBridge:
                 return [type("T", (), {"name": "tool_a", "description": "does a"})()]
 
         stub = _StubHub()
-        bridge = CoordMCPHubBridge(stub)
+        bridge = CoordMCPHubBridge(cast(MCPHub, stub))
         tools = await bridge.async_find_tools()
         assert len(tools) == 1
         assert tools[0]["name"] == "tool_a"

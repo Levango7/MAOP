@@ -211,6 +211,7 @@ class TestMessageQueue:
         mq = MessageQueue(db_path=str(tmp_path / "queue.db"))
         mq.enqueue("topic1", {"k": "v"})
         msg = mq.dequeue("topic1")
+        assert msg is not None
         result = mq.nack(msg.id, error="test error")
         assert isinstance(result, bool)
 

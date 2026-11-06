@@ -14,6 +14,7 @@ Design reference: tests/test_coordination_m2.py (M2 test).
 from __future__ import annotations
 
 import sys
+from typing import Any
 
 import pytest
 
@@ -787,6 +788,7 @@ class TestDictEventBridge:
     def test_to_federated(self):
         bridge = DictEventBridge("test", "maos")
         fed = bridge.to_federated({"event_type": "task_completed", "payload": {"id": 1}})
+        assert fed is not None
         assert fed.source == "maos"
         assert fed.topic == "task.completed"
         assert fed.data == {"id": 1}
@@ -876,7 +878,7 @@ class TestBlackboardHealthMonitor:
         assert snap["debates"]["converged"] == 1
 
     def test_percentile(self):
-        data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
         assert BlackboardHealthMonitor._percentile(data, 50) == 5.5
         assert BlackboardHealthMonitor._percentile(data, 99) == 9.91
         assert BlackboardHealthMonitor._percentile([], 50) == 0.0
@@ -914,7 +916,7 @@ class TestHealthProbes:
 
     def test_readiness_exception_in_check(self):
         probes = HealthProbes()
-        probes.register("x", lambda: 1 / 0)
+        probes.register("x", lambda: bool(1 / 0))
         r = probes.readiness()
         assert r["ready"] is False
         assert r["checks"]["x"] is False
@@ -926,7 +928,7 @@ class TestHealthProbes:
 
 
 def _make_entry(domain: str = "evidence", **kwargs) -> BlackboardEntry:
-    defaults = {"domain": domain, "content": {}}
+    defaults: dict[str, Any] = {"domain": domain, "content": {}}
     defaults.update(kwargs)
     return BlackboardEntry(**defaults)
 

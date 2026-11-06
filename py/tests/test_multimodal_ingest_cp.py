@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
+from maop.core.memory.multimodal_backend import MultimodalBackend
 from maop.core.memory.multimodal_ingest_cp import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_CONSUMER_GROUP,
@@ -24,6 +25,11 @@ from maop.core.memory.multimodal_ingest_cp import (
 from maop.core.reliability.message_queue import MessageQueue
 
 REPO = Path(__file__).resolve().parents[2]
+
+
+def _as_backend(fake: object) -> MultimodalBackend:
+    """假后端只实现 index_many；队列不会调用协议里的其它成员。"""
+    return cast(MultimodalBackend, fake)
 
 
 class _Recorder:
@@ -58,7 +64,7 @@ def mq(tmp_path) -> MessageQueue:
 
 def test_submit_persists_to_queue(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, start=False)
     eid = q.submit(_item("e1"))
     assert eid == "e1"
     # The message is in the queue DB, not yet consumed.
@@ -69,20 +75,20 @@ def test_submit_persists_to_queue(mq: MessageQueue):
 def test_submit_rejects_empty_id():
     be = _Recorder()
     mq = MessageQueue(db_path=":memory:")
-    q = CrossProcessIngestQueue(be, mq, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, start=False)
     assert q.submit({"text": "no id"}) == ""
 
 
 def test_submit_returns_empty_when_closed(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, start=False)
     q.close(drain=False)
     assert q.submit(_item("e1")) == ""
 
 
 def test_submit_many_filters_unusable(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, start=False)
     ids = q.submit_many([_item("a"), {"text": "x"}, _item("b")])
     assert ids == ["a", "b"]
 
@@ -92,7 +98,7 @@ def test_submit_many_filters_unusable(mq: MessageQueue):
 
 def test_drain_consumes_and_writes(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, start=False)
     q.submit_many([_item(f"t{i}") for i in range(3)]
                   + [_item(f"i{i}", modality="image") for i in range(3)])
     flushed = q.drain(timeout=2.0)
@@ -106,7 +112,7 @@ def test_drain_consumes_and_writes(mq: MessageQueue):
 
 def test_drain_batches_in_chunks(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, batch_size=2, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, batch_size=2, start=False)
     q.submit_many([_item(f"e{i}") for i in range(5)])
     flushed = q.drain(timeout=2.0)
     assert flushed == 5
@@ -116,7 +122,7 @@ def test_drain_batches_in_chunks(mq: MessageQueue):
 
 def test_drain_returns_zero_when_empty(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, start=False)
     assert q.drain(timeout=0.1) == 0
 
 
@@ -125,7 +131,7 @@ def test_drain_returns_zero_when_empty(mq: MessageQueue):
 
 def test_worker_consumes_and_batches(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, batch_size=4, flush_interval_s=0.3, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, batch_size=4, flush_interval_s=0.3, start=False)
     q.submit_many([_item(f"e{i}") for i in range(4)])
     q.start()
     try:
@@ -143,7 +149,7 @@ def test_worker_consumes_and_batches(mq: MessageQueue):
 
 def test_close_drains_pending(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, start=False)
     q.submit_many([_item(f"e{i}") for i in range(3)])
     flushed = q.close(drain=True, timeout=2.0)
     assert flushed == 3
@@ -152,7 +158,7 @@ def test_close_drains_pending(mq: MessageQueue):
 
 def test_close_idempotent(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, start=False)
     q.submit(_item("e1"))
     q.close(drain=True, timeout=2.0)
     second = q.close(drain=True, timeout=2.0)
@@ -164,7 +170,7 @@ def test_close_idempotent(mq: MessageQueue):
 
 def test_stats_reports_mode_and_topic(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, start=False)
     s = q.stats()
     assert s["mode"] == "crossprocess"
     assert s["topic"] == DEFAULT_TOPIC
@@ -175,7 +181,7 @@ def test_stats_reports_mode_and_topic(mq: MessageQueue):
 
 def test_pending_reflects_queue_depth(mq: MessageQueue):
     be = _Recorder()
-    q = CrossProcessIngestQueue(be, mq, start=False)
+    q = CrossProcessIngestQueue(_as_backend(be), mq, start=False)
     assert q.pending == 0
     q.submit_many([_item(f"e{i}") for i in range(3)])
     assert q.pending == 3
@@ -193,7 +199,7 @@ def test_factory_defaults_to_inprocess(tmp_path):
     # Ensure no override
     s.multimodal_ingest_mode = ""
     be = _Recorder()
-    q = create_ingest_queue(be)
+    q = create_ingest_queue(_as_backend(be))
     try:
         assert q.stats()["mode"] == "inprocess"
     finally:
@@ -207,7 +213,7 @@ def test_factory_crossprocess_mode(tmp_path):
     s.multimodal_ingest_mode = "crossprocess"
     be = _Recorder()
     mq = MessageQueue(db_path=str(tmp_path / "factory.db"))
-    q = create_ingest_queue(be, mq=mq)
+    q = create_ingest_queue(_as_backend(be), mq=mq)
     try:
         assert q.stats()["mode"] == "crossprocess"
     finally:
@@ -224,7 +230,7 @@ def test_factory_crossprocess_custom_topic(tmp_path):
     s.multimodal_ingest_consumer_group = "custom_group"
     be = _Recorder()
     mq = MessageQueue(db_path=str(tmp_path / "factory2.db"))
-    q = create_ingest_queue(be, mq=mq)
+    q = create_ingest_queue(_as_backend(be), mq=mq)
     try:
         stats = q.stats()
         assert stats["topic"] == "custom_topic"
@@ -246,8 +252,8 @@ def test_two_workers_share_topic_without_conflict(tmp_path):
     mq = MessageQueue(db_path=str(tmp_path / "shared.db"))
     be1 = _Recorder()
     be2 = _Recorder()
-    q1 = CrossProcessIngestQueue(be1, mq, consumer_group="worker-1", start=False)
-    q2 = CrossProcessIngestQueue(be2, mq, consumer_group="worker-2", start=False)
+    q1 = CrossProcessIngestQueue(_as_backend(be1), mq, consumer_group="worker-1", start=False)
+    q2 = CrossProcessIngestQueue(_as_backend(be2), mq, consumer_group="worker-2", start=False)
 
     # Both submit to the same topic.
     q1.submit(_item("e1"))

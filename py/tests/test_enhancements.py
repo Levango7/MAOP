@@ -355,9 +355,10 @@ class TestJson1Queries:
     def test_json_each_expand(self):
         """Expand JSON array with json_each."""
         # Insert metrics with tags array
+        # 故意传 JSON 字符串：验证实现按原样写入 JSON1 列
         self.db.record_metric(
             agent="test", metric_name="latency", metric_value=100.0,
-            tags=json.dumps(["prod", "api"]),
+            tags=json.dumps(["prod", "api"]),  # type: ignore[arg-type]
         )
 
         rows = self.db.json_each("metrics", "tags", "$")

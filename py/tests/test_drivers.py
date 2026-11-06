@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import shutil
 import sys
+from typing import Any
 
 import pytest
 
@@ -22,8 +23,8 @@ from maop.delegate.drivers import (
 from maop.delegate.models import AgentConfig
 
 
-def _config(**overrides) -> AgentConfig:
-    defaults = {"name": "test-agent", "cli": "echo", "driver": "cli", "model": "test-model"}
+def _config(**overrides: Any) -> AgentConfig:
+    defaults: dict[str, Any] = {"name": "test-agent", "cli": "echo", "driver": "cli", "model": "test-model"}
     defaults.update(overrides)
     return AgentConfig(**defaults)
 
@@ -41,6 +42,7 @@ class TestRunCli:
         config = _config(cli="nonexistent_command_xyz_12345")
         result = await _run_cli(config, "test", 10, ".", "t1")
         assert result.exit_code == -2
+        assert result.error is not None
         assert "not found" in result.error.lower() or "error" in result.error.lower()
 
     @pytest.mark.asyncio
@@ -174,6 +176,7 @@ class TestRunPowershell:
         )
         result = await _run_powershell(config, "test", 10, ".", "t3")
         assert result.exit_code == -1
+        assert result.error is not None
         assert "unsafe" in result.error.lower() or "Rejected" in result.error
 
 

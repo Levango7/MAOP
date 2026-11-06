@@ -51,10 +51,13 @@ class TestEnqueueDequeue:
         mq.enqueue("tasks", {"name": "normal"}, priority=MessagePriority.NORMAL)
 
         msg1 = mq.dequeue("tasks")
+        assert msg1 is not None
         assert msg1.payload["name"] == "high"
         msg2 = mq.dequeue("tasks")
+        assert msg2 is not None
         assert msg2.payload["name"] == "normal"
         msg3 = mq.dequeue("tasks")
+        assert msg3 is not None
         assert msg3.payload["name"] == "low"
 
     def test_topic_isolation(self, mq: MessageQueue):
@@ -157,8 +160,10 @@ class TestDeadLetters:
         mq.enqueue("events", {"x": 2}, max_retries=0)
 
         msg1 = mq.dequeue("tasks")
+        assert msg1 is not None
         mq.nack(msg1.id)
         msg2 = mq.dequeue("events")
+        assert msg2 is not None
         mq.nack(msg2.id)
 
         assert len(mq.get_dead_letters(topic="tasks")) == 1
@@ -198,6 +203,7 @@ class TestPurge:
     def test_purge_acked(self, mq: MessageQueue):
         mq.enqueue("tasks", {"x": 1})
         msg = mq.dequeue("tasks")
+        assert msg is not None
         mq.ack(msg.id)
 
         # Purge acked messages older than 0 seconds

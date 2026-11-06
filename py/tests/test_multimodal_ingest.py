@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
+from maop.core.memory.multimodal_backend import MultimodalBackend
 from maop.core.memory.multimodal_ingest import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_FLUSH_INTERVAL_S,
@@ -22,6 +23,11 @@ from maop.core.memory.multimodal_ingest import (
 )
 
 REPO = Path(__file__).resolve().parents[2]
+
+
+def _as_backend(fake: object) -> MultimodalBackend:
+    """假后端只实现 index_many；队列不会调用协议里的其它成员。"""
+    return cast(MultimodalBackend, fake)
 
 
 class _Recorder:
@@ -50,7 +56,7 @@ def _item(entry_id: str, *, modality: str = "text") -> dict[str, Any]:
 
 def test_submit_returns_immediately_without_embedding():
     be = _Recorder()
-    q = MultimodalIngestQueue(be, start=False)
+    q = MultimodalIngestQueue(_as_backend(be), start=False)
     t0 = time.perf_counter()
     eid = q.submit(_item("e1"))
     elapsed_ms = (time.perf_counter() - t0) * 1000
@@ -61,20 +67,20 @@ def test_submit_returns_immediately_without_embedding():
 
 def test_submit_rejects_empty_id(caplog):
     be = _Recorder()
-    q = MultimodalIngestQueue(be, start=False)
+    q = MultimodalIngestQueue(_as_backend(be), start=False)
     assert q.submit({"text": "no id"}) == ""
 
 
 def test_submit_returns_empty_when_closed():
     be = _Recorder()
-    q = MultimodalIngestQueue(be, start=False)
+    q = MultimodalIngestQueue(_as_backend(be), start=False)
     q.close(drain=False)
     assert q.submit(_item("e1")) == ""
 
 
 def test_submit_many_filters_unusable():
     be = _Recorder()
-    q = MultimodalIngestQueue(be, start=False)
+    q = MultimodalIngestQueue(_as_backend(be), start=False)
     ids = q.submit_many([_item("a"), {"text": "x"}, _item("b")])
     assert ids == ["a", "b"]
 
@@ -89,7 +95,7 @@ def test_worker_batches_and_writes_once_per_flush():
     (drain() racing a live worker would take nothing).
     """
     be = _Recorder()
-    q = MultimodalIngestQueue(be, batch_size=8, flush_interval_s=0.2, start=False)
+    q = MultimodalIngestQueue(_as_backend(be), batch_size=8, flush_interval_s=0.2, start=False)
     q.submit_many([_item(f"t{i}") for i in range(3)]
                   + [_item(f"i{i}", modality="image") for i in range(3)])
     q.start()
@@ -105,7 +111,7 @@ def test_worker_batches_and_writes_once_per_flush():
 def test_drain_alone_is_the_workerless_path():
     """Without a worker, drain() itself flushes (the explicit/test path)."""
     be = _Recorder()
-    q = MultimodalIngestQueue(be, start=False)
+    q = MultimodalIngestQueue(_as_backend(be), start=False)
     q.submit_many([_item(f"t{i}") for i in range(3)]
                   + [_item(f"i{i}", modality="image") for i in range(3)])
     assert q.drain(timeout=2.0) == 6
@@ -114,7 +120,7 @@ def test_drain_alone_is_the_workerless_path():
 
 def test_worker_flushes_partial_batch_on_interval():
     be = _Recorder()
-    q = MultimodalIngestQueue(be, batch_size=100, flush_interval_s=0.2)
+    q = MultimodalIngestQueue(_as_backend(be), batch_size=100, flush_interval_s=0.2)
     q.submit(_item("solo"))
     deadline = time.monotonic() + 3.0
     while not be.calls and time.monotonic() < deadline:
@@ -134,7 +140,7 @@ def test_batch_failure_does_not_kill_worker():
             raise RuntimeError("backend down")
 
     be = _Boom()
-    q = MultimodalIngestQueue(be, batch_size=2, flush_interval_s=0.1)
+    q = MultimodalIngestQueue(_as_backend(be), batch_size=2, flush_interval_s=0.1)
     q.submit_many([_item("a"), _item("b"), _item("c")])
     flushed = q.drain(timeout=2.0)
     assert flushed == 0
@@ -146,7 +152,7 @@ def test_batch_failure_does_not_kill_worker():
 
 def test_drain_is_repeatable_and_empties():
     be = _Recorder()
-    q = MultimodalIngestQueue(be, start=False)
+    q = MultimodalIngestQueue(_as_backend(be), start=False)
     q.submit_many([_item("a"), _item("b")])
     assert q.drain() == 2
     assert q.drain() == 0
@@ -158,7 +164,7 @@ def test_drain_is_repeatable_and_empties():
 
 def test_close_drains_by_default():
     be = _Recorder()
-    q = MultimodalIngestQueue(be, batch_size=100, flush_interval_s=30.0)
+    q = MultimodalIngestQueue(_as_backend(be), batch_size=100, flush_interval_s=30.0)
     q.submit(_item("late"))
     assert q.pending == 1
     q.close(drain=True, timeout=2.0)
@@ -167,14 +173,14 @@ def test_close_drains_by_default():
 
 
 def test_start_rejects_after_close():
-    q = MultimodalIngestQueue(_Recorder(), start=False)
+    q = MultimodalIngestQueue(_as_backend(_Recorder()), start=False)
     q.close(drain=False)
     with pytest.raises(RuntimeError, match="closed"):
         q.start()
 
 
 def test_stats_shape():
-    q = MultimodalIngestQueue(_Recorder(), start=False)
+    q = MultimodalIngestQueue(_as_backend(_Recorder()), start=False)
     q.submit(_item("a"))
     s = q.stats()
     for key in ("running", "closed", "submitted", "batch_writes", "flushed",

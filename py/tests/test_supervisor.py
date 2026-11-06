@@ -875,11 +875,11 @@ async def test_engine_supervisor_returns_instance(supervisor):
 async def test_engine_skips_terminated_agent(supervisor):
     """Engine skips a terminated agent and returns SKIPPED."""
     from maop.engine import Engine
-    from maop.engine_types import WorkflowStep
+    from maop.engine_types import StepType, WorkflowStep
 
     await supervisor.terminate("a", reason="test")
     engine = Engine()
-    step = WorkflowStep(id="s1", type="agent", agent="a", task="t")
+    step = WorkflowStep(id="s1", type=StepType.AGENT, agent="a", task="t")
     result = await engine._execute_step(
         step, context={}, results={}, workdir="", trace_id="t1",
     )

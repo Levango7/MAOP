@@ -7,6 +7,7 @@ import json
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import cast
 
 import maop.enterprise.license as _license_mod
 import pytest
@@ -83,7 +84,10 @@ def _generate_test_license(
     if key_data.startswith(b"DEVELOPMENT"):
         lines = key_data.split(b"\n")
         key_data = b"\n".join(lines[1:])
-    private_key = serialization.load_pem_private_key(key_data, password=None)
+    private_key = cast(
+        Ed25519PrivateKey,
+        serialization.load_pem_private_key(key_data, password=None),
+    )
 
     payload = {
         "customer": customer,
@@ -202,7 +206,10 @@ class TestLicenseValidator:
 
         # Use module-level test private key so the signature matches LicenseValidator default public key
         key_data = _DEV_PRIVATE_KEY.read_bytes()
-        private_key = serialization.load_pem_private_key(key_data, password=None)
+        private_key = cast(
+            Ed25519PrivateKey,
+            serialization.load_pem_private_key(key_data, password=None),
+        )
 
         payload = {
             "customer": "Enterprise Corp",

@@ -7,6 +7,7 @@ Tests model management endpoints:
 """
 from __future__ import annotations
 
+from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -131,7 +132,7 @@ class FakeModelRegistry:
         """
         from maop.model.registry import ModelRegistry
 
-        return ModelRegistry.stats(self)
+        return ModelRegistry.stats(cast(ModelRegistry, self))
 
     def list_models(self, enabled_only=False):
         models = [_make_model()]

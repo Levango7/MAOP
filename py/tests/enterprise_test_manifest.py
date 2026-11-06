@@ -75,8 +75,9 @@ def _module_scope_enterprise_imports(tree: ast.Module) -> list[str]:
                     a.name for a in node.names if a.name.startswith("maop.enterprise")
                 )
             elif isinstance(node, ast.ImportFrom):
-                if (node.module or "").startswith("maop.enterprise"):
-                    found.append(node.module)
+                module = node.module or ""
+                if module.startswith("maop.enterprise"):
+                    found.append(module)
             elif isinstance(node, (ast.If, ast.Try)):
                 _walk(node.body)
                 _walk(node.orelse)

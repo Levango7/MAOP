@@ -5,6 +5,7 @@ Uses isolated MAOP_ROOT + admin role injection + mocked managers.
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -242,14 +243,14 @@ class TestSubagentTranscript:
 def plugin_client(tmp_path, monkeypatch):
     mock_mgr = MagicMock()
 
-    def _info(**kw):
+    def _info(**kw: Any):
         """Real PluginInfo, not a partial SimpleNamespace.
 
         ``PluginInfo.name`` is required and ``state`` is a 5-value enum with no
         ``reloaded`` member, so the old stubs matched nothing the manager emits
         and a strict response_model would 500 on them.
         """
-        base = {
+        base: dict[str, Any] = {
             "id": "p1", "name": "test", "version": "0.1.0", "description": "",
             "author": "", "state": PluginState.DISCOVERED, "path": str(tmp_path),
             "error": "", "loaded_at": "", "started_at": "", "config": {},

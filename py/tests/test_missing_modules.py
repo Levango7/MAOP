@@ -27,12 +27,14 @@ class TestHumanProxy:
     def test_request_with_priority(self):
         req_id = self.proxy.request(task="Urgent fix", priority="critical")
         req = self.proxy.get(req_id)
+        assert req is not None
         assert req.priority == "critical"
 
     def test_approve(self):
         req_id = self.proxy.request(task="Test task")
         assert self.proxy.approve(req_id) is True
         req = self.proxy.get(req_id)
+        assert req is not None
         assert req.status == "approved"
         assert req.resolved is not None
 
@@ -40,6 +42,7 @@ class TestHumanProxy:
         req_id = self.proxy.request(task="Test task")
         assert self.proxy.reject(req_id, reason="Not ready") is True
         req = self.proxy.get(req_id)
+        assert req is not None
         assert req.status == "rejected"
 
     def test_approve_not_found(self):
@@ -66,7 +69,9 @@ class TestHumanProxy:
     def test_resolve(self):
         req_id = self.proxy.request(task="Test")
         assert self.proxy.resolve(req_id, "approve") is True
-        assert self.proxy.get(req_id).status == "approved"
+        req = self.proxy.get(req_id)
+        assert req is not None
+        assert req.status == "approved"
 
     def test_stats(self):
         self.proxy.request(task="T1")
@@ -119,6 +124,7 @@ class TestSandboxManager:
         sb = self.mgr.create()
         assert self.mgr.cleanup(sb.id) is True
         info = self.mgr.get(sb.id)
+        assert info is not None
         assert info.status == "cleaned"
         assert not Path(sb.path).exists()
 
@@ -160,6 +166,7 @@ class TestToolManager:
     def test_register_with_params(self):
         self.mgr.register("deploy", command="deploy.sh", params={"env": "staging"})
         info = self.mgr.info("deploy")
+        assert info is not None
         assert info.params["env"] == "staging"
 
     def test_list(self):
@@ -181,9 +188,11 @@ class TestToolManager:
         self.mgr.register("tool1", command="echo")
         assert self.mgr.disable("tool1") is True
         info = self.mgr.info("tool1")
+        assert info is not None
         assert info.enabled is False
         assert self.mgr.enable("tool1") is True
         info = self.mgr.info("tool1")
+        assert info is not None
         assert info.enabled is True
 
     def test_delete(self):
@@ -318,5 +327,7 @@ class TestPromptManager:
         self.mgr.create("p1", content="Version 2", version="2.0")
         ver1 = self.mgr.get("p1", version="1.0")
         ver2 = self.mgr.get("p1", version="2.0")
+        assert ver1 is not None
+        assert ver2 is not None
         assert ver1.content == "Version 1"
         assert ver2.content == "Version 2"

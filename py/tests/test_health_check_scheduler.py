@@ -90,7 +90,9 @@ def test_check_agent_healthy(catalog: AgentCatalog) -> None:
     result = scheduler.check_agent("agent_a")
 
     assert result is True
-    assert catalog.get("agent_a").healthy is True
+    desc = catalog.get("agent_a")
+    assert desc is not None
+    assert desc.healthy is True
     assert adapter.call_count == 1
 
 
@@ -106,7 +108,9 @@ def test_check_agent_unhealthy(catalog: AgentCatalog) -> None:
     result = scheduler.check_agent("agent_a")
 
     assert result is False
-    assert catalog.get("agent_a").healthy is False
+    desc = catalog.get("agent_a")
+    assert desc is not None
+    assert desc.healthy is False
     assert adapter.call_count == 1
 
 
@@ -122,7 +126,9 @@ def test_check_agent_adapter_missing(catalog: AgentCatalog) -> None:
 
     assert result is False
     # catalog 未被更新，保持初始 healthy=True
-    assert catalog.get("agent_a").healthy is True
+    desc = catalog.get("agent_a")
+    assert desc is not None
+    assert desc.healthy is True
 
 
 # ── 4. check_agent — 异常 ────────────────────────────────────────
@@ -137,7 +143,9 @@ def test_check_agent_exception(catalog: AgentCatalog) -> None:
     result = scheduler.check_agent("agent_a")
 
     assert result is False
-    assert catalog.get("agent_a").healthy is False
+    desc = catalog.get("agent_a")
+    assert desc is not None
+    assert desc.healthy is False
     status = scheduler.get_status()
     assert "agent_a" in status
     assert status["agent_a"].healthy is False
@@ -163,8 +171,12 @@ def test_check_once_all_agents(catalog: AgentCatalog) -> None:
 
     assert adapter_a.call_count == 1
     assert adapter_b.call_count == 1
-    assert catalog.get("agent_a").healthy is True
-    assert catalog.get("agent_b").healthy is False
+    desc_a = catalog.get("agent_a")
+    desc_b = catalog.get("agent_b")
+    assert desc_a is not None
+    assert desc_b is not None
+    assert desc_a.healthy is True
+    assert desc_b.healthy is False
 
 
 # ── 6. check_once — 无 Agent ────────────────────────────────────
