@@ -55,18 +55,20 @@ def _config_with(steps: list[WorkflowStepDef], name: str = "wf") -> MaopConfig:
     return cfg
 
 
-async def test_run_workflow_legacy_passthrough(monkeypatch: pytest.MonkeyPatch):
-    """flag 关：走 maop_plan.execute_workflow（规划合同），参数原样透传。"""
-    calls: list[tuple] = []
+async def test_run_workflow_legacy_without_config_is_empty(monkeypatch: pytest.MonkeyPatch):
+    """legacy 后端（GAP-1 收口后）：真实执行节点，不再走纯规划。
 
-    def _fake_execute(name, config, initial_vars):
-        calls.append((name, config, initial_vars))
-        return "legacy-result"  # type: ignore[return-value]
-
-    monkeypatch.setattr(wiring, "execute_workflow", _fake_execute)
+    合同变更说明：E2-a 时期 legacy 走 ``maop_plan.execute_workflow``（纯规划，
+    参数透传）；GAP-1 收口后 legacy 按编译层序真实 dispatch 节点——配置缺失或
+    workflow 未定义时**诚实空结果**（零节点执行），不伪造规划成功。
+    真实执行的验收见 ``tests/test_legacy_workflow_execution.py``。
+    """
     out = await run_workflow("wf", None, {"k": "v"})
-    assert out == "legacy-result"
-    assert calls == [("wf", None, {"k": "v"})]
+    assert out.workflow_name == "wf"
+    assert out.variables == {"k": "v"}
+    assert out.steps_total == 0
+    assert out.steps_completed == 0
+    assert out.step_results == []
 
 
 _SINGLE_NODE = (WorkflowNode(step_id="0", agent="a", task="t", timeout_s=5),)
