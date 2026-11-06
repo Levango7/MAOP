@@ -105,6 +105,7 @@ class TestImageStore:
         store = ImageStore(root_dir=str(tmp_path))
         img_id = store.save("s1", "photo.jpg", b"\x00" * 10)
         meta = store.get_meta(img_id)
+        assert meta is not None
         assert meta.content_type == "image/jpeg"
 
 

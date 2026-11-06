@@ -13,6 +13,7 @@ import asyncio
 import sys
 import unittest
 from pathlib import Path
+from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -21,6 +22,7 @@ from maop.core.scheduling.supervisor import (
     Supervisor,
     SupervisorAction,
 )
+from maop.core.scheduling.supervisor_models import HealthProbe
 
 
 class _Probe:
@@ -120,7 +122,7 @@ class TestSupervisorMixinBoundary(unittest.TestCase):
             action_params={"factor": 0.5},
         )
         probe = _Probe("a", reachable=True, failure_rate=0.5)
-        self._run(self.sup._apply_rule(rule, probe))
+        self._run(self.sup._apply_rule(rule, cast(HealthProbe, probe)))
         self.assertAlmostEqual(self.sup.get_weight("a"), 0.5)
 
     def test_apply_rule_terminate(self):
@@ -130,7 +132,7 @@ class TestSupervisorMixinBoundary(unittest.TestCase):
             condition={"reachable": False}, cooldown_s=0,
         )
         probe = _Probe("a", reachable=False)
-        self._run(self.sup._apply_rule(rule, probe))
+        self._run(self.sup._apply_rule(rule, cast(HealthProbe, probe)))
         decision = self.sup.check_before_dispatch("a")
         self.assertFalse(decision.allow)
 
@@ -142,7 +144,7 @@ class TestSupervisorMixinBoundary(unittest.TestCase):
             action_params={"replacement": "backup", "routing_key": "rk"},
         )
         probe = _Probe("a", reachable=True, failure_rate=0.5)
-        self._run(self.sup._apply_rule(rule, probe))
+        self._run(self.sup._apply_rule(rule, cast(HealthProbe, probe)))
         self.assertEqual(self.sup.get_weight("a"), 0.0)
         status = self.sup.get_supervisor_status()
         agents = {x["agent_id"]: x for x in status["agents"]}
@@ -156,7 +158,7 @@ class TestSupervisorMixinBoundary(unittest.TestCase):
             action_params={"target_version": "v3.0"},
         )
         probe = _Probe("a", reachable=True, failure_rate=0.5)
-        self._run(self.sup._apply_rule(rule, probe))
+        self._run(self.sup._apply_rule(rule, cast(HealthProbe, probe)))
         status = self.sup.get_supervisor_status()
         agents = {x["agent_id"]: x for x in status["agents"]}
         self.assertEqual(agents["a"]["operational_status"], "upgrading")

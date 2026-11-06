@@ -737,8 +737,13 @@ class TestMCPServerContract:
         calls: list[str] = []
 
         class FakeTransport:
+            name = "fake"
+
             async def connect(self) -> None:
                 calls.append("connect")
+
+            async def disconnect(self) -> None:
+                pass
 
             async def send_request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
                 calls.append(method)
@@ -755,7 +760,12 @@ class TestMCPServerContract:
         seen: dict[str, Any] = {}
 
         class FakeTransport:
+            name = "fake"
+
             async def connect(self) -> None:
+                pass
+
+            async def disconnect(self) -> None:
                 pass
 
             async def send_request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:

@@ -51,6 +51,7 @@ class TestRegistration:
         lb.register("claude", weight=10)
         lb.register("claude", weight=20)
         m = lb.get_metrics("claude")
+        assert m is not None
         assert m.weight == 20
 
 
@@ -167,9 +168,11 @@ class TestLoadTracking:
         lb.register("a", weight=10)
         lb.record_start("a", "t1")
         m = lb.get_metrics("a")
+        assert m is not None
         assert m.active_tasks == 1
         lb.record_finish("a", "t1", duration_ms=500, success=True)
         m = lb.get_metrics("a")
+        assert m is not None
         assert m.active_tasks == 0
         assert m.total_requests == 1
         assert m.total_successes == 1
@@ -183,6 +186,7 @@ class TestLoadTracking:
         lb.record_finish("a", "t1", duration_ms=100, success=True)
         lb.record_finish("a", "t2", duration_ms=200, success=False)
         m = lb.get_metrics("a")
+        assert m is not None
         assert m.active_tasks == 0
         assert m.total_requests == 2
         assert m.total_successes == 1

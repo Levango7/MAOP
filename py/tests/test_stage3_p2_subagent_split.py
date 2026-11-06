@@ -160,10 +160,12 @@ class TestSubAgentSplit(unittest.TestCase):
         spawned = self.mgr.spawn_child(parent="root", agent="child")
         fetched = self.mgr.get(spawned.id)
         self.assertIsNotNone(fetched)
+        assert fetched is not None
         self.assertEqual(fetched.id, spawned.id)
         self.assertEqual(fetched.child_agent, "child")
 
         result = self.mgr.terminate(spawned.id, exit_code=0)
+        assert result is not None
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.exit_code, 0)
 

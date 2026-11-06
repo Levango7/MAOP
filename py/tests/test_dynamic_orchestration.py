@@ -156,7 +156,7 @@ class TestFanOut:
     async def test_chained_fan_out(self) -> None:
         """A spawned step may itself fan out further steps."""
         call_order: list[str] = []
-        spawn_map = {
+        spawn_map: dict[tuple[str, str] | str, SpawnDirective] = {
             "gen": SpawnDirective(steps=[_step("mid")]),
             "mid": SpawnDirective(steps=[_step("leaf")]),
         }
@@ -299,7 +299,7 @@ class TestBackwardCompat:
         """Spawn queues are keyed by trace_id — concurrent runs
         only see their own directives."""
         call_order: list[str] = []
-        spawn_map: dict[tuple[str, str], SpawnDirective] = {}
+        spawn_map: dict[tuple[str, str] | str, SpawnDirective] = {}
 
         async def run_one(tag: str) -> list[str]:
             trace_id = f"trace-{tag}"

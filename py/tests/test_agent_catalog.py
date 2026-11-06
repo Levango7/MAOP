@@ -170,9 +170,13 @@ def test_update_health_then_recover(catalog: AgentCatalog) -> None:
     """健康状态可恢复：False → True。"""
     catalog.register(_desc("agent_a"))
     catalog.update_health("agent_a", healthy=False)
-    assert catalog.get("agent_a").healthy is False
+    desc = catalog.get("agent_a")
+    assert desc is not None
+    assert desc.healthy is False
     catalog.update_health("agent_a", healthy=True)
-    assert catalog.get("agent_a").healthy is True
+    desc = catalog.get("agent_a")
+    assert desc is not None
+    assert desc.healthy is True
 
 
 # ── 7. 参数校验 ──────────────────────────────────────────────────

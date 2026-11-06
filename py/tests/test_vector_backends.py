@@ -17,6 +17,7 @@ import json
 import math
 import sys
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -272,7 +273,7 @@ class TestPgVectorBackend:
     def test_insert_batch(self) -> None:
         eng = _make_mock_engine()
         b = PgVectorBackend(engine=eng, dimension=None)
-        entries = [
+        entries: list[dict[str, Any]] = [
             {"id": "a", "text": "ta", "vector": [1.0, 0.0]},
             {"id": "b", "text": "tb", "vector": [0.0, 1.0], "metadata": {"n": 1}},
             {"id": "c", "text": "tc", "vector": []},  # skipped

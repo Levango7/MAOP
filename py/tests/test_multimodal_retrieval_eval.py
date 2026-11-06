@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -173,7 +174,7 @@ def test_dataset_rejects_a_query_without_a_perfect_answer() -> None:
 
 
 def test_dataset_rejects_duplicate_queries_and_negative_grades() -> None:
-    base = {
+    base: dict[str, Any] = {
         "name": "bad",
         "image_paths": {"a.png": IMAGE_DIR / "red_circle.png"},
     }

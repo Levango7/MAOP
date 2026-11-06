@@ -5,6 +5,8 @@ Uses isolated tmp_path + real instances where possible.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 # ── Memory Search (via real MemoryStore) ────────────────────────────
@@ -300,7 +302,7 @@ class TestVectorStoreFull:
     def test_index_batch(self, tmp_path):
         from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(tmp_path / "vectors.db"))
-        entries = [
+        entries: list[dict[str, Any]] = [
             {"id": "e1", "text": "hello"},
             {"id": "e2", "text": "world", "metadata": {"topic": "test"}},
         ]

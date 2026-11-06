@@ -17,9 +17,10 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 
 from maop.core.tenant.context import (
     current_tenant,
@@ -43,8 +44,9 @@ LEGACY_WRAPPERS = {
 }
 
 
-def _request(tenant_id: str = "", **state: object) -> SimpleNamespace:
-    return SimpleNamespace(state=SimpleNamespace(tenant_id=tenant_id, **state))
+def _request(tenant_id: str | None = "", **state: object) -> Request:
+    """假 request：这些函数只读 `request.state.tenant_id`，故用 SimpleNamespace 顶替。"""
+    return cast(Request, SimpleNamespace(state=SimpleNamespace(tenant_id=tenant_id, **state)))
 
 
 # ── 两种语义 ─────────────────────────────────────────────────────────

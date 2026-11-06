@@ -85,7 +85,9 @@ def test_register_same_name_updates(registry: AgentRegistry) -> None:
     """Re-registering the same name overwrites attributes (INSERT OR REPLACE)."""
     registry.register(_agent("agent_a", timeout_s=60))
     registry.register(_agent("agent_a", timeout_s=120))
-    assert registry.get_agent("agent_a").timeout_s == 120
+    registered = registry.get_agent("agent_a")
+    assert registered is not None
+    assert registered.timeout_s == 120
 
 
 # ── 7. Persistence across instances ─────────────────────────────

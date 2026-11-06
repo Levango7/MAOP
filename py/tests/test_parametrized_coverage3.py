@@ -274,10 +274,12 @@ class TestCircuitBreakerStateParametrized:
             cb = CircuitBreaker(path=db_path)
             # 先获取 threshold
             entry = cb.get("claude")
+            assert entry is not None
             threshold = entry.threshold
             for _ in range(min(failures, threshold + 2)):
                 cb.record_failure("claude")
             entry = cb.get("claude")
+            assert entry is not None
             if should_be_open:
                 assert entry.state == BreakerState.OPEN
             else:

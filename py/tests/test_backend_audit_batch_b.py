@@ -29,12 +29,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from maop.core.agent.auth.harness_auth import _mask_key
+from maop.core.reliability.pipeline_checkpoint import PipelineCheckpoint
 from maop.core.reliability.worker_pool import (
     _COMPLETED_TASK_RETENTION,
     WorkerPool,
@@ -314,7 +315,7 @@ class TestFailureVisibility:
     async def test_checkpoint_begin_failure_warns(self, caplog: Any) -> None:
         pool = WorkerPool(
             max_workers=1, root_dir="",
-            checkpoint=self._BoomBeginCheckpoint(),
+            checkpoint=cast(PipelineCheckpoint, self._BoomBeginCheckpoint()),
         )
         await pool.start()
         try:
@@ -336,7 +337,7 @@ class TestFailureVisibility:
     async def test_checkpoint_end_failure_warns(self, caplog: Any) -> None:
         pool = WorkerPool(
             max_workers=1, root_dir="",
-            checkpoint=self._BoomEndCheckpoint(),
+            checkpoint=cast(PipelineCheckpoint, self._BoomEndCheckpoint()),
         )
         await pool.start()
         try:

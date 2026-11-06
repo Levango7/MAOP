@@ -253,8 +253,9 @@ class TestPlanVersionManager:
         ver = vm.append(m, n_samples=5)
         assert ver.version_id
         # First version is auto-promoted on disk (check via active_version).
-        assert vm.active_version() is not None
-        assert vm.active_version().version_id == ver.version_id
+        active = vm.active_version()
+        assert active is not None
+        assert active.version_id == ver.version_id
         chain = vm.list_versions()
         assert len(chain) == 1
 
@@ -268,14 +269,20 @@ class TestPlanVersionManager:
         m2.fit([[0.2] * 10] * 5, [1.0] * 5)
         v2 = vm.append(m2, 5)
 
-        assert vm.active_version().version_id == v1.version_id
+        active = vm.active_version()
+        assert active is not None
+        assert active.version_id == v1.version_id
         assert vm.promote(v2.version_id)
-        assert vm.active_version().version_id == v2.version_id
+        active = vm.active_version()
+        assert active is not None
+        assert active.version_id == v2.version_id
 
         rb = vm.rollback()
         assert rb is not None
         assert rb.version_id == v1.version_id
-        assert vm.active_version().version_id == v1.version_id
+        active = vm.active_version()
+        assert active is not None
+        assert active.version_id == v1.version_id
 
     def test_load_model_weights(self, pq_root: Path) -> None:
         vm = PlanVersionManager(pq_root)
@@ -463,6 +470,7 @@ class TestEndToEndVersionLifecycle:
         _populate_dataset(pq_root, n=80)
         m2 = pipe.train(save_version=True)
         active2 = vm.active_version()
+        assert active2 is not None
         # 新版默认不 promote（仍留在 v1）
         assert active2.version_id == active1.version_id, (
             "新版不应自动 promote — active 应仍是 v1"
@@ -474,8 +482,10 @@ class TestEndToEndVersionLifecycle:
         # promote() 的返回值只说明"这个 id 在链上"，不能当"它现在是 active"的证据，
         # 所以断言只看 active_version()。
         assert vm.promote(m2._version), f"v2 {m2._version} 不在版本链上"
-        assert vm.active_version().version_id == m2._version, (
-            f"promote v2 失败: active={vm.active_version().version_id}, "
+        active = vm.active_version()
+        assert active is not None
+        assert active.version_id == m2._version, (
+            f"promote v2 失败: active={active.version_id}, "
             f"v2={m2._version}"
         )
 
@@ -483,7 +493,9 @@ class TestEndToEndVersionLifecycle:
         rb = vm.rollback()
         assert rb is not None
         assert rb.version_id == active1.version_id
-        assert vm.active_version().version_id == active1.version_id
+        active = vm.active_version()
+        assert active is not None
+        assert active.version_id == active1.version_id
 
         # v1 权重可完整回读，且与原始 m1 一致
         loaded_v1 = vm.load_model(active1.version_id)
@@ -500,7 +512,9 @@ class TestEndToEndVersionLifecycle:
         versions = []
         for _ in range(3):
             pipe.train(save_version=True)
-            versions.append(vm.active_version().version_id)
+            active = vm.active_version()
+            assert active is not None
+            versions.append(active.version_id)
 
         chain = vm.list_versions()
         assert len(chain) == 3
@@ -513,10 +527,14 @@ class TestEndToEndVersionLifecycle:
         vm = PlanVersionManager(pq_root)
         pipe.train(save_version=True)
 
-        active_before = vm.active_version().version_id
+        active_before = vm.active_version()
+        assert active_before is not None
+        active_before_id = active_before.version_id
         rb = vm.rollback()
         assert rb is None, "只有一个版本时 rollback 应返回 None"
-        assert vm.active_version().version_id == active_before
+        active_after = vm.active_version()
+        assert active_after is not None
+        assert active_after.version_id == active_before_id
 
 
 class TestEndToEndOnlineLearning:

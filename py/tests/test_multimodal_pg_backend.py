@@ -12,7 +12,9 @@ protocol conformance, and stats parity with the SQLite backend.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
+
+from sqlalchemy.engine import Engine
 
 from maop.core.memory.multimodal_backend import MultimodalBackend
 from maop.core.memory.multimodal_embed import HashModalityEmbedding
@@ -112,7 +114,7 @@ class _StubEngine:
 
 def _backend(engine: _StubEngine | None = None) -> PgMultimodalBackend:
     eng = engine or (_eng := _StubEngine())
-    return PgMultimodalBackend(engine=eng, embedding=HashModalityEmbedding())
+    return PgMultimodalBackend(engine=cast(Engine, eng), embedding=HashModalityEmbedding())
 
 
 # ── protocol / schema ─────────────────────────────────────────

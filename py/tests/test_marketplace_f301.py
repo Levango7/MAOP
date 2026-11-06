@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import cast
 
 import pytest
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 # 环境白名单实现 2026-10-05 统一到 core/security/sandbox.py（原先那份在
 # marketplace 下且从未接线，而真正在跑的沙箱没做环境过滤）。
@@ -64,8 +66,9 @@ class TestEd25519Signing:
         assert private_pem.startswith("-----BEGIN PRIVATE KEY-----")
         assert public_pem.startswith("-----BEGIN PUBLIC KEY-----")
 
-        loaded_private = serialization.load_pem_private_key(
-            private_pem.encode("utf-8"), password=None,
+        loaded_private = cast(
+            Ed25519PrivateKey,
+            serialization.load_pem_private_key(private_pem.encode("utf-8"), password=None),
         )
         loaded_public = load_public_key_from_bytes(public_pem.encode("utf-8"))
 

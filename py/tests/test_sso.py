@@ -12,6 +12,7 @@ import hashlib
 import io
 import json
 import time
+from email.message import Message
 from typing import Any
 
 import pytest
@@ -466,7 +467,7 @@ class TestHandleCallbackOIDC:
             raise urllib.error.HTTPError(
                 url=req.full_url, code=400,
                 msg="Bad Request",
-                hdrs=None,
+                hdrs=Message(),
                 fp=io.BytesIO(b'{"error":"invalid_grant"}'),
             )
 

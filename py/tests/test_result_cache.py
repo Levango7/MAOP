@@ -80,8 +80,12 @@ class TestPutGet:
         """不同 Agent 的相同任务应独立缓存。"""
         cache.put("agent-a", "task-1", "result-a")
         cache.put("agent-b", "task-1", "result-b")
-        assert cache.get("agent-a", "task-1").result == "result-a"
-        assert cache.get("agent-b", "task-1").result == "result-b"
+        entry_a = cache.get("agent-a", "task-1")
+        entry_b = cache.get("agent-b", "task-1")
+        assert entry_a is not None
+        assert entry_b is not None
+        assert entry_a.result == "result-a"
+        assert entry_b.result == "result-b"
 
 
 # ── 2. TTL 过期 ──────────────────────────────────────────────────

@@ -326,9 +326,11 @@ def test_the_request_models_declare_everything_the_view_sends(client) -> None:
         return cast(dict[str, Any], components[ref.rsplit("/", 1)[-1]] if ref else body)
 
     source = VIEW_FILE.read_text(encoding="utf-8")
+    payload_match = _PAYLOAD_RE.search(source)
+    assert payload_match is not None
     payload_keys = {
         line.split(":", 1)[0].strip()
-        for line in _PAYLOAD_RE.search(source).group(1).splitlines()
+        for line in payload_match.group(1).splitlines()
         if ":" in line
     }
 

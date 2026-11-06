@@ -699,7 +699,8 @@ class TestParseQd:
         from maop.core.memory.three_layer_memory import ThreeLayerMemory
         from maop.core.memory.three_layer_memory_types import QualityDimensions
         qd = QualityDimensions(correctness=0.9)
-        result = ThreeLayerMemory._parse_qd(qd)
+        # 刻意传 QualityDimensions 实例：验证 passthrough 分支
+        result = ThreeLayerMemory._parse_qd(qd)  # type: ignore[arg-type]
         assert result is qd
 
     def test_invalid_json_returns_default(self):
