@@ -44,6 +44,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 logger = logging.getLogger(__name__)
 
 ENV_POLICY_MODE = "MAOP_TOOL_POLICY_MODE"
@@ -104,7 +106,7 @@ class ToolPolicy:
         """读取配置文件。失败时 fail-open 到 audit + warning。"""
         try:
             data = _load_yaml(self._config_path)
-        except Exception as exc:
+        except (OSError, yaml.YAMLError) as exc:
             self._mode = "audit"
             self._allow_rules = []
             self._deny_rules = []

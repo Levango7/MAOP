@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -103,7 +103,7 @@ def _register(client: TestClient, name: str, **overrides: Any) -> dict[str, Any]
     body.update(overrides)
     resp = client.post("/api/agent-catalog/agents", json=body)
     assert resp.status_code == 200, resp.text
-    return resp.json()
+    return cast(dict[str, Any], resp.json())
 
 
 def _seed_three(client: TestClient) -> None:
@@ -323,7 +323,7 @@ def test_the_request_models_declare_everything_the_view_sends(client) -> None:
         op = schema["paths"][template][method]
         body = op["requestBody"]["content"]["application/json"]["schema"]
         ref = body.get("$ref")
-        return components[ref.rsplit("/", 1)[-1]] if ref else body
+        return cast(dict[str, Any], components[ref.rsplit("/", 1)[-1]] if ref else body)
 
     source = VIEW_FILE.read_text(encoding="utf-8")
     payload_keys = {

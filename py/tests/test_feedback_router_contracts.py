@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -88,7 +88,7 @@ def _submit(client: TestClient, **overrides: Any) -> dict[str, Any]:
     payload.update(overrides)
     resp = client.post("/api/feedback", json=payload)
     assert resp.status_code == 200, resp.text
-    return resp.json()
+    return cast(dict[str, Any], resp.json())
 
 
 # ── the row speaks the vocabulary the view reads ──────────────────
@@ -236,7 +236,7 @@ def test_the_view_request_bodies_match_the_declared_request_models(client) -> No
         op = schema["paths"][template][method]
         body = op["requestBody"]["content"]["application/json"]["schema"]
         ref = body.get("$ref")
-        return components[ref.rsplit("/", 1)[-1]] if ref else body
+        return cast(dict[str, Any], components[ref.rsplit("/", 1)[-1]] if ref else body)
 
     create = _declared("post", "/api/feedback")
     assert set(create["properties"]) == {

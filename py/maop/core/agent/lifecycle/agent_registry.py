@@ -173,7 +173,7 @@ class AgentRegistry:
         try:
             with open(cfg_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
-        except Exception as exc:
+        except (OSError, yaml.YAMLError) as exc:
             logger.warning("[registry] Failed to parse %s: %s", cfg_path, exc)
             return 0
 
@@ -241,7 +241,7 @@ class AgentRegistry:
                     "SELECT COUNT(*) AS cnt FROM registered_agents WHERE enabled=1"
                 ).fetchone()
             MAOP_ACTIVE_AGENTS.set(row["cnt"] if row else 0)
-        except Exception:
+        except (ImportError, OSError, sqlite3.Error, IndexError):
             # 指标更新失败不应影响业务逻辑；记录 debug 日志便于排查
             logger.debug("update MAOP_ACTIVE_AGENTS metric failed", exc_info=True)
 

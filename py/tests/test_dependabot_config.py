@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -40,8 +41,8 @@ ECOSYSTEMS = {
 }
 
 
-def _config() -> dict:
-    return yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+def _config() -> dict[str, Any]:
+    return cast(dict[str, Any], yaml.safe_load(CONFIG.read_text(encoding="utf-8")))
 
 
 def test_config_is_valid_yaml_with_expected_shape():

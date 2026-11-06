@@ -143,7 +143,9 @@ def _json_dumps(obj: Any) -> str:
     """JSON dumps with a str fallback for non-serialisable values."""
     try:
         return json.dumps(obj, ensure_ascii=False, default=str)
-    except Exception:
+    except (TypeError, ValueError, RecursionError):
+        # default=str 已兜住绝大多数对象；剩余是循环引用（ValueError）、
+        # 键类型非法（TypeError）与超深嵌套（RecursionError）。
         return str(obj)
 
 

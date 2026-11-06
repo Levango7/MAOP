@@ -49,7 +49,8 @@ class TestEmptyInput:
         """空列表批量注册应正常完成，不抛异常。"""
         catalog = AgentCatalog(db_path=tmp_path / "cat.db")
         results = []
-        for desc in []:
+        descs: list[AgentDescriptor] = []
+        for desc in descs:
             catalog.register(desc)
             results.append(desc)
         assert results == []

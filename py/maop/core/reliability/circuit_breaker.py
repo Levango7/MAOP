@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sqlite3
 import threading
 import time
 from enum import Enum
@@ -342,7 +343,8 @@ class CircuitBreaker:
                        VALUES (?, ?, ?, ?)""",
                     (name, json.dumps(chain.agents), chain.current_index, now),
                 )
-        except Exception as exc:
+        except (OSError, sqlite3.Error, TypeError, ValueError) as exc:
+            # TypeError/ValueError: json.dumps(chain.agents) 对不可序列化值失败
             logger.warning("Failover chain save failed: %s", exc)
 
     # ── public API ───────────────────────────────────────────
@@ -719,7 +721,8 @@ class CircuitBreaker:
                 )
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as exc:
+        except (OSError, sqlite3.Error, TypeError) as exc:
+            # TypeError: cursor.description 为 None 时列表推导失败
             logger.warning("Get events failed: %s", exc)
             return []
 
@@ -743,7 +746,8 @@ class CircuitBreaker:
                     params,
                 ).fetchone()
                 return row["cnt"] if row else 0
-        except Exception as exc:
+        except (OSError, sqlite3.Error, IndexError) as exc:
+            # IndexError: sqlite3.Row 缺 "cnt" 列时的下标取值失败
             logger.warning(
                 "[circuit_breaker] Failed to query breaker event count, returning 0: %s",
                 exc, exc_info=True,

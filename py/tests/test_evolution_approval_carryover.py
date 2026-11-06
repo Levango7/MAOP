@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -74,7 +75,7 @@ def _seed_manual_gate_suggestion(real_loop) -> str:
     queue_file.write_text(
         json.dumps([payload], ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    return payload["id"]
+    return cast(str, payload["id"])
 
 
 def test_approved_suggestion_is_applied_in_next_cycle(real_loop):

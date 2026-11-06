@@ -30,6 +30,7 @@ import sys
 import types
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -176,8 +177,8 @@ class _FakeSsoRegistry:
         pass
 
     @staticmethod
-    def to_masked_response(resp: object) -> dict:
-        data = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)  # type: ignore[arg-type]
+    def to_masked_response(resp: object) -> dict[str, Any]:
+        data: dict[str, Any] = resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)  # type: ignore[arg-type, call-overload]
         data["config"] = {**data["config"], "client_secret": "******"}
         # 真实 registry 会原样带上企业包模型新增的字段——这里也模拟一个。
         data["last_login_at"] = None

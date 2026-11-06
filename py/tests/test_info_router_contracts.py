@@ -11,7 +11,7 @@ rendered as ErrorSchema and must keep their status codes.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -59,7 +59,7 @@ def _openapi_props(client: TestClient, method: str) -> dict[str, Any]:
     schema = client.app.openapi()
     op = schema["paths"]["/api/info/edition"][method]
     ref = op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
-    return schema["components"]["schemas"][ref.rsplit("/", 1)[-1]]["properties"]
+    return cast(dict[str, Any], schema["components"]["schemas"][ref.rsplit("/", 1)[-1]]["properties"])
 
 
 def test_the_get_payload_equals_the_producer(client) -> None:

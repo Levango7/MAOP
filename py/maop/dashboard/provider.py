@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 import time
 from pathlib import Path
 from typing import Any, cast
@@ -126,7 +127,7 @@ class DashboardProvider:
                 cursor = conn.execute("SELECT COUNT(*) FROM delegations")
                 row = cursor.fetchone()
                 return row[0] if row else 0
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[provider] _count_delegations failed: %s", exc)
             return 0
 
@@ -149,7 +150,7 @@ class DashboardProvider:
                 )
                 success = cursor.fetchone()[0]
                 return cast(float, round((success / total) * 100, 1))
-        except Exception as exc:
+        except (OSError, sqlite3.Error) as exc:
             logger.warning("[provider] _compute_success_rate failed: %s", exc)
             return 0.0
 
@@ -271,6 +272,6 @@ class DashboardProvider:
             if isinstance(data, list):
                 return data[-limit:]
             return [data]
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             logger.warning("[provider] get_recent_delegations failed: %s", exc)
             return []

@@ -23,6 +23,7 @@ import asyncio
 import json
 import logging
 import re
+import sqlite3
 import sys
 import time
 import uuid as _uuid
@@ -567,7 +568,9 @@ async def maintain_vacuum() -> dict[str, Any]:
     """
     try:
         from maop.core.backends.db_utils import sqlite_connect
-        with sqlite_connect() as conn:  # type: ignore
+        # 收窄宽口径后暴露的存量缺陷：原先漏传 db_path，TypeError 被
+        # ``except Exception`` 静默吞成 "Skipped: vacuum unavailable"。
+        with sqlite_connect(str(state.MAOP_ROOT / "data" / "maop.db")) as conn:
             # P2-9 fix: prefer incremental_vacuum to avoid full-table lock.
             av = conn.execute("PRAGMA auto_vacuum").fetchone()[0]
             if av:
@@ -575,7 +578,7 @@ async def maintain_vacuum() -> dict[str, Any]:
             else:
                 conn.execute("VACUUM")
         return {"status": "ok", "action": "vacuum", "msg": "Database compacted"}
-    except Exception:
+    except (OSError, sqlite3.Error):
         logger.exception("Database vacuum failed")
         return {"status": "ok", "action": "vacuum", "msg": "Skipped: vacuum unavailable"}
 

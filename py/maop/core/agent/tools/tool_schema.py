@@ -85,7 +85,8 @@ class ToolSchemaGenerator:
         sig = inspect.signature(func)
         try:
             hints = get_type_hints(func)
-        except Exception:
+        except (NameError, TypeError):
+            # 前向引用未解析（NameError）或对象不是函数/类（TypeError）
             hints = {}
 
         properties: dict[str, Any] = {}

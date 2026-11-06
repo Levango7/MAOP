@@ -39,6 +39,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### `refactor/layering-closeout` 追上 master：154 个提交合并 + 基线断点登记（2026-11-05）
+
+该分支长期落后主树（12 领先 / 154 落后），阶段一至四的成果（13 个端点建模、
+六模块 92 处宽口径收窄、集成分层收尾）一直不可见、未过 CI。本次把
+`origin/master` 合并进来，21 处冲突逐文件裁决：
+
+- **response_model 建模重复**（`share` / `agent_versions` / `credential_vault` /
+  `long_running_task` 的 router + schemas，共 8 文件）：两线对同一批 13 个端点
+  各自建模，allowlist 条目后来收敛成完全一致。取 master —— 它每个字段都有默认值、
+  时间戳用 `float | str` 联合、`status` 默认 `error`，能接住 `error_value` 降级
+  dict；本分支的早期版本用纯 `str` + 必填字段，在降级路径上会 500。
+- **企业包缺席时的收集口径**（`tests/conftest.py` 等 9 文件）：master 用
+  `tests/_overlay_rule.py` 的 AST 判定取代清单方案，各用例 `importorskip` 也缩到
+  具体子模块。取 master。
+- **前端通知入口门挡**（`dashboard-enterprise/src/**` 3 文件）：master 已从
+  `requiresEnterprise` 改为 `requiresCapability`，与后端 import 探测一致。取 master。
+- 本分支自有的宽口径棘轮、六模块收窄、supervisor mixin 用例无冲突，原样保留。
+
+**基线断点**：合并把他线未经本门禁的代码带进来，树上宽口径 1067 → 1072（+5，
+全部位于 `core/security/middleware/_auth.py`、`_protection.py`、`dashboard/server.py`、
+`operator/handlers.py` 等，均为第三方句柄 / `await` / 子进程，不可静态枚举）。
+合并点是基线的唯一合法上调口，登记见 ADR-023 D11；此后任何新增仍是「新增即红」。
+
+顺带修掉 `tests/test_supervisor_mixin_boundary.py` 的 4 个 ruff 告警
+（未使用的 `AlertLevel` 导入与 3 个未使用赋值）。
+
 ## [5.6.1] — 2026-11-06
 
 ### GAP-5 修复——并行分支成本台账静默缺行（2026-11-06）
@@ -880,6 +906,188 @@ relay_platform 改回空壳 `list`、撤掉兜底、把"非 overlay 原因"改�
   - `A2AGateway` 由 `MAOP_A2A_GATEWAY=1` 显式开启（默认关——门户 HTTP 传输层
     对外监听属部署决策），起停对称、句柄挂 `app.state`；
   - 新增 `tests/test_layering_lifespan_wiring.py` 4 例锁定上述约定。
+
+### 宽口径异常：`dashboard/` 模块第四批（2026-10-29）
+
+- `dashboard/` 272 处 → 249 处，实收窄 **23 处**：SQLite 读写 9（`data_proxy.py` 2、
+  `provider.py` 2、`auth_service.py` 3、`memory_service.py` 1、`system_service.py` 1）、
+  文件读取/`stat`/`glob` 7、特定库已知异常 4（`n8n.py` 的 `model_validate_json`、
+  `channels/routing.py` 的 `datetime.fromisoformat`、otel 探针 2）、死 try 1、
+  租户列缺列的退化分支 2。
+- **收窄逼出一个真 bug**：`system_service.py::maintain_vacuum` 一直写
+  `sqlite_connect()`（漏传必填的 `db_path`），每次都抛 `TypeError` 并被
+  `except Exception` 静默吞成 `"Skipped: vacuum unavailable"` —— 该维护动作从未
+  真正执行过。已改为 `sqlite_connect(str(state.MAOP_ROOT / "data" / "maop.db"))`，
+  `test_router_control.py::test_vacuum` 由红转绿。
+- 故意保留宽口径的四类登记见 ADR-023 D10：诊断端点的导入探针（契约要求
+  「任何原因导入失败 → ok:false」，收窄会让健康检查 500）、`aiosqlite.Error`
+  是 `RuntimeError` 子类而非 `sqlite3.Error`、未知 service/bridge 实现、
+  `await` 未知协程 91 处。
+- `BROAD_EXCEPT_BASELINE` 1090 → 1067。
+
+### 宽口径异常：`memory/` + `core/backends/` + `core/reliability/` 模块第三批（2026-10-29）
+
+- 三模块合计收窄 **42 处**（`memory/` 64→50、`core/backends/` 59→44、
+  `core/reliability/` 95→82），全部属于异常集可静态枚举的形态：
+  `(OSError, sqlite3.Error)` 的 SQLite 读写（`memory/store.py` 4、`vector_search.py` 6、
+  `manager_mixin.py` 3、`facade.py` 1；`backends/data.py` 5 含 FTS5 四件套、
+  `db_backup.py` 3、`migration.py` 4、`db_utils.py` 1；`reliability/message_queue.py` 7、
+  `circuit_breaker.py` 3）、纯文件 `unlink` → `OSError`（`db_backup.py` 2、
+  `change_tracker.py` 1、`log_rotate.py` 1）、prometheus 指标 → `(ImportError, AttributeError)`。
+- 三处非 DB 参数错误按实际抛点补入异常集：`artifact_store.py` / `image_store.py` 的
+  `json.dumps`/`len()` → `(TypeError, ValueError, sqlite3.Error)`、`(TypeError, sqlite3.Error)`。
+- **主动回滚 2 处**：`data.py::_execute` / `save_checkpoint` 原拟收窄为 `OSError`，复核发现
+  `try` 体含 `dict(zip(columns, row))`，非 SELECT 语句时 `cursor.description` 为 `None`
+  会抛 `TypeError`，且这两处是 log-then-reraise 兜底 —— 恢复宽口径并补注释。
+- 故意保留宽口径的三类形态（`data.py::_connect`/`db_utils.py::connection` 的 `yield conn`
+  会把调用方 `with` 体内任意异常带进 `except`；`backends_distributed.py::transport.close()`
+  等第三方 `Any` 句柄）登记理由见 ADR-023 D9。
+- `BROAD_EXCEPT_BASELINE` 1132 → 1090。
+
+### 宽口径异常：`core/scheduling/` 模块第二批（2026-10-29）
+
+- `core/scheduling/` 31 处 → 29 处，可静态证明的只有 2 处：
+  `_models.py::_json_dumps` 收窄为 `(TypeError, ValueError, RecursionError)`（`default=str`
+  已兜住绝大多数对象，剩下循环引用/键类型/超深嵌套）；`supervisor_status.py::_routing_key_conflict`
+  删掉只会 `return None` 的死兜底。
+- 剩余 29 处归因见 ADR-023 D8：13 处含 `await` 未知协程（含已登记的 `health_service`
+  4 个探测）、13 处调用注入的 `_redis` / `_registry` / `_detector` / prometheus 句柄
+  （`_redis: Any` 不 `import redis`，收窄会在未装时变 `NameError`）、3 处事件发布。
+- 可收窄率 6.5%，明显低于 `core/agent/` 的 15% —— 调度层几乎全是「调用注入实现」，
+  静态分析只能证明「不该收窄」。
+- `BROAD_EXCEPT_BASELINE` 1134 → 1132。
+
+### 宽口径异常：`core/agent/` 模块首批收窄（2026-10-29）
+
+- `core/agent/` 166 处 → 141 处，实收窄 **25 处**，全部属于异常集可静态枚举的形态：
+  YAML/文件读取 4（`(OSError, yaml.YAMLError)`）、`json.loads` 落库回读 3、
+  SQLite CRUD 11（`(OSError, sqlite3.Error[, ValueError, TypeError])`）、
+  标准库探针 5（`ImportError` / `packaging.InvalidVersion ⊂ ValueError` /
+  `get_type_hints` / `importlib + getattr`）、`subprocess.run` 1、pydantic 反序列化 1。
+- 剩余 141 处按 AST 归因登记在 ADR-023 D7：95 处调用未知实现的对象方法、
+  21 处含 `await`、25 处是插件/hook 外部回调与组合 try 体，均不存在可静态证明的异常集。
+- `llm_providers.py` 的 3 处流式兜底**故意保留宽口径**：`try` 体内有 `chunk.get(...)`，
+  上游返回合法 JSON 但结构非对象时会抛 `AttributeError`，收窄会把「产出错误 token」
+  变成「生成器抛异常」。
+- `BROAD_EXCEPT_BASELINE` 1159 → 1134。
+
+### 前端响应契约：13 个未建模端点结清（2026-10-28）
+
+- 新建 4 个 response-model 模块并逐端点接上 `response_model`：
+  `agent_versions_schemas.py`（`AgentVersionView`/`CanaryView`/`VersionListMeta` +
+  4 个 envelope）、`credential_vault_schemas.py`（复用领域模型 `CredentialSummary`）、
+  `long_running_task_schemas.py`（复用领域模型 `LongRunningTask`）、
+  `share_schemas.py`（`ShareSummary` 13 键对齐 `run_service._summarize`）。
+- `GET /api/long-running-tasks/{id}/progress` 返回 `StreamingResponse`
+  (`text/event-stream`)，套 JSON `response_model` 会造出假契约，按既有政策迁入
+  `fixtures/frontend_non_json_endpoints.txt`（该文件每条都会被校验"仍指向真实挂载
+  且确实无模型"）。
+- `fixtures/frontend_response_model_allowlist.txt` 删 13 行，`RATCHET_CAP` 88 → 75
+  回到评估时的原始上限。所有 envelope 的 `status`/`error` 字段带默认值，因为
+  `handle_api_errors` 的 `error_value` 兜底 dict 同样会被 `response_model` 校验。
+- 逐键核对过 FastAPI 会在运行时**过滤**未声明字段（`share_service._summarize`、
+  `_version_row_to_dict`、`_canary_row_to_dict`、`CredentialSummary`），127 → 154 例
+  回归无字段丢失。
+
+### 宽口径异常登记与基线校准（2026-10-28，`refactor/layering-closeout`）
+
+- **实收窄 5 处**：`distributed_scheduler/_scheduler.py` 顶部两个可选依赖守卫改
+  `except ImportError`；`health_service.py` 的 `subprocess.run` 兜底收窄为
+  `(OSError, ValueError, subprocess.SubprocessError)`、`wait_closed()` 收窄为
+  `(OSError, RuntimeError)`；`ws_dag.py` 任务回调的 `t.exception()` 收窄为
+  `asyncio.InvalidStateError`（任务已取消时抛的是 `CancelledError`，原宽口径本就没抓到）。
+- **登记为合法宽口径 16 处**（ADR-023 D6 逐条判据）：健康探测的 4 个 `await` 调用、
+  A2A 网关的 `bridge/server.start()|stop()` 与 `client.send()`、middleware 认证链与用量记录、
+  redis 可选依赖探测与限流降级、派发健康门禁（显式 non-blocking）。这些站点的 `try` 体
+  含 `await` 未知协程或第三方库未知异常集，不存在可静态证明的异常集。
+- **基线校准**：`BROAD_EXCEPT_BASELINE` 1142 → 1159，双向棘轮语义不变（再新增仍红，
+  再收窄须下调）；复核条件见 ADR-023 D6。
+
+### 阶段三：异常收敛 / 租户权威归属 / WS 推送降级显式化（2026-10-28）
+
+- **宽口径异常进入门禁**（ADR-023 D5）：`check_silent_exceptions.py` 新增裸 `except:`
+  硬失败 + `except Exception`/`except BaseException` 双向棘轮（`BROAD_EXCEPT_BASELINE`，
+  本轮为 1142，后经 D6 校准至 1159）。
+  实测存量 1156 处宽口径 + 2 处裸 `except:`。本轮实收窄 **14 处**——所有「`try` 体只有
+  `import`」的可选依赖守卫改 `except ImportError`（`mcp_hub_metrics` / `mcp_cache` /
+  `mcp_concurrency` / `agent_scanner` / `multimodal` 等），零语义风险；剩余 1142 处按模块
+  随重构逐步收窄，不批量替换。
+- **租户实现权威归属钉死**：`core/tenant/manager.py` 的 docstring 写明它是**个人版**实现
+  （生产引用 0 处、仅测试使用），dashboard 的权威实现是企业版 `maop.enterprise.tenant`；
+  `core/agent/ops/__init__.py` 里"实际生效的是 core.tenant"的旧断言同步更正。
+  新增 `tests/test_tenant_authority.py` 锁边界：dashboard 租户服务只准导入企业版，
+  运行面（dashboard/worker/delegate/control）不得导入个人版租户注册表。
+- **多 worker 下 WS 推送关闭改为显式**：`lifespan` 在 `MAOP_BACKGROUND_TASKS=0` 时把
+  `_ws_push_enabled` 置 False 并打 WARNING；`/ws` 的 `hello` 帧新增 `push_enabled` 字段，
+  客户端可据此改走轮询，而不是连上后永远等不到 snapshot。新增
+  `tests/test_ws_push_degradation.py` 锁该契约。
+
+### 个人版测试盲区收口 + 跨仓契约进入 CI（2026-10-28）
+
+`tests/conftest.py` 原来按「文件正文里出现 `maop.enterprise` 字样」设置
+`collect_ignore` —— 26 个文件在个人版环境被**静默忽略**，其中 20 个其实只在注释/
+docstring 里提到企业包（`test_backends.py`、`test_router_system.py`、
+`test_frontend_response_models.py`、`test_notifications_ws_auth.py` …），
+双版都能跑却被一起挡掉。后果不是抽象的：`test_frontend_response_models` 带着 13 个
+未建模端点，它的棘轮门禁在个人版**从未执行过**；`test_notifications_ws_auth`
+（WS 鉴权的 P0 回归，111 条断言）同样从未在这个环境跑过。
+
+- **忽略判据从「子串」改为「模块顶层真实 import」**（AST 判定），清单移到
+  `tests/enterprise_test_manifest.py` 声明；仅 17 个文件 + 1 个间接依赖
+  （`test_relay_platform.py`）仍整体忽略，其余**被收集并显式 skip**（skip 计入汇总）。个人版下
+  这 18 个文件之外的一律照跑。
+- **新增 `tests/test_enterprise_test_surface.py`**（两份清单双向校验）：漏登记
+  （新增企业测试忘登记 → 个人版收集即 ImportError 崩全轮）、过期条目（文件已改/
+  已删）、以及「引用了企业包但没进清单又没自带跳过守卫」全部判红 —— 后者直接针对
+  4 处 `guard removed` 注释所记录的复发（开发机装了企业包 → 守卫被删 → 个人版永远
+  没人发现）。它本身零企业依赖，个人版 CI 必跑。
+- **恢复 4 处被删掉的守卫**：`test_router_system.py::test_error_handling`、
+  `test_router_misc_coverage.py`（TenantList/TenantCreate）、
+  `test_sso_router_callback_guard.py`、`test_edition_bypass_guard.py` 的错误消息匹配
+  放宽为 `MAOP_LICENSE_KEY|enterprise package`（个人版报的是后者，导出报错 vs
+  包缺失是两种不同的拒绝原因）。
+- **补登记 13 个未建模端点**（share / agent-versions / credential-vault /
+  long-running-tasks，10-06 ~ 10-28 新增）为显式债务，`RATCHET_CAP` 75→88
+  （与 allowlist 实际 88 条对齐）；
+  这是**记录**不是修复 —— 补 `response_model` 后应删行并把 CAP 降回。
+- **`personal-install-smoke` 作业从「导入冒烟」扩展为「导入冒烟 + 版本耦合门禁」**：
+  纯个人版环境里跑 `test_enterprise_test_surface` / `test_edition_switch_guard` /
+  `test_edition_bypass_guard` / `test_notifications_edition_gate` /
+  `test_maos_version_floor` / `test_frontend_response_models`。
+
+同轮把**跨仓契约**接进 MAOS CI（MAOS 侧改动，见其 CHANGELOG）：新增
+`maop-enterprise-contract` 作业，装两仓后直接跑本仓 24 个企业依赖测试文件
+（SSO / 通知 / tenant / quota / audit / license / CRL / pg_persist / n8n / HA /
+容器化）。此前这条依赖方向（MAOP → MAOS）没有任何流水线验证：MAOS 改个类名、
+挪个模块，本仓 CI 全绿，直到客户按 5.5.0 装上 MAOS 才炸。本地实测该批
+647 passed / 38 skipped。
+
+### 双版边界收口：通知中心归企业版 + 个人版安装冒烟 + MAOS 版本地板（2026-10-28）
+
+三处"文档说双版可用、代码实际只企业版能跑"的静默退化，以及一条只能靠文档
+声明的跨仓版本约束，在本轮一次性收口：
+
+- **通知中心改为企业版专属（FeatureFlag.NOTIFICATION_CENTER）**：`routers/notifications.py`
+  与 `notification_schemas.py` 模块级 import `maop.enterprise.notification.models`，
+  `services/notification_service.py` 惰性 import `EventBus/NotificationManager` ——
+  个人版此前**路由无条件挂载**，第一次调用即 ImportError→500，而前端 `/notifications`
+  也无条件暴露。现 `_register_notifications_and_config` 按新 FeatureFlag gate
+  （个人版不挂载、`/api/alerts` 告警入站不受影响），前端 `nav.js` 与路由
+  `meta.requiresEnterprise` 同步隐藏。`/api/info/edition` 的 feature 表因此多出
+  `notification_center` 一项。
+- **新增 `py/scripts/check_personal_imports.py` + CI 作业 `personal-install-smoke`**：
+  在**屏蔽 `maop.enterprise`** 的进程里逐个导入 `dashboard.routers`，把"某 router
+  偷偷依赖企业包"从运行期一行 warning 变成可失败的断言。企业版专属模块走白名单
+  （licenses / n8n / notification_schemas / notifications / relay_platform / sso），
+  **白名单过期（其实能导入）同样红灯**，防止豁免名单逐年腐蚀。CI 作业仅装
+  `maop-orchestrator` 并先断言 `maop.enterprise` 确实不可导入。
+- **MAOS 版本地板进入运行期**：`config/edition.py` 新增 `MIN_MAOS_VERSION = "5.2.3"`
+  与 `_check_maos_version_floor()`，企业版激活（license 通过）后读
+  `importlib.metadata.version("maop-enterprise")`，低于地板抛 `RuntimeError` 并给出
+  升级命令；读不到版本只告警，测试运行器内降级为 ERROR 日志，联调可用
+  `MAOP_SKIP_MAOS_VERSION_CHECK=1` 跳过。配套 `tests/test_maos_version_floor.py`
+  新增 5 例（含"运行期地板必须与 README 声明一致"）。校验实现在 MAOP 一侧，
+  因为 MAOS 的 `.py` 受完整性 manifest 签名保护（见 README 该节说明）。
 
 ### 拆分收尾：质量门禁清单同步（PR #172 CI 修复）
 

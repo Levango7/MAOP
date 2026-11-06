@@ -18,6 +18,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -54,13 +55,13 @@ def _needs(**results: str) -> dict:
     return {k: {"result": v} for k, v in results.items()}
 
 
-def _ci_jobs() -> dict:
-    doc = yaml.safe_load(CI.read_text(encoding="utf-8"))
-    return doc["jobs"]
+def _ci_jobs() -> dict[str, Any]:
+    doc = cast(dict[str, Any], yaml.safe_load(CI.read_text(encoding="utf-8")))
+    return cast(dict[str, Any], doc["jobs"])
 
 
-def _gate_needs() -> list:
-    return _ci_jobs()["gate"].get("needs") or []
+def _gate_needs() -> list[Any]:
+    return cast(list[Any], _ci_jobs()["gate"].get("needs") or [])
 
 
 # ── 判定面：evaluate ─────────────────────────────────────────────────

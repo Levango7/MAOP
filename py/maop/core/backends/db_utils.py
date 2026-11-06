@@ -247,7 +247,7 @@ class ConnectionPool:
             except sqlite3.Error:
                 try:
                     conn.close()
-                except Exception as e:
+                except sqlite3.Error as e:
                     logger.debug("ignored: %s", e, exc_info=True)
                 logger.warning("Discarded broken pooled connection for %s", self._db_path)
         conn = sqlite3.connect(self._db_path, timeout=10, check_same_thread=False)

@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from typing import cast
 
 # Set auth enabled BEFORE importing app
 os.environ["MAOP_AUTH"] = "1"
@@ -52,7 +53,7 @@ async def _login(client: AsyncClient, username: str = "admin", password: str = _
     assert resp.status_code == 200, f"Login failed: {resp.status_code} {resp.text}"
     data = resp.json()
     assert data["status"] == "ok"
-    return data["token"]
+    return cast(str, data["token"])
 
 
 # -- Fixtures -------------------------------------------------------

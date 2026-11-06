@@ -51,7 +51,12 @@ import sys
 # 已刻意压掉的：`cmd_start` 复用 `_runtime_root()` 而非自己再写一次 env、
 # 不再 setdefault MAOP_HOME（与 default_home() 同值）、owner+auth 两个写入
 # 合成一行 `os.environ.update(...)`、cli_evolution 不再重复导出根目录。
-BASELINE = 240
+# 240→241（2026-10-28）：config/edition.py 新增 `MAOP_SKIP_MAOS_VERSION_CHECK`
+# 逃生阀（MAOS 版本地板不满足时允许联调继续启动）。edition 检测发生在 settings
+# 实例化之前、且必须读"当前进程"的现值（与同文件既有 MAOP_EDITION / MAOP_ENV /
+# MAOP_LICENSE_KEY 同口径），走 settings 会引入循环依赖与缓存语义 —— 属有意
+# 配置读取，非 drift。
+BASELINE = 241
 
 
 def count_getenv_calls(root: pathlib.Path) -> int:

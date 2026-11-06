@@ -46,6 +46,7 @@ def scan_root(tmp_path, monkeypatch):
     monkeypatch.setattr(cfs, "SCAN_ROOT", pkg)
     monkeypatch.setattr(cse, "SILENT_EXCEPTION_BASELINE", frozenset())
     monkeypatch.setattr(cse, "SUPPRESS_BASELINE", 0)
+    monkeypatch.setattr(cse, "BROAD_EXCEPT_BASELINE", 0)
     return pkg
 
 
@@ -107,6 +108,42 @@ def test_suppress_ratchet_fails_on_growth(scan_root, capsys):
     ))
     assert cse.main([]) == 1  # baseline 0, measured 1
     assert "suppress count" in capsys.readouterr().out
+
+
+_BROAD_BODY = (
+    "import logging\nlogger = logging.getLogger(__name__)\n\n"
+    "def f():\n    try:\n        pass\n"
+    "    except Exception as exc:\n        logger.warning('x: %s', exc)\n"
+)
+
+
+def test_broad_except_ratchet_fails_on_growth(scan_root, capsys):
+    """宽口径 except（即使有 logger）也计入棘轮，基线 0 时新增即判红。"""
+    _write(scan_root, "broad.py", _BROAD_BODY)
+    total, bare, _per_file = cse.count_broad_handlers()
+    assert total == 1 and bare == []
+    assert cse.main([]) == 1
+    assert "宽口径" in capsys.readouterr().out
+
+
+def test_broad_except_ratchet_is_bidirectional(scan_root, monkeypatch):
+    """已收窄后基线必须下调，否则同样判红（棘轮只能降）。"""
+    _write(scan_root, "broad2.py", _BROAD_BODY)
+    monkeypatch.setattr(cse, "BROAD_EXCEPT_BASELINE", 3)
+    assert cse.main(["--quiet"]) == 1
+
+
+def test_bare_except_is_hard_failure(scan_root, capsys):
+    """裸 except 会吞掉 KeyboardInterrupt/SystemExit，不进棘轮，直接硬失败。"""
+    _write(scan_root, "bare.py", (
+        "import logging\nlogger = logging.getLogger(__name__)\n\n"
+        "def f():\n    try:\n        pass\n"
+        "    except:\n        logger.warning('swallowed')\n"
+    ))
+    _total, bare, _per_file = cse.count_broad_handlers()
+    assert bare == ["maop/bare.py:9"]
+    assert cse.main([]) == 1
+    assert "bare" in capsys.readouterr().out
 
 
 def test_baseline_bidirectional(scan_root):

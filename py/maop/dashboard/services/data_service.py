@@ -406,7 +406,7 @@ async def get_skills() -> dict[str, Any]:
                         try:
                             first_line = skill_md.read_text(encoding="utf-8", errors="replace").strip().split("\n")[0]
                             cat = first_line.replace("#", "").strip()[:30]
-                        except Exception as exc:
+                        except OSError as exc:
                             logger.warning('Failed to read skill metadata: %s', exc)
                     skills.append({"name": d.name, "category": cat, "usage_count": 0, "path": str(d)})
     return {"skills": skills, "count": len(skills)}

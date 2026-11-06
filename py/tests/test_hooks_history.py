@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -70,7 +72,7 @@ def _create_hook(client: TestClient, name: str = "h1") -> str:
         "method": "POST",
     })
     assert resp.status_code == 200, resp.text
-    return resp.json()["id"]
+    return cast(str, resp.json()["id"])
 
 
 class TestHookHistory:

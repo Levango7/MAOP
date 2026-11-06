@@ -18,10 +18,14 @@
    一次性创建，此后从未被接线；CHANGELOG 亦未记载本包。
 
    .. note::
-      ``tenant_isolation`` 与 :mod:`maop.core.tenant` 是**两套并存的租户实现**。
-      实际生效的是 ``maop.core.tenant``（``TenantManager`` / ``TenantRLS`` /
-      配额中间件），本包这套仅存在于测试中。不要因为"有代码 + 有测试"就
-      推断该能力已交付。
+      ``tenant_isolation`` 与 :mod:`maop.core.tenant` 是**两套并存的租户实现**，
+      而 dashboard 生产路径用的是第三套——企业版
+      ``maop.enterprise.tenant.TenantManager``。三者关系：
+      ``maop.core.tenant`` 是个人版实现（SQLite + RLS/quota/audit，生产引用 0 处，
+      仅测试使用），本包 ``tenant_isolation`` 只在测试中，企业版才是 dashboard
+      真正的数据源（见 ``core/tenant/manager.py`` 的「权威归属」段与
+      ``tests/test_tenant_authority.py``）。不要因为"有代码 + 有测试"就推断该
+      能力已交付。
 
 
 公共导出：

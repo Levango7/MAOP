@@ -423,7 +423,7 @@ class ChangeTracker:
                         logger.info(
                             "[change_tracker] Deleted (added after snapshot): %s", rel
                         )
-                    except Exception as exc:
+                    except OSError as exc:
                         logger.warning(
                             "[change_tracker] Failed to delete %s: %s", rel, exc
                         )

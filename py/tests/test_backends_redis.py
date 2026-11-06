@@ -10,6 +10,7 @@ The FakeRedis simulates the subset of Redis operations used by the backends:
 from __future__ import annotations
 
 import sys
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -150,7 +151,7 @@ class FakeRedis:
 
     def xclaim(self, stream, group, consumer, min_idle_time=0, message_ids=None):
         key = (stream, group)
-        claimed = []
+        claimed: list[tuple[bytes, dict[str, Any]]] = []
         for mid in (message_ids or []):
             mid_str = mid.decode() if isinstance(mid, bytes) else mid
             if key in self._pending and mid_str in self._pending[key]:

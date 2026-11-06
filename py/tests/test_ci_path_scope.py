@@ -17,6 +17,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -30,12 +31,12 @@ sys.path.insert(0, str(SCRIPT.parent))
 import ci_path_scope as scope_mod
 
 
-def _ci() -> dict:
-    return yaml.safe_load(CI.read_text(encoding="utf-8"))
+def _ci() -> dict[str, Any]:
+    return cast(dict[str, Any], yaml.safe_load(CI.read_text(encoding="utf-8")))
 
 
-def _triggers(doc: dict) -> dict:
-    return doc.get("on") or doc.get(True) or {}
+def _triggers(doc: dict) -> dict[str, Any]:
+    return cast(dict[str, Any], doc.get("on") or doc.get(True) or {})
 
 
 # ── 分类逻辑 ─────────────────────────────────────────────────────────

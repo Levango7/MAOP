@@ -15,6 +15,13 @@ verbatim so existing callers keep working.
 （同类名同方法，本模块额外提供 ``rls`` / ``quota`` / ``audit``），且此前
 仅被测试引用。历史导入路径 ``from maop.core.security import TenantManager``
 仍可用，由 ``core/security/__init__.py`` 重定向到本模块。
+
+权威归属（2026-10-28）：本模块是**个人版**的租户实现（SQLite + RLS/quota/
+audit），**不是** dashboard 的租户数据源。企业版的权威实现是同名的
+``maop.enterprise.tenant.TenantManager``（PG 持久化 + FeatureFlag 门禁），
+``maop.dashboard.services.tenant_service`` 与 ``routers/tenant.py`` 只用后者。
+理由：两套实现各有独立的租户字典，若 dashboard 混用，API 写进去的租户在
+UI 里看不到（反之亦然）。这条边界由 ``tests/test_tenant_authority.py`` 锁定。
 """
 
 from __future__ import annotations

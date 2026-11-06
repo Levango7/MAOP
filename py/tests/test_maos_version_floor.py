@@ -71,3 +71,63 @@ def test_pyproject_explains_why_the_floor_is_not_a_dependency() -> None:
         "且无法在此表达依赖约束"
     )
     assert "README" in head, "该注释应指向 README 的「版本兼容地板」节"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 运行期地板（2026-10-28）：`config/edition.py` 在 ENTERPRISE 激活后校验
+# `maop-enterprise` 版本，避免"装得上、跑不动"（pip --no-deps / 手工拼 wheel /
+# 旧 venv 残留会绕过安装期约束）。地板常量必须与 README 声明同步，否则改了文档
+# 却忘了改代码（或反之），检查会用错的标准放行或拦截。
+# ═══════════════════════════════════════════════════════════════════════════
+
+def test_runtime_floor_matches_readme_declaration() -> None:
+    from maop.config.edition import MIN_MAOS_VERSION
+
+    assert MIN_MAOS_VERSION == _readme_floor(), (
+        f"config/edition.py 的运行期地板是 {MIN_MAOS_VERSION}，"
+        f"README 声明的是 {_readme_floor()} —— 两处必须一致。"
+    )
+
+
+def test_runtime_floor_rejects_old_maos(monkeypatch) -> None:
+    import pytest
+
+    from maop.config import edition as ed
+
+    monkeypatch.setattr(ed, "get_installed_maos_version", lambda: "5.2.1")
+    monkeypatch.setattr(ed, "_in_test_runner", lambda: False)
+    monkeypatch.delenv(ed.MAOS_VERSION_SKIP_ENV, raising=False)
+
+    with pytest.raises(RuntimeError, match="below the version floor"):
+        ed._check_maos_version_floor()
+
+
+def test_runtime_floor_accepts_current_maos(monkeypatch) -> None:
+    from maop.config import edition as ed
+
+    monkeypatch.setattr(ed, "get_installed_maos_version", lambda: ed.MIN_MAOS_VERSION)
+    monkeypatch.setattr(ed, "_in_test_runner", lambda: False)
+    monkeypatch.delenv(ed.MAOS_VERSION_SKIP_ENV, raising=False)
+
+    ed._check_maos_version_floor()  # 不抛即可
+
+
+def test_runtime_floor_skip_env_is_honored(monkeypatch) -> None:
+    from maop.config import edition as ed
+
+    monkeypatch.setattr(ed, "get_installed_maos_version", lambda: "5.0.0")
+    monkeypatch.setattr(ed, "_in_test_runner", lambda: False)
+    monkeypatch.setenv(ed.MAOS_VERSION_SKIP_ENV, "1")
+
+    ed._check_maos_version_floor()  # 逃生阀生效，不抛
+
+
+def test_runtime_floor_tolerates_unknown_version(monkeypatch) -> None:
+    """读不到版本（裁剪 wheel / editable 元数据缺失）只告警，不阻断启动。"""
+    from maop.config import edition as ed
+
+    monkeypatch.setattr(ed, "get_installed_maos_version", lambda: "")
+    monkeypatch.setattr(ed, "_in_test_runner", lambda: False)
+    monkeypatch.delenv(ed.MAOS_VERSION_SKIP_ENV, raising=False)
+
+    ed._check_maos_version_floor()  # 不抛即可

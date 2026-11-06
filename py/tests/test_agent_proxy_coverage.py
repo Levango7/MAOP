@@ -14,9 +14,12 @@ from maop.core.agent.delegation.agent_proxy import (
 class _FakeAdapter(AgentAdapter):
     """Minimal concrete adapter for testing."""
 
-    def __init__(self, *, connect_ok=True, execute_result="ok", healthy=True,
-                 raise_execute=None, raise_connect=None, raise_disconnect=None,
-                 raise_sync=None, raise_health=None):
+    def __init__(self, *, connect_ok: bool = True, execute_result: str = "ok",
+                 healthy: bool = True, raise_execute: Exception | None = None,
+                 raise_connect: Exception | None = None,
+                 raise_disconnect: Exception | None = None,
+                 raise_sync: Exception | None = None,
+                 raise_health: Exception | None = None):
         self._connect_ok = connect_ok
         self._execute_result = execute_result
         self._healthy = healthy

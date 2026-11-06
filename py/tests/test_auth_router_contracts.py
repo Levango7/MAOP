@@ -29,7 +29,7 @@ import inspect
 import re
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -113,13 +113,13 @@ def _register(
         json={"username": username, "password": password, "roles": list(roles)},
     )
     assert resp.status_code == 200, resp.text
-    return resp.json()
+    return cast(dict[str, Any], resp.json())
 
 
 def _users(client: TestClient) -> list[dict[str, Any]]:
     body = client.get("/api/auth/users").json()
     assert body["status"] == "ok"
-    return body["users"]
+    return cast(list[dict[str, Any]], body["users"])
 
 
 def _row(client: TestClient, username: str) -> dict[str, Any]:
@@ -336,7 +336,7 @@ def test_the_view_request_bodies_match_the_declared_request_models(client) -> No
         op = schema["paths"][template][method]
         body = op["requestBody"]["content"]["application/json"]["schema"]
         ref = body.get("$ref")
-        return components[ref.rsplit("/", 1)[-1]] if ref else body
+        return cast(dict[str, Any], components[ref.rsplit("/", 1)[-1]] if ref else body)
 
     create = _declared("post", "/api/auth/register")
     assert set(create["properties"]) == {"username", "password", "roles"}

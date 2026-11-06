@@ -244,13 +244,13 @@ class TestVerifyEngine:
         assert "Unknown gate" in vr.gates[0].reason
 
     def test_default_gates_when_empty(self, engine, success_result):
-        plan = {"gates": []}
+        plan: dict[str, list[str]] = {"gates": []}
         vr = engine.verify(plan, success_result)
         assert vr.passed
         assert len(vr.gates) == 2  # exit_code + output
 
     def test_default_gates_when_missing(self, engine, success_result):
-        plan = {}
+        plan: dict[str, list[str]] = {}
         vr = engine.verify(plan, success_result)
         assert vr.passed
 

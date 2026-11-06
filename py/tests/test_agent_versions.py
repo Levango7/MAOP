@@ -16,6 +16,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -93,7 +95,7 @@ def _create_version(client: TestClient, **overrides) -> dict:
     payload.update(overrides)
     r = client.post("/api/agent-versions", json=payload)
     assert r.status_code == 200, r.text
-    return r.json()
+    return cast(dict, r.json())
 
 
 # ── 创建版本 ─────────────────────────────────────────────────────

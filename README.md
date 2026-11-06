@@ -57,6 +57,7 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 | RabbitMQ 消息队列 | ✗ | ✓ (可选依赖 pika) |
 | etcd 分布式 KV | ✗ | ○ (planned, 可选依赖 etcd3) |
 | License CRL 在线撤销 | ✗ | ✓ |
+| 通知中心 (Email/Webhook/InApp + WS 实时推送) | ✗ | ✓ |
 | Vue Dashboard 企业版路由 | ✗ | ✓ |
 
 > 编排外部 CLI agent（口径：31 个顶层条目 = 23 开箱可派发第三方 + 5 需配置 + 1 自研 + 1 自引用，已用脚本核实，见上方"适配器计数口径"）。非自研运行时。
@@ -161,8 +162,21 @@ pip install ./maop_enterprise-<版本>-py3-none-any.whl
 > `maop-orchestrator` 的依赖里，也不会从 PyPI 解析（`pyproject.toml` 的 `[enterprise]`
 > extra 只列企业模块所需的第三方依赖）。故以本节 + CHANGELOG 声明为准，
 > 并由 `py/tests/test_maos_version_floor.py` 守卫其不被静默删除。
-> 运行时强制检查（启动时读 `importlib.metadata.version("maop-enterprise")` 并告警）
-> 属候选改进，**本版未实施**。
+
+**运行时强制检查**（2026-10-28 实施）：企业版激活（license 校验通过）后，
+`py/maop/config/edition.py` 的 `_check_maos_version_floor()` 读取
+`importlib.metadata.version("maop-enterprise")`，低于
+`MIN_MAOS_VERSION`（当前 `5.2.3`）即抛 `RuntimeError` 并给出升级命令——
+`pip install --no-deps`、手工拼 wheel、旧 venv 残留绕过安装期约束时，
+不会等到第一次调用通知列表才 500。读不到版本（裁剪 wheel / editable 元数据
+缺失）只告警不阻断；测试运行器内降级为 ERROR 日志；联调可用
+`MAOP_SKIP_MAOS_VERSION_CHECK=1` 临时跳过。
+
+反向约束在 MAOS 侧：`maop-enterprise` 的 `pyproject.toml` 声明
+`maop-orchestrator>=5.2.1,<6.0.0`。注意 **MAOS 的 `.py` 源码受完整性
+manifest 签名保护**，任何改动（含这类校验代码）都必须由持离线生产私钥方重签
+`_integrity_manifest.json` 才能过 CI 的 release guard（`scripts/test_signing_key.pem`
+在信任锚轮换后已不配对打包公钥）——故版本校验落在 MAOP 一侧实施。
 
 > **开发者注意**：开发企业版功能需要同时 clone 两个仓库：
 > ```bash

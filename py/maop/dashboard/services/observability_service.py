@@ -141,7 +141,7 @@ def get_observability_health() -> dict[str, Any]:
             "ok": True,
             "type": type(provider).__name__,
         }
-    except Exception as exc:
+    except (ImportError, AttributeError) as exc:
         logger.debug("[observability] tracer provider check failed: %s", exc)
         checks["tracer_provider"] = {"ok": False, "error": "Tracer provider unavailable"}
 
@@ -153,7 +153,7 @@ def get_observability_health() -> dict[str, Any]:
             "ok": True,
             "type": type(meter_provider).__name__,
         }
-    except Exception as exc:
+    except (ImportError, AttributeError) as exc:
         logger.debug("[observability] meter provider check failed: %s", exc)
         checks["meter_provider"] = {"ok": False, "error": "Meter provider unavailable"}
 

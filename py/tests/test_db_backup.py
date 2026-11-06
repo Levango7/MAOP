@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from maop.core.backends.db_backup import DbBackup
+from maop.core.backends.db_backup import BackupEntry, DbBackup
 
 
 @pytest.fixture
@@ -87,7 +87,7 @@ class TestRetention:
         # Should keep 1 per db = 4, remove 4
         assert removed == 4
         # Each db should have exactly 1 backup
-        by_db = {}
+        by_db: dict[str, list[BackupEntry]] = {}
         for e in backup._manifest:
             by_db.setdefault(e.db_name, []).append(e)
         for entries in by_db.values():

@@ -16,6 +16,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -101,7 +102,7 @@ class TestSubAgentSplit(unittest.TestCase):
     def test_spawn_and_wait_all(self):
         async def _run():
             with patch.object(self.mgr, "_invoke_llm", new=AsyncMock(return_value="ok")):
-                tasks = [
+                tasks: list[tuple[AgentConfig, str, dict[str, Any]]] = [
                     (_config(name="a"), "task A", {}),
                     (_config(name="b"), "task B", {}),
                 ]

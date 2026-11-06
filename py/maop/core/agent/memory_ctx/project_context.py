@@ -209,7 +209,7 @@ class ProjectContext:
             if result.returncode == 0 and result.stdout.strip():
                 lines = result.stdout.strip().splitlines()[:20]
                 return "\n".join(lines)
-        except Exception as exc:
+        except (OSError, subprocess.SubprocessError) as exc:
             logger.warning(
                 "[project_context] git status failed, falling back to mtime scan: %s",
                 exc, exc_info=True,

@@ -26,7 +26,7 @@ import hmac
 import json
 import logging
 import os
-import sqlite3  # noqa: F401
+import sqlite3
 import threading
 import time
 from pathlib import Path
@@ -152,7 +152,7 @@ def _users_has_tenant_column(conn: Any) -> bool:
         return "tenant_id" in {
             row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()
         }
-    except Exception:  # pragma: no cover
+    except sqlite3.Error:  # pragma: no cover
         return False
 
 
@@ -166,7 +166,7 @@ def _migrate_users_columns(conn: Any) -> None:
     """
     try:
         existing = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
-    except Exception as exc:  # pragma: no cover - 极端情况下表不可读
+    except sqlite3.Error as exc:  # pragma: no cover - 极端情况下表不可读
         logger.warning("[auth] 无法读取 users 表结构，跳过列迁移: %s", exc)
         return
     new_cols = [("tenant_id", "TEXT NOT NULL DEFAULT ''")]
@@ -175,8 +175,8 @@ def _migrate_users_columns(conn: Any) -> None:
             try:
                 conn.execute(f"ALTER TABLE users ADD COLUMN {col} {decl}")
                 logger.info("[auth] users 表已补充列: %s", col)
-            except Exception as exc:
-                # 重复列 / 权限不足等：记 warning 而不是让启动崩掉——
+            except sqlite3.Error as exc:
+                # 重复列（OperationalError）/ 权限不足等：记 warning 而不是让启动崩掉——
                 # 缺该列只会让租户链路退化，不应阻断整个认证服务。
                 logger.warning("[auth] users 表补充列 %s 失败: %s", col, exc)
 
@@ -284,7 +284,7 @@ def db_login_user(db_path_str: str, username: str, password: str) -> Any:
     try:
         if "tenant_id" in row:
             tenant_id = row["tenant_id"] or ""
-    except Exception:  # pragma: no cover - 非 Row 类型的兜底
+    except TypeError:  # pragma: no cover - 非 Row 类型的兜底
         tenant_id = ""
     return {"status": "ok", "username": username, "roles": roles, "tenant_id": tenant_id}
 
@@ -348,7 +348,7 @@ def db_list_users(db_path_str: str) -> list:
                 "created_at": r["created_at"], "enabled": bool(r["enabled"])}
         try:
             item["tenant_id"] = r["tenant_id"] or ""
-        except Exception:  # pragma: no cover - 缺列时退化为未分配
+        except (IndexError, KeyError, TypeError):  # pragma: no cover - 缺列时退化为未分配
             item["tenant_id"] = ""
         out.append(item)
     return out

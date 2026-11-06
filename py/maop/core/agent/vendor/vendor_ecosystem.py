@@ -356,8 +356,8 @@ class VendorEcosystem:
         metadata_json = row["metadata"] or "{}"
         try:
             return Vendor.model_validate_json(metadata_json)
-        except Exception:
-            # metadata 损坏时回退到列字段重建
+        except (ValueError, TypeError):
+            # pydantic ValidationError ⊂ ValueError；列值类型不符走 TypeError
             logger.warning(
                 "[vendor] 厂商 %s 的 metadata 损坏，回退到列字段重建",
                 row["name"],

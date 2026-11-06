@@ -3,6 +3,7 @@
 import asyncio
 import sys
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -153,7 +154,7 @@ class _FakeResponse:
 
 def _install_fake_httpx(monkeypatch, statuses):
     """Install a fake ``httpx`` module that returns the given status codes."""
-    calls = {"init": [], "post": []}
+    calls: dict[str, list[Any]] = {"init": [], "post": []}
     queue = list(statuses)
 
     class _Client:

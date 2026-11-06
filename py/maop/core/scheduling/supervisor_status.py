@@ -190,13 +190,10 @@ class SupervisorStatusMixin:
         """
         if self._routing_store is None:
             return None
-        try:
-            # The routing store API for "list routing_keys for agent" is
-            # not standardised in v1; we skip the check and rely on the
-            # caller passing force=True when they are sure.
-            return None
-        except Exception:
-            return None
+        # The routing store API for "list routing_keys for agent" is
+        # not standardised in v1; we skip the check and rely on the
+        # caller passing force=True when they are sure.
+        return None
 
     async def _maybe_trigger_evolution(
         self,

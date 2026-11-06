@@ -14,7 +14,7 @@ import json
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from cryptography import x509
@@ -22,6 +22,11 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 from lxml import etree
+
+# 全文件都是企业能力（SAML 加解密、CRL 拉取、后端契约），被测对象在 MAOS 私有仓。
+# 个人版环境在收集阶段显式跳过并计入 skip 数，而不是被 conftest 静默忽略
+# （见 tests/conftest.py 的 `_ENTERPRISE_MODULE_IMPORT_TESTS` 说明）。
+pytest.importorskip("maop.enterprise", reason="企业能力在 maop-enterprise（MAOS）")
 
 # ═══════════════════════════════════════════════════════════════════════
 # Helpers: generate real X.509 cert + RSA key for SAML tests
@@ -142,7 +147,7 @@ def _build_saml_response(
     issuer_idx = list(assertion_elem).index(issuer_elem)
     assertion_elem.insert(issuer_idx + 1, signature_elem)
 
-    return etree.tostring(root, xml_declaration=False, encoding="unicode")
+    return cast(str, etree.tostring(root, xml_declaration=False, encoding="unicode"))
 
 
 # ═══════════════════════════════════════════════════════════════════════

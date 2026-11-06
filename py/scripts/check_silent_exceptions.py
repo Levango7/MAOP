@@ -12,12 +12,17 @@ Why AST + tokenize (not regex): the previous sweep script matched only
 ValueError:``) and multi-line layouts escaped — and comments are invisible to
 AST, so the marker check needs ``tokenize``.
 
-Two ratchets, both bidirectional (a stale entry fails the gate just like a
+Three ratchets, all bidirectional (a stale entry fails the gate just like a
 new violation fails it, so the baseline can only shrink):
 
 * silent handlers not in ``SILENT_EXCEPTION_BASELINE`` → fail
 * ``contextlib.suppress(...)`` count above ``SUPPRESS_BASELINE`` → fail
   (``suppress(Exception)`` is exactly "swallow without a trace")
+* 宽口径 ``except Exception`` / ``except BaseException`` count above
+  ``BROAD_EXCEPT_BASELINE`` → fail. 宽口径把本应上抛的编程错误
+  （``AttributeError`` / ``TypeError`` / ``KeyError``）也一起吞掉，是「假降级」
+  的主要来源；它比「静默」更隐蔽，因为处理器里往往有 logger。裸 ``except:``
+  会连 ``KeyboardInterrupt`` / ``SystemExit`` 一起吞，一律硬失败。
 
 Usage::
 
@@ -66,6 +71,28 @@ SILENT_EXCEPTION_BASELINE: frozenset[str] = frozenset({
 #: ``with suppress(asyncio.CancelledError)`` 合并成 ``drain_cancelled()``
 #: 一个带理由标记的处理器（顺带让这条关停路径变得可测）。
 SUPPRESS_BASELINE = 46
+
+#: Ratchet for 宽口径 ``except Exception`` / ``except BaseException``。只许下降：
+#: 每收窄一处就把这个数字改小。2026-10-28: 1156 → 1142（14 处「try 体只有
+#: import」的可选依赖守卫收窄为 ``except ImportError``）。同日第二轮：1142 → 1159，
+#: 针对 ``refactor/layering-closeout`` 新增的健康探测/A2A/middleware 代码：5 处实
+#: 收窄、16 处登记为「必须宽口径」。2026-10-29 第三轮：1159 → 1134，
+#: ``core/agent/`` 模块分模块收窄 25 处（yaml/文件读取、json 回读、sqlite CRUD、
+#: 标准库探针），该模块剩余 141 处的归因见 ADR-023 D7。同日第四轮：1134 → 1132，
+#: ``core/scheduling/`` 收窄 2 处（json.dumps 兜底、删掉一处只会 ``return None``
+#: 的死 try）。第五轮：1132 → 1090，``memory/`` 14 处、``core/backends/`` 15 处、
+#: ``core/reliability/`` 13 处（sqlite CRUD、unlink、import 探针、prometheus 指标），
+#: 三个模块的不可收窄归因见 ADR-023 D9。同日第六轮：1090 → 1067，
+#: ``dashboard/`` 收窄 23 处（诊断端点的文件读取与 stat、sqlite CRUD、
+#: ``datetime.fromisoformat``、pydantic ``model_validate_json``、otel 可选依赖
+#: 探针），该模块剩余 249 处的归因见 ADR-023 D10。登记条目一旦 try 体缩小到
+#: 只剩 import 或单一已知 API，必须收窄并下调本基线。
+#:
+#: 2026-11-05 合并 origin/master（154 个提交）后：1067 → 1072。这 5 处不是本分支
+#: 新增，而是他线在本轮之前合入的代码（usage 记录 best-effort、Redis 可选/瞬时
+#: 失败、route 注册兜底等），它们的 try 体含第三方客户端或 await，不可静态枚举，
+#: 归对应线继续收窄。合并点是基线的唯一合法上调口——此后任何新增仍是「新增即红」。
+BROAD_EXCEPT_BASELINE = 1072
 
 
 def _iter_py_files() -> Iterator[pathlib.Path]:
@@ -259,6 +286,33 @@ def count_suppress_calls() -> int:
     return total
 
 
+def count_broad_handlers() -> tuple[int, list[str], dict[str, int]]:
+    """宽口径 ``except Exception/BaseException`` 计数。
+
+    Returns ``(total, bare_except_locations, per_file_counts)``.
+    裸 ``except:`` 单独返回，因为它是硬失败而不是棘轮。
+    """
+    total = 0
+    bare: list[str] = []
+    per_file: dict[str, int] = {}
+    for path in _iter_py_files():
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ExceptHandler):
+                continue
+            if node.type is None:
+                bare.append(f"{_rel(path)}:{node.lineno}")
+                continue
+            if _exc_type_text(node) in ("Exception", "BaseException"):
+                total += 1
+                rel = _rel(path)
+                per_file[rel] = per_file.get(rel, 0) + 1
+    return total, bare, per_file
+
+
 def _key(entry: dict[str, object]) -> str:
     return f"{entry['path']}:{entry['line']}:{entry['kind']}"
 
@@ -269,10 +323,15 @@ def main(argv: list[str]) -> int:
     keys = sorted(_stable_key(v) for v in violations)
     by_key = {_stable_key(v): f"{v['path']}:{v['line']}" for v in violations}
     suppress = count_suppress_calls()
+    broad, bare, broad_per_file = count_broad_handlers()
 
     if "--print-baseline" in argv:
         print(json.dumps(
-            {"silent_exceptions": keys, "suppress_calls": suppress},
+            {
+                "silent_exceptions": keys,
+                "suppress_calls": suppress,
+                "broad_except_handlers": broad,
+            },
             ensure_ascii=False, indent=2,
         ))
         return 0
@@ -318,10 +377,35 @@ def main(argv: list[str]) -> int:
             "tighten SUPPRESS_BASELINE in scripts/check_silent_exceptions.py"
         )
 
+    if bare:
+        failed = True
+        print(
+            f"FAIL: {len(bare)} bare ``except:`` handler(s) — 它会连 "
+            "KeyboardInterrupt / SystemExit 一起吞掉："
+        )
+        for item in bare:
+            print(f"  {item}")
+    if broad > BROAD_EXCEPT_BASELINE:
+        failed = True
+        print(
+            f"FAIL: 宽口径 ``except Exception`` 计数 {broad} > 基线 {BROAD_EXCEPT_BASELINE}。"
+            "新增宽口径必须改为具体异常类型，或在 ADR-023 记录理由后上调基线。"
+        )
+        top = sorted(broad_per_file.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+        for rel, count in top:
+            print(f"  {rel}: {count}")
+    elif broad < BROAD_EXCEPT_BASELINE:
+        failed = True
+        print(
+            f"FAIL: 宽口径 ``except Exception`` 计数 {broad} < 基线 "
+            f"{BROAD_EXCEPT_BASELINE} — 已收窄，请把 BROAD_EXCEPT_BASELINE 下调"
+        )
+
     if not quiet:
         print(
             f"silent handlers: {len(keys)} (baseline {len(SILENT_EXCEPTION_BASELINE)}), "
-            f"suppress calls: {suppress} (baseline {SUPPRESS_BASELINE})"
+            f"suppress calls: {suppress} (baseline {SUPPRESS_BASELINE}), "
+            f"broad except: {broad} (baseline {BROAD_EXCEPT_BASELINE})"
         )
     if failed:
         return 1

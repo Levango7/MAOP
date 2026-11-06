@@ -451,7 +451,7 @@ class TestOtel:
     def test_inject_trace_context_disabled(self, monkeypatch):
         monkeypatch.delenv("MAOP_OTEL_ENABLED", raising=False)
         from maop.core.monitoring.otel import inject_trace_context
-        carrier = {}
+        carrier: dict[str, str] = {}
         inject_trace_context(carrier)
         # No-op when disabled.
         assert carrier == {}
@@ -488,6 +488,21 @@ class TestOtel:
 
 # ── SAML Handler ────────────────────────────────────────────────────
 
+
+def _enterprise_available() -> bool:
+    """企业包是否可导入（本类被测对象在 maop.enterprise，MAOS 私有仓）。"""
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec("maop.enterprise") is not None
+    except (ImportError, ValueError):  # find_spec 不可解析时抛异常而非返回 None
+        return False
+
+
+@pytest.mark.skipif(
+    not _enterprise_available(),
+    reason="SAML handler 在 maop-enterprise（MAOS）：个人版跳过，本文件其余覆盖照跑",
+)
 class TestSamlHandler:
     @pytest.fixture(autouse=True)
     def _require_overlay(self):

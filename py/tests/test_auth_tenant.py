@@ -13,6 +13,7 @@ import base64
 import json
 import sqlite3
 import tempfile  # noqa: F401
+from typing import cast
 
 import pytest
 
@@ -27,7 +28,7 @@ def handler():
 def _decode_payload(token: str) -> dict:
     part = token.split(".")[1]
     part += "=" * (-len(part) % 4)
-    return json.loads(base64.urlsafe_b64decode(part))
+    return cast(dict, json.loads(base64.urlsafe_b64decode(part)))
 
 
 # ── 令牌面 ────────────────────────────────────────────────────────────

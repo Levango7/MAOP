@@ -66,7 +66,8 @@ class SecurityMixin:
             return []
         try:
             data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
+            # ValueError：文件不是合法 JSON（json.JSONDecodeError 是其子类）。
             logger.warning("data_proxy._read_delegations_json failed: %s", exc)
             return []
         if not isinstance(data, list):
@@ -91,7 +92,7 @@ class SecurityMixin:
         for f in files:
             try:
                 text = f.read_text(encoding="utf-8", errors="replace")
-            except Exception as exc:
+            except OSError as exc:
                 logger.debug("[bridge] log scan: failed to read %s: %s", f.name, exc)
                 continue
             for raw in text.splitlines():

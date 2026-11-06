@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json  # noqa: F401
 import time
+from typing import cast
 
 import pytest
 from fastapi import FastAPI
@@ -94,7 +95,7 @@ def _submit(client: TestClient, **overrides) -> dict:
     payload.update(overrides)
     r = client.post("/api/feedback", json=payload)
     assert r.status_code == 200, r.text
-    return r.json()
+    return cast(dict, r.json())
 
 
 # ── 提交反馈 ─────────────────────────────────────────────────────
