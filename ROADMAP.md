@@ -7,7 +7,7 @@
 
 ## 当前状态
 
-- **已发布**：v5.6.0（2026-11-05，PyPI）— GAP-2/GAP-4 计量与编码收口 + M-X1 M1 三通道密钥解析 + E2-b dashboard workflow 提交面 + B2 Facade 异步入口 + M-SIM M1 双腿（kind/Temporal）+ chart 三修复；上一版 v5.5.0（2026-10-27）— 社区版阶段三超前全落地
+- **已发布**：v5.6.1（2026-11-06，PyPI）— patch：GAP-5 修复（并行分支成本台账静默缺行，见 5.6.0 节后的修复说明）；上一版 v5.6.0（2026-11-05，PyPI）— GAP-2/GAP-4 计量与编码收口 + M-X1 M1 三通道密钥解析 + E2-b dashboard workflow 提交面 + B2 Facade 异步入口 + M-SIM M1 双腿（kind/Temporal）+ chart 三修复；上一版 v5.5.0（2026-10-27）— 社区版阶段三超前全落地
   （Operator M0-M2.2 / Marketplace 签名 M0+首签 / 成本归因 M-X3 /
   Temporal M0+E2-a），范围见下方 v5.5.0 节与 CHANGELOG。
 - **上一版**：v5.4.0（2026-10-12，minor）— M2.2 首批：多模态记忆

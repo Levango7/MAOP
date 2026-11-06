@@ -65,6 +65,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 顺带修掉 `tests/test_supervisor_mixin_boundary.py` 的 4 个 ruff 告警
 （未使用的 `AlertLevel` 导入与 3 个未使用赋值）。
 
+## [5.6.1] — 2026-11-06
+
+### GAP-5 修复——并行分支成本台账静默缺行（2026-11-06）
+
+M-SIM M1 Temporal 腿发现（证据稿 GAP-5 节）：任务文本触发 analyzer 拆子任务
+走 `_execute_parallel` 并行分支时，聚合结果不透传 model/usage ⇒
+`_budget_reconciliation` 早退 ⇒ `run_events` 无 `run.cost`、成本表静默缺行。
+修复：聚合结果 model 取首个非空子任务值、usage 按键求和（并累计进 loop 级
+实测口径）；对账入口硬化为「有实测 usage 就记账，两者皆缺才早退」。
+验收：英文触发文本全链复跑，成本行在账且 `prompt+completion==total`；
+回归测试 3 例 + 邻近 40 例。
+
 ## [5.6.0] — 2026-11-05
 
 ### 门禁：`overlay_probe` 子进程输出形状校验（2026-11-05）

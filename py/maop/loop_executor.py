@@ -250,6 +250,32 @@ class ExecuteMixin:
         )
         combined_errors = [r for r in subtask_results.values() if not r.is_success()]
 
+        # GAP-5（M-SIM M1 Temporal 腿，2026-11-05）：并行聚合结果此前不带
+        # model/usage，`_budget_reconciliation` 遇到即早退 ⇒ 成本台账静默缺行
+        # （任务文本触发 analyzer 拆子任务走并行路径时必现；子任务各自的
+        # dispatch 结果本就带实测 usage，只是聚合时被丢弃）。聚合语义：
+        # model 取首个非空子任务值（组合结果由多个子任务构成，记账以首个
+        # 可归因模型为准）；usage 按键求和（组合消耗 = 子任务消耗之和），
+        # 全部子任务均无实测时保持 None（不冒充实测）。
+        combined_model = next(
+            (r.model for r in subtask_results.values() if r.model), None
+        )
+        combined_usage: dict[str, int] | None = None
+        for r in subtask_results.values():
+            u = r.usage
+            if not isinstance(u, dict):
+                continue
+            if combined_usage is None:
+                combined_usage = {}
+            for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                combined_usage[key] = combined_usage.get(key, 0) + int(u.get(key, 0) or 0)
+        if combined_usage is not None and not combined_usage:
+            combined_usage = None
+        if combined_usage:
+            # loop 级 [USAGE] 行的实测口径与串行路径（_execute_with_retry 的
+            # 逐 dispatch 累计）保持一致：并行路径在此处累计组合总量。
+            self._tokens_used_measured += int(combined_usage.get("total_tokens", 0))
+
         return new_result(
             agent=agent, task=task,
             exit_code=0 if all_success else 1,
@@ -257,6 +283,8 @@ class ExecuteMixin:
             error="\n".join(r.error for r in combined_errors if r.error) or None,
             duration_ms=max((r.duration_ms for r in subtask_results.values()), default=0),
             trace_id=trace_id, routing_key=routing_key,
+            model=combined_model,
+            usage=combined_usage,
         )
 
     async def _execute_with_retry(

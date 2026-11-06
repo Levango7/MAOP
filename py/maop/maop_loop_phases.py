@@ -382,7 +382,15 @@ class PhasesMixin:
         directly instead of the legacy JSON ``budget_ledger.json`` via
         ``model.budget.BudgetGuard``, eliminating the dual-write split.
         """
-        if not exec_result or not exec_result.model:
+        if not exec_result:
+            return
+        # GAP-5 硬化（2026-11-05，M-SIM M1 Temporal 腿）：此前 model 为空即
+        # 整条放弃——即便实测 usage 在手也静默缺行（run_events 无 run.cost、
+        # 成本表缺行且无任何线索）。改为：有实测 usage 就记账（model 留空时
+        # 与启发式路径的 ``model_name or ""`` 同形归档）；两者皆缺才返回。
+        _usage = getattr(exec_result, "usage", None)
+        _has_usage = isinstance(_usage, dict) and bool(_usage)
+        if not exec_result.model and not _has_usage:
             return
         try:
             from maop.core.cost_tracker import CostTracker
