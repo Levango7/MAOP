@@ -32,15 +32,16 @@
 | **后端健壮性** | 非测试代码静默 `except: pass` **仅 1 处**（localStorage 私有模式，带注释）；13 处 `NotImplementedError` 全为抽象基类/防御守卫；4 处 `include_in_schema=False` 全为尾斜杠别名（防 OpenAPI 重复 operationId） |
 | **工程纪律** | 非测试代码 **0 处 TODO/FIXME**（此前的「92 处桩标记」为关键词误命中——`task_placeholder` 等） |
 
-## 三、未闭环项（如实登记，下一轮）
+## 三、未闭环项 → 收口进展（2026-11-07 当日更新）
 
-1. **前端交互态运行时抽查**：静态面干净，但「点击/拖拽/反馈」的最终判据是运行时行为；建议下一轮用浏览器自动化对 10 个高频页做点击级抽查。
-2. **`maop run --agent claude --task "hello"` 在可用 CLI 环境下 `turns=4`**：一次打招呼耗 4 个 dispatch（含启发式计量警告）。是否为计划-执行-验证循环的正常开销，还是循环过旋，待专项核对（不阻塞）。
-3. **`done` 事件 token 口径**：`maop_execute.py` 的 `done` 事件用 `len(stdout)//4` 估计 tokens（与协议行实测口径并存）——两条口径在面板同轴展示时会打架，待统一。
-4. **routing 兜底 agent=codex**：sim/无 routing 配置环境下 loop 打印
-   `Config routing did not match task, using default: rk=chat agent=codex`
-   并尝试 codex（不存在时依赖 failover 兜回）。生产 config 有 routing 段，
-   但「兜底 agent 硬编码 codex」值得参数化（避免用户环境无 codex 时先失败一轮）。
+1. **（仍待做）前端交互态运行时抽查**：静态面干净，但「点击/拖拽/反馈」的最终判据是运行时行为；建议下一轮用浏览器自动化对 10 个高频页做点击级抽查。
+2. **`turns=4` 根因已查明**（原记为「循环过旋嫌疑」，**证伪**）：`--agent claude` 而 **claude 根本不在 `agents.yaml` 在册条目**（README 早有记载「不存在 claude 适配器条目」）→ 首轮 dispatch 失败 → failover 链兜到 copilot 成功。run_events 实证（run.cost / run.step 的 agent=copilot，而 started/finished 标 claude）。**修复**：入口 `unknown_agent_warning`——`--agent X` 不在册即打印 WARN + 在册名清单（failover 机制保留）。5 例测试。
+3. **`done` 事件 token 口径已统一**：优先 `MaopResult.usage` 实测（GAP-2 链路），无实测退回字符估计，附 `tokens_source` 标注。
+4. **routing 兜底已按在册解析**：`resolve_default_agent`——env 显式值 → 在册 codex 优先（保持历史行为）→ 首个 enabled 且 cli 非空的 agent → 字面 codex（如实报错）。5 例测试。
+
+> 方法论收获：`turns=4` 与「兜底 codex」是**同一个根因类**——「请求的 agent
+> 与实际执行的 agent 不一致且无信号」。这类缺陷不会报错、不会红测试，只会
+> 在用户看懂 run_events 时才显形；入口告警是成本最低的防线。
 
 ## 四、总判断
 
