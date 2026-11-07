@@ -18,6 +18,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from maop.config.loader import MaopConfig
+from maop.config.settings import default_agent as _default_agent_env
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,42 @@ _VALID_SLA_TIERS = frozenset({"best_effort", "standard", "critical"})
 _VALID_PRIORITY_RANGE = (1, 5)  # 1 = highest, 5 = lowest
 
 # M1 修复：移除硬编码 agent = "claude"，改为从环境变量读取默认 agent。
-# MAOP_DEFAULT_AGENT 优先级最高，未设置时回退到 "codex"（已在 agents.yaml 中定义）。
+def resolve_default_agent(config: MaopConfig | None = None) -> str:
+    """routing 未命中时的兜底 agent 解析（GAP 收口，2026-11-07）.
+
+    顺序：① ``MAOP_DEFAULT_AGENT`` env（settings 收敛点，非空即用）；
+    ② 配置在册且 ``enabled``/``cli`` 非空的 ``codex``（保持历史默认）；
+    ③ 配置中首个 ``enabled`` 且 ``cli`` 非空的 agent（用户环境常见：只有
+    自家 agent 在册，无 codex）；④ 字面 ``"codex"``（原样保留，让「无可用
+    agent」在派发处如实报错，不静默换成别的）。
+
+    动机：此前恒定兜底 "codex"——该 agent 不在册的用户环境会在首轮
+    dispatch 打到一个不存在的 agent，白耗 turn 再靠 failover 兜回。
+    """
+    env_value = _default_agent_env()
+    if env_value:
+        return env_value
+    if config is not None:
+        agents = getattr(config, "agents", None) or {}
+
+        def _usable(name: str) -> bool:
+            spec = agents.get(name)
+            if spec is None:
+                return False
+            return bool(getattr(spec, "enabled", True)) and bool(
+                getattr(spec, "cli", "")
+            )
+
+        if _usable("codex"):
+            return "codex"
+        for name in agents:
+            if _usable(name):
+                return str(name)
+    return "codex"
+
+
+#: 向后兼容常量（历史调用方/模型默认值引用）。注意：运行时兜底请用
+#: :func:`resolve_default_agent`（会按配置在册情况解析）。
 DEFAULT_AGENT = os.getenv("MAOP_DEFAULT_AGENT", "codex")
 # 默认 routing_key（config 路由未匹配时使用）
 DEFAULT_ROUTING_KEY = "chat"
@@ -210,8 +246,9 @@ def maop_plan(
     # Priority 1: explicit routing_key override
     if routing_key:
         rk = routing_key
-        # M1 修复：移除硬编码 agent = "claude"，改为从配置读取默认 agent
-        agent = DEFAULT_AGENT
+        # M1 修复：移除硬编码 agent = "claude"，改为从配置读取默认 agent；
+        # 2026-11-07：未命中 route 时走 resolve_default_agent（按在册解析）。
+        agent = resolve_default_agent(config)
         if config:
             for route_rk, route in config.routing.items():
                 if route_rk == rk:
@@ -226,8 +263,9 @@ def maop_plan(
             rk, agent = config_result
         else:
             # v5.0.0: legacy keyword routing removed; use conservative default.
-            # M1 修复：默认 agent 改为从环境变量读取（DEFAULT_AGENT），不再硬编码 "claude"
-            rk, agent = DEFAULT_ROUTING_KEY, DEFAULT_AGENT
+            # M1 修复：默认 agent 改为从环境变量读取，不再硬编码 "claude"；
+            # 2026-11-07：env 未设时按配置在册解析（codex 优先 → 首个可用）。
+            rk, agent = DEFAULT_ROUTING_KEY, resolve_default_agent(config)
             logger.warning("Config routing did not match task, using default: rk=%s agent=%s — check agents.yaml routing table", rk, agent)
 
     # Get agent budget

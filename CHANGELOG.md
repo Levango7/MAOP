@@ -82,6 +82,25 @@ M-SIM M0 演练抓到的最后一条真缺口：`wiring.run_workflow` 在默认�
 测试：3 例（真实 dispatch 两节点全 success + 事件回写 + 未知 workflow 诚实
 空结果）；ruff/mypy 无问题。
 
+### 质量排查第一轮修复 —— 路由兜底 / 静默换人告警 / token 口径（2026-11-07）
+
+排查报告 `docs/audits/quality-audit-2026-11-07.md` 三项落地：
+
+- **routing 兜底按在册解析**（`resolve_default_agent`）：此前恒定回退
+  `codex`——不在册的用户环境首轮 dispatch 打到不存在的 agent，白耗 turn 再
+  靠 failover 兜回。新语义：env 显式值 → 在册 codex 优先（保持历史行为）→
+  首个 enabled 且 cli 非空的 agent → 字面 codex（如实报错）。env 读点收敛
+  进 settings（`default_agent()`），`.env.example` 改留空并写明语义。
+- **`--agent` 不在册告警**（`unknown_agent_warning`）：`maop run --agent X`
+  而 X 不在 agents.yaml 时，入口即打印 WARN + 在册名清单——此前会静默兜到
+  别的 agent 执行（实测「请求 claude、实际跑 copilot、turns=4」全链复现）。
+- **`done` 事件 token 口径统一**：dispatch 路径此前恒为 `len(stdout)//4`
+  字符估计；现优先 `MaopResult.usage` 实测（GAP-2 链路），无实测才退回估计，
+  并附 `tokens_source` 标注，面板不再把两类口径混排。
+
+测试：resolver 5 例 + 告警 5 例；ruff/mypy/零漂移全过。排查报告「未闭环」
+四项中三项已收口（含 turns=4 根因），剩余前端交互运行时抽查待下轮。
+
 ## [5.6.1] — 2026-11-06
 
 ### GAP-5 修复——并行分支成本台账静默缺行（2026-11-06）

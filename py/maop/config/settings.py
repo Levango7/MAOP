@@ -45,6 +45,17 @@ def a2a_gateway_enabled() -> bool:
     return os.environ.get("MAOP_A2A_GATEWAY", "0") == "1"
 
 
+def default_agent() -> str:
+    """``MAOP_DEFAULT_AGENT``：routing 未命中时的兜底 agent 名（可空）.
+
+    空串 = 未显式配置，由 ``maop_plan`` 按「codex 优先（若在册）→ 首个
+    enabled 且 cli 非空的 agent」解析（避免用户环境无 codex 时首轮 dispatch
+    打到一个不存在的 agent，白耗 turn 再靠 failover 兜回）。
+    config-drift 收敛点（原先读点在 ``maop_plan.py`` 模块级，已收敛至此）。
+    """
+    return os.environ.get("MAOP_DEFAULT_AGENT", "").strip()
+
+
 def marketplace_verify_key_path() -> str:
     """``MAOP_MARKETPLACE_VERIFY_KEY``：Marketplace 包签名校验公钥（PEM 路径）.
 
