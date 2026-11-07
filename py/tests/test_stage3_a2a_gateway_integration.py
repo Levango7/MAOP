@@ -29,8 +29,8 @@ from maop.core.agent.delegation.a2a import (
     A2AMessage,
     A2AResponse,
 )
-from maop.core.coordination.a2a_gateway import A2AGateway
 from maop.core.coordination.a2a_blackboard_bridge import A2ABlackboardBridge
+from maop.core.coordination.a2a_gateway import A2AGateway
 from maop.core.coordination.a2a_transport_server import A2ATransportServer
 
 
