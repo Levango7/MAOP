@@ -101,6 +101,48 @@ M-SIM M0 演练抓到的最后一条真缺口：`wiring.run_workflow` 在默认�
 测试：resolver 5 例 + 告警 5 例；ruff/mypy/零漂移全过。排查报告「未闭环」
 四项中三项已收口（含 turns=4 根因），剩余前端交互运行时抽查待下轮。
 
+### CLI 原生 usage 采集 —— `tokens_source` 从 estimated 变 measured（2026-11-08）
+
+GAP-2 方案 A 解析的是 agent 主动打印的 `[USAGE]` 协议行。那是 MAOP 自定义的
+约定，只有配合它的 stub / 自研 agent 会输出；**真实第三方 CLI 从不输出**，
+因此生产环境该路径恒为 `None`，成本侧只能退回 CJK 启发式 —— `maop run` 的
+`[USAGE]` 行长期是 `tokens=0 source=estimated`。M-SIM 演练里
+`tokensSource=measured` 成立，是因为 stub 自己按协议申报，不代表生产。
+
+本次补上第二条取值链：CLI **自己**的机器可读出口。
+
+- `usage_protocol.parse_usage_file(path, fmt)`：解析 `--usage-output-file`
+  落盘的 usage JSON；未注册格式 / 文件缺失 / 结构不符一律返回 `None`
+  （宁可退回启发式，也不把 0 冒充实测）。
+- `agents.yaml` 新增 `usage_format` 字段，经 `AgentDef → AgentConfig →
+  _make_config` 全程透传（2026-10-11「声明了但没透传」的教训）。
+- `drivers._run_cli` 支持 `{usage_file}` 占位符：`mkdtemp` 给出**尚不存在**
+  的目标文件（避免各 CLI 对「文件已存在」行为不一），进程结束后回读，`finally`
+  清理。占位符在 `shlex.split` **之后**还原 —— cli_args 走 posix 模式，
+  Windows 路径的反斜杠会被当转义符吃掉。
+- copilot 声明 `usage_format: copilot` 并加
+  `--usage-output-file "{usage_file}"`。
+
+**口径**：copilot 的 prompt 侧 = `input + cache_read + cache_write`，与其
+stderr 的 `Tokens ↑ 19.9k` 一致（525 + 19328 = 19853）。只取 `input` 会把
+19853 报成 525（低估 37 倍），而且因为「有数」不会被启发式纠正 —— 那是最坏的
+假实测。
+
+**实测对照**（Windows，copilot 1.0.107，同一命令）：
+
+| | 修复前 | 修复后 |
+|---|---|---|
+| `[USAGE]` | `turns=1 tokens=0 source=estimated` | `turns=1 tokens=21468 source=measured` |
+| `cost_entries.prompt_tokens` | 启发式 | 21463 |
+| `cost_entries.total_tokens` | 启发式 | 21468 |
+
+测试：新增 16 例（解析边界 12 + 端到端 4，含临时目录清理与「未声明格式行为
+不变」守卫）；受影响模块 68 + 149 例全绿；ruff / mypy 干净。
+
+**边界**：`cache_read_tokens` / `cache_write_tokens` 已随 `MaopResult.usage`
+返回，但尚未透传到 `cost_entries.metadata` 与 `[USAGE]` 行 —— 该处与 #241
+（`maop_loop_phases._budget_reconciliation`）同文件，留待其合并后单独做。
+
 ## [5.6.1] — 2026-11-06
 
 ### GAP-5 修复——并行分支成本台账静默缺行（2026-11-06）
