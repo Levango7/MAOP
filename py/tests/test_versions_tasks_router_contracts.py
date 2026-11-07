@@ -19,10 +19,11 @@ two tests pin both halves of that: no model declared, and the exemption entry ex
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from maop.core.agent.router.long_running_task import LongRunningTask
@@ -231,7 +232,7 @@ def test_progress_route_has_no_effective_response_model() -> None:
     from pydantic import BaseModel
 
     routes = [
-        route
+        cast(APIRoute, route)
         for route in lrt_router.router.routes
         if getattr(route, "path", "").endswith("/{task_id}/progress")
     ]

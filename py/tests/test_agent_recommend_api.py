@@ -8,9 +8,10 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import pytest
+from fastapi.routing import APIRoute
 
 from maop.dashboard.routers import agent_catalog
 from maop.dashboard.services import agent_recommend_service
@@ -133,15 +134,15 @@ def test_none_capabilities_becomes_empty_list(monkeypatch: pytest.MonkeyPatch) -
 
 def test_recommend_endpoint_is_registered() -> None:
     """端点必须真的注册了 —— 否则 service 写得再好也到不了前端。"""
-    paths = {r.path for r in agent_catalog.router.routes}
+    paths = {cast(APIRoute, r).path for r in agent_catalog.router.routes}
     assert "/api/agent-catalog/recommend" in paths
 
 
 def test_recommend_endpoint_uses_response_model() -> None:
     """响应模型契约：与 #141 的 response_model 棘轮方向一致。"""
     route = next(
-        r for r in agent_catalog.router.routes
-        if r.path == "/api/agent-catalog/recommend"
+        cast(APIRoute, r) for r in agent_catalog.router.routes
+        if cast(APIRoute, r).path == "/api/agent-catalog/recommend"
     )
     assert route.response_model is not None
     assert route.response_model.__name__ == "RecommendAgentsPayload"

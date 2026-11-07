@@ -5,7 +5,7 @@ Uses isolated MAOP_ROOT + admin role injection + mocked managers.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -42,7 +42,7 @@ def tenant_client(tmp_path, monkeypatch):
 
     # Reset tenant manager singleton
     import maop.dashboard.routers.tenant as tenant_mod
-    tenant_mod._tenant_manager = None
+    cast(Any, tenant_mod)._tenant_manager = None
 
     mock_mgr = MagicMock()
     mock_mgr.list_tenants = MagicMock(return_value=[])
@@ -140,7 +140,7 @@ class TestTenantUsage:
 def subagent_client(tmp_path, monkeypatch):
     monkeypatch.setattr("maop.dashboard.routers.subagent.MAOP_ROOT", tmp_path)
     import maop.dashboard.routers.subagent as sa_mod
-    sa_mod._subagent_mgr = None
+    cast(Any, sa_mod)._subagent_mgr = None
 
     mock_mgr = MagicMock()
     mock_mgr.spawn = AsyncMock(return_value="agent-1")

@@ -11,6 +11,7 @@ from __future__ import annotations
 import ast
 import sys
 import types
+from typing import Any
 
 import pytest
 
@@ -30,7 +31,7 @@ def stub_temporalio(monkeypatch: pytest.MonkeyPatch):
             return fn
         return deco
 
-    stub = types.ModuleType("temporalio")
+    stub: Any = types.ModuleType("temporalio")
     stub.activity = types.SimpleNamespace(defn=_identity_deco)
     stub.workflow = types.SimpleNamespace(defn=_identity_deco)
     monkeypatch.setitem(sys.modules, "temporalio", stub)

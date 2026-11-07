@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import cast
 
 import pytest
+from fastapi.routing import APIRoute
 
 from maop.core.memory.knowledge_graph import (
     GraphEdgeV2,
@@ -445,6 +447,6 @@ class TestKnowledgeGraphEndpoint:
         # is on a different router not mounted here. We verify the kg_router
         # does not register a /graph path.
         from maop.dashboard.routers.knowledge import kg_router
-        paths = [r.path for r in kg_router.routes]
+        paths = [cast(APIRoute, r).path for r in kg_router.routes]
         assert "/api/knowledge-graph" in paths
         assert "/api/knowledge/graph" not in paths

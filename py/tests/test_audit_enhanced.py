@@ -18,7 +18,7 @@ import csv
 import io
 import json
 import time
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -119,7 +119,7 @@ def _make_event(
 ) -> AuditEvent:
     """Build an AuditEvent directly (bypassing the logger)."""
     return AuditEvent(
-        event_id=f"evt_{int(time.time() * 1000)}_{_make_event._counter}",
+        event_id=f"evt_{int(time.time() * 1000)}_{cast(Any, _make_event)._counter}",
         timestamp=timestamp if timestamp is not None else time.time(),
         action=action,
         severity=severity,

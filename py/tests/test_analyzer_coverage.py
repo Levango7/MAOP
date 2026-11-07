@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from maop.core.agent.analyzer import (
+from maop.core.agent.analyzer.analyzer import (
     AnalysisResult,
     Complexity,
     DependencyDAG,

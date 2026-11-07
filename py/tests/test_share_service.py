@@ -9,9 +9,10 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, cast
 
 import pytest
+from fastapi.routing import APIRoute
 
 from maop.dashboard.services import share_service
 
@@ -130,7 +131,10 @@ def test_list_excludes_expired(temp_db, fake_run, monkeypatch: pytest.MonkeyPatc
 def test_router_exposes_expected_paths() -> None:
     from maop.dashboard.routers import share
 
-    paths = {(r.path, tuple(sorted(r.methods))) for r in share.router.routes}
+    paths = {
+        (cast(APIRoute, r).path, tuple(sorted(cast(APIRoute, r).methods or ())))
+        for r in share.router.routes
+    }
     assert ("/api/share", ("POST",)) in paths
     assert ("/api/share", ("GET",)) in paths
     assert ("/api/share/{token}", ("GET",)) in paths

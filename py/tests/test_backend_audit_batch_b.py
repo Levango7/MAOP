@@ -228,10 +228,10 @@ class TestResolveTemplate:
 
 class TestSafeEvalCache:
     def test_parse_is_cached(self) -> None:
-        before = _parse_expr.cache_info().hits
+        before = cast(Any, _parse_expr).cache_info().hits
         safe_eval("1 + 1", {})
         safe_eval("1 + 1", {})
-        assert _parse_expr.cache_info().hits >= before + 1
+        assert cast(Any, _parse_expr).cache_info().hits >= before + 1
 
     def test_eval_still_correct(self) -> None:
         assert safe_eval("2 * 3", {}) == 6

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import sys
 import types
+from typing import Any
 
 from maop.operator import handlers
 from maop.operator.controller import OperatorController
@@ -161,9 +162,9 @@ def test_enterprise_checker_wired_when_enterprise_available(monkeypatch):
             recorded["qm"] = qm
             self.qm = qm
 
-    fake_quota = types.ModuleType("maop.enterprise.quota")
+    fake_quota: Any = types.ModuleType("maop.enterprise.quota")
     fake_quota.QuotaManager = _FakeQM
-    fake_adapter = types.ModuleType("maop.enterprise.quota_operator")
+    fake_adapter: Any = types.ModuleType("maop.enterprise.quota_operator")
     fake_adapter.OperatorQuotaChecker = _FakeChecker
     monkeypatch.setitem(sys.modules, "maop.enterprise.quota", fake_quota)
     monkeypatch.setitem(sys.modules, "maop.enterprise.quota_operator", fake_adapter)
