@@ -11,6 +11,11 @@
 | npm | 9+ | `npm --version` |
 | Git | 任意 | `git --version` |
 
+> **还必须装至少一个外部 CLI agent**。MAOP 是编排层，本身不提供 agent 运行时
+> （见 README「定位说明」）；`maop run` 驱动的是 `config/agents.yaml` 里已注册的 CLI。
+> 一个都没装时，派发会返回 `exit_code=-2 (Command not found)`，任务不会真正执行。
+> 在册清单见 `config/agents.yaml`（如 `codex`、`gemini`、`copilot`、`qwen`、`pi`）。
+
 ## 1. 安装（1 分钟）
 
 ```bash
@@ -33,11 +38,15 @@ cd ..
 # 复制环境变量模板
 cp .env.example .env
 
-# 编辑 .env，至少设置以下变量：
-#   MAOP_LLM_API_KEY=<你的 API Key>    （必填）
-#   MAOP_LLM_API_BASE=<API 地址>      （可选，默认 OpenAI）
-#   MAOP_LLM_MODEL=gpt-4o             （可选）
+# 编辑 .env，按需设置以下变量（完整模板见 .env.example）：
 #   MAOP_DASH_PORT=9079               （可选，默认 9079）
+#   MAOP_DEFAULT_AGENT=codex          （可选，兜底 agent，须已在 agents.yaml 在册）
+#   MAOP_LLM_DEFAULT_AGENT=MAOP       （可选，Chat 面板默认 agent）
+#   MAOP_LLM_DEFAULT_MODEL=           （可选，留空由 provider 决定）
+#
+# 注意：仓库不存在 MAOP_LLM_API_KEY 这一变量（.env.example 与
+# py/maop/config/settings.py 均无此字段）。内置 LLM 的凭据走
+# py/maop/core/api_key_vault.py（Dashboard 的密钥/凭据管理页），不通过 .env 注入。
 ```
 
 > 截图：`.env` 文件关键配置区域
@@ -105,7 +114,9 @@ npm run dev
 **A:** 检查后端是否正在运行（默认端口 9079），确认 `.env` 中 `MAOP_DASH_PORT` 与前端代理配置一致。
 
 ### Q: Agent 执行时报 LLM API 错误
-**A:** 检查 `.env` 中 `MAOP_LLM_API_KEY` 是否正确设置，以及 API 地址是否可访问。可以用 `curl` 测试 API 连通性。
+**A:** 内置 LLM 的凭据在 Dashboard 的密钥/凭据管理页配置（Fernet 加密存储，见
+`py/maop/core/api_key_vault.py`），**不通过 `.env` 的 `MAOP_LLM_API_KEY`**（该变量不存在）。
+若只用外部 CLI agent 执行任务，则不需要配置内置 LLM 凭据。
 
 ### Q: 企业版功能（SSO/RBAC/审计）显示 404
 **A:** MAOP 个人版（Community）默认启用 `personal` edition。MAOS 企业版功能需要在 `.env` 中设置 `MAOP_EDITION=enterprise` 并配置有效 License。详见 [ADR-016](adr/016-dual-edition-architecture.md)。
