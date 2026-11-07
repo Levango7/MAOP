@@ -133,6 +133,7 @@ class TestTaskPool:
                 await pool.wait(tid, timeout=5)
 
             t = pool.get_task(tid)
+            assert t is not None
             assert t.status == TaskStatus.FAILED
             assert "deliberate error" in t.error
             await pool.stop()

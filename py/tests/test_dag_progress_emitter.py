@@ -69,7 +69,8 @@ class TestNodeStatusEvent:
     def test_status_must_be_valid_enum(self):
         """status field rejects invalid values."""
         with pytest.raises(Exception):  # noqa: B017
-            NodeStatusEvent(node_id="n1", status="invalid_status")
+            # 故意传非法枚举值：验证校验会拒绝
+            NodeStatusEvent(node_id="n1", status="invalid_status")  # type: ignore[arg-type]
 
 
 class TestDagProgressEmitter:

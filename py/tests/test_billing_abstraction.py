@@ -485,7 +485,9 @@ class TestBillingEngineCostTracker:
         )
         assert result.success
         # 验证 CostTracker 记录
-        entries = engine_with_tracker._cost_tracker.get_entries(agent="a")
+        tracker = engine_with_tracker._cost_tracker
+        assert tracker is not None
+        entries = tracker.get_entries(agent="a")
         assert len(entries) == 1
         assert entries[0].session_id == "sess1"
         assert entries[0].model == "gpt-4o"
@@ -511,16 +513,18 @@ class TestBillingEngineCostTracker:
         catalog.register(_make_descriptor("a", BillingModel.PER_TOKEN))
         engine_with_tracker._quota.set_quota("a", QuotaEntry(free_quota=10000))
         # 让 CostTracker.record 抛异常
-        original_record = engine_with_tracker._cost_tracker.record
+        tracker = engine_with_tracker._cost_tracker
+        assert tracker is not None
+        original_record = tracker.record
 
         def boom(**kwargs: Any) -> None:
             raise RuntimeError("boom")
 
-        engine_with_tracker._cost_tracker.record = boom
+        tracker.record = boom  # type: ignore[assignment,method-assign]
         try:
             result = engine_with_tracker.charge("a", tokens=100)
         finally:
-            engine_with_tracker._cost_tracker.record = original_record
+            tracker.record = original_record  # type: ignore[method-assign]
         assert result.success
         assert result.record is not None
 

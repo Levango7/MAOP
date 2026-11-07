@@ -133,6 +133,7 @@ class TestA2ABlackboardBridge:
             source_agent="planner",
         )
         entry = await bridge.on_a2a_message(msg)
+        assert entry is not None
         assert entry.domain == "hypothesis"
 
     @pytest.mark.asyncio

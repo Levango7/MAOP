@@ -232,7 +232,7 @@ def _marker_expr(script: str) -> str | None:
 
 
 def _excludes_slow(expr: str | None) -> bool:
-    return bool(expr) and expr.startswith("not slow")
+    return expr is not None and expr.startswith("not slow")
 
 
 def _pytest_targets(script: str) -> list[str]:

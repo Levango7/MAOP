@@ -214,6 +214,7 @@ class TestDriverFunctions:
 
         # 应返回错误结果
         assert result.exit_code == -2
+        assert result.error is not None
         assert "连接失败" in result.error or "failed" in result.error.lower()
         # connect 失败时未进入 try/finally，disconnect 不应被调用
         # （连接未建立，无需断开 — 这是正确行为）
@@ -245,6 +246,7 @@ class TestDriverFunctions:
 
         # 应返回超时错误
         assert result.exit_code == -1
+        assert result.error is not None
         assert "TIMEOUT" in result.error or "timeout" in result.error.lower()
 
 

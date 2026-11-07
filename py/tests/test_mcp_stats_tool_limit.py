@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 from maop.core.mcp import mcp_hub as mcp_hub_mod
 from maop.core.mcp.mcp_call_stats import MCPCallStats
 from maop.core.mcp.mcp_hub import MCPHub
-from maop.core.mcp.mcp_hub_types import MCPServerConfig
+from maop.core.mcp.mcp_hub_types import MCPServerConfig, TransportType
 
 
 @pytest.fixture(autouse=True)
@@ -154,7 +154,7 @@ def wired_hub(hub: MCPHub):
     sid = "srv-1"
     transport = _FakeTransport()
     hub._transports[sid] = transport
-    hub._configs[sid] = MCPServerConfig(name="srv1", transport="stdio")
+    hub._configs[sid] = MCPServerConfig(name="srv1", transport=TransportType.STDIO)
     return hub, sid, transport
 
 
@@ -270,7 +270,7 @@ class TestCallStatsCollectedByHub:
         hub._transports[sid] = _FakeTransport(
             {"result": {"content": [], "isError": True}}
         )
-        hub._configs[sid] = MCPServerConfig(name="srv2", transport="stdio")
+        hub._configs[sid] = MCPServerConfig(name="srv2", transport=TransportType.STDIO)
         await hub.call_tool(sid, "badTool")
         snap = hub.call_stats()
         assert snap["total"]["calls"] == 1
@@ -286,7 +286,7 @@ class TestCallStatsCollectedByHub:
                 raise RuntimeError("transport down")
 
         hub._transports[sid] = _Boom()
-        hub._configs[sid] = MCPServerConfig(name="srv3", transport="stdio")
+        hub._configs[sid] = MCPServerConfig(name="srv3", transport=TransportType.STDIO)
 
         with pytest.raises(RuntimeError):
             await hub.call_tool(sid, "boomTool")

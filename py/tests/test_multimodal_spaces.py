@@ -19,8 +19,10 @@ everywhere — no models, no server.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import pytest
+from sqlalchemy.engine import Engine
 
 from maop.core.memory.multimodal_embed import HashModalityEmbedding
 from maop.core.memory.multimodal_pg import PgMultimodalBackend
@@ -281,7 +283,7 @@ def test_pg_second_space_targets_its_own_table() -> None:
     register_multimodal_space(AUDIO_SPACE)
     engine = _StubEngine()
     backend = PgMultimodalBackend(
-        engine=engine, space=AUDIO_SPACE, embedding=HashModalityEmbedding(dim=8),
+        engine=cast(Engine, engine), space=AUDIO_SPACE, embedding=HashModalityEmbedding(dim=8),
     )
     assert backend.stats()["space"] == "audio-8"
     assert backend.stats()["table"] == "audio_entries_stub"
@@ -295,7 +297,7 @@ def test_pg_second_space_targets_its_own_table() -> None:
 
 def test_pg_default_space_targets_multimodal_entries() -> None:
     engine = _StubEngine()
-    PgMultimodalBackend(engine=engine)
+    PgMultimodalBackend(engine=cast(Engine, engine))
     joined = "\n".join(engine.connection.statements)
     assert "multimodal_entries" in joined
     assert "vector(512)" in joined
@@ -305,7 +307,7 @@ def test_pg_default_space_targets_multimodal_entries() -> None:
 def test_pg_rejects_a_non_identifier_table() -> None:
     with pytest.raises(ValueError, match="invalid table name"):
         PgMultimodalBackend(
-            engine=_StubEngine(),
+            engine=cast(Engine, _StubEngine()),
             space=MultimodalSpaceSpec(
                 name="bad", table_name="audio; DROP TABLE x", dimension=8,
                 modalities=("audio",),
@@ -318,7 +320,7 @@ def test_pg_generic_write_is_routed() -> None:
     register_multimodal_space(AUDIO_SPACE)
     engine = _StubEngine()
     backend = PgMultimodalBackend(
-        engine=engine, space=AUDIO_SPACE, embedding=HashModalityEmbedding(dim=8),
+        engine=cast(Engine, engine), space=AUDIO_SPACE, embedding=HashModalityEmbedding(dim=8),
     )
     assert backend.index_modality("audio", "a1", vector=_audio_vector()) == "a1"
     joined = "\n".join(engine.connection.statements)

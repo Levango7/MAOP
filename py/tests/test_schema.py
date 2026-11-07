@@ -107,7 +107,8 @@ class TestProviderDef:
         assert p.enabled is False
 
     def test_from_dict_with_string_type(self):
-        p = ProviderDef(type="builtin", api_key_env="KEY")
+        # 故意传裸字符串：验证 pydantic 会按枚举值收敛
+        p = ProviderDef(type="builtin", api_key_env="KEY")  # type: ignore[arg-type]
         assert p.type == ProviderType.BUILTIN
 
     def test_serialization(self):
@@ -155,7 +156,8 @@ class TestModelDef:
         assert m2.capabilities == []  # independent lists
 
     def test_from_dict_with_string_enums(self):
-        m = ModelDef(name="test", quality_tier="excellent", latency_tier="fast")
+        # 故意传裸字符串：验证 pydantic 会按枚举值收敛
+        m = ModelDef(name="test", quality_tier="excellent", latency_tier="fast")  # type: ignore[arg-type]
         assert m.quality_tier == QualityTier.EXCELLENT
         assert m.latency_tier == LatencyTier.FAST
 

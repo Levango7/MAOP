@@ -626,7 +626,7 @@ def test_gate_turns_a_residual_leak_into_a_failing_session(
     import tests.conftest as c
 
     session = _fake_session()
-    fired = c.apply_leak_gate(session, "impl=tests.evil:test.<locals>.fake", 0, "gw3")  # type: ignore[attr-defined]
+    fired = c.apply_leak_gate(session, "impl=tests.evil:test.<locals>.fake", 0, "gw3")  # type: ignore[attr-defined,arg-type]
     out = capsys.readouterr().out
     assert fired is True
     assert session.exitstatus == pytest.ExitCode.TESTS_FAILED, "会话退码必须被改成失败"  # type: ignore[attr-defined]
@@ -641,7 +641,7 @@ def test_gate_leaves_a_clean_session_alone(
     import tests.conftest as c
 
     session = _fake_session()
-    assert c.apply_leak_gate(session, "", 5, "master") is False  # type: ignore[attr-defined]
+    assert c.apply_leak_gate(session, "", 5, "master") is False  # type: ignore[attr-defined,arg-type]
     assert session.exitstatus == pytest.ExitCode.OK, "干净时不许动退码"  # type: ignore[attr-defined]
     assert "::error" not in capsys.readouterr().out
 

@@ -28,6 +28,7 @@ import io
 import json
 import urllib.error
 from contextlib import contextmanager
+from email.message import Message
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -517,7 +518,7 @@ class TestStreamableHttpTransport:
             url="http://localhost:8080/mcp",
             code=500,
             msg="Internal Server Error",
-            hdrs=None,
+            hdrs=Message(),
             fp=io.BytesIO(b"boom-body"),
         )
 

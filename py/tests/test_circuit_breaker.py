@@ -69,10 +69,12 @@ class TestCircuitBreaker:
 
     def test_record_failure_opens_after_threshold(self, breaker: CircuitBreaker):
         entry = breaker.get("claude")
+        assert entry is not None
         threshold = entry.threshold  # default 3
         for _ in range(threshold):
             breaker.record_failure("claude")
         entry = breaker.get("claude")
+        assert entry is not None
         assert entry.state == BreakerState.OPEN
 
     def test_is_available_closed(self, breaker: CircuitBreaker):
@@ -151,6 +153,7 @@ class TestFailover:
         breaker.record_failure("claude")
 
         chain = breaker.get_failover_chain("codegen")
+        assert chain is not None
         assert chain.current == "kimi"
 
     def test_record_success_resets_failover(self, breaker: CircuitBreaker):
@@ -161,11 +164,13 @@ class TestFailover:
         breaker.record_failure("claude")
 
         chain = breaker.get_failover_chain("codegen")
+        assert chain is not None
         assert chain.current == "kimi"
 
         # kimi succeeds → chain resets to primary
         breaker.record_success("kimi")
         chain = breaker.get_failover_chain("codegen")
+        assert chain is not None
         assert chain.current == "claude"
 
     def test_resolve_nonexistent_chain(self, breaker: CircuitBreaker):

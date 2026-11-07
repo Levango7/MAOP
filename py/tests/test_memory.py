@@ -120,6 +120,7 @@ class TestSearch:
 
     def test_search_by_id(self, mem_store: MemoryStore):
         entry_id = mem_store.store(agent="claude", task="specific task", content="specific content")
+        assert entry_id is not None
 
         results = mem_store.search(entry_id=entry_id)
         assert len(results) == 1
@@ -221,6 +222,7 @@ class TestPrune:
 
     def test_prune_dry_run(self, mem_store: MemoryStore):
         entry_id = mem_store.store(agent="claude", task="old")
+        assert entry_id is not None
         # Backdate the entry in SQLite
         import sqlite3
         conn = sqlite3.connect(str(mem_store._db_path))
@@ -239,6 +241,7 @@ class TestPrune:
 
     def test_prune_actual_delete(self, mem_store: MemoryStore):
         entry_id = mem_store.store(agent="claude", task="old")
+        assert entry_id is not None
         # Backdate the entry in SQLite
         import sqlite3
         conn = sqlite3.connect(str(mem_store._db_path))

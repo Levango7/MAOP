@@ -175,6 +175,7 @@ class TestAgentRegistry:
         agent = RegisteredAgent(name="test")
         reg.register(agent)
         got = reg.get_agent("test")
+        assert got is not None
         assert got.registered_at != ""
 
     def test_unregister(self, tmp_path):
@@ -189,9 +190,11 @@ class TestAgentRegistry:
         reg.register(RegisteredAgent(name="test"))
         assert reg.disable("test") is True
         agent = reg.get_agent("test")
+        assert agent is not None
         assert agent.enabled is False
         assert reg.enable("test") is True
         agent = reg.get_agent("test")
+        assert agent is not None
         assert agent.enabled is True
 
     def test_list_agents(self, tmp_path):
@@ -295,6 +298,7 @@ class TestAgentRegistry:
              patch.object(scanner, "_probe_version", return_value="2.0"):
             reg.sync_from_scanner(scanner)
         agent = reg.get_agent("claude")
+        assert agent is not None
         assert agent.cli_path == "/new/path"
         assert agent.version == "2.0"
 

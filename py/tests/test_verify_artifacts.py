@@ -19,11 +19,11 @@ from pathlib import Path
 
 import pytest
 
-from maop.core.reliability.error_schema import new_result
+from maop.core.reliability.error_schema import MaopResult, new_result
 from maop.maop_verify import GateResult, VerifyEngine, _call_gate, _gate_expected_files
 
 
-def _exec_ok() -> object:
+def _exec_ok() -> MaopResult:
     return new_result(agent="a", task="t", exit_code=0, stdout="done")
 
 

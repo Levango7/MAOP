@@ -214,6 +214,7 @@ class TestHealthService(unittest.TestCase):
         asyncio.run(svc.probe_agent("cli-agent"))
 
         desc = self.catalog.get("cli-agent")
+        assert desc is not None
         self.assertTrue(desc.healthy)
         self.assertGreater(desc.last_health_check, 0)
 
@@ -346,6 +347,7 @@ class TestDispatcherHealthGate(unittest.TestCase):
             ))
             self.assertTrue(result.breaker_tripped is False)
             self.assertEqual(result.result.exit_code, -7)
+            assert result.result.error is not None
             self.assertIn("unhealthy", result.result.error)
         finally:
             self._restore_catalog_default()
@@ -377,6 +379,7 @@ class TestDispatcherHealthGate(unittest.TestCase):
             finally:
                 self.dispatcher._resolve_agent = orig_resolve
             self.assertEqual(result.result.exit_code, -7)
+            assert result.result.error is not None
             self.assertIn("drained", result.result.error)
         finally:
             self._restore_catalog_default()
@@ -472,6 +475,7 @@ class TestDistributedSchedulerHealthGate(unittest.TestCase):
         if not entries:
             return {}
         _, fields = entries[0]
+        assert fields is not None
         return {k: v for k, v in fields.items()}
 
     def test_healthy_worker_dispatched(self):
@@ -611,6 +615,7 @@ class TestCLIAPIEntryPoints(unittest.TestCase):
 
         got = catalog.get("agent-x")
         self.assertIsNotNone(got)
+        assert got is not None
         self.assertEqual(got.name, "agent-x")
         self.assertTrue(got.healthy)
 
@@ -620,7 +625,9 @@ class TestCLIAPIEntryPoints(unittest.TestCase):
 
         # update_health
         catalog.update_health("agent-x", False)
-        self.assertFalse(catalog.get("agent-x").healthy)
+        updated = catalog.get("agent-x")
+        assert updated is not None
+        self.assertFalse(updated.healthy)
 
     def test_catalog_count_healthy(self):
         """count / count_healthy 正确。"""

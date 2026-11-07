@@ -354,7 +354,9 @@ class TestABTestFramework:
         pm.create("tpl1", content="v1 content", version="v1")
         pm.create("tpl1", content="v2 content", version="v2")
         # Verify current is v1
-        assert pm.get("tpl1").version == "v1"
+        tpl = pm.get("tpl1")
+        assert tpl is not None
+        assert tpl.version == "v1"
 
         # Create experiment and promote
         fw = ABTestFramework(root_dir=tmp_path)
@@ -368,10 +370,13 @@ class TestABTestFramework:
         assert fw.promote_treatment(exp.id) is True
 
         # Verify current_version is now v2
-        assert pm.get("tpl1").version == "v2"
+        tpl = pm.get("tpl1")
+        assert tpl is not None
+        assert tpl.version == "v2"
 
         # Verify experiment status updated
         loaded = fw.get_experiment(exp.id)
+        assert loaded is not None
         assert loaded.status == "completed"
 
     def test_promote_treatment_nonexistent_template(self, tmp_path: Path) -> None:

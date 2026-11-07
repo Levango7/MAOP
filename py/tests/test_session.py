@@ -69,6 +69,7 @@ class TestSessionCRUD:
         ok = mgr.update(sid, status="paused", agent="b", token_count=500)
         assert ok is True
         session = mgr.get(sid)
+        assert session is not None
         assert session.status == "paused"
         assert session.agent == "b"
         assert session.token_count == 500
@@ -92,6 +93,7 @@ class TestSessionTokens:
         mgr.add_tokens(sid, 300)
         mgr.add_tokens(sid, 200)
         session = mgr.get(sid)
+        assert session is not None
         assert session.token_count == 500
 
     def test_is_over_budget(self, tmp_path):
@@ -124,11 +126,14 @@ class TestSessionTouch:
         mgr = SessionManager(root_dir=str(tmp_path))
         sid = mgr.create(agent="a")
         session = mgr.get(sid)
+        assert session is not None
         original = session.last_active_at
         import time
         time.sleep(0.01)
         mgr.touch(sid)
-        updated = mgr.get(sid).last_active_at
+        updated_session = mgr.get(sid)
+        assert updated_session is not None
+        updated = updated_session.last_active_at
         assert updated >= original
 
 

@@ -20,6 +20,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 # ── 1. state_classifier: blocked / failed / working 模式参数化 ──
@@ -313,7 +315,7 @@ class TestNewResultParametrized:
     def test_new_result_ok_derived(self, exit_code, error, expected_ok):
         from maop.core.reliability.error_schema import new_result
 
-        kwargs = {"agent": "a", "task": "t"}
+        kwargs: dict[str, Any] = {"agent": "a", "task": "t"}
         if exit_code is not None:
             kwargs["exit_code"] = exit_code
         if error is not None:

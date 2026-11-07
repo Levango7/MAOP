@@ -711,6 +711,7 @@ class TestHermeticGuard:
         import sys
 
         conftest_mod = sys.modules.get("tests.conftest") or sys.modules.get("conftest")
+        assert conftest_mod is not None
         repair = getattr(conftest_mod, "repair_subprocess_run", None)
         assert callable(repair), "conftest 未暴露 repair_subprocess_run —— 会话级守卫缺失"
 

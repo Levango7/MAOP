@@ -67,6 +67,7 @@ class TestSupervisorComposition(unittest.TestCase):
         self.assertIn("agents", stats)
         health = self.sup.get_agent_health("a")
         self.assertIsNotNone(health)
+        assert health is not None
         self.assertEqual(health.agent_id, "a")
 
     def test_reset_delegation(self):
@@ -163,6 +164,7 @@ class TestSupervisorComposition(unittest.TestCase):
         self.sup.check_after_dispatch("a", success=True, latency=0.5)
         health = self.sup.get_agent_health("a")
         self.assertIsNotNone(health)
+        assert health is not None
         self.assertEqual(health.total_recorded, 1)
 
     # ── Retry strategy ───────────────────────────────────────────

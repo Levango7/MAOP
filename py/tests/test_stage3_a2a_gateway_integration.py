@@ -18,6 +18,7 @@ import os
 import sys
 import tempfile
 import unittest
+from typing import cast
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -28,7 +29,9 @@ from maop.core.agent.delegation.a2a import (
     A2AMessage,
     A2AResponse,
 )
+from maop.core.coordination.a2a_blackboard_bridge import A2ABlackboardBridge
 from maop.core.coordination.a2a_gateway import A2AGateway
+from maop.core.coordination.a2a_transport_server import A2ATransportServer
 
 
 class _FakeBridge:
@@ -71,7 +74,11 @@ class TestA2AGatewayLifecycle(unittest.TestCase):
         server = _FakeServer()
         manager = A2AManager(root_dir=tempfile.mkdtemp())
 
-        gw = A2AGateway(manager=manager, bridge=bridge, server=server)
+        gw = A2AGateway(
+            manager=manager,
+            bridge=cast(A2ABlackboardBridge, bridge),
+            server=cast(A2ATransportServer, server),
+        )
         asyncio.run(gw.start())
         self.assertTrue(gw.started)
         self.assertTrue(bridge.started)
@@ -107,7 +114,7 @@ class TestA2AGatewayLifecycle(unittest.TestCase):
             async def start(self):
                 raise RuntimeError("bridge down")
 
-        gw = A2AGateway(bridge=_BoomBridge())
+        gw = A2AGateway(bridge=cast(A2ABlackboardBridge, _BoomBridge()))
         asyncio.run(gw.start())
         self.assertTrue(gw.started)
         asyncio.run(gw.stop())
@@ -129,6 +136,7 @@ class TestA2AGatewayCardManagement(unittest.TestCase):
 
         card = self.gw.get_card("code-reviewer")
         self.assertIsNotNone(card)
+        assert card is not None
         self.assertEqual(card.name, "code-reviewer")
         self.assertEqual(card.capabilities, ["review", "suggest"])
 
@@ -157,12 +165,14 @@ class TestA2AGatewayTask(unittest.TestCase):
         """create_task 创建并返回带 task_id 的任务。"""
         task = self.gw.create_task("code-reviewer", "review this")
         self.assertIsNotNone(task)
+        assert task is not None
         self.assertIsNotNone(task.task_id)
         self.assertEqual(task.status, "submitted")
 
         # manager 也能查到
         got = self.manager.get_task(task.task_id)
         self.assertIsNotNone(got)
+        assert got is not None
         self.assertEqual(got.status, "submitted")
 
     def test_create_task_no_manager(self):
@@ -175,7 +185,7 @@ class TestA2AGatewayMessagePassthrough(unittest.TestCase):
     def test_on_a2a_message_delegates_to_bridge(self):
         """on_a2a_message 转发给 bridge，返回 bridge 的结果。"""
         bridge = _FakeBridge()
-        gw = A2AGateway(bridge=bridge)
+        gw = A2AGateway(bridge=cast(A2ABlackboardBridge, bridge))
 
         msg = A2AMessage(method="tasks/send", params={"agent": "a", "message": "hi"})
         result = asyncio.run(gw.on_a2a_message(msg))
@@ -215,6 +225,7 @@ class TestA2AGatewayRemoteCommunication(unittest.TestCase):
         with _patch_client_get_card(expected_card):
             card = asyncio.run(gw.fetch_card("http://remote:9090", "reviewer"))
         self.assertIsNotNone(card)
+        assert card is not None
         self.assertEqual(card.name, "reviewer")
 
     def test_fetch_card_failure_returns_none(self):

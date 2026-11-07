@@ -218,6 +218,7 @@ class TestModelGatewayAccess:
         d = gw.check_access("gpt-4o")
         # 两个都匹配，priority=100 的 gpt-4* 胜出
         assert d.allowed is False
+        assert d.matched_permission is not None
         assert d.matched_permission.model_pattern == "gpt-4*"
 
     def test_no_rule_falls_back_to_policy(self, tmp_path: Path):

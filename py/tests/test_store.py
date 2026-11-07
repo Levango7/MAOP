@@ -186,6 +186,7 @@ class TestStoreOperation:
 
     def test_store_with_tags_list(self, store: MemoryStore):
         eid = store.store(agent="a", task="t", tags=["bug", "auth"])
+        assert eid is not None
         results = store.search(entry_id=eid)
         assert len(results) == 1
         assert "auth" in results[0].tags
@@ -198,12 +199,14 @@ class TestStoreOperation:
 
     def test_store_topic_override(self, store: MemoryStore):
         eid = store.store(agent="a", task="t", topic="custom_topic")
+        assert eid is not None, "store() 必须返回新条目 id"
         results = store.search(entry_id=eid)
         assert results[0].topic == "custom_topic"
 
     def test_store_writes_wiki_json(self, store: MemoryStore):
         """Verify entry persists to SQLite (legacy wiki.json removed in v4 ADR-011)."""
         eid = store.store(agent="a", task="my task", content="my content")
+        assert eid is not None
         # Verify entry is persisted in SQLite via search
         results = store.search(entry_id=eid)
         assert len(results) == 1
@@ -212,6 +215,7 @@ class TestStoreOperation:
     def test_store_writes_memory_json(self, store: MemoryStore):
         """Verify entry persists to SQLite (legacy memory.json removed in v4 ADR-011)."""
         eid = store.store(agent="a", task="my task")
+        assert eid is not None
         # Verify entry is persisted in SQLite via search
         results = store.search(entry_id=eid)
         assert len(results) == 1
@@ -224,6 +228,7 @@ class TestSearch:
     def test_search_by_entry_id(self, populated_store: MemoryStore):
         # Store a known entry and search by ID
         eid = populated_store.store(agent="x", task="find me", content="unique content")
+        assert eid is not None, "store() 必须返回新条目 id"
         results = populated_store.search(entry_id=eid)
         assert len(results) == 1
         assert results[0].id == eid

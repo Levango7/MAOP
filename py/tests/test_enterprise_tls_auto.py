@@ -85,6 +85,7 @@ def test_auto_configure_generates_dev_certs(tmp_path, monkeypatch):
     result = tls_auto.auto_configure_tls()
     assert "ssl" in result
     data_dir = os.getenv("MAOP_DATA_DIR")
+    assert data_dir is not None
     assert os.path.isfile(os.path.join(data_dir, "tls", "dev-cert.pem"))
     assert os.path.isfile(os.path.join(data_dir, "tls", "dev-key.pem"))
 
@@ -109,6 +110,7 @@ def test_ensure_dev_certs_reuses_existing(tmp_path, monkeypatch):
     monkeypatch.delenv("MAOP_TLS_CERT", raising=False)
     monkeypatch.delenv("MAOP_TLS_KEY", raising=False)
     data_dir = os.getenv("MAOP_DATA_DIR")
+    assert data_dir is not None
     tls_dir = os.path.join(data_dir, "tls")
     os.makedirs(tls_dir, exist_ok=True)
     cert_path = os.path.join(tls_dir, "dev-cert.pem")

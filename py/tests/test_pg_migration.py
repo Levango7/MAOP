@@ -351,6 +351,7 @@ def _make_fake_engine(table_columns: dict[str, list[str]], table_rows: dict[str,
 
     class FakeConn:
         def execute(self, stmt: Any, params: Any | None = None) -> Any:
+            assert table_rows is not None
             stmt_str = str(stmt)
             if "COUNT(*)" in stmt_str:
                 table = stmt_str.split("FROM")[1].strip().strip('"')

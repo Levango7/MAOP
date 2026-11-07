@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import shutil
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -40,8 +41,8 @@ class FakeProc:
         pass
 
 
-def _agent(name: str = "claude", **kw) -> RegisteredAgent:
-    defaults = {
+def _agent(name: str = "claude", **kw: Any) -> RegisteredAgent:
+    defaults: dict[str, Any] = {
         "cli_path": "/usr/bin/claude",
         "provider": "anthropic",
         "capabilities": ["code"],

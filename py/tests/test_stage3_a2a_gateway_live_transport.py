@@ -17,6 +17,7 @@ import os
 import sys
 import tempfile
 import unittest
+from typing import cast
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -25,6 +26,7 @@ import httpx
 from maop.core.agent.delegation.a2a import A2AManager
 from maop.core.coordination.a2a_blackboard_bridge import (
     A2ABlackboardBridge,
+    AgentRegistry,
 )
 from maop.core.coordination.a2a_blackboard_bridge import (
     AgentCard as BridgeAgentCard,
@@ -51,7 +53,10 @@ class TestA2AGatewayLiveTransport(unittest.TestCase):
         self.manager = A2AManager(root_dir=self.tmpdir)
         self.blackboard = Blackboard()
         self.registry = _FakeRegistry()
-        self.bridge = A2ABlackboardBridge(blackboard=self.blackboard, registry=self.registry)
+        self.bridge = A2ABlackboardBridge(
+            blackboard=self.blackboard,
+            registry=cast(AgentRegistry, self.registry),
+        )
         self.server = A2ATransportServer(
             bridge=self.bridge,
             registry=self.registry,
@@ -166,6 +171,7 @@ class TestA2AGatewayLiveTransport(unittest.TestCase):
         )
         card = self.gw.get_card("code-reviewer")
         self.assertIsNotNone(card)
+        assert card is not None
         self.assertEqual(card.name, "code-reviewer")
 
     def test_start_stop_idempotent_with_transport(self):

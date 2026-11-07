@@ -275,6 +275,7 @@ class TestEvolveEngine:
     def test_analyze_with_data(self, engine: EvolveEngine, evolve_root: Path):
         _write_delegations(evolve_root, [_delegation("claude"), _delegation("codex", exit_code=1)])
         result = engine.analyze()
+        assert result.stats is not None
         assert len(result.stats.by_agent) == 2
 
     def test_suggest_saves_and_returns(self, engine: EvolveEngine, evolve_root: Path):
@@ -428,6 +429,7 @@ class TestEvolveEngineEventSource:
         ])
         eng = EvolveEngine(root_dir=evolve_root)
         result = eng.analyze()
+        assert result.stats is not None
         agents = {s.agent for s in result.stats.by_agent}
         assert "event_agent" in agents
         assert "json_agent" not in agents
@@ -436,12 +438,14 @@ class TestEvolveEngineEventSource:
         _write_delegations(evolve_root, [_delegation("claude"), _delegation("codex", exit_code=1)])
         eng = EvolveEngine(root_dir=evolve_root)
         result = eng.analyze()
+        assert result.stats is not None
         assert len(result.stats.by_agent) == 2
 
     def test_json_fallback_when_no_db(self, evolve_root: Path):
         _write_delegations(evolve_root, [_delegation("claude", exit_code=0)])
         eng = EvolveEngine(root_dir=evolve_root)
         result = eng.analyze()
+        assert result.stats is not None
         assert len(result.stats.by_agent) == 1
         assert result.stats.by_agent[0].agent == "claude"
 
