@@ -168,12 +168,23 @@ class CostTracker:
         total_tokens: int = 0,
         latency_ms: int = 0,
         metadata: dict[str, Any] | None = None,
+        cost_usd: float | None = None,
     ) -> CostEntry:
-        """Record a single LLM call's token usage and calculate cost."""
+        """Record a single LLM call's token usage and calculate cost.
+
+        ``cost_usd``（可选）：调用方已算好金额时显式传入，不再按
+        ``self._pricing`` 重算。此前 :meth:`record_actual_cost` 的
+        "pricing 未收录则退回 estimated_cost" 分支是**死代码**——它算出
+        的金额被这里按 ``_calculate_cost`` 重算覆盖，导致 `models.yaml`
+        有价、`DEFAULT_PRICING` 无价的模型（如 ``agnes-2.5-pro``）
+        台账恒记 ``cost_usd=0.0``，而同一笔的 ``run.cost`` 事件写
+        ``estimated_cost=0.00098``。
+        """
         if total_tokens == 0:
             total_tokens = prompt_tokens + completion_tokens
 
-        cost_usd = self._calculate_cost(model, prompt_tokens, completion_tokens)
+        if cost_usd is None:
+            cost_usd = self._calculate_cost(model, prompt_tokens, completion_tokens)
 
         entry = CostEntry(
             id=f"cost-{uuid.uuid4().hex[:8]}",
@@ -461,6 +472,7 @@ class CostTracker:
         estimated_cost: float = 0.0,
         agent: str = "",
         phase: str = "",
+        tokens_source: str = "",
     ) -> dict[str, Any]:
         """Post-execution cost reconciliation.
 
@@ -475,6 +487,11 @@ class CostTracker:
         ``agent`` / ``phase``（2026-10-29，M-X3 归属）：写入归属维度，供
         ``core.cost_attribution`` 按 agent/phase 聚合；空值不写 phase 元数据
         （聚合侧记 unattributed），旧调用方零改动。
+
+        ``tokens_source``（2026-11-08）：用量**来源标记**。外部 CLI 路径拿不到
+        真实 usage 时，台账里的 token 数是启发式估算，必须与实测值可区分，
+        否则"按 token 计量省钱"无从验证。取值：``measured`` / ``estimated``
+        / ``mixed``。空串 = 调用方未声明，不写。
         """
         # Calculate actual cost from the pricing table; fall back to
         # the caller's estimate when the model is not in the table.
@@ -489,6 +506,8 @@ class CostTracker:
         }
         if phase:
             metadata["phase"] = phase
+        if tokens_source:
+            metadata["tokens_source"] = tokens_source
 
         self.record(
             agent=agent,
@@ -496,6 +515,9 @@ class CostTracker:
             prompt_tokens=actual_tokens_in,
             completion_tokens=actual_tokens_out,
             metadata=metadata,
+            # 显式传入，避免 record() 按 DEFAULT_PRICING 重算把上面的
+            # estimated_cost 兜底覆盖成 0.0。
+            cost_usd=actual_cost,
         )
 
         discrepancy = round(actual_cost - estimated_cost, 6)

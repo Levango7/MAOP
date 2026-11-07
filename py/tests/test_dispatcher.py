@@ -711,7 +711,9 @@ class TestModelResolution:
         mock_agent.model = "original-model"
         mock_agent.wrapper = ""
         mock_agent.command = ""
-        mock_agent.provider = ""  # F2c (Phase F): explicit str to avoid MagicMock
+        # 2026-11-08: 只有声明了直连 provider 的 agent（MAOP 自己发 API 请求）
+        # 才允许改写 config.model；provider 为空的纯外部 CLI 不允许。
+        mock_agent.provider = "agnes"
         mock_config = MagicMock()
         mock_config.agents = [mock_agent]
         mock_config.workflows = []
@@ -737,6 +739,62 @@ class TestModelResolution:
             )
             assert result.result.is_success()
             assert result.model_resolved is True
+        finally:
+            disp_mod._DRIVERS["cli"] = original_cli
+
+    def test_model_selector_keeps_declared_model_for_cli_only_agent(self):
+        """provider 为空的纯外部 CLI：解析结果不得覆盖 config.model。
+
+        回归 trace 6032ef98：copilot 的 `model: gpt-5.4` 不在 models.yaml，
+        selector 回落到 best_model('codegen') = agnes-2.5-pro，config.model
+        被改写，成本台账因此记录了从未执行的模型。路由决策本身仍写入
+        routing_decisions，不受影响。
+        """
+        mock_agent = MagicMock()
+        mock_agent.name = "copilot"
+        mock_agent.cli = "echo"
+        mock_agent.driver = "cli"
+        mock_agent.cli_args = ""
+        mock_agent.capabilities = []
+        mock_agent.timeout_s = 10
+        mock_agent.model = "gpt-5.4"
+        mock_agent.wrapper = ""
+        mock_agent.command = ""
+        mock_agent.provider = ""  # 无直连 provider = 模型由 CLI 自选
+        mock_config = MagicMock()
+        mock_config.agents = [mock_agent]
+        mock_config.workflows = []
+
+        mock_selector = MagicMock()
+        mock_em = MagicMock()
+        mock_em.model_name = "agnes-2.5-pro"
+        mock_selector.select_for_routing_key.return_value = mock_em
+
+        dispatcher = Dispatcher(MAOP_config=mock_config, model_selector=mock_selector)
+
+        from maop.delegate import dispatcher as disp_mod
+        original_cli = disp_mod._DRIVERS["cli"]
+
+        seen = {}
+
+        async def mock_cli(config, prompt, timeout, workdir, trace_id, *, streamer=None):
+            seen["model"] = config.model
+            return new_result(
+                agent="copilot", task="test", exit_code=0, stdout="ok",
+                driver="cli", model=config.model,
+            )
+
+        disp_mod._DRIVERS["cli"] = mock_cli
+        try:
+            result = asyncio.run(
+                dispatcher.dispatch(agent="copilot", task="test", routing_key="chat")
+            )
+            assert result.result.is_success()
+            assert result.model_resolved is True
+            assert seen["model"] == "gpt-5.4", "declared model must not be overwritten"
+            # selector 仍被调用且结果保留在 effective_model 上（遥测可读）
+            mock_selector.select_for_routing_key.assert_called_once()
+            assert dispatcher._effective_model is mock_em
         finally:
             disp_mod._DRIVERS["cli"] = original_cli
 

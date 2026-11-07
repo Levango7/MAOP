@@ -404,6 +404,13 @@ class PhasesMixin:
             else:
                 est_tokens_in = 0
                 est_tokens_out = 0
+            # 来源标记（2026-11-08）：实测与启发式估算必须可区分。此前两种
+            # 数值都写进 cost_entries 的 prompt_tokens/completion_tokens，
+            # 台账上无法判断真伪；同一次运行控制台打
+            # `[USAGE] tokens=0 source=estimated`、台账却写 5/31，看上去是
+            # 自相矛盾（其实前者是「实测口径为 0」，后者是「估算值」）。
+            measured_in = bool(est_tokens_in)
+            measured_out = bool(est_tokens_out)
             if not est_tokens_in:
                 logger.warning("[maop_loop] No prompt_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN")
                 cjk = sum(1 for ch in exec_result.task if '\u4e00' <= ch <= '\u9fff')
@@ -412,6 +419,12 @@ class PhasesMixin:
                 logger.warning("[maop_loop] No completion_tokens reported by provider — using heuristic estimate, cost accuracy is UNKNOWN")
                 cjk = sum(1 for ch in exec_result.stdout if '\u4e00' <= ch <= '\u9fff')
                 est_tokens_out = cjk * 2 + (len(exec_result.stdout) - cjk) // 4
+            if measured_in and measured_out:
+                tokens_source = "measured"
+            elif measured_in or measured_out:
+                tokens_source = "mixed"
+            else:
+                tokens_source = "estimated"
 
             registry = ModelRegistry(project_root=self._root)
             model_def = registry.get_model(model_name)
@@ -431,6 +444,7 @@ class PhasesMixin:
                 # M-X3 归属：成本条目带上 agent 与执行阶段，供三维成本归因聚合；
                 # 此前这两维在账面上是空的（聚合侧只能记 unattributed）。
                 agent=exec_result.agent or "", phase="execute",
+                tokens_source=tokens_source,
             )
             record_run_event(
                 trace_id, "run.cost", agent=exec_result.agent or "",
@@ -439,6 +453,10 @@ class PhasesMixin:
                     "provider": provider,
                     "tokens_in": est_tokens_in,
                     "tokens_out": est_tokens_out,
+                    # 金额是否可信：models.yaml 未收录该模型时 priced=False，
+                    # cost_usd 只能是 0.0，不能当成"这次真的免费"。
+                    "priced": bool(model_def),
+                    "tokens_source": tokens_source,
                     "estimated_cost": round(estimated_cost, 6),
                 },
             )
@@ -468,6 +486,12 @@ class PhasesMixin:
         should_skip = skip_verify or lc.skip_verify
         verify_result = ctx.verify_result
         exec_result = ctx.execution_result
+        # 进循环前的重试轮次。循环体未执行（首轮 verify 即通过 / blocked /
+        # 已用满额度）时，末尾不能再记一次 run.step —— 那与 _phase_execute
+        # 记的是同一次执行：同一 attempt、同一 duration_ms、同一 payload，
+        # 时间线会重复展示（实测 trace 6032ef98：seq=4 与 seq=6 均为
+        # step=1 / duration_ms=21903）。
+        retries_at_entry = ctx.feedback_cycles
 
         while (verify_result and not verify_result.errored and not verify_result.passed
                and ctx.feedback_cycles < lc.feedback_max_cycles
@@ -519,7 +543,9 @@ class PhasesMixin:
             )
 
         ctx.execution_result = exec_result
-        _record_exec_step(ctx, exec_result)
+        if ctx.feedback_cycles != retries_at_entry:
+            # 只有真的重跑过执行，才追加一条 step 记录。
+            _record_exec_step(ctx, exec_result)
         ctx.verify_result = verify_result
         return PhaseResult(ok=True)
 
