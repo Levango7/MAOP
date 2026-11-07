@@ -12,10 +12,23 @@
 
 **MAOP 是编排层，不自带 agent 运行时。** `maop run` 驱动的是 `config/agents.yaml`
 里已注册的 CLI；一个都没装时，派发返回 `exit_code=-2 (Command not found)`，任务不会执行。
-实测可用的第三方 CLI 包括 `codex`、`gemini`、`copilot`、`qwen`、`pi`、`opencode`、`cline` 等。
 
-> 目标 CLI 必须**已在本机完成登录**、且能非交互运行。否则 `maop run` 会停在等待登录，
-> 且当前版本不打印执行进度（见文末「已知行为」）。
+### 开工前自检三步
+
+MAOP **不校验**目标 CLI 的登录状态、配额与非交互参数。CLI 未就绪时不会快速失败，
+而是长时间无输出（见文末「已知行为」）。所以先自己确认三件事：
+
+```bash
+copilot --version                                  # 1. 装了吗（换成你要用的 CLI）
+grep -n "^  copilot:" ~/.maop/config/agents.yaml   # 2. 在册吗
+copilot -p "Reply with exactly: OK"                # 3. 能非交互跑通吗
+```
+
+三步都通过，`maop run` 才可能成功。第 3 步是关键：各 CLI 的非交互参数不同
+（`copilot` 用 `-p`、`codex` 用 `exec`、`pi` 用 `--print`），`agents.yaml` 的
+`cli_args` 已按各 CLI 写好；若 CLI 升级后改了参数，派发会退化成交互模式并挂起。
+
+> 自定义 `--home` 时，`agents.yaml` 在 `<home>/config/agents.yaml`。
 
 ## 1. 安装（约 1 分钟）
 
@@ -54,12 +67,17 @@ maop start
 maop run --task "把 README 里的错别字列出来" --agent codex
 ```
 
+成功时末行输出形如：
+
+```
+[OK] run 完成 (23556.5ms)
+```
+
 `--agent` 必须是 `config/agents.yaml` 里在册、且本机已登录的 CLI。
-不在册的名字（例如 `claude`）当前版本会回退到兜底 agent 并打印 WARN，
-`run_events` 里 `agent=` 与实际执行者可能不一致。
+不在册的名字（例如 `claude`）当前版本会回退到兜底 agent 并打印 WARN。
 
 > 当前版本 `maop run` 在任务执行期间不打印进度，只在结束时输出结果。
-> 任务较大时请耐心等待，或用 `maop status` 观察。
+> `maop status` 只报告服务是否运行，**不显示任务进度**。
 
 ## 6. 重启后历史仍在
 
@@ -110,13 +128,15 @@ maop start --port 9079
 前端热更新开发：后端 `cd py && python -m maop.dashboard.server`；前端
 `cd dashboard-enterprise && npm run dev`（Vite 默认 5173，需代理到 9079）。
 
-## 已知行为（2026-11-07 在 v5.6.1 干净环境实测）
+## 已知行为（2026-11-08 在 v5.6.1 干净环境实测，Windows）
 
-| 现象 | 原因 | 是否影响可用性 |
+| 现象 | 原因 | 影响 |
 |---|---|---|
 | `maop health` 全新安装返回 FAIL | `memory.db` 未创建被判 degraded，CLI 又把 degraded 当失败 | 不影响：`healthz` 仍为 200 |
 | `maop run` 执行期间无进度输出 | 未接流式进度 | 长任务难以判断是否卡住 |
+| 目标 CLI 未登录或配额耗尽时**长时间无输出、不报错** | 无登录态预检，也不区分「等待中」与「已失败」 | 首跑最易踩：看起来像卡死 |
 | `--agent` 指定不在册 CLI 时静默回退 | failover 机制 | `run_events` 的 agent 标注可能与实际执行者不一致 |
+| 日志打印 `agent=codex` 但实际执行的是 `--agent` 指定的 CLI | 路由默认值先被记录，`--agent` 覆盖发生在其后 | 读日志会误判实际执行者 |
 
 ## 下一步
 
