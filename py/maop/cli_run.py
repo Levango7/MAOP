@@ -8,6 +8,7 @@ re-export ``cmd_run`` —— CLI 调用面与既有测试的 patch 目标
 
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from typing import Any
@@ -17,6 +18,39 @@ from maop.core.agent.delegation.depth import (
     MAX_SELF_DELEGATION_DEPTH,
     current_depth,
 )
+
+
+def unknown_agent_warning(agent: str, root: Any) -> str | None:
+    """``--agent`` 不在 agents.yaml 在册时返回告警文本，否则 None（2026-11-07）.
+
+    动机（质量排查·静默换人）：``--agent claude`` 而 claude 不在册时，首轮
+    dispatch 失败并沿 failover 链兜到别的 agent 执行——用户既白耗 turn，又
+    「请求 claude 实际跑到 copilot」而毫不知情（实测 ``turns=4`` 的根因之一）。
+    本函数只产出告警文本（调用方打印）；failover 机制本身保留（在册 agent
+    的瞬时失败仍可兜底）。配置不可读等异常一律返回 None（告警尽力而为，
+    绝不阻断运行）。
+    """
+    if not agent:
+        return None
+    try:
+        from maop.config.loader import load_config
+
+        cfg = load_config(root)
+        known = set(getattr(cfg, "agents", {}) or {})
+    except (OSError, ValueError, ImportError, TypeError) as exc:
+        # 具体类型收窄（ADR-023 门禁：不新增宽口径 except Exception）——
+        # loader 已把 YAML 解析错误吸收为告警，此处的现实失败面=路径/校验/
+        # 导入/形状四类；真正的病态错误会由后续 loop 自身的加载路径暴露。
+        logging.getLogger(__name__).debug("unknown-agent check skipped: %s", exc)
+        return None
+    if not known or agent in known:
+        return None
+    names = ", ".join(sorted(known)[:8])
+    return (
+        f"[WARN] --agent {agent!r} 不在 agents.yaml 在册条目中；"
+        f"若该名无对应 CLI，将白耗 turn 后沿 failover 链兜到其他 agent 执行。"
+        f"在册示例: {names} …"
+    )
 
 
 def _emit_fail(name: str, exc: BaseException | str) -> None:
@@ -59,6 +93,10 @@ def cmd_run(task: str, depth: int = 0, agent: str = "", max_turns: int = 0) -> A
         # 复用其 _runtime_root 也避免在 config-drift 门禁里重复一次 env 写。
         from maop.cli import _runtime_root
         from maop.maop_loop import MaopLoop
+
+        _warn = unknown_agent_warning(agent, _runtime_root())
+        if _warn:
+            print(_warn, file=sys.stderr)
 
         loop = MaopLoop(root_dir=str(_runtime_root()))
         result = asyncio.run(loop.run(task, agent=agent, max_turns=max_turns or None))

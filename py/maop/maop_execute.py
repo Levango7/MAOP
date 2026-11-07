@@ -331,9 +331,20 @@ async def maop_execute(
             result = dispatch_result.result
             result.trace_id = trace_id
             # P1-13: emit done event with final content length / token count.
+            # 2026-11-07（质量排查）：token 口径统一——优先用协议行/provider
+            # 实测（``result.usage``，GAP-2 回填链路），无实测才退回字符估计，
+            # 并显式标注来源；面板不再把估算与实测当同一口径混排（此前该事件
+            # 恒为 len(stdout)//4，与 run_events 的实测口径并存打架）。
+            _usage = getattr(result, "usage", None)
+            _measured = (
+                int(_usage.get("total_tokens", 0) or 0)
+                if isinstance(_usage, dict)
+                else 0
+            )
             _emit_agent_event(trace_id, "done", {
                 "content_length": len(result.stdout or ""),
-                "tokens": len(result.stdout or "") // 4,
+                "tokens": _measured or len(result.stdout or "") // 4,
+                "tokens_source": "measured" if _measured else "estimated",
                 "exit_code": result.exit_code,
             })
         finally:
