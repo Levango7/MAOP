@@ -53,6 +53,55 @@ def unknown_agent_warning(agent: str, root: Any) -> str | None:
     )
 
 
+def cli_availability_error(agent: str, root: Any) -> str | None:
+    """``--agent`` 在册但其 CLI 二进制不在 PATH 时返回错误文本（2026-11-08）.
+
+    动机（首公里·CLI 未就绪）：``agents.yaml`` 注册了约 30 个外部 CLI，用户
+    机器上通常只装了其中几个。被 ``--agent`` 指定的那个若没装，现状是走完
+    plan → dispatch → ``FileNotFoundError`` → ``exit_code=-2``，用户先白等
+    一轮编排，再拿到一句 ``Command not found``。把判断提到派发之前，零 token、
+    零等待，并直接给出缺哪个可执行文件。
+
+    只检查在册且 ``driver == "cli"`` 的条目。agent 不在册 / ``cli`` 为空 /
+    配置不可读一律返回 None（交给调用方既有的告警与派发路径处理，本函数
+    不改变那些分支的语义）。
+    """
+    if not agent:
+        return None
+    try:
+        import shlex
+        import shutil
+        import sys as _sys
+
+        from maop.config.loader import load_config
+
+        cfg = load_config(root)
+        entry = (getattr(cfg, "agents", {}) or {}).get(agent)
+        if entry is None:
+            return None
+        driver = str(getattr(entry, "driver", "cli") or "cli")
+        cli = str(getattr(entry, "cli", "") or "").strip()
+    except (OSError, ValueError, ImportError, TypeError) as exc:
+        logging.getLogger(__name__).debug("cli availability check skipped: %s", exc)
+        return None
+    if driver != "cli" or not cli:
+        return None
+    parts = shlex.split(cli, posix=(_sys.platform != "win32"))
+    if not parts:
+        return None
+    base = parts[0]
+    if base.lower() in {"python", "python3"}:
+        # drivers.py 会把解释器换成 sys.executable，必然存在。
+        return None
+    if shutil.which(base):
+        return None
+    return (
+        f"[BLOCK] --agent {agent!r} 已在 agents.yaml 注册，但其 CLI {base!r} "
+        f"不在 PATH 中；已在派发前中止（未消耗 turn）。请先安装该 CLI，"
+        f"或改用本机已安装的 agent（`maop validate` 可查看配置问题）。"
+    )
+
+
 def _emit_fail(name: str, exc: BaseException | str) -> None:
     """输出命令失败信息到 stderr（与 ``maop.cli._emit_fail`` 同语义）。"""
     print(f"[FAIL] {name} 失败: {exc}", file=sys.stderr)
@@ -97,6 +146,11 @@ def cmd_run(task: str, depth: int = 0, agent: str = "", max_turns: int = 0) -> A
         _warn = unknown_agent_warning(agent, _runtime_root())
         if _warn:
             print(_warn, file=sys.stderr)
+        # 派发前零成本自检：CLI 不存在就没必要进 plan/dispatch。
+        _unavailable = cli_availability_error(agent, _runtime_root())
+        if _unavailable:
+            print(_unavailable, file=sys.stderr)
+            sys.exit(1)
 
         loop = MaopLoop(root_dir=str(_runtime_root()))
         result = asyncio.run(loop.run(task, agent=agent, max_turns=max_turns or None))
@@ -115,6 +169,16 @@ def cmd_run(task: str, depth: int = 0, agent: str = "", max_turns: int = 0) -> A
                 print(result.execution.stdout)
             if result.execution.error:
                 print(f"[stderr] {result.execution.error}", file=sys.stderr)
+        # 事后核对：入口告警说的是「可能会兜到别的 agent」，这里给出**事实**。
+        # 实测 `--agent no-such-agent` 会真的换一个 agent 执行并打印
+        # `[OK] run 完成`——只看成功行的人会以为自己的 agent 跑过了。
+        _actual_agent = str(getattr(result.execution, "agent", "") or "") if result.execution else ""
+        if agent and _actual_agent and _actual_agent != agent:
+            print(
+                f"[WARN] 实际执行者={_actual_agent!r}，与 --agent {agent!r} 不一致"
+                f"（已沿 failover 链兜底，本结果不代表 {agent} 的行为）",
+                file=sys.stderr,
+            )
         if result.block_reason:
             print(f"[BLOCK] 任务被阻塞：{result.block_reason}", file=sys.stderr)
             sys.exit(1)
