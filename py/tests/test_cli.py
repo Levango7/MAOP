@@ -247,3 +247,40 @@ class TestCmdHealth:
             with pytest.raises(SystemExit) as exc_info:
                 cli.cmd_health()
             assert exc_info.value.code == 1
+
+    @patch("maop.cli.MAOP_ROOT")
+    def test_health_degraded_only_does_not_exit(self, mock_root):
+        """全新安装：db / memory 未创建 + dashboard 未启动 ⇒ 全 degraded，退出 0。
+
+        回归：此前判定为 ``status != "healthy"`` 即失败，导致
+        ``pip install`` + ``maop init`` 后第 4 步 ``maop health`` 必然
+        ``[FAIL]``，把一个 ``maop run`` 能跑通的安装判成坏的。
+        """
+        mock_deploy = MagicMock()
+        results = []
+        for name in ("database", "memory", "dashboard"):
+            r = MagicMock()
+            r.name = name
+            r.status.value = "degraded"
+            r.latency_ms = 1.0
+            r.message = "not ready"
+            results.append(r)
+        mock_deploy.health_check.return_value = results
+        with patch.dict(sys.modules, {"maop.deploy": mock_deploy}):
+            cli.cmd_health()  # 不得抛 SystemExit
+
+    @patch("maop.cli.MAOP_ROOT")
+    def test_health_unhealthy_beats_degraded(self, mock_root):
+        """degraded 与 unhealthy 并存时，仍以 unhealthy 判失败。"""
+        mock_deploy = MagicMock()
+        ok = MagicMock()
+        ok.name = "database"
+        ok.status.value = "degraded"
+        bad = MagicMock()
+        bad.name = "config"
+        bad.status.value = "unhealthy"
+        mock_deploy.health_check.return_value = [ok, bad]
+        with patch.dict(sys.modules, {"maop.deploy": mock_deploy}):
+            with pytest.raises(SystemExit) as exc_info:
+                cli.cmd_health()
+            assert exc_info.value.code == 1

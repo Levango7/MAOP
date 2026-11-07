@@ -222,23 +222,44 @@ def cmd_validate() -> Any:
 
 
 def cmd_health() -> Any:
-    """Run health check using Python-native deploy.health_check()."""
+    """Run health check using Python-native deploy.health_check().
+
+    退出码语义（2026-11-08 修正）：只有 ``unhealthy`` 才判失败（退出 1）。
+    ``degraded`` 表示「组件尚未就绪」而非故障 —— 全新安装时 ``data/maop.db``
+    与 ``data/memory.db`` 都还不存在、dashboard 也没启动，``health_check``
+    一律返回 ``DEGRADED``，于是首公里第 4 步必然 ``[FAIL] health 失败``，
+    把一个完全可用（``maop run`` 能跑通）的安装判成坏的。
+    现在 degraded 只做提示，不改变退出码。
+    """
     start = time.monotonic()
     try:
         from maop.deploy import health_check
         results = health_check(_runtime_root())
         elapsed = (time.monotonic() - start) * 1000
-        all_healthy = True
+        icons = {"healthy": "+", "degraded": "~", "unhealthy": "!"}
+        unhealthy: list[str] = []
+        degraded: list[str] = []
         for r in results:
-            icon = {"healthy": "+", "degraded": "~", "unhealthy": "!"}[r.status.value]
-            print(f"  [{icon}] {r.name}: {r.status.value}")
-            if r.status.value != "healthy":
-                all_healthy = False
-        if not all_healthy:
-            print(f"[FAIL] health 失败 ({elapsed:.1f}ms) — 存在不健康组件", file=sys.stderr)
+            status = r.status.value
+            print(f"  [{icons.get(status, '?')}] {r.name}: {status}")
+            if status == "unhealthy":
+                unhealthy.append(r.name)
+            elif status == "degraded":
+                degraded.append(r.name)
+        if unhealthy:
+            print(
+                f"[FAIL] health 失败 ({elapsed:.1f}ms) — 不可用组件: {', '.join(unhealthy)}",
+                file=sys.stderr,
+            )
             sys.exit(1)
-        else:
-            print(f"[OK] health 完成 ({elapsed:.1f}ms) — 所有组件健康")
+        if degraded:
+            print(
+                f"[OK] health 完成 ({elapsed:.1f}ms) — "
+                f"{len(degraded)} 项降级: {', '.join(degraded)}"
+            )
+            print("  [~] 表示尚未就绪，不影响基本功能；首次运行后会自动创建")
+            return
+        print(f"[OK] health 完成 ({elapsed:.1f}ms) — 所有组件健康")
     except Exception as exc:
         _emit_fail("health", exc)
         sys.exit(1)
