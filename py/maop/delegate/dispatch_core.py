@@ -334,8 +334,27 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
                     policy_name=routing_key or "",
                 )
                 self._effective_model = em
-                # Inject resolved model name into config (strong contract)
-                config.model = em.model_name
+                # 只有「MAOP 自己发 API 请求」的 agent 才该被改写模型名。
+                # provider 为空 = 纯外部驱动（cli / wrapper / powershell…），
+                # 执行模型由 CLI 自己选，MAOP 既不下发也不知知情
+                # （drivers.py 只把 cli_args 拼进 argv，config.model 从不进入
+                # 命令行）。此前无条件注入，使 copilot 的 `model: gpt-5.4`
+                # （不在 models.yaml）解析失败后回落到 best_model('codegen')，
+                # config.model 被改写成 `agnes-2.5-pro`，成本台账据此记账——
+                # 记录了一个从未执行的模型（trace 6032ef98：
+                # run.cost.model=agnes-2.5-pro，实际执行模型为 Copilot 自报的
+                # MAI-Code-1.1-Flash）。
+                # 路由决策不会丢：selector 已把 selected_model 写入
+                # `routing_decisions`（model/selector.py:_record_selector_decision）。
+                if not config.provider:
+                    logger.debug(
+                        "[dispatch] agent=%s has no direct provider; keeping declared "
+                        "model=%r, routed model=%r recorded in routing_decisions only",
+                        agent, config.model, em.model_name,
+                    )
+                else:
+                    # Inject resolved model name into config (strong contract)
+                    config.model = em.model_name
             except Exception as exc:
                 # ModelSelector configured but resolution failed — contract violation
                 model_resolved = False
