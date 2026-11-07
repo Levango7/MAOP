@@ -45,7 +45,9 @@ maop init
 ```
 
 写入 `~/.maop`：默认配置 6 个文件 + 预构建 Dashboard（273 个静态资产）。实测约 72 秒。
-自定义目录用 `maop init --home <dir>`，之后所有命令都要带同一个 `MAOP_HOME`。
+自定义目录用 `maop init --home <dir>`。wheel 安装后续命令带 `MAOP_HOME=<dir>` 即可；
+但从源码 / `pip install -e` 运行时 `MAOP_HOME` 会被源码树覆盖（数据仍写进 `<仓库>/data/`），
+必须改用 `MAOP_ROOT_DIR=<dir>`。
 
 ## 3. 启动（约 10 秒）
 
