@@ -949,3 +949,24 @@
   views/Integrations.vue,App.vue,i18n/view-integrations.js}` 及对应 4 个测试、
   CHANGELOG `[Unreleased]` 本批段、本登记。
 - **不碰**：#225 与 ZCode 第十九轮三线领地、MAOS 主工作树；本线 #226 独立串行。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：顶栏/对齐整改——UI 批 A）
+- **授权**：用户原话「现在交代一个 新任务，我认为 maop 项目的 UI界面 做的有点别扭。
+  左上角的logo区 右边的刷新按钮要不要位置换一下？居右对齐？？两者之间的 小分割线也去掉？
+  再有就是 对齐，对齐，对齐 左右对齐，上下对齐！有些比较小的机制 我看界面上就不要占据那么大的地方了！」
+- **取证**（dev server :5174 + 真后端 :9079，Playwright 实测 1600×1000，截图存本会话工作区）：
+  - TopBar 控件高度不齐：刷新胶囊 41px / 分析 26px / 偏好 27px / 用户 45px（DOM rect）；
+  - 品牌块 4 行 55px，statusline（在线+v5.6.1）与 AppFooter 重复承载（AppFooter.vue 模板同载）；
+  - 品牌区与刷新胶囊之间 1px 分割线（TopBar.vue `.topbar__divider` 首处）；
+  - 首页 `.stats-grid` 全局 5 列（pages.css:60）只渲染 4 张 StatCard → 右侧空一整列
+    （实测末卡 right=1301，容器 right=1566）；
+  - 首页 hero 与 PageHeader 双「更新于 刚刚」（Overview.vue:36 与 PageHeader actions）。
+- **修法**：刷新右移进右侧工具簇、删品牌区间分割线；顶栏控件统一 32px（DESIGN.md §4
+  小按钮 28-32px）；品牌块降 2 行（删 statusline，页脚已载）；`.stats-grid` 改
+  `repeat(auto-fit, minmax(220px,1fr))`；删 hero 新鲜度重复行；DESIGN.md §9 措辞同步。
+- **领地**：`dashboard-enterprise/src/components/TopBar.vue`、`src/styles/pages.css`
+  （.stats-grid 行）、`src/views/Overview.vue`（hero fresh 行）、`DESIGN.md` §9、本登记。
+- **不碰**：#252 领地（loop_executor.py / test_gap5_parallel_usage.py / CHANGELOG 段）、
+  其它 session 板面条、MAOS 主工作树、后端任何文件、tokens.css 配色（纯布局/尺寸改动）。
+- **验证**：改后同口径复测（rect 对齐/高度一致/网格填满）+ `npm run design:contrast`
+  + `npm run lint` + `npx vue-tsc --noEmit` + 相关 vitest；暗/亮两套主题各截图一张。
