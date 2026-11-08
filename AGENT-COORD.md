@@ -1077,3 +1077,18 @@
   CHANGELOG `[Unreleased]` 本批段、本登记。
 - **不碰**：#232 聚合透传本体与对账硬化（v5.6.1 已发布）；#241/#246 成本台账
   provenance/缓存明细线（OPEN，文件不交叠）；M-SIM soak 线。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：批 A/B 交付——PR #257 开立）
+- **PR**：#257 https://github.com/Levango7/MAOP/pull/257，ui/topbar-alignment -> master，
+  8 笔提交（交付 6 + 推送回执 22070a31 + 合并提交 a69daee0）。开立授权＝用户「授权」
+  （针对上一条汇报中唯一标注的「未做：开 PR（未授权）」；仅开 PR，不含合并）。
+- **冲突处置**：开 PR 初判 mergeable=CONFLICTING；`git merge origin/master` 后仅
+  AGENT-COORD.md 冲突（双方追加段撞车，台账惯例），解法＝删三行冲突标记、双方内容全留
+  （union）；Overview.vue 自动合干净；合并后树重跑四道门禁（design:contrast / lint /
+  vue-tsc / vitest）全 EXIT=0（日志 maop-ui-merge-gates.log）后才落合并提交 a69daee0
+  并推送。
+- **状态快照**（2026-11-08 开立后即时读回）：mergeable=MERGEABLE /
+  mergeStateStatus=BLOCKED——required 检查 pending（CI scope / Secret Scan 等起跑中），
+  属正常未绿态、非红。
+- **未做**：合并（无授权；按「确定没问题再 merge」口径，绿灯后另行授权）；rebase
+  （合入式保 sha，台账引用不变）。
