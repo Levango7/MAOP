@@ -77,7 +77,7 @@ def test_get_route_is_registered(client: TestClient) -> None:
 def test_webhook_reports_stored_counts(client: TestClient) -> None:
     resp = client.post("/api/alerts/webhook", json=_payload(_alert(1)), headers=_HEADERS)
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok", "received": 1, "stored": 1, "duplicate": 0}
+    assert resp.json() == {"status": "ok", "received": 1, "stored": 1, "duplicate": 0, "unnamed": 0}
 
 
 def test_stored_alert_is_readable_with_a_stable_shape(client: TestClient) -> None:
@@ -118,7 +118,7 @@ def test_repeat_notification_reports_duplicate(client: TestClient) -> None:
     first = client.post("/api/alerts/webhook", json=body, headers=_HEADERS).json()
     again = client.post("/api/alerts/webhook", json=body, headers=_HEADERS).json()
     assert first["stored"] == 1
-    assert again == {"status": "ok", "received": 1, "stored": 0, "duplicate": 1}
+    assert again == {"status": "ok", "received": 1, "stored": 0, "duplicate": 1, "unnamed": 0}
     assert client.get("/api/alerts").json()["total"] == 1
 
 
@@ -138,7 +138,7 @@ def test_batch_with_one_repeat_counts_it_once(client: TestClient) -> None:
         json=_payload(_alert(1), _alert(1), _alert(2)),
         headers=_HEADERS,
     ).json()
-    assert resp == {"status": "ok", "received": 3, "stored": 2, "duplicate": 1}
+    assert resp == {"status": "ok", "received": 3, "stored": 2, "duplicate": 1, "unnamed": 0}
 
 
 # ── 查询参数必须真的被后端接受 ──────────────────────────────────
@@ -210,7 +210,7 @@ def test_webhook_still_200_when_storage_is_broken(client, monkeypatch) -> None:
     monkeypatch.setattr(alert_ingest, "get_db_path", boom)
     resp = client.post("/api/alerts/webhook", json=_payload(_alert(1)), headers=_HEADERS)
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok", "received": 1, "stored": 0, "duplicate": 0}
+    assert resp.json() == {"status": "ok", "received": 1, "stored": 0, "duplicate": 0, "unnamed": 0}
 
 
 # ── 认证边界：读端点不能变成第二个公开口子 ──────────────────────
