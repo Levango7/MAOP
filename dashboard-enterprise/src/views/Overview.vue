@@ -33,7 +33,6 @@
         {{ data?.agents_total ?? '—' }} {{ t('view.overview.statActiveAgents') }}
         · {{ data?.delegations_total ?? '—' }} {{ t('view.overview.heroTasksRunning') }}
       </span>
-      <span class="ov-hero__fresh muted">{{ t('view.overview.updated') }} {{ freshnessText }}</span>
     </div>
 
     <!-- ── 层 2: Action 磁贴 — 引导用户"下一步做什么" ── -->
@@ -410,7 +409,6 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); if (pulseTime
 .ov-hero__status { font-size: var(--fs-md); font-weight: 600; color: var(--text); }
 .ov-hero__sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
 .ov-hero__kpi { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.ov-hero__fresh { margin-left: auto; font-size: var(--fs-xs); }
 
 /* ── Plan-Execute-Verify 叙事 (企业版差异化) ───────────────────────────
  * 设计语言对齐 workbench: 1px 描边卡片, 无阴影/无渐变, 中性灰底。

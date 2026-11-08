@@ -8,7 +8,7 @@
          顶栏不再重复提供 — 见 App.vue -->
     <div class="topbar__brand">
       <div class="topbar__logo" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
         </svg>
       </div>
@@ -18,26 +18,6 @@
           <span class="topbar__brandedition">{{ editionLabel }}</span>
         </div>
         <div class="topbar__branddesc">{{ isZh ? t('topbar.systemNameZh') : t('topbar.systemNameEn') }}</div>
-        <div class="topbar__statusline">
-          <span class="topbar__live" :class="{ connected: realtimeOk }">
-            <span class="topbar__livedot"></span>{{ realtimeOk ? t('status.live') : t('status.offline') }}
-          </span>
-          <span class="topbar__ver">v{{ appVersion }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 分隔符 -->
-    <div class="topbar__divider" aria-hidden="true"></div>
-
-    <!-- ② 刷新按钮 + 时间（标识右侧） -->
-    <div class="topbar__refresh">
-      <button class="topbar__refresh-btn" :title="t('common.refresh')" :aria-label="t('common.refresh')" @click="doRefresh">
-        <AppIcon name="refresh" :size="15" />
-      </button>
-      <div class="topbar__refreshmeta">
-        <span class="topbar__refreshtime">{{ formattedRefreshTime }}</span>
-        <span class="topbar__refreshlabel">{{ t('common.refresh') }}</span>
       </div>
     </div>
 
@@ -59,10 +39,16 @@
       </div>
     </div>
 
-    <!-- 分隔符 -->
+    <!-- ④ 刷新（居右工具簇；不再贴品牌区、无分割线） -->
+    <button class="topbar__refresh" :title="t('common.refresh')" :aria-label="t('common.refresh')" @click="doRefresh">
+      <AppIcon name="refresh" :size="15" />
+      <span class="topbar__refreshtime">{{ formattedRefreshTime }}</span>
+    </button>
+
+    <!-- 分隔符（仅分隔工具簇与身份区） -->
     <div class="topbar__divider" aria-hidden="true"></div>
 
-    <!-- ④ 用户区（居右） -->
+    <!-- ⑤ 用户区（居右） -->
     <div class="topbar__user">
       <button class="topbar__avatar-btn" :title="t('nav.users')" :aria-label="t('a11y.userProfile')" @click="goToUsers">
         <div class="topbar__avatar">
@@ -91,7 +77,6 @@ import { useI18n } from '../i18n';
 import AppIcon from './AppIcon.vue';
 import Segmented from './Segmented.vue';
 import { useUiStore } from '../stores/ui.js';
-import { useRealtimeStore } from '../stores/realtime.js';
 import { useEditionStore } from '../stores/edition.js';
 import { useApiStore } from '../stores/api.js';
 
@@ -101,7 +86,6 @@ defineProps({ rail: { type: Boolean, default: false } });
 const { t, locale } = useI18n();
 const router = useRouter();
 const ui = useUiStore();
-const realtime = useRealtimeStore();
 const edition = useEditionStore();
 const api = useApiStore();
 
@@ -110,7 +94,6 @@ const isZh = computed(() => locale.value === 'zh');
 // ── Stores 安全访问 ────────────────────────────────────────────────
 const densityVal = computed(() => ui.density);
 const themeVal = computed(() => ui.theme);
-const realtimeOk = computed(() => realtime.connected);
 const editionLabel = computed(() => edition.edition === 'enterprise' ? 'Enterprise' : 'Personal');
 
 function onDensityChange(v) { ui.setDensity(v); }
@@ -151,9 +134,6 @@ const roleLabel = computed(() => {
 });
 
 const authOn = computed(() => ls('maop_auth_enabled') === 'true');
-// Do not read the version from localStorage: a stale cached value from an
-// older build made the header show v5.3.0 while the footer showed v5.4.0.
-const appVersion = computed(() => (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown'));
 
 // ── 刷新时间 ───────────────────────────────────────────────────────
 const refreshTime = ref(new Date());
@@ -186,14 +166,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 顶栏硬编码值说明 (无精确 token 对应, 为顶栏紧凑布局微调):
- *   gap: 12px — 品牌区内部 logo↔brandtext 间距 (比 --sp-3 略宽, 视觉分组)
- *   gap: 10px — 刷新区/用户区内部元素间距 (紧凑胶囊布局)
- *   gap: 8px  — 品牌名行/状态行内 inline 元素间距 (≈ --sp-2)
- *   gap: 6px/5px/4px — 图例点/状态点/角色点等微间距 (亚 token 级别)
- *   padding: 5px 12px/14px — 胶囊按钮非对称内边距 (左图标右文字)
- *   height: 36px — 分隔符竖线高度 (≈ --row-h, 视觉与控件对齐)
- *   padding-left: 8px — 版本号与状态指示器的分隔间距 (≈ --sp-2) */
+/* 顶栏硬编码值说明 (无精确 token 对应, 为顶栏统一 32px 胶囊微调):
+ *   gap: 12px — 右侧工具簇(刷新/分析/偏好)之间距, 分组而不松散
+ *   height: 32px — 全部交互胶囊统一高 (DESIGN.md §4 小按钮档)
+ *   height: 24px — 分隔符竖线 (比胶囊短, 亚 token 视觉降噪)
+ *   padding: 0 12px — 胶囊横向内边距 (图标+文字档)
+ *   4px/5px/6px — 头像环/角色点等微间距 (亚 token 级别) */
 .topbar {
   /* 通栏 fixed (T-UI 2026-09-30): 顶栏是顶栏——不被侧栏覆盖, 侧栏从顶栏下方开始;
      品牌大标题常驻可见 (废弃"展开盖品牌区"的层叠设计)。
@@ -205,7 +183,7 @@ onMounted(() => {
   z-index: var(--z-topbar-fixed);
   display: flex;
   align-items: center;
-  gap: var(--sp-4);
+  gap: var(--sp-3);
   padding: 0 var(--sp-6);
   height: var(--topbar-h);
   background: var(--surface);
@@ -232,7 +210,7 @@ onMounted(() => {
 .topbar__brand { display: flex; align-items: center; gap: var(--sp-3); flex-shrink: 0; position: relative; }
 .topbar__logo {
   display: grid; place-items: center;
-  width: 38px; height: 38px;
+  width: 34px; height: 34px;
   border-radius: var(--r-md);
   background: var(--brand);
   color: var(--brand-contrast);
@@ -262,72 +240,40 @@ onMounted(() => {
   font-size: calc(var(--fs-xs) - .5px); color: var(--text-muted);
   letter-spacing: .015em; margin-top: 1px;
 }
-.topbar__statusline {
-  display: flex; align-items: center; gap: var(--sp-2); margin-top: 3px;
-  font-size: var(--fs-2xs); color: var(--text-faint);
-}
-.topbar__live { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
-.topbar__livedot {
-  width: 6px; height: 6px; border-radius: var(--r-full);
-  background: var(--text-faint);
-  transition: background var(--motion) var(--ease), box-shadow var(--motion) var(--ease);
-}
-.topbar__live.connected { color: var(--success); }
-.topbar__live.connected .topbar__livedot {
-  background: var(--success);
-  /* 呼吸灯动画删除 — 常亮圆点即是状态, 不需要脉动吸引注意 */
-}
-.topbar__ver {
-  font-family: var(--font-mono);
-  padding-left: var(--sp-2);
-  border-left: 1px solid var(--border-subtle);
-  color: var(--text-faint);
-}
-
-/* 分隔符 */
+/* 分隔符 — 只留一处: 右侧工具簇与身份区之间 (品牌区旁的旧分割线已删) */
 .topbar__divider {
   width: 1px;
-  height: 36px;
+  height: 24px;
   background: linear-gradient(180deg, transparent, var(--border) 25%, var(--border) 75%, transparent);
   flex-shrink: 0;
 }
 
-/* ② 刷新区 */
+/* ④ 刷新 (居右工具簇; 与顶栏其他胶囊同高 32px, 图标+等宽时间) */
 .topbar__refresh {
-  display: flex; align-items: center; gap: 10px;
-  padding: 5px var(--sp-3) 5px 5px;
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  height: 32px;
+  padding: 0 var(--sp-3);
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-full);
-  position: relative;
-  transition: border-color var(--motion) var(--ease), background var(--motion) var(--ease);
-}
-.topbar__refresh:hover { border-color: var(--border-strong); background: var(--surface-3); }
-.topbar__refresh-btn {
-  display: grid; place-items: center;
-  width: 30px; height: 30px;
-  background: var(--surface-3); border: 1px solid var(--border-subtle);
-  border-radius: var(--r-full); color: var(--text-muted);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
   cursor: pointer;
-  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), transform var(--motion-slow) var(--ease), border-color var(--motion) var(--ease);
+  flex-shrink: 0;
+  transition: color var(--motion) var(--ease), background var(--motion) var(--ease), border-color var(--motion) var(--ease);
 }
-.topbar__refresh-btn:hover {
+.topbar__refresh:hover {
   color: var(--brand-strong);
   background: var(--brand-soft);
   border-color: var(--brand);
 }
-.topbar__refresh-btn:active { transform: rotate(180deg); }
-.topbar__refreshmeta { display: flex; flex-direction: column; line-height: 1.1; }
+/* 按下只转图标 — 整钮旋转会把时间文字倒过来 (旧圆钮时代的残留) */
+.topbar__refresh .app-icon { transition: transform var(--motion-slow) var(--ease); }
+.topbar__refresh:active .app-icon { transform: rotate(180deg); }
 .topbar__refreshtime {
-  font-size: var(--fs-sm); color: var(--text);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-}
-.topbar__refreshlabel {
-  /* 修复: 9.5px 硬编码 token 化 → calc(var(--fs-2xs) - .5px) (10px - 0.5px) */
-  font-size: calc(var(--fs-2xs) - .5px); color: var(--text-faint);
-  letter-spacing: .02em;
 }
 
 /* 弹性分隔 */
@@ -336,7 +282,8 @@ onMounted(() => {
 /* ②.5 分析快速入口: 轻量胶囊按钮, 复用 design token, 不破坏顶栏紧凑布局 */
 .topbar__quick-analysis {
   display: flex; align-items: center; gap: 6px;
-  padding: 5px var(--sp-3);
+  height: 32px;
+  padding: 0 var(--sp-3);
   background: var(--surface-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-full);
@@ -356,12 +303,16 @@ onMounted(() => {
 
 /* ③ 布局/主题 */
 .topbar__prefs { display: flex; align-items: center; gap: var(--sp-3); position: relative; }
+/* 密度/主题 Segmented 与其他胶囊同高, 上下边对齐 */
+.topbar__prefs :deep(.segmented) { height: 32px; }
+.topbar__prefs :deep(.segmented__item) { height: 100%; }
 
 /* ④ 用户区 */
 .topbar__user { display: flex; align-items: center; gap: 10px; flex-shrink: 0; position: relative; }
 .topbar__avatar-btn {
-  display: flex; align-items: center; gap: 10px;
-  padding: 5px 14px 5px 5px;
+  display: flex; align-items: center; gap: var(--sp-2);
+  height: 32px;
+  padding: 0 var(--sp-3) 0 4px;
   background: var(--surface-2); border: 1px solid var(--border-subtle);
   border-radius: var(--r-full);
   cursor: pointer;
@@ -374,11 +325,11 @@ onMounted(() => {
   box-shadow: 0 0 0 3px var(--brand-soft), var(--shadow-sm);
 }
 .topbar__avatar {
-  width: 34px; height: 34px; flex-shrink: 0;
+  width: 24px; height: 24px; flex-shrink: 0;
   border-radius: var(--r-full);
   /* 实底承载白字必须用 --brand-solid（白字 4.51:1）；--brand 只有 3.74:1。 */
   background: var(--brand-solid);
-  color: var(--brand-contrast); font-size: var(--fs-base); font-weight: 700;
+  color: var(--brand-contrast); font-size: 11px; font-weight: 700;
   display: grid; place-items: center;
   box-shadow: var(--shadow-brand), var(--shadow-inset-highlight);
   font-family: var(--font-sans);
@@ -395,17 +346,17 @@ onMounted(() => {
   border-color: var(--brand);
   box-shadow: 0 0 0 3px var(--brand-soft);
 }
-.topbar__usermeta { display: flex; flex-direction: column; line-height: 1.2; text-align: left; min-width: 0; }
+.topbar__usermeta { display: flex; align-items: center; gap: 6px; line-height: 1.2; text-align: left; min-width: 0; }
 .topbar__username {
-  font-size: var(--fs-base); font-weight: 600; color: var(--text);
-  max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-xs); font-weight: 600; color: var(--text);
+  max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   letter-spacing: -0.005em;
 }
 .topbar__userrole {
-  display: inline-flex; align-items: center; gap: var(--sp-1);
+  display: inline-flex; align-items: center; gap: 4px;
   font-size: var(--fs-2xs); color: var(--brand-strong);
   font-weight: 600; letter-spacing: .02em;
-  margin-top: 1px;
+  white-space: nowrap;
 }
 .topbar__roledot {
   width: 4px; height: 4px; border-radius: var(--r-full);
@@ -414,7 +365,8 @@ onMounted(() => {
 
 .topbar__logout-btn {
   display: flex; align-items: center; gap: 6px;
-  padding: var(--sp-2) var(--sp-3);
+  height: 32px;
+  padding: 0 var(--sp-3);
   background: var(--surface-2); border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
   color: var(--fail); font-size: var(--fs-xs);
@@ -432,35 +384,32 @@ onMounted(() => {
 @media (max-width: 1100px) {
   .topbar { padding: 0 var(--sp-5); }
   .topbar__branddesc { display: none; }
-  .topbar__refreshlabel { display: none; }
-  .topbar__refreshmeta { flex-direction: row; align-items: center; }
 }
 
 @media (max-width: 900px) {
   .topbar { gap: var(--sp-2); padding: 0 var(--sp-3); }
-  .topbar__statusline { display: none; }
   /* 移动端分析入口仅保留图标, 隐藏文字标签 */
   .topbar__quick-analysis-label { display: none; }
-  .topbar__quick-analysis { padding: 5px; }
+  .topbar__quick-analysis { padding: 0 6px; }
   /* 移动端保留主题切换(高使用频次), 仅隐藏密度切换(低使用频次)。
      修复 P3: 此前整个 .topbar__prefs 被隐藏导致移动端无法切换主题。 */
   .topbar__pref-group--density { display: none; }
   .topbar__usermeta { display: none; }
   .topbar__logout-text { display: none; }
-  .topbar__refresh { padding: var(--sp-1); }
-  .topbar__refreshmeta { display: none; }
+  /* 刷新只留图标, 时间隐藏 */
+  .topbar__refreshtime { display: none; }
+  .topbar__refresh { padding: 0; width: 32px; justify-content: center; }
   .topbar__divider { display: none; }
-  .topbar__avatar-btn { padding: var(--sp-1); }
+  .topbar__avatar-btn { padding: 0 4px; }
   .topbar__brandedition { display: none; }
 }
 
 @media (max-width: 700px) {
   .topbar__brandtext { display: none; }
-  .topbar__refresh { display: none; }
 }
 
 /* a11y: 键盘焦点环 (P0 focus-visible 补充) */
-.topbar__refresh-btn:focus-visible,
+.topbar__refresh:focus-visible,
 .topbar__quick-analysis:focus-visible,
 .topbar__avatar-btn:focus-visible,
 .topbar__logout-btn:focus-visible {

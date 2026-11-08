@@ -57,7 +57,7 @@
 }
 
 /* ── Grids & lists (actual layout properties) ─────────────────────────── */
-.stats-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(5, 1fr); align-items: stretch; }
+.stats-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: stretch; }
 .two-col { display: grid; gap: var(--sp-4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
 .row { display: grid; gap: var(--sp-4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
 .status-strip { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; padding: var(--sp-3) var(--sp-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
