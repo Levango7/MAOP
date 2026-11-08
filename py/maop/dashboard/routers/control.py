@@ -19,6 +19,19 @@ from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.services import system_service
 
+from .control_schemas import (
+    ControlCancelResponse,
+    ControlClearCacheResponse,
+    ControlDoctorResponse,
+    ControlPauseResponse,
+    ControlProviderHealthResponse,
+    ControlRefreshResponse,
+    ControlResumeResponse,
+    ControlRunResponse,
+    ControlStopResponse,
+    ControlValidateResponse,
+)
+
 # Re-export shared state for backward compatibility (tests monkeypatch
 # ``control.MAOP_ROOT`` / ``control.active_jobs`` etc.).  The service
 # layer accesses these via the ``state`` module so monkeypatching
@@ -64,7 +77,7 @@ async def control_job(job_id: str, request: Request) -> dict[str, Any]:
     return {"status": "ok", "job": job}
 
 
-@router.post("/api/control/run")
+@router.post("/api/control/run", response_model=ControlRunResponse)
 @handle_api_errors("control run")
 async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
     """Start a new control job from a task or workflow."""
@@ -80,7 +93,7 @@ async def control_run(body: RunRequest, request: Request) -> dict[str, Any]:
     job_id = await system_service.start_control_run(actual_task)
     return {"status": "ok", "job_id": job_id, "task": actual_task}
 
-@router.post("/api/control/pause")
+@router.post("/api/control/pause", response_model=ControlPauseResponse)
 @handle_api_errors("control pause")
 async def control_pause(request: Request) -> dict[str, Any]:
     """Pause the control loop."""
@@ -88,7 +101,7 @@ async def control_pause(request: Request) -> dict[str, Any]:
     paused = system_service.pause_control()
     return {"status": "ok", "action": "pause", "paused": paused}
 
-@router.post("/api/control/resume")
+@router.post("/api/control/resume", response_model=ControlResumeResponse)
 @handle_api_errors("control resume")
 async def control_resume(request: Request) -> dict[str, Any]:
     """Resume the control loop."""
@@ -117,7 +130,7 @@ async def control_pause_status(request: Request) -> dict[str, Any]:
         "total_jobs": info["total_jobs"],
     }
 
-@router.post("/api/control/stop")
+@router.post("/api/control/stop", response_model=ControlStopResponse)
 @handle_api_errors("control stop")
 async def control_stop(request: Request) -> dict[str, Any]:
     """Stop the control loop gracefully."""
@@ -125,7 +138,7 @@ async def control_stop(request: Request) -> dict[str, Any]:
     stopped = system_service.stop_control()
     return {"status": "ok", "action": "stop", "stopped": stopped}
 
-@router.post("/api/control/validate")
+@router.post("/api/control/validate", response_model=ControlValidateResponse)
 @handle_api_errors("control validate")
 async def control_validate(request: Request) -> dict[str, Any]:
     """Validate the current MAOP configuration."""
@@ -137,7 +150,7 @@ async def control_validate(request: Request) -> dict[str, Any]:
         # M4 fix: 统一错误处理——raise HTTPException 让 handle_api_errors 装饰器处理。
         raise HTTPException(status_code=500, detail="Validate failed")
 
-@router.post("/api/control/doctor")
+@router.post("/api/control/doctor", response_model=ControlDoctorResponse)
 @handle_api_errors("control doctor")
 async def control_doctor(request: Request) -> dict[str, Any]:
     """Run health diagnostics and return findings."""
@@ -149,7 +162,7 @@ async def control_doctor(request: Request) -> dict[str, Any]:
         # M4 fix: 统一错误处理——raise HTTPException 让 handle_api_errors 装饰器处理。
         raise HTTPException(status_code=500, detail="Doctor check failed")
 
-@router.post("/api/control/cancel")
+@router.post("/api/control/cancel", response_model=ControlCancelResponse)
 @handle_api_errors("control cancel")
 async def control_cancel(body: CancelRequest, request: Request) -> dict[str, Any]:
     """Cancel a running job by ID."""
@@ -158,7 +171,7 @@ async def control_cancel(body: CancelRequest, request: Request) -> dict[str, Any
         return {"status": "ok", "job_id": body.job_id}
     raise HTTPException(status_code=404, detail="job not found")
 
-@router.post("/api/control/refresh")
+@router.post("/api/control/refresh", response_model=ControlRefreshResponse)
 @handle_api_errors("control refresh")
 async def control_refresh(request: Request) -> dict[str, Any]:
     """Refresh runtime state and caches."""
@@ -166,7 +179,7 @@ async def control_refresh(request: Request) -> dict[str, Any]:
     await system_service.refresh_caches()
     return {"status": "ok", "cache": "cleared"}
 
-@router.post("/api/control/clear-cache")
+@router.post("/api/control/clear-cache", response_model=ControlClearCacheResponse)
 @handle_api_errors("control clear cache")
 async def control_clear_cache(request: Request) -> dict[str, Any]:
     """Clear all in-memory caches."""
@@ -175,7 +188,7 @@ async def control_clear_cache(request: Request) -> dict[str, Any]:
     return {"status": "ok"}
 
 
-@router.post("/api/control/provider-health")
+@router.post("/api/control/provider-health", response_model=ControlProviderHealthResponse)
 @handle_api_errors("control provider health")
 async def control_provider_health(request: Request) -> dict[str, Any]:
     """Check health of configured LLM providers."""
