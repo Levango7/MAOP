@@ -1098,3 +1098,22 @@
 - **核验**（合入前即时读回）：required 四件（CI scope / Secret Scan (gitleaks) / Docs consistency gate / CI merge gate）全 pass；全仓 checks 无 pending/in_progress/queued；mergeStateStatus=CLEAN、mergeable=MERGEABLE、head sha `db84cb5e…` 未变（合并前无新推送）。
 - **未做**：master 本地指针同步（服务器侧合并，按需再 fetch）；后续线（hallmark 反 AI 味整改 / Agents 分类 taxonomy）未授权不动。
 - 任务 #109 关闭。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：Agents 分类 taxonomy + 空数据降级（用户「授权，做吧」））
+- **授权**：用户 2026-11-08「授权，做吧」（针对上一条汇报末尾挂起的两项：hallmark 反 AI 味整改 / Agents 分类 taxonomy；授权含两个裁决的端到端决定权）。
+- **裁决 1（category 维护方）**：`config/agents.yaml` 为唯一事实源，每 agent 增 `category` 键；后端 /api/agents 透传（未知字段不得被 response_model 吞掉，若吞则修）；前端 Agents.vue 消费 category 做过滤芯片 + 分组计数。不设新管理面（无 UI 改分类）。
+- **裁决 2（platform 组件归属）**：cloudbase / omniroute / doc-pipeline 留在智能体页，归入独立 platform 桶（不进 general）；不动 MCP 工具页、不动路由表。判据：general＝caps≥5 且多主域（含 codegen）；specialized＝CLI agent 不满足 general；platform＝cli 为空或 driver 非 cli 的基建/适配器。
+- **领地**：config/agents.yaml（31 agent 各加 category）、py/maop/dashboard/routers/agents/* 与 agent_service（透传）、dashboard-enterprise/src/views/Agents.vue（芯片+分组）、src/i18n/view-agents.js（文案）、本登记。
+- **不碰**：MCP 工具页、routing/loops/workflows 段、其他视图、CI/CD、分支保护。
+- **批次**：批 1 数据面（yaml+后端透传）；批 2 呈现面（前端芯片+i18n）；批 3 hallmark 空数据降级（取证后单列）。每批独立提交+回执。
+
+## 交付回执（2026-11-08：批 1 数据面，sha 1e26b1f0）
+- **提交**：`1e26b1f0` feat(agents): category 分类桶透传（yaml 为事实源 → registry → /api/agents），+105/-5。
+- **内容**：config/agents.yaml 31 agent 各加 category（general 14 / specialized 15 / platform 2；cloudbase 归 specialized、omniroute/doc-pipeline 归 platform，符合「通用桶不得含 cloudbase/omniroute」口味约束）；RegisteredAgent 加 category 字段（model/DDL/_migrate_schema 新列/_upsert_db INSERT/_row_to_agent/register_from_config 六处）；新增白盒 3 测（config→DB→新实例回读、空缺省 ''、迁移列重建后数据不丢）。
+- **门禁**：pytest 10 passed（7 旧 + 3 新）；ruff 净；mypy 全仓 exit 0；yaml 解析 + 分桶计数核验。
+
+## 交付回执（2026-11-08：批 2 呈现面，sha 806bf494）
+- **提交**：`806bf494` feat(agents): category 过滤芯片 + 空分类降级（批 2 呈现面），+59/-2。
+- **内容**：Agents.vue .cat-bar 芯片组（全部/通用/专用/平台组件，带计数，aria-label，重复点击取消过滤）+ categoryFilter ref + filteredAgents computed（grid/table 同源）+ 空分类 EmptyState；view-agents.js 8 键 en+zh；pages.css .cat-bar/.cat-chip/.cat-count。
+- **门禁**：design:contrast 164 对全 PASS；lint 0 error（16 warning 全在他文件，预存）；Agents.test.js 7 passed；vue-tsc TSC_EXIT=0；vitest 705 passed VITEST_EXIT=0。
+- **未做**：推送（逐批授权制）；批 3 hallmark 空数据降级（取证后单列）。
