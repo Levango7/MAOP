@@ -3,8 +3,7 @@
 根因（M-SIM M1 Temporal 腿，2026-11-05）：任务文本触发 analyzer 拆子任务走
 并行路径时，``_execute_parallel`` 的聚合 ``new_result`` 不带 model/usage ⇒
 ``_budget_reconciliation`` 早退 ⇒ ``run_events`` 无 ``run.cost``、成本表静默
-缺行。修复 = 聚合结果 model 取首个非空子任务值、usage 按键求和（并累计进
-loop 级 ``_tokens_used_measured``，与串行路径口径一致）；对账入口硬化为
+缺行。修复 = 聚合结果 model 取首个非空子任务值、usage 按键求和；对账入口硬化为
 「有实测 usage 就记账（model 留空同启发式路径归档），两者皆缺才早退」。
 """
 
@@ -32,6 +31,11 @@ class _Harness:
     async def _execute_with_retry(self, task: str, fallback_chain: list[str], **kwargs: object):
         result = self._results_by_task[task]
         assert fallback_chain == ["sim-worker"], fallback_chain
+        # 镜像生产路径：实测 token 由本方法逐 dispatch 累加（聚合处不再
+        # 累加——双计回归守卫，下面的 410 断言若因聚合二次累加变 820 即红）。
+        usage = getattr(result, "usage", None)
+        if isinstance(usage, dict):
+            self._tokens_used_measured += int(usage.get("total_tokens", 0) or 0)
         return result
 
     def _log(self, *args: object, **kwargs: object) -> None:
@@ -88,7 +92,8 @@ async def test_parallel_combine_preserves_model_and_sums_usage() -> None:
         "completion_tokens": 110,
         "total_tokens": 410,
     }
-    # loop 级实测口径与串行路径一致（[USAGE] 行不再回落 estimated/0）
+    # loop 级实测口径与串行路径一致（[USAGE] 行不再回落 estimated/0）；
+    # 410 = 两子任务逐 dispatch 之和——聚合处若再累加一次会变 820
     assert executor._tokens_used_measured == 410
     assert combined.is_success()
 
