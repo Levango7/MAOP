@@ -56,7 +56,7 @@ def _isolate_edition(tmp_path, monkeypatch):
 
 
 def _openapi_props(client: TestClient, method: str) -> dict[str, Any]:
-    schema = client.app.openapi()
+    schema = cast(FastAPI, client.app).openapi()
     op = schema["paths"]["/api/info/edition"][method]
     ref = op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
     return cast(dict[str, Any], schema["components"]["schemas"][ref.rsplit("/", 1)[-1]]["properties"])

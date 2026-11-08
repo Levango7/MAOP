@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import sys
 import types
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -33,11 +34,11 @@ def fake_psycopg():
     ``fake._pool_mod`` so tests can assert on ConnectionPool construction
     and pool behavior.
     """
-    fake = types.ModuleType("psycopg")
+    fake: Any = types.ModuleType("psycopg")
     fake.connect = MagicMock(return_value=MagicMock())
     sys.modules["psycopg"] = fake
 
-    fake_pool_mod = types.ModuleType("psycopg_pool")
+    fake_pool_mod: Any = types.ModuleType("psycopg_pool")
     mock_pool = MagicMock()
     fake_pool_mod.ConnectionPool = MagicMock(return_value=mock_pool)
     sys.modules["psycopg_pool"] = fake_pool_mod

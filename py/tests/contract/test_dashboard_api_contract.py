@@ -5,9 +5,10 @@ dashboard API endpoints, with response schema assertions for key endpoints.
 """
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import pytest
+from fastapi.routing import APIRoute
 
 pytestmark = pytest.mark.contract
 
@@ -90,7 +91,7 @@ class TestResponseSchemas:
         overview_route = None
         for route in system.router.routes:
             if getattr(route, "path", "") == "/api/overview":
-                overview_route = route
+                overview_route = cast(APIRoute, route)
                 break
         assert overview_route is not None, "/api/overview route not registered"
         assert overview_route.methods is not None
@@ -296,7 +297,7 @@ class TestLogsContract:
         found = False
         for route in data_mod.router.routes:
             if getattr(route, "path", "") == "/api/logs":
-                assert "GET" in (route.methods or set()), "/api/logs must be GET"
+                assert "GET" in (cast(APIRoute, route).methods or set()), "/api/logs must be GET"
                 found = True
                 break
         assert found, "/api/logs route not registered"

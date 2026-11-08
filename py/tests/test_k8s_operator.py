@@ -345,6 +345,8 @@ class TestKindIntegration:
 
     CLUSTER_NAME = "maop-test-kind"
     TEST_NS = "maop-kind-test"
+    _prev_kubeconfig: str | None = None
+    _kubeconfig_path: Path
 
     @classmethod
     def setup_class(cls) -> None:
