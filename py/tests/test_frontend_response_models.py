@@ -76,7 +76,11 @@ URL_EXCEPTIONS = FIXTURES / "frontend_url_reference_exceptions.txt"
 # extractor used to lose (a template tail, and a literal prefix concatenated
 # with a variable); the ten endpoints it exposed were modelled rather than
 # allowlisted, so the net move is down.
-RATCHET_CAP = 74
+# 2026-11-08: 74 -> 72. ``GET /api/control/status`` and
+# ``GET /api/control/jobs/{}`` got ``ControlStatusResponse`` /
+# ``ControlJobResponse``; ``POST /api/control/maintain`` stays exempt
+# because its keys come from the maintain handler registry.
+RATCHET_CAP = 72
 
 _QUOTES = {"`": "`", "'": "'", '"': '"'}
 _CALL_HEAD_RE = re.compile(

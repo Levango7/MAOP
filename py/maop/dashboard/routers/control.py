@@ -23,11 +23,13 @@ from .control_schemas import (
     ControlCancelResponse,
     ControlClearCacheResponse,
     ControlDoctorResponse,
+    ControlJobResponse,
     ControlPauseResponse,
     ControlProviderHealthResponse,
     ControlRefreshResponse,
     ControlResumeResponse,
     ControlRunResponse,
+    ControlStatusResponse,
     ControlStopResponse,
     ControlValidateResponse,
 )
@@ -58,7 +60,7 @@ class CancelRequest(BaseModel):
     job_id: str = Field(default="", max_length=128)
 
 
-@router.get("/api/control/status")
+@router.get("/api/control/status", response_model=ControlStatusResponse)
 @handle_api_errors("control status")
 async def control_status(request: Request) -> dict[str, Any]:
     """Return status of all active control jobs."""
@@ -66,7 +68,7 @@ async def control_status(request: Request) -> dict[str, Any]:
     jobs = system_service.get_control_status()
     return {"status": "ok", "active_jobs": jobs, "jobs": jobs, "count": len(jobs)}
 
-@router.get("/api/control/jobs/{job_id}")
+@router.get("/api/control/jobs/{job_id}", response_model=ControlJobResponse)
 @handle_api_errors("control job detail")
 async def control_job(job_id: str, request: Request) -> dict[str, Any]:
     """Return one control job, including captured stdout/stderr."""
