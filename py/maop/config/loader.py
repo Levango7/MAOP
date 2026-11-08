@@ -38,6 +38,10 @@ class AgentDef(BaseModel):
     """One agent entry from agents.yaml."""
     cli: str = ""
     cli_args: str = ""
+    # 原生 usage 出口格式（如 "copilot"）。非空时，cli_args 里的
+    # ``{usage_file}`` 占位符由驱动替换为临时文件路径，进程结束后回读解析
+    # 真实 token 用量。空 = 不启用，行为与既往逐字节一致。
+    usage_format: str = ""
     # driver 类型：基础驱动（cli/powershell/wrapper/cmd/python）+
     # 桌面应用 / IDE 扩展 / Vibe Coding 三种新驱动（接入调度主链路）
     driver: str = "cli"  # cli | powershell | wrapper | desktop_app | ide_extension | vibe_coding
