@@ -42,7 +42,10 @@ class RouteRequest(BaseModel):
     excluded_agents: list[str] = Field(
         default_factory=list, description="排除的 Agent 名列表"
     )
-    max_cost_tier: str = Field(default="low", description="成本偏好: low/medium/high/any")
+    # 2026-11-08：默认 "low" 会让未设 billing_model 的 agent 全被筛空
+    # （真机实证：默认参数下 /api/agent-router/route 恒返回 primary=null），
+    # 改为 "any" —— 与领域层 RoutingContext 默认值一致，也符合同一契约两端同源。
+    max_cost_tier: str = Field(default="any", description="成本偏好: low/medium/high/any")
     require_healthy: bool = Field(default=True, description="是否要求健康")
     session_id: str = Field(default="", description="会话 ID（负载均衡粘性）")
     strategy: str = Field(

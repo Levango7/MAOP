@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sqlite3
 import time
 from typing import Any
 
@@ -168,6 +169,19 @@ class DispatchImplMixin:
             },
         )
 
+        # ── 并发槽位占位（2026-11-08 接线）────────────────────────────
+        # acquire/release 与 AgentRouter._active_count 一直都存在，但**全仓没有
+        # 任何调用方**，于是两个后果：① RoutingStrategy.LOAD_BALANCED 的排序键
+        # 第一项恒为 0，实际退化成 agent 名字典序（用户选"负载均衡"拿到字母序
+        # 第一）；② AgentDescriptor.max_concurrent 从未被强制执行。
+        # 这里补上调用点，让两件事第一次真正发生。
+        #
+        # 刻意设计为**降级而非拒绝**：acquire 失败时不阻断派发（那会改变既有
+        # 行为、打翻大量用例），而是记一条审计后照常执行——负载数据先真实起来，
+        # 是否升级为硬限额留给产品决策。
+        _slot_agent = agent
+        _slot_held = self._acquire_agent_slot(_slot_agent)
+
         try:
             return await self._dispatch_impl_inner(
                 agent, task,
@@ -180,7 +194,40 @@ class DispatchImplMixin:
                 dry_run=dry_run,
             )
         finally:
+            if _slot_held:
+                self._release_agent_slot(_slot_agent)
             self._record_sla_dispatch_end(priority, sla_tier, deadline_ms=deadline_ms)
+
+    def _acquire_agent_slot(self, agent_name: str) -> bool:
+        """占用 agent 并发槽位；失败不阻断派发（降级 + 审计）。
+
+        AgentRouter 未配置或不可用时静默返回 True（视为不 tracking），
+        保证接线本身不会成为新的故障点。
+        """
+        try:
+            from maop.core.agent.router.agent_router import get_agent_router
+            router = get_agent_router()
+            if router.acquire(agent_name):
+                return True
+            logger.info(
+                "[dispatch] agent=%s 并发槽位已满，降级执行（max_concurrent 未作硬限额）",
+                agent_name,
+            )
+        except (ImportError, sqlite3.Error, OSError, ValueError, TypeError) as exc:
+            # ADR-023：收窄到现实失败面，不用宽口径 except Exception——这条路径的
+            # 全部真实异常来源就是"模块导入 / SQLite 读写 / 文件 IO / 描述符形状"。
+            # 接线不得成为故障点：任何一类失败都只降级、不阻断派发。
+            logger.debug("[dispatch] acquire slot unavailable (non-blocking): %s", exc)
+        return False
+
+    def _release_agent_slot(self, agent_name: str) -> None:
+        """释放并发槽位。与 :meth:`_acquire_agent_slot` 严格配对。"""
+        try:
+            from maop.core.agent.router.agent_router import get_agent_router
+            router = get_agent_router()
+            router.release(agent_name)
+        except (ImportError, sqlite3.Error, OSError, ValueError, TypeError) as exc:
+            logger.debug("[dispatch] release slot failed (ignored): %s", exc)
 
     async def delegate_to_subagent(
         self,

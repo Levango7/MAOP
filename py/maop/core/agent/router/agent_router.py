@@ -118,7 +118,15 @@ class RoutingContext(BaseModel):
         default_factory=list, description="排除的 Agent 名",
     )
     max_cost_tier: str = Field(
-        default="low", description="成本偏好: low/medium/high/any",
+        # 2026-11-08：默认值从 "low" 改为 "any"。原默认 "low" 只允许
+        # FREE/SUBSCRIPTION 计费模式（_COST_TIER_LIMIT["low"]==1），而
+        # AgentDescriptor.billing_model 默认 BLACKBOX（优先级 5）⇒ 任何
+        # 不显式设 billing_model 的 agent 都会被成本过滤筛空。真机实证：
+        # POST /api/agent-router/route 用默认参数恒返回
+        # {"primary": null, "reason": "no candidates after filtering"}。
+        # 默认放行、把选择权交给显式传入的调用方——能力/健康/限流筛起来后，
+        # 不应再被一个"没填就默认最严"的字段把候选全部清空。
+        default="any", description="成本偏好: low/medium/high/any",
     )
     require_healthy: bool = Field(default=True, description="是否要求健康")
     session_id: str = Field(default="", description="会话 ID（用于负载均衡粘性）")
@@ -145,6 +153,35 @@ class RoutingResult(BaseModel):
 
 
 # ── AgentRouter ───────────────────────────────────────────────────
+# ── 进程级单例（2026-11-08）────────────────────────────────────────────
+# acquire/release 与 _active_count 一直存在但全仓无调用方，导致
+# RoutingStrategy.LOAD_BALANCED 的排序键恒 0（退化成字典序）、
+# AgentDescriptor.max_concurrent 从未被强制执行。补单例访问器，
+# 让 delegate/dispatch_impl 能在不知道调用方是谁的情况下占用/释放槽位
+# （模式与 core/scheduling/failure_detector.get_failure_detector() 一致）。
+_router_instance: AgentRouter | None = None
+_router_lock = threading.Lock()
+
+
+def get_agent_router() -> AgentRouter:
+    """Return the process-wide :class:`AgentRouter` singleton."""
+    global _router_instance
+    with _router_lock:
+        if _router_instance is None:
+            _router_instance = AgentRouter()
+        return _router_instance
+
+
+def set_agent_router(router: AgentRouter | None) -> None:
+    """Replace (or clear with ``None``) the global agent-router singleton.
+
+    Used by tests to inject an isolated router without touching the DB.
+    """
+    global _router_instance
+    with _router_lock:
+        _router_instance = router
+
+
 class AgentRouter:
     """Agent 路由器：从 AgentCatalog 中按策略选择最优 Agent.
 
