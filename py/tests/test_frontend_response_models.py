@@ -72,15 +72,11 @@ URL_EXCEPTIONS = FIXTURES / "frontend_url_reference_exceptions.txt"
 # follow computed URLs and found seven endpoints two earlier "model every
 # frontend endpoint" batches had walked past (three auth, two edition, graph
 # stats, knowledge-graph). They are burned down next.
-# 2026-10-31: 75 -> 74. ``reachable_targets`` closed two more shapes the
+# 2026-11-08: 75 -> 74. ``reachable_targets`` closed two more shapes the
 # extractor used to lose (a template tail, and a literal prefix concatenated
 # with a variable); the ten endpoints it exposed were modelled rather than
 # allowlisted, so the net move is down.
-# 2026-11-08: 74 -> 72. ``GET /api/control/status`` and
-# ``GET /api/control/jobs/{}`` got ``ControlStatusResponse`` /
-# ``ControlJobResponse``; ``POST /api/control/maintain`` stays exempt
-# because its keys come from the maintain handler registry.
-RATCHET_CAP = 72
+RATCHET_CAP = 74
 
 _QUOTES = {"`": "`", "'": "'", '"': '"'}
 _CALL_HEAD_RE = re.compile(
@@ -441,6 +437,14 @@ def reachable_targets(
     展开是有界的：前缀至少三段（``/api/x/``），且幻影路径后面必须还有段。
     ``/api/{}`` 或 ``POST /api/health`` 那种不是拼出来的，展开只会把整个审计
     面拖进来；真正的死端点该由前端修，不该在这里被静默吸收。
+
+    **已知残余**：若拼接的前缀本身恰好是一条同动词的真实路由，``(verb, path)``
+    会命中 ``routes``，这条调用不触发展开，它真正的目标仍然不可见。当前全仓
+    没有这个形状——``/api/`` 字面量后接 ``+`` 只有两处，一处是查询串
+    （``'/api/billing/records' + (qs ? '?' + qs : '')``，走 rule 2 且路径完整），
+    一处是已修的 marketplace 安装路径。要彻底消掉这个残余，得让 ``scan_source_dir``
+    把「字面量是整条路径」与「字面量只是前缀」区分开，那会改它的返回签名；
+    在没有真实反例之前不为此加机器。
     """
     targets: set[tuple[str, str]] = set()
     for verb, path in calls:

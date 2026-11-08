@@ -140,3 +140,70 @@ def test_persistence_reload_preserves_entries(tracker: CostTracker) -> None:
     with sqlite3.connect(str(db_path)) as conn:
         row = conn.execute("SELECT metadata FROM cost_entries LIMIT 1").fetchone()
     assert json.loads(row[0]) == {"task": "codegen"}
+
+
+# ── 2. 无法计价必须与「免费」可区分 ────────────────────────────────
+# 2026-11-08 实测：models.yaml 只登记 3 个模型，agents.yaml 声明的 14 个模型
+# 有 12 个未收录（含真实跑过的 gpt-5.4 / qwen3.5-plus）。这些运行的
+# cost_usd 必然是 0.0，与"这次真免费"在账面上完全同形，成本页因此把
+# 「总成本 $0.0000」当真实花费显示。record_actual_cost 现在把 priced 判据
+# 写进台账 metadata，summary 则给出 unpriced_entries 与逐模型 unpriced 计数。
+
+
+def test_record_actual_cost_writes_priced_flag(tracker: CostTracker) -> None:
+    tracker.record_actual_cost(
+        trace_id="t1", model="gpt-5.4", provider="",
+        actual_tokens_in=100, actual_tokens_out=20,
+        estimated_cost=0.0, agent="copilot", phase="execute",
+        tokens_source="estimated", priced=False,
+    )
+    entries = tracker.get_entries(limit=10)
+    assert entries[0].metadata["priced"] is False
+    # 未声明 priced 的调用方：键不写，元数据保持原样（旧调用方零改动）。
+    tracker.record_actual_cost(trace_id="t2", model="agnes-2.5-pro", provider="agnes")
+    assert "priced" not in tracker.get_entries(limit=1)[0].metadata
+
+
+def test_summary_counts_unpriced_entries(tracker: CostTracker) -> None:
+    tracker.record_actual_cost(
+        model="gpt-5.4", provider="", actual_tokens_in=10,
+        actual_tokens_out=2, priced=False,
+    )
+    tracker.record_actual_cost(
+        model="agnes-2.5-pro", provider="agnes", actual_tokens_in=10,
+        actual_tokens_out=2, priced=True,
+    )
+    summary = tracker.summary()
+    assert summary.total_calls == 2
+    assert summary.unpriced_entries == 1
+    assert summary.by_model["gpt-5.4"]["unpriced"] == 1
+    assert summary.by_model["agnes-2.5-pro"]["unpriced"] == 0
+
+
+def test_legacy_rows_without_priced_fall_back_to_provider(tracker: CostTracker) -> None:
+    """2026-11-08 之前写入的历史行没有 priced 键——按 provider 是否为空兜底。"""
+    # provider 空 = models.yaml 没收这个模型 = 无从取价。
+    tracker.record(
+        agent="copilot", model="gpt-5.4", prompt_tokens=10, completion_tokens=2,
+        metadata={"provider": "", "phase": "execute"},
+    )
+    # provider 有值 = 有价。
+    tracker.record(
+        agent="mmx", model="agnes-2.5-pro", prompt_tokens=10, completion_tokens=2,
+        metadata={"provider": "agnes", "phase": "execute"},
+    )
+    summary = tracker.summary()
+    assert summary.unpriced_entries == 1
+    assert summary.by_model["gpt-5.4"]["unpriced"] == 1
+    assert summary.by_model["agnes-2.5-pro"]["unpriced"] == 0
+
+
+def test_entry_unpriced_helper_matches_both_eras() -> None:
+    from maop.core.cost_tracker import CostEntry, _entry_unpriced
+
+    assert _entry_unpriced(CostEntry(model="m", metadata={"priced": False})) is True
+    assert _entry_unpriced(CostEntry(model="m", metadata={"priced": True})) is False
+    assert _entry_unpriced(CostEntry(model="m", metadata={"provider": "agnes"})) is False
+    assert _entry_unpriced(CostEntry(model="m", metadata={"provider": ""})) is True
+    # 无 metadata 的极端行：视为无从取价（保守，宁可提示不可漏报）。
+    assert _entry_unpriced(CostEntry(model="m")) is True

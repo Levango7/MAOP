@@ -9,7 +9,7 @@
 # 1 条 SSE（GET /api/long-running-tasks/{}/progress）按本目录政策迁入
 # frontend_non_json_endpoints.txt。RATCHET_CAP 由 88 回到 75。
 #
-# 2026-10-31：`POST /api/control/run` 结清，RATCHET_CAP 75 -> 74。
+# 2026-11-08：`POST /api/control/run` 结清，RATCHET_CAP 75 -> 74。
 # 同批把 `POST /api/control/{pause,resume,stop,validate,doctor,cancel,refresh,
 # clear-cache,provider-health}` 一并补上模型——它们此前**根本不在本表里**，
 # 因为前端用 `api.post(`/api/control/${action}`)` 分发，抽取器只能记成
@@ -17,10 +17,6 @@
 # `reachable_targets()` 会把这类拼出来的路径展开到同前缀的真实路由。
 # `POST /api/control/maintain` 仍在本表：它的返回由 MAINTAIN_HANDLERS 的
 # 多个 handler 拼出，键集不封闭，收窄成模型会截断字段。
-#
-# 2026-11-08：`GET /api/control/status` 与 `GET /api/control/jobs/{}` 结清
-# （ControlStatusResponse / ControlJobResponse，作业条目开 extra="allow"
-# 透传历史文件里的未知键）。RATCHET_CAP 74 -> 72。
 
 GET /api/agent/upgrade
 POST /api/agent/upgrade
@@ -36,7 +32,9 @@ GET /api/chat/{}
 GET /api/config/history
 GET /api/config/history/{}
 POST /api/config/rollback/{}
+GET /api/control/jobs/{}
 POST /api/control/maintain
+GET /api/control/status
 GET /api/cost/budget
 PUT /api/cost/budget
 GET /api/cost/entries

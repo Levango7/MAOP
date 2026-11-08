@@ -45,7 +45,7 @@ import { useI18n } from '../i18n';
  * 4 步轻提示, 高亮当前聚焦的 DOM 元素 (数据驱动, 不侵入业务视图):
  *   0. 快捷操作磁贴   .ov-actions
  *   1. 侧栏导航       .sidebar
- *   2. 顶栏状态       .topbar__statusline
+ *   2. 顶栏刷新       .topbar__refresh
  *   3. 演化特性       .evolve-tabs (Evolution 页里的 Segmented)
  *
  * 行为:
@@ -62,7 +62,7 @@ const STORAGE_KEY = 'maop_onboarding_done';
 const steps = [
   { sel: '.ov-actions', title: t('coach.actions.title'), body: t('coach.actions.body') },
   { sel: '.sidebar', title: t('coach.nav.title'), body: t('coach.nav.body') },
-  { sel: '.topbar__statusline', title: t('coach.topbar.title'), body: t('coach.topbar.body') },
+  { sel: '.topbar__refresh', title: t('coach.topbar.title'), body: t('coach.topbar.body') },
   // 2026-09-01 IA 重设计适配：.evolve-tabs 已不存在（演化入口并入记忆
   // 站）。目标改为侧边栏的"记忆"链接本身（在所有页面都存在）。
   { sel: '.sidebar a[href="/memory"]', title: t('coach.evolve.title'), body: t('coach.evolve.body') },

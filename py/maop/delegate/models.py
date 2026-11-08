@@ -19,6 +19,8 @@ class AgentConfig(BaseModel):
     cli: str = ""
     driver: str = "cli"  # cli | wrapper | powershell | cmd | desktop_app | ide_extension | vibe_coding
     cli_args: str = ""
+    # 原生 usage 出口格式（见 config.loader.AgentDef.usage_format）。
+    usage_format: str = ""
     capabilities: list[str] = Field(default_factory=list)
     timeout_s: int = 180
     model: str | None = None

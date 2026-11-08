@@ -22,47 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
-
-
-class ControlJobModel(BaseModel):
-    """一个控制作业的快照。
-
-    形状持有者是 ``system_service`` 的 job 字典与 ``control_jobs.jsonl``
-    历史记录：run 作业有 ``task/stdout/stderr``，maintain 作业只有
-    ``action``，历史文件还可能带更早版本写下的键。已知字段之外的键必须
-    原样透传，否则抽屉里会出现"字段凭空消失"——故开 ``extra="allow"``，
-    不做任何收窄。
-    """
-
-    model_config = ConfigDict(extra="allow")
-
-    id: str = ""
-    action: str = ""
-    status: str = ""
-    task: str = ""
-    start: str = ""
-    finished_at: str | None = None
-    exit_code: int | None = None
-    trace_id: str = ""
-    stdout: str = ""
-    stderr: str = ""
-
-
-class ControlStatusResponse(BaseModel):
-    """``GET /api/control/status`` —— 活跃作业与历史记录的合并视图。"""
-
-    status: str = "ok"
-    active_jobs: list[ControlJobModel] = []
-    jobs: list[ControlJobModel] = []
-    count: int = 0
-
-
-class ControlJobResponse(BaseModel):
-    """``GET /api/control/jobs/{job_id}`` —— 单个作业（含 stdout/stderr）。"""
-
-    status: str = "ok"
-    job: ControlJobModel
+from pydantic import BaseModel
 
 
 class ControlRunResponse(BaseModel):
