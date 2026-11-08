@@ -178,9 +178,24 @@
       <EmptyState v-else icon="search" :title="t('view.agents.noScanned')" :description="t('view.agents.noScannedHint')" />
     </Card>
 
+    <!-- 分类 taxonomy 过滤（category 事实源 config/agents.yaml） -->
+    <div class="cat-bar" role="group" :aria-label="t('view.agents.category.title')">
+      <button class="cat-chip" :class="{ active: !categoryFilter }" @click="categoryFilter = ''">
+        {{ t('view.agents.category.all') }} <span class="cat-count">{{ agents.length }}</span>
+      </button>
+      <button
+        v-for="c in categoryList" :key="c.key"
+        class="cat-chip" :class="{ active: categoryFilter === c.key }"
+        @click="categoryFilter = categoryFilter === c.key ? '' : c.key"
+      >
+        {{ t('view.agents.category.' + c.key) }} <span class="cat-count">{{ c.count }}</span>
+      </button>
+    </div>
+    <EmptyState v-if="agents.length && !filteredAgents.length" icon="filter" :title="t('view.agents.noAgentsInCategory')" :description="t('view.agents.noAgentsInCategoryHint')" />
+
     <div v-if="viewMode === 'grid'" class="agent-grid">
       <Card
-        v-for="a in agents"
+        v-for="a in filteredAgents"
         :key="a.name"
         class="agent-card"
         :class="{ selected: selectedAgent === a.name }"
@@ -232,7 +247,7 @@
         <div class="trow header">
           <span>{{ t('view.agents.colAgent') }}</span><span>{{ t('common.status') }}</span><span>{{ t('common.model') }}</span><span>{{ t('common.driver') }}</span><span>{{ t('common.capabilities') }}</span><span>{{ t('common.latency') }}</span><span>{{ t('common.actions') }}</span>
         </div>
-        <div v-for="a in agents" :key="a.name" class="trow">
+        <div v-for="a in filteredAgents" :key="a.name" class="trow">
           <span class="agent-name">{{ a.name }}</span>
           <span><Badge :tone="statusTone(agentStatus(a))">{{ agentStatus(a) }}</Badge></span>
           <span class="mono">{{ a.model || 'auto' }}</span>
@@ -588,6 +603,26 @@ function toList(data) {
   }
   return [];
 }
+
+// ── 分类 taxonomy（批 2）：category 事实源 config/agents.yaml；scanner 发现的 CLI agent 无此键，缺省归 specialized ──
+const CATEGORY_ORDER = ['general', 'specialized', 'platform'];
+const categoryFilter = ref('');
+const categoryList = computed(() => {
+  const counts = {};
+  for (const a of agents.value) {
+    const c = a.category || 'specialized';
+    counts[c] = (counts[c] || 0) + 1;
+  }
+  const keys = CATEGORY_ORDER.filter((k) => counts[k]);
+  for (const k of Object.keys(counts)) {
+    if (!CATEGORY_ORDER.includes(k)) keys.push(k);
+  }
+  return keys.map((k) => ({ key: k, count: counts[k] }));
+});
+const filteredAgents = computed(() => {
+  if (!categoryFilter.value) return agents.value;
+  return agents.value.filter((a) => (a.category || 'specialized') === categoryFilter.value);
+});
 
 function agentStatus(a) {
   if (!a || a.enabled === false) return 'disabled';

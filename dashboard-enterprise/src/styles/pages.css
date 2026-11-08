@@ -1010,6 +1010,12 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 /* Capability chips (shared by scanned + detail) */
 .caps { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
 .cap-chip { font-size: var(--fs-xs); padding: 2px var(--sp-2); border-radius: var(--r-full); background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); white-space: nowrap; }
+.cat-bar { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+.cat-chip { font-size: var(--fs-xs); padding: 3px var(--sp-3); border-radius: var(--r-full); background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-1); }
+.cat-chip:hover { border-color: var(--border-card-hover); color: var(--text); }
+.cat-chip:active { transform: translateY(1px); }
+.cat-chip.active { background: var(--brand-solid); border-color: var(--brand-solid); color: var(--brand-contrast); }
+.cat-count { font-family: var(--font-mono); opacity: .75; }
 
 /* Table mode */
 .agent-table { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
