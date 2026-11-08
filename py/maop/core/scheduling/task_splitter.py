@@ -133,7 +133,7 @@ class TaskSplitter:
         provider = self._resolve_provider()
         if provider is None:
             logger.warning("[task_splitter] LLM 不可用，使用 fallback 单节点 DAG")
-            return self._fallback(description)
+            return self._fallback(description, "llm_provider_unavailable")
 
         prompt = self._build_prompt(description, context, max_subtasks)
         messages: list[dict[str, Any]] = [
@@ -150,32 +150,32 @@ class TaskSplitter:
             )
         except Exception as exc:
             logger.warning("[task_splitter] LLM 调用失败: %s，使用 fallback", exc)
-            return self._fallback(description)
+            return self._fallback(description, "llm_call_failed")
 
         content = response.content if hasattr(response, "content") else str(response)
         if not content or not content.strip():
             logger.warning("[task_splitter] LLM 返回空内容，使用 fallback")
-            return self._fallback(description)
+            return self._fallback(description, "llm_empty_response")
 
         try:
             parsed = self._parse_response(content)
         except TaskSplitError:
             # JSON 解析失败 → fallback 而不是抛出，保证健壮性
             logger.warning("[task_splitter] LLM 响应 JSON 解析失败，使用 fallback")
-            return self._fallback(description)
+            return self._fallback(description, "llm_invalid_json")
 
         subtasks = parsed.get("subtasks", [])
-        edges = parsed.get("edges", [])
+        raw_edges = parsed.get("edges", [])
 
         # 规范化 edges 为 list[list[str]]
         normalized_edges: list[list[str]] = []
-        for e in edges:
+        for e in raw_edges:
             if isinstance(e, (list, tuple)) and len(e) == 2:
                 normalized_edges.append([str(e[0]), str(e[1])])
 
         if not subtasks:
             logger.warning("[task_splitter] LLM 返回空 subtasks，使用 fallback")
-            return self._fallback(description)
+            return self._fallback(description, "llm_empty_subtasks")
 
         # 限制子任务数量
         if len(subtasks) > max_subtasks:
@@ -189,7 +189,24 @@ class TaskSplitter:
 
         if not self._validate_dag(subtasks, normalized_edges):
             logger.warning("[task_splitter] DAG 验证失败，使用 fallback")
-            return self._fallback(description)
+            return self._fallback(description, "dag_validation_failed")
+
+        # ── 单一真相来源：edges 由 depends_on 推导 ──────────────────
+        # 2026-11-08：此前 system prompt 要求"edges 与 subtasks[i].depends_on
+        # 保持一致"，但代码从不校验，于是 LLM 给出互相矛盾的两份时两者都会被
+        # 接受（真实验证：depends_on={t2:["t1"]} 与 edges=[["t3","t1"]] 并存）。
+        # 爆炸半径是真实的：/api/dag/execute 只按 edges 推导依赖，而
+        # orchestration/base.py 只吃 depends_on ⇒ 同一份结果两条路径得到两张
+        # 不同的执行图，用户看到的顺序与实际跑出的可以不一致。
+        # 这里不比对两者，而是**以 depends_on 为唯一真相重算 edges**——
+        # 下游工作流编译本来就只读 depends_on，由它推导可保证两个字段永远同形。
+        derived = self._edges_from_depends_on(subtasks)
+        if derived != normalized_edges:
+            logger.info(
+                "[task_splitter] edges 与 depends_on 不一致，已按 depends_on 重算 "
+                "(%d → %d 条边)", len(normalized_edges), len(derived),
+            )
+            normalized_edges = derived
 
         # 构造兼容 DAGScheduler 的 dag 字段
         dag = self._build_dag_dict(subtasks, normalized_edges)
@@ -198,6 +215,8 @@ class TaskSplitter:
             "subtasks": subtasks,
             "edges": normalized_edges,
             "dag": dag,
+            "degraded": False,
+            "degraded_reason": "",
         }
 
     # ── prompt 构造 ───────────────────────────────────────────
@@ -294,11 +313,25 @@ class TaskSplitter:
 
         # 收集所有节点 id
         node_ids: set[str] = set()
+        seen: set[str] = set()
         for s in subtasks:
             sid = s.get("id")
             if not sid or not isinstance(sid, str):
                 return False
+            # 2026-11-08：重复 id 必须拒绝。此前用 set 收集 id，重复项自动
+            # 坍缩、校验必然通过，而返回的 subtasks 仍是两条——下游任何
+            # {id: task} 字典化（execution_service.execute_dag 的依赖推导、
+            # 前端 DAG 编辑器建节点）都会静默丢掉其中一条。
+            if sid in seen:
+                return False
+            seen.add(sid)
             node_ids.add(sid)
+            # name/description 为空 = 派给 agent 的任务书是空的，白耗一个 turn
+            # 得到一个无意义结果，而 UI 上它是个正常节点。
+            if not str(s.get("name") or "").strip():
+                return False
+            if not str(s.get("description") or "").strip():
+                return False
 
         # 检查 edges 引用合法性
         for e in edges:
@@ -404,10 +437,19 @@ class TaskSplitter:
             logger.debug("[task_splitter] 解析 LLM provider 失败: %s", exc)
             return None
 
-    def _fallback(self, description: str) -> dict[str, Any]:
+    def _fallback(
+        self, description: str, reason: str = "llm_split_unavailable",
+    ) -> dict[str, Any]:
         """LLM 不可用时的 fallback：返回单节点 DAG。
 
         返回结构与 :meth:`split` 正常路径完全一致，保证调用方无需特殊处理。
+
+        ``degraded`` / ``degraded_reason``（2026-11-08）：**这次没有真拆**。
+        此前五种情况（LLM 不可用 / 调用失败 / 返回空 / JSON 解析失败 /
+        DAG 校验失败）都会走到这里，而返回结构与"成功拆出 1 个子任务"逐字段
+        同形，唯一区别是后端一行 logger.warning——用户看不见。前端
+        ``Run.vue`` 照弹"拆分成功"，下面挂着一个内容等于原话的单节点。
+        判据现在随返回值一起出来，调用方可以据此不谎报成功。
         """
         subtasks: list[dict[str, Any]] = [
             {
@@ -422,7 +464,25 @@ class TaskSplitter:
             "subtasks": subtasks,
             "edges": edges,
             "dag": self._build_dag_dict(subtasks, edges),
+            "degraded": True,
+            "degraded_reason": reason,
         }
+
+    @staticmethod
+    def _edges_from_depends_on(subtasks: list[dict[str, Any]]) -> list[list[str]]:
+        """由 ``depends_on`` 推导显式边列表 ``[dep, node]``（去重、稳定排序）。
+
+        这是 edges 的唯一来源：LLM 同时给两份时容易写歪，而两条下游路径
+        （``/api/dag/execute`` 按 edges 推导、``orchestration/base.py`` 按
+        depends_on 分层）只有存在一份真相时才保证同形。
+        """
+        pairs: set[tuple[str, str]] = set()
+        for s in subtasks:
+            sid = s.get("id", "")
+            for dep in s.get("depends_on", []) or []:
+                if dep and sid and dep != sid:
+                    pairs.add((str(dep), str(sid)))
+        return [[a, b] for a, b in sorted(pairs)]
 
     @staticmethod
     def _build_dag_dict(

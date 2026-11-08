@@ -170,9 +170,9 @@ class TestValidateDag:
         """无环 DAG 应验证通过。"""
         splitter = TaskSplitter()
         subtasks = [
-            {"id": "t1", "name": "a", "depends_on": []},
-            {"id": "t2", "name": "b", "depends_on": ["t1"]},
-            {"id": "t3", "name": "c", "depends_on": ["t2"]},
+            {"id": "t1", "name": "a", "description": "a", "depends_on": []},
+            {"id": "t2", "name": "b", "description": "b", "depends_on": ["t1"]},
+            {"id": "t3", "name": "c", "description": "c", "depends_on": ["t2"]},
         ]
         edges = [["t1", "t2"], ["t2", "t3"]]
         assert splitter._validate_dag(subtasks, edges) is True
@@ -217,7 +217,7 @@ class TestValidateDag:
     def test_validate_dag_single_node(self) -> None:
         """单节点无依赖应验证通过。"""
         splitter = TaskSplitter()
-        subtasks = [{"id": "t1", "name": "a", "depends_on": []}]
+        subtasks = [{"id": "t1", "name": "a", "description": "a", "depends_on": []}]
         assert splitter._validate_dag(subtasks, []) is True
 
 
@@ -426,3 +426,100 @@ class TestApiAutoSplitEndpoint:
         data = resp.json()
         assert data["status"] == "ok"
         assert "auto-split" in data["features"]
+
+
+# ── 2026-11-08 静默失配修复的钉子 ───────────────────────────────────────
+# 四条缺陷均由真实 split() 跑出后确认，此前 test_task_splitter.py 一条都没覆盖。
+
+
+def _j(d: Any) -> str:
+    import json
+    return json.dumps(d)
+
+
+class TestSilentMismatchGuards:
+    """id 唯一性 / 单源真相 / 空字段 / 降级标记。"""
+
+    @pytest.mark.asyncio
+    async def test_duplicate_ids_are_rejected(self) -> None:
+        """重复 id 曾靠 set 坍缩被静默接受 → 下游字典化丢掉一半子任务。"""
+        payload = _j({"subtasks": [
+            {"id": "t1", "name": "A", "description": "a", "depends_on": []},
+            {"id": "t1", "name": "B", "description": "b", "depends_on": []},
+        ], "edges": []})
+        res = await TaskSplitter(llm_provider=_make_mock_provider(payload)).split("x")
+        assert res["degraded"] is True
+        assert res["degraded_reason"] == "dag_validation_failed"
+        assert len(res["subtasks"]) == 1  # 走 fallback 单节点
+
+    @pytest.mark.asyncio
+    async def test_empty_description_is_rejected(self) -> None:
+        """description 为空 = 任务书是空的，白耗一个 turn。"""
+        payload = _j({"subtasks": [
+            {"id": "t1", "name": "A", "description": "  ", "depends_on": []},
+        ], "edges": []})
+        res = await TaskSplitter(llm_provider=_make_mock_provider(payload)).split("x")
+        assert res["degraded"] is True
+
+    @pytest.mark.asyncio
+    async def test_empty_name_is_rejected(self) -> None:
+        payload = _j({"subtasks": [
+            {"id": "t1", "name": "", "description": "a", "depends_on": []},
+        ], "edges": []})
+        res = await TaskSplitter(llm_provider=_make_mock_provider(payload)).split("x")
+        assert res["degraded"] is True
+
+    @pytest.mark.asyncio
+    async def test_edges_are_derived_from_depends_on(self) -> None:
+        """edges 与 depends_on 矛盾时，以 depends_on 为唯一真相重算。
+
+        真实验证过的 bug：depends_on={t2:["t1"]} 与 edges=[["t3","t1"]] 并存被
+        接受，而 /api/dag/execute 只读 edges、orchestration 只读 depends_on，
+        同一份结果两条路径得到两张不同的执行图。
+        """
+        payload = _j({"subtasks": [
+            {"id": "t1", "name": "A", "description": "a", "depends_on": []},
+            {"id": "t2", "name": "B", "description": "b", "depends_on": ["t1"]},
+            {"id": "t3", "name": "C", "description": "c", "depends_on": []},
+        ], "edges": [["t3", "t1"]]})  # 与 depends_on 矛盾的假边
+        res = await TaskSplitter(llm_provider=_make_mock_provider(payload)).split("x")
+        assert res["degraded"] is False
+        # edges 必须由 depends_on 重算得出，假边被丢弃
+        assert res["edges"] == [["t1", "t2"]]
+        # dag 字段与 edges 同形（下游 DAGScheduler 会合并两者）
+        assert res["dag"]["edges"] == [["t1", "t2"]]
+
+    @pytest.mark.asyncio
+    async def test_consistent_inputs_keep_edges_unchanged(self) -> None:
+        """输入自洽时不应被改写（避免"修好了但把对的也改了"）。"""
+        payload = _j({"subtasks": [
+            {"id": "t1", "name": "A", "description": "a", "depends_on": []},
+            {"id": "t2", "name": "B", "description": "b", "depends_on": ["t1"]},
+        ], "edges": [["t1", "t2"]]})
+        res = await TaskSplitter(llm_provider=_make_mock_provider(payload)).split("x")
+        assert res["edges"] == [["t1", "t2"]]
+
+    @pytest.mark.asyncio
+    async def test_fallback_is_marked_degraded_with_reason(self) -> None:
+        """无 provider 时 fallback 必须带标记——否则前端照弹"拆分成功"。"""
+        res = await TaskSplitter(llm_provider=None).split("帮我调研竞品并生成对比报告")
+        assert res["degraded"] is True
+        assert res["degraded_reason"] == "llm_provider_unavailable"
+        assert len(res["subtasks"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_success_path_is_not_marked_degraded(self) -> None:
+        payload = _j({"subtasks": [
+            {"id": "t1", "name": "A", "description": "a", "depends_on": []},
+            {"id": "t2", "name": "B", "description": "b", "depends_on": ["t1"]},
+        ], "edges": [["t1", "t2"]]})
+        res = await TaskSplitter(llm_provider=_make_mock_provider(payload)).split("x")
+        assert res["degraded"] is False
+        assert res["degraded_reason"] == ""
+
+    @pytest.mark.asyncio
+    async def test_invalid_json_marks_reason(self) -> None:
+        res = await TaskSplitter(
+            llm_provider=_make_mock_provider("not json at all")).split("x")
+        assert res["degraded"] is True
+        assert res["degraded_reason"] == "llm_invalid_json"

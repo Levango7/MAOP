@@ -94,6 +94,15 @@
 
           <!-- 拆分结果 -->
           <div v-if="splitResult" class="split-result">
+            <!-- 降级说明：only when the splitter did not actually run. -->
+            <p
+              v-if="splitResult.degraded"
+              class="muted"
+              style="display:flex; align-items:center; gap:var(--sp-2); margin:0 0 var(--sp-3); font-size:var(--fs-sm); color:var(--warn);"
+            >
+              <AppIcon name="alert-triangle" :size="14" aria-hidden="true" />
+              <span>{{ t('view.run.splitDegradedHint', { reason: splitResult.degraded_reason || 'unknown' }) }}</span>
+            </p>
             <div class="split-result__header">
               <span class="split-result__title">{{ t('view.run.splitResult') }}</span>
               <span class="split-result__stats">
@@ -267,7 +276,15 @@ async function runSplit() {
     });
     if (resp && resp.success) {
       splitResult.value = resp.data;
-      toast.success(t('view.run.splitSuccess'));
+      // 2026-11-08：LLM 不可用/调用失败/JSON 解析失败/DAG 校验失败时后端走
+      // fallback 单节点，但返回结构与"成功拆出 1 个子任务"逐字段同形——此前界面
+      // 照弹"拆分成功"，用户以为 AI 拆过了。后端现在返回 degraded 标记，
+      // 据此把提示改成"未能拆分"，不再谎报成功。
+      if (resp.data && resp.data.degraded) {
+        toast.warn(t('view.run.splitDegraded'));
+      } else {
+        toast.success(t('view.run.splitSuccess'));
+      }
     } else {
       splitError.value = (resp && (resp.error || resp.detail)) || t('view.run.splitFailed');
       toast.error(splitError.value);
