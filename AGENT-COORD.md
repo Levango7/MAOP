@@ -1117,3 +1117,10 @@
 - **内容**：Agents.vue .cat-bar 芯片组（全部/通用/专用/平台组件，带计数，aria-label，重复点击取消过滤）+ categoryFilter ref + filteredAgents computed（grid/table 同源）+ 空分类 EmptyState；view-agents.js 8 键 en+zh；pages.css .cat-bar/.cat-chip/.cat-count。
 - **门禁**：design:contrast 164 对全 PASS；lint 0 error（16 warning 全在他文件，预存）；Agents.test.js 7 passed；vue-tsc TSC_EXIT=0；vitest 705 passed VITEST_EXIT=0。
 - **未做**：推送（逐批授权制）；批 3 hallmark 空数据降级（取证后单列）。
+
+## 交付回执（2026-11-09：批 3 hallmark 空数据降级，sha 1699721d）
+- **提交**：`1699721d` feat(overview): idle 空数据降级——说明条替代全零 KPI/居中占位卡（批 3 hallmark），+73/-9（Overview.vue / view-overview.js / pages.css / Overview.test.js）。
+- **取证**（忠实 idle payload＝/api/overview 全零+空数组+timeseries:[]，与 hourly_rollup 空转口径一致；vite build + 同源 stub + 真浏览器 A/B）：整改前三 tell 全 LIVE——4 张全零 KPI 卡、系统健康 0% 徽章+4 条零填充条、近期委派 .dt__empty 与活动流 EmptyState 两张居中空卡。整改后 idle：`.ov-idle` 说明条 44px（标题「系统尚未产生活动数据」+ 复用 noActivityHint 行动指引），stats-grid/健康行/ov-split 整体消失、canvas 0、运行时卡保留（版本/uptime/Python/平台为真事实非占位）；active A/B：4 KPI（5/120/98.5%/150ms）+ 健康 99% + 委派表 3 行 + 12 点曲线 canvas 全恢复。T2（无系列吞吐量卡）复核为既有 label 空守卫已覆盖（active+时序空 → EmptyState），非可达缺陷，不改动并以单测钉住。
+- **门禁**：vitest 706/706（新增 idle 降级 + active 时序空 EmptyState 两例，概览文件 7 例）；eslint 0 error（16 warning 预存他文件）；vue-tsc 净；design:contrast 164/164 PASS。
+- **环境注**：取证用 stub/探针/截图（zz_*）已全部删除；stub 服务器按 PID 精确杀掉（先 Get-CimInstance 核对 CommandLine）。期间一次进程清理误伤过用户 WorkBuddy 的 node 进程（已自发恢复），与产品改动无关。
+- **未做**：推送（连前批共 5 笔待推，逐批授权制）。
