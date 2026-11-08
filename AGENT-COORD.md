@@ -1124,3 +1124,9 @@
 - **门禁**：vitest 706/706（新增 idle 降级 + active 时序空 EmptyState 两例，概览文件 7 例）；eslint 0 error（16 warning 预存他文件）；vue-tsc 净；design:contrast 164/164 PASS。
 - **环境注**：取证用 stub/探针/截图（zz_*）已全部删除；stub 服务器按 PID 精确杀掉（先 Get-CimInstance 核对 CommandLine）。期间一次进程清理误伤过用户 WorkBuddy 的 node 进程（已自发恢复），与产品改动无关。
 - **未做**：推送（连前批共 5 笔待推，逐批授权制）。
+
+## 推送回执（2026-11-09：ui/topbar-alignment 5 笔上链）
+- **授权与执行**：用户授权推送本批 5 笔；`git push origin ui/topbar-alignment` 一次成功 `ada80977..0235e502`；读回 remote ref == local HEAD `0235e502233ab463ea8b689973440a0f21ff174c`，分支不再 ahead。
+- **上链清单**：`1e26b1f0`（批 1 数据面）、`806bf494`（批 2 呈现面）、`d48bb7e6`（批 1/2 回执）、`1699721d`（批 3 hallmark 空数据降级）、`0235e502`（批 3 回执）。
+- **注**：推送触发分支 CI；若红按内容红/环境红/门禁未启动三态分诊再报。
+- **未做**：本回执提交留本地未推（逐批授权制）。
