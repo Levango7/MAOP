@@ -18,6 +18,7 @@ from maop.core.security.middleware import require_admin
 from maop.dashboard.error_handler import handle_api_errors
 from maop.dashboard.routers.mcp_schemas import (
     AddServerEnvelope,
+    MarketplaceInstallEnvelope,
     MarketplaceListEnvelope,
     ServerDetailEnvelope,
     ServerListEnvelope,
@@ -326,7 +327,7 @@ async def marketplace_tools(request: Request) -> dict[str, Any]:
     return {"status": "ok", **result}
 
 
-@router.post("/marketplace/tools/{tool_id}/install")
+@router.post("/marketplace/tools/{tool_id}/install", response_model=MarketplaceInstallEnvelope)
 @handle_api_errors
 async def marketplace_install(tool_id: str, request: Request) -> dict[str, Any]:
     """安装 Marketplace 工具.

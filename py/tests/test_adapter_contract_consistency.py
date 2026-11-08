@@ -187,11 +187,11 @@ class AdapterSpec:
     """
 
     adapter_id: str
-    cls: type
-    config_cls: type
+    cls: type[AgentAdapter]
+    config_cls: type[Any]
     timeout_fields: tuple[str, ...]
     minimal_sync_config: dict[str, Any]
-    get_config: Callable[[AgentAdapter], Any]
+    get_config: Callable[[Any], Any]
     build_unconfigured: Callable[[pytest.MonkeyPatch], AgentAdapter]
     build_connected: Callable[[pytest.MonkeyPatch], AgentAdapter]
     expected_execute_output: str

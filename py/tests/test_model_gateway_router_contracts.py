@@ -17,7 +17,7 @@ these are precisely the paths where a stub would have agreed with the old bug.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -249,7 +249,7 @@ def test_check_error_branch_leaves_decision_null(client: TestClient, monkeypatch
 
 
 def test_all_contract_routes_declare_a_response_model(client: TestClient) -> None:
-    schema = client.app.openapi()
+    schema = cast(FastAPI, client.app).openapi()
     problems: list[str] = []
     for method, template in CONTRACT_ROUTES:
         op = (schema["paths"].get(template) or {}).get(method.lower())

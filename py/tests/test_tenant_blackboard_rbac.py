@@ -27,7 +27,7 @@ import pathlib
 import sys
 import textwrap
 import types
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -195,7 +195,8 @@ def test_service_deletes_through_the_rbac_wrapper() -> None:
     function's own docstring names those attributes to explain the fix.
     """
     tree = ast.parse(textwrap.dedent(inspect.getsource(tenant_blackboard_service.delete_tenant_data)))
-    body = tree.body[0].body
+    func = cast(ast.FunctionDef | ast.AsyncFunctionDef, tree.body[0])
+    body = func.body
     if isinstance(body[0], ast.Expr):  # docstring
         body = body[1:]
     code = "\n".join(ast.unparse(stmt) for stmt in body)
@@ -230,7 +231,7 @@ def test_resolve_returns_none_without_enterprise_package() -> None:
 
 def test_resolve_reuses_the_process_rbac_manager_singleton() -> None:
     """The adapter's own default would open a second RBAC store handle."""
-    fake_adapter = types.ModuleType("maop.enterprise.rbac_m3_adapter")
+    fake_adapter: Any = types.ModuleType("maop.enterprise.rbac_m3_adapter")
     create = MagicMock(name="create_m3_enforcer")
     fake_adapter.create_m3_enforcer = create
     sentinel_manager = object()
@@ -245,7 +246,7 @@ def test_resolve_reuses_the_process_rbac_manager_singleton() -> None:
 
 
 def test_resolve_degrades_to_fallback_when_manager_unavailable() -> None:
-    fake_adapter = types.ModuleType("maop.enterprise.rbac_m3_adapter")
+    fake_adapter: Any = types.ModuleType("maop.enterprise.rbac_m3_adapter")
     fake_adapter.create_m3_enforcer = MagicMock()
 
     with patch.dict(sys.modules, {"maop.enterprise.rbac_m3_adapter": fake_adapter}), patch(

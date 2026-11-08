@@ -94,6 +94,7 @@ def _direct_reads() -> dict[str, set[str]]:
         rel = path.relative_to(ROOT).as_posix()
         for node in ast.walk(tree):
             name: str | None = None
+            lineno: int | None = None
             if isinstance(node, ast.Call) and node.args:
                 func = node.func
                 func_name = func.attr if isinstance(func, ast.Attribute) else ""
@@ -104,6 +105,7 @@ def _direct_reads() -> dict[str, set[str]]:
                     func_name == "get" and _enclosing_env_object(func)
                 ):
                     name = first.value
+                    lineno = node.lineno
             elif isinstance(node, ast.Subscript):
                 value = node.value
                 if (
@@ -113,8 +115,9 @@ def _direct_reads() -> dict[str, set[str]]:
                     and isinstance(node.slice.value, str)
                 ):
                     name = node.slice.value
-            if name and name.startswith("MAOP_"):
-                found.setdefault(name, set()).add(f"{rel}:{node.lineno}")
+                    lineno = node.lineno
+            if name and lineno is not None and name.startswith("MAOP_"):
+                found.setdefault(name, set()).add(f"{rel}:{lineno}")
     return found
 
 

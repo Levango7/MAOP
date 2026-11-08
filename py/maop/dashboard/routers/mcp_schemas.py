@@ -192,3 +192,18 @@ class MarketplaceListEnvelope(BaseModel):
     status: str = "ok"
     tools: list[MarketplaceTool] = []
     count: int = 0
+
+
+class MarketplaceInstallEnvelope(BaseModel):
+    """``POST /marketplace/tools/{tool_id}/install`` 的安装结果.
+
+    前端用 ``'/api/mcp/marketplace/tools/' + id + '/install'`` 拼这条路径，
+    抽取器只能截到 ``/api/mcp/marketplace/tools``——后端没有这条路由，于是
+    这条真实端点长期掉在两条棘轮之外。键照 ``plugin_service.marketplace_install``
+    的返回写：hub 注册失败时 ``registered`` 为 False 而安装已完成，故它不能省。
+    """
+
+    status: str = "ok"
+    server: str = ""
+    transport: str = ""
+    registered: bool = False

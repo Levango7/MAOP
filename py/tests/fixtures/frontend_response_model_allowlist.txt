@@ -8,6 +8,15 @@
 # 四个路由的 13 条债务已结清——12 条补上 response_model（各自的 *_schemas.py），
 # 1 条 SSE（GET /api/long-running-tasks/{}/progress）按本目录政策迁入
 # frontend_non_json_endpoints.txt。RATCHET_CAP 由 88 回到 75。
+#
+# 2026-11-08：`POST /api/control/run` 结清，RATCHET_CAP 75 -> 74。
+# 同批把 `POST /api/control/{pause,resume,stop,validate,doctor,cancel,refresh,
+# clear-cache,provider-health}` 一并补上模型——它们此前**根本不在本表里**，
+# 因为前端用 `api.post(`/api/control/${action}`)` 分发，抽取器只能记成
+# `/api/control/{}`，后端没有这条路由，于是整批掉在两条棘轮之外。现在
+# `reachable_targets()` 会把这类拼出来的路径展开到同前缀的真实路由。
+# `POST /api/control/maintain` 仍在本表：它的返回由 MAINTAIN_HANDLERS 的
+# 多个 handler 拼出，键集不封闭，收窄成模型会截断字段。
 
 GET /api/agent/upgrade
 POST /api/agent/upgrade
@@ -25,7 +34,6 @@ GET /api/config/history/{}
 POST /api/config/rollback/{}
 GET /api/control/jobs/{}
 POST /api/control/maintain
-POST /api/control/run
 GET /api/control/status
 GET /api/cost/budget
 PUT /api/cost/budget

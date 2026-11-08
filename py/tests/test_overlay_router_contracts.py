@@ -542,7 +542,7 @@ def test_mirrors_match_the_overlay_models() -> None:
     n8n_mod = importlib.import_module(OVERLAY_IMPORT + ".n8n")
     license_mod = importlib.import_module(OVERLAY_IMPORT + ".license_manager")
 
-    pairs = [
+    pairs: list[tuple[type[BaseModel], type[BaseModel]]] = [
         (sso_schemas.SSOProviderItem, sso_store.SSOProviderResponse),
         (n8n_schemas.N8nExecutionItem, n8n_mod.N8nWorkflowExecution),
         (licenses_schemas.LicenseItem, license_mod.LicenseRecord),

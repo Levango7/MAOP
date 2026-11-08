@@ -4,6 +4,8 @@ Uses isolated tmp_path + real instances where possible.
 """
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 # ── Tool Manager ────────────────────────────────────────────────────
@@ -111,7 +113,7 @@ class TestMemoryStoreSearch:
         store = MemoryStore(root_dir=str(tmp_path))
         # Add an entry
         try:
-            entry_id = store.add(
+            entry_id = cast(Any, store).add(
                 agent="claude", task="test task", outcome="success",
                 tags="test", topic="testing",
             )
@@ -242,7 +244,7 @@ class TestVectorStore:
         from maop.core.memory.vector import VectorStore
         vs = VectorStore(db_path=str(tmp_path / "vectors.db"))
         try:
-            stats = vs.stats()
+            stats = cast(Any, vs).stats()
             assert stats is not None
         except Exception:
             pass

@@ -210,7 +210,7 @@ def test_clear_envelope_is_flat_where_the_view_reads_it(client: TestClient) -> N
 
 
 def test_all_contract_routes_declare_a_response_model(client: TestClient) -> None:
-    schema = client.app.openapi()
+    schema = cast(FastAPI, client.app).openapi()
     problems: list[str] = []
     for method, template in CONTRACT_ROUTES:
         op = (schema["paths"].get(template) or {}).get(method.lower())

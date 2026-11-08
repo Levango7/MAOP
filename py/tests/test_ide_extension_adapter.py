@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch  # noqa: F401
 
 import pytest
@@ -138,9 +138,9 @@ class TestConnect:
         # 第二次连接应直接返回，不再次调用 websockets.connect
         import websockets
 
-        call_count_before = websockets.connect.call_count
+        call_count_before = cast(Any, websockets.connect).call_count
         assert adapter.connect() is True
-        assert websockets.connect.call_count == call_count_before
+        assert cast(Any, websockets.connect).call_count == call_count_before
 
 
 # ======================================================================

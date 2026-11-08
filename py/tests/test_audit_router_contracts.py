@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI
@@ -207,7 +207,7 @@ def test_alert_history_envelope_matches_enterprise_alert_dump() -> None:
 
 
 def test_all_contract_routes_declare_a_response_model(client: TestClient) -> None:
-    schema = client.app.openapi()
+    schema = cast(FastAPI, client.app).openapi()
     problems: list[str] = []
     for method, template in CONTRACT_ROUTES:
         op = (schema["paths"].get(template) or {}).get(method.lower())

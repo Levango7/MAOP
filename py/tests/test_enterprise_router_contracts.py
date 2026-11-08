@@ -28,6 +28,7 @@ import sys
 import types
 from enum import Enum
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -244,7 +245,7 @@ _STAND_IN_CACHE: dict[str, types.ModuleType] = {}
 def _stand_in(name: str) -> types.ModuleType:
     if name in _STAND_IN_CACHE:
         return _STAND_IN_CACHE[name]
-    module = types.ModuleType(name)
+    module: Any = types.ModuleType(name)
     if name.endswith(".tenant"):
         module.TenantStatus = _StandInTenantStatus
         module.TenantQuota = _StandInTenantQuota
@@ -255,7 +256,7 @@ def _stand_in(name: str) -> types.ModuleType:
     else:  # pragma: no cover - programming error
         raise AssertionError(name)
     _STAND_IN_CACHE[name] = module
-    return module
+    return cast(types.ModuleType, module)
 
 
 def _overlay_present() -> bool:
@@ -518,7 +519,7 @@ def test_mirrors_match_the_overlay_models() -> None:
     rbac_mod = importlib.import_module(OVERLAY_IMPORT + ".rbac")
     quota_mod = importlib.import_module(OVERLAY_IMPORT + ".quota")
 
-    pairs = [
+    pairs: list[tuple[type[BaseModel], type[BaseModel]]] = [
         (tenant_schemas.TenantQuota, tenant_mod.TenantQuota),
         (tenant_schemas.TenantUsage, tenant_mod.TenantUsage),
         (tenant_schemas.TenantItem, tenant_mod.Tenant),

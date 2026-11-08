@@ -27,8 +27,8 @@ ROUTE_METHODS = {"get", "post", "put", "delete", "patch"}
 _BOUND_KEYS = ("ge=", "le=", "gt=", "lt=")
 
 
-def _route_handlers(tree: ast.Module) -> list[ast.AST]:
-    out: list[ast.AST] = []
+def _route_handlers(tree: ast.Module) -> list[ast.FunctionDef | ast.AsyncFunctionDef]:
+    out: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)):
             continue

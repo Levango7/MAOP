@@ -13,9 +13,11 @@ P1-13: verifies the full token-flow pipeline:
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 
@@ -239,7 +241,7 @@ class TestAgentTokenStreamEndpoint:
     def test_endpoint_route_registered(self, client):
         """Endpoint should be registered (not 405 Method Not Allowed)."""
         from maop.dashboard.routers.stream import router
-        routes = [r.path for r in router.routes]
+        routes = [cast(APIRoute, r).path for r in router.routes]
         assert "/agent/{execution_id}" in routes or any("/agent/" in r for r in routes)
 
     def test_sse_replays_history_tokens(self, client, clean_event_bus):
