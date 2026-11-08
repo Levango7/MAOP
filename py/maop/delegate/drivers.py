@@ -19,14 +19,14 @@ import re
 import shlex
 import shutil
 import sys
-import tempfile
 import time
 from pathlib import Path
 from typing import Any
 
 from maop.core.agent.delegation.depth import next_depth_env
-from maop.core.agent.usage_protocol import parse_usage_file, parse_usage_line
+from maop.core.agent.usage_protocol import parse_usage_line
 from maop.core.reliability.error_schema import MaopResult, new_result
+from maop.delegate.cli_invocation import discard_usage_dir, prepare_argv, resolve_usage
 from maop.delegate.models import AgentConfig, _escape_for_cmd, _escape_for_ps_command
 
 logger = logging.getLogger(__name__)
@@ -81,72 +81,18 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
         resolved = shutil.which(base_cmd)
         if resolved:
             base_cmd = resolved
-    args_template = config.cli_args or "-p '{task}'"
-    task_placeholder = None
-    for ph in ("'{task}'", "{task}", "{{safePrompt}}"):
-        if ph in args_template:
-            task_placeholder = ph
-            break
-
-    # 原生 usage 出口（GAP-2 方案 A 之外的第二条取值链）：CLI 若支持把用量
-    # 写成 JSON 文件（copilot: ``--usage-output-file``），由 cli_args 里的
-    # ``{usage_file}`` 占位符声明，本驱动给出临时路径并在进程结束后回读。
-    # 未声明 usage_format 的 agent 完全不走这段——行为与既往逐字节一致。
-    # 用 mkdtemp 而非 mkstemp：给 CLI 一个尚不存在的目标文件，避免"文件已
-    # 存在"在各 CLI 上的行为差异（覆盖 / 追加 / 拒绝）。
-    usage_dir = ""
-    usage_file = ""
     usage_format = getattr(config, "usage_format", "") or ""
-    if usage_format and "{usage_file}" in args_template:
-        try:
-            usage_dir = tempfile.mkdtemp(prefix="maop-usage-")
-            usage_file = os.path.join(usage_dir, "usage.json")
-        except OSError:
-            usage_dir = usage_file = ""
-    elif "{usage_file}" in args_template:
-        # 配置自相矛盾：声明了占位符却没声明格式。不静默替换成空串（那会让
-        # CLI 收到一个不存在的路径），也不硬失败（旧配置可能只是多余），
-        # 保留字面量并留下可诊断的告警。
-        logger.warning(
-            "agent=%s uses {usage_file} in cli_args but declares no usage_format; "
-            "the placeholder will be passed through literally",
-            config.name,
-        )
-
-    # 占位符统一用哨兵替换后再 shlex.split。{task}：避免模板里未配对引号
-    # 导致拆分失败。{usage_file}：cli_args 走 posix 模式，Windows 路径的
-    # 反斜杠会被当转义符吃掉，必须在 split 之后才还原成真实路径。
-    placeholder = "\x00MAOP_TASK_PLACEHOLDER\x00"
-    usage_placeholder = "\x00MAOP_USAGE_PLACEHOLDER\x00"
-    safe_template = args_template
-    if task_placeholder:
-        safe_template = safe_template.replace(task_placeholder, placeholder)
-    if usage_file:
-        safe_template = safe_template.replace("{usage_file}", usage_placeholder)
     try:
-        split_args = shlex.split(safe_template)
+        cli_args, usage_dir, usage_file = prepare_argv(
+            config.cli_args or "-p '{task}'", prompt,
+            agent_name=config.name, usage_format=usage_format,
+        )
     except ValueError as exc:
-        if usage_dir:
-            shutil.rmtree(usage_dir, ignore_errors=True)
         return new_result(
             agent=config.name, task=prompt,
             exit_code=-1, error=f"Invalid cli_args template: {exc}",
             duration_ms=0,
         )
-    cli_args = [
-        prompt if arg == placeholder
-        else usage_file if arg == usage_placeholder
-        else arg
-        for arg in split_args
-    ]
-
-    def _resolve_usage(raw_stdout: str | None) -> dict[str, int] | None:
-        """取值链：原生 usage 文件 → 协议行 → None（调用方退回启发式）。"""
-        if usage_file:
-            parsed = parse_usage_file(usage_file, usage_format)
-            if parsed:
-                return parsed
-        return parse_usage_line(raw_stdout)
 
     start = time.monotonic()
     proc = None
@@ -188,7 +134,7 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
                     stdout=streamer.stdout, stderr=streamer.stderr,
                     duration_ms=duration_ms, trace_id=trace_id,
                     driver="cli", model=config.model,
-                    usage=_resolve_usage(streamer.stdout),
+                    usage=resolve_usage(usage_file, usage_format, streamer.stdout),
                 )
 
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
@@ -202,7 +148,7 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
             stdout=out, stderr=err,
             duration_ms=duration_ms, trace_id=trace_id,
             driver="cli", model=config.model,
-            usage=_resolve_usage(out),
+            usage=resolve_usage(usage_file, usage_format, out),
         )
     except asyncio.TimeoutError:
         if proc:
@@ -234,8 +180,7 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
     finally:
         # 临时目录在 return 表达式求值之后、真正返回之前清理；usage 已在
         # _resolve_usage 里读完，顺序安全。
-        if usage_dir:
-            shutil.rmtree(usage_dir, ignore_errors=True)
+        discard_usage_dir(usage_dir)
 
 
 async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,

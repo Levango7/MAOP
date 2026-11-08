@@ -157,17 +157,17 @@ class TestRunCliUsageFile:
     @pytest.mark.asyncio
     async def test_tempdir_cleaned_up(self, tmp_path, monkeypatch):
         """临时目录必须在返回前删除（否则每次 run 泄漏一个目录）。"""
-        import maop.delegate.drivers as drv
+        import maop.delegate.cli_invocation as cli_inv
 
         created: list[str] = []
-        real_mkdtemp = drv.tempfile.mkdtemp
+        real_mkdtemp = cli_inv.tempfile.mkdtemp
 
         def _spy(*args: Any, **kwargs: Any) -> str:
             path = real_mkdtemp(*args, **kwargs)
             created.append(path)
             return path
 
-        monkeypatch.setattr(drv.tempfile, "mkdtemp", _spy)
+        monkeypatch.setattr(cli_inv.tempfile, "mkdtemp", _spy)
         config = _config(
             cli_args=f'-c "{_FAKE_CLI}" --usage-output-file "{{usage_file}}"',
             usage_format="copilot",
@@ -181,17 +181,17 @@ class TestRunCliUsageFile:
     @pytest.mark.asyncio
     async def test_no_usage_format_leaves_behavior_unchanged(self, tmp_path, monkeypatch):
         """未声明 usage_format：不建临时目录，usage 仍走协议行路径。"""
-        import maop.delegate.drivers as drv
+        import maop.delegate.cli_invocation as cli_inv
 
         called = False
-        real_mkdtemp = drv.tempfile.mkdtemp
+        real_mkdtemp = cli_inv.tempfile.mkdtemp
 
         def _spy(*args: Any, **kwargs: Any) -> str:
             nonlocal called
             called = True
             return real_mkdtemp(*args, **kwargs)
 
-        monkeypatch.setattr(drv.tempfile, "mkdtemp", _spy)
+        monkeypatch.setattr(cli_inv.tempfile, "mkdtemp", _spy)
         config = _config(cli_args='-c "print(\'[USAGE] turns=1 tokens=42 source=measured\')"')
         result = await _run_cli(config, "hi", 30, str(tmp_path), "t-plain")
         assert result.exit_code == 0

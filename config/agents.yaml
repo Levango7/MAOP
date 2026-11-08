@@ -132,7 +132,7 @@ agents:
     - refactor
     - quickfix
     cli: copilot
-    cli_args: -p "{task}" --allow-all-tools --usage-output-file "{usage_file}"
+    cli_args: --usage-output-file "{usage_file}" --allow-all-tools -p "{task}"
     usage_format: copilot
     description: GitHub Copilot CLI v1.0.73 (GPT-5.4/Claude, requires GitHub auth)
     driver: cli

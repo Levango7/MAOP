@@ -122,6 +122,17 @@ GAP-2 方案 A 解析的是 agent 主动打印的 `[USAGE]` 协议行。那是 M
   Windows 路径的反斜杠会被当转义符吃掉。
 - copilot 声明 `usage_format: copilot` 并加
   `--usage-output-file "{usage_file}"`。
+- **模板处理拆到 `delegate/cli_invocation.py`**：加完采集后 `drivers.py` 达 830 行，
+  越过 800 行规模门禁（`scripts/check_file_size.py`；`ALLOWED_OVERSIZE` 已归零，
+  既定方向是不再加白名单）。拆分后 774 行，占位符与取值链成为可独立测试的纯函数。
+
+**参数顺序有讲究（实测踩到）**：`--usage-output-file` 必须排在 `-p "{task}"`
+**之前**。copilot 在 Windows 上是 npm 的 `.CMD` shim，`%*` 传参经 cmd.exe 重新
+分词——prompt 里的换行符会把后续参数**整段截断**。实测一个 316 字符、含
+`[Memory Context]` 与 `\n` 的 prompt，会让 `--allow-all-tools` 与
+`--usage-output-file` 全部丢失，usage 文件根本不生成（`exists=False`），而
+`[USAGE]` 行安静地退回 `estimated`——**不报错、不告警**。这同时说明
+`--allow-all-tools` 此前也可能一直没真正传到。
 
 **口径**：copilot 的 prompt 侧 = `input + cache_read + cache_write`，与其
 stderr 的 `Tokens ↑ 19.9k` 一致（525 + 19328 = 19853）。只取 `input` 会把
@@ -132,9 +143,10 @@ stderr 的 `Tokens ↑ 19.9k` 一致（525 + 19328 = 19853）。只取 `input` �
 
 | | 修复前 | 修复后 |
 |---|---|---|
-| `[USAGE]` | `turns=1 tokens=0 source=estimated` | `turns=1 tokens=21468 source=measured` |
-| `cost_entries.prompt_tokens` | 启发式 | 21463 |
-| `cost_entries.total_tokens` | 启发式 | 21468 |
+| `[USAGE]` | `turns=1 tokens=0 source=estimated` | `turns=1 tokens=21463 source=measured` |
+| `cost_entries.prompt_tokens` | 启发式（44） | 实测 |
+| `cache_read_tokens` | 不可见 | 9827 |
+| `cache_write_tokens` | 不可见 | 11628 |
 
 测试：新增 16 例（解析边界 12 + 端到端 4，含临时目录清理与「未声明格式行为
 不变」守卫）；受影响模块 68 + 149 例全绿；ruff / mypy 干净。
