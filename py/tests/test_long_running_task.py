@@ -377,15 +377,39 @@ class TestAPIRoutes:
 
     @pytest.fixture
     def client(self, manager):
-        """构造带注入管理器的 TestClient."""
+        """构造带注入管理器的 TestClient.
+
+        2026-11-08：本路由自此全部端点带 ``require_admin``（此前 submit/cancel
+        是全库唯一零鉴权变更端点）。生产里 ``request.state.auth_roles`` 由
+        ScopeMiddleware 写入，这里用裸 FastAPI 组装、没有那条中间件，因此补一个
+        最薄的 middleware 把 admin 角色放上去——**不是绕过守卫**，只是补回
+        生产链路里由中间件负责的那一步。
+        """
         from maop.dashboard.routers import long_running_task as lrt_router
 
         # 注入测试管理器
         lrt_router._set_manager_for_tests(manager)
         app = FastAPI()
+
+        @app.middleware("http")
+        async def _inject_admin(request, call_next):
+            request.state.auth_roles = ["superadmin"]
+            return await call_next(request)
+
         app.include_router(lrt_router.router)
         yield TestClient(app)
         # 清理
+        lrt_router._set_manager_for_tests(None)
+
+    @pytest.fixture
+    def anon_client(self, manager):
+        """未认证客户端：验证四个上报端点与既有变更端点都要求 admin 角色."""
+        from maop.dashboard.routers import long_running_task as lrt_router
+
+        lrt_router._set_manager_for_tests(manager)
+        app = FastAPI()
+        app.include_router(lrt_router.router)
+        yield TestClient(app)
         lrt_router._set_manager_for_tests(None)
 
     def test_api_submit(self, client):
@@ -459,3 +483,104 @@ class TestAPIRoutes:
         # 再取消应 409
         r2 = client.post(f"/api/long-running-tasks/{task_id}/cancel")
         assert r2.status_code == 409
+
+
+    # ── 执行器上报端点（2026-11-08 新增）─────────────────────────────
+    # 背景：长任务子系统此前只有 CRUD + SSE 外壳——manager 的
+    # update_progress/complete/fail 都在，但没有任何入口把进度推进回来，
+    # 提交的任务永远停在 pending（真机实证）。下列测试钉住新上报链路。
+
+    def _submit(self, client):
+        r = client.post("/api/long-running-tasks", json={
+            "agent_name": "devin", "task": "重构模块",
+        })
+        return r.json()["task_id"]
+
+    def test_api_report_progress_advances_to_running(self, client):
+        task_id = self._submit(client)
+        r = client.post(f"/api/long-running-tasks/{task_id}/progress",
+                        json={"progress": 0.5, "message": "已完成一半"})
+        assert r.status_code == 200
+        st = client.get(f"/api/long-running-tasks/{task_id}").json()["task"]
+        assert st["status"] == STATUS_RUNNING
+        assert st["progress"] == 0.5
+        assert st["progress_message"] == "已完成一半"
+
+    def test_api_complete_sets_result(self, client):
+        task_id = self._submit(client)
+        r = client.post(f"/api/long-running-tasks/{task_id}/complete",
+                        json={"result": "全绿通过"})
+        assert r.status_code == 200
+        st = client.get(f"/api/long-running-tasks/{task_id}").json()["task"]
+        assert st["status"] == STATUS_COMPLETED
+        assert st["result"] == "全绿通过"
+
+    def test_api_fail_sets_error(self, client):
+        task_id = self._submit(client)
+        r = client.post(f"/api/long-running-tasks/{task_id}/fail",
+                        json={"error": "编译失败"})
+        assert r.status_code == 200
+        st = client.get(f"/api/long-running-tasks/{task_id}").json()["task"]
+        assert st["status"] == STATUS_FAILED
+        assert st["error"] == "编译失败"
+
+    def test_api_report_progress_rejects_out_of_range(self, client):
+        """progress 由 Pydantic 约束在 [0,1]——超界必须 422 而不是静默夹取。"""
+        task_id = self._submit(client)
+        r = client.post(f"/api/long-running-tasks/{task_id}/progress",
+                        json={"progress": 1.5})
+        assert r.status_code == 422
+
+    def test_api_report_progress_unknown_task_404(self, client):
+        r = client.post("/api/long-running-tasks/nonexistent/progress",
+                        json={"progress": 0.1})
+        assert r.status_code == 404
+
+    def test_api_complete_unknown_task_404(self, client):
+        r = client.post("/api/long-running-tasks/nonexistent/complete",
+                        json={"result": "x"})
+        assert r.status_code == 404
+
+
+
+    def test_all_mutation_endpoints_require_admin(self, anon_client):
+        """零凭证访问任何变更端点必须 403（2026-11-08 修复的鉴权缺口）.
+
+        背景：本路由的 submit/cancel 曾是**全库唯一零鉴权变更端点**——
+        既无 ``require_admin`` 也不依赖任何守卫（真机实证：无凭证 POST 直接
+        200 创建成功）。此处把四个变更端点一次性钉死，防回归。
+        """
+        # submit：匿名必须 403（且拿不到 task_id）
+        r = anon_client.post("/api/long-running-tasks", json={
+            "agent_name": "devin", "task": "任务",
+        })
+        assert r.status_code == 403, "submit 未要求 admin"
+        assert "task_id" not in (r.json() or {})
+        # 其余三个用任意 id——403 应在查库之前就抛，故无需真实任务
+        for path in ("progress", "complete", "fail"):
+            body = {"progress": 0.1} if path == "progress" else (
+                {"result": "x"} if path == "complete" else {"error": "x"})
+            rr = anon_client.post(f"/api/long-running-tasks/any/{path}", json=body)
+            assert rr.status_code == 403, f"{path} 未要求 admin"
+        # cancel 同属变更端点（原本就是缺口之一）
+        rc = anon_client.post("/api/long-running-tasks/any/cancel")
+        assert rc.status_code == 403, "cancel 未要求 admin"
+
+    def test_api_fail_unknown_task_404(self, client):
+        r = client.post("/api/long-running-tasks/nonexistent/fail",
+                        json={"error": "x"})
+        assert r.status_code == 404
+
+    def test_api_full_chain_pending_to_completed(self, client):
+        """完整链路：pending → running(0.3) → running(0.9) → completed。"""
+        task_id = self._submit(client)
+        for pct in (0.3, 0.9):
+            r = client.post(f"/api/long-running-tasks/{task_id}/progress",
+                            json={"progress": pct, "message": f"{pct:.0%}"})
+            assert r.status_code == 200
+        mid = client.get(f"/api/long-running-tasks/{task_id}").json()["task"]
+        assert mid["status"] == STATUS_RUNNING and mid["progress"] == 0.9
+        client.post(f"/api/long-running-tasks/{task_id}/complete",
+                    json={"result": "ok"})
+        end = client.get(f"/api/long-running-tasks/{task_id}").json()["task"]
+        assert end["status"] == STATUS_COMPLETED

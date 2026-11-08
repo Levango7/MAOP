@@ -255,6 +255,37 @@ def cancel_long_running_task(task_id: str) -> bool:
     return mgr.cancel(task_id)
 
 
+# ── Executor progress reporting ──────────────────────────────────────────
+# 2026-11-08：长任务子系统此前只有 CRUD + SSE 外壳——manager 的
+# update_progress/complete/fail 都在，但**没有任何入口能把进度推进回来**
+# （全仓零调用方、无 HTTP 上报端点），于是提交的任务永远停在 pending、
+# SSE 进度流永不动（真机实证：提交后 GET 得 status="pending"、progress=0.0，
+# SSE 推一条 pending 后即无下文）。这三个函数补上执行器→manager 的上报通道。
+
+
+def report_long_running_task_progress(
+    task_id: str, progress: float, message: str = "",
+) -> dict[str, Any]:
+    """执行器上报进度。推进状态为 running；任务不存在抛 KeyError。"""
+    mgr = get_long_running_task_manager()
+    mgr.update_progress(task_id, progress, message)
+    return mgr.get_status(task_id).model_dump()
+
+
+def complete_long_running_task(task_id: str, result: str = "") -> dict[str, Any]:
+    """执行器上报成功完成。任务不存在抛 KeyError。"""
+    mgr = get_long_running_task_manager()
+    mgr.complete(task_id, result=result)
+    return mgr.get_status(task_id).model_dump()
+
+
+def fail_long_running_task(task_id: str, error: str = "") -> dict[str, Any]:
+    """执行器上报失败。任务不存在抛 KeyError。"""
+    mgr = get_long_running_task_manager()
+    mgr.fail(task_id, error=error)
+    return mgr.get_status(task_id).model_dump()
+
+
 def get_long_running_task_raw(task_id: str) -> LongRunningTask:
     """Get the raw task object (for SSE streaming). Raises ``KeyError``."""
     mgr = get_long_running_task_manager()
