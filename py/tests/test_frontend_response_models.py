@@ -72,7 +72,11 @@ URL_EXCEPTIONS = FIXTURES / "frontend_url_reference_exceptions.txt"
 # follow computed URLs and found seven endpoints two earlier "model every
 # frontend endpoint" batches had walked past (three auth, two edition, graph
 # stats, knowledge-graph). They are burned down next.
-RATCHET_CAP = 75
+# 2026-10-31: 75 -> 74. ``reachable_targets`` closed two more shapes the
+# extractor used to lose (a template tail, and a literal prefix concatenated
+# with a variable); the ten endpoints it exposed were modelled rather than
+# allowlisted, so the net move is down.
+RATCHET_CAP = 74
 
 _QUOTES = {"`": "`", "'": "'", '"': '"'}
 _CALL_HEAD_RE = re.compile(
@@ -408,11 +412,54 @@ def load_entries(path: Path) -> set[tuple[str, str]]:
     return entries
 
 
+def reachable_targets(
+    calls: set[tuple[str, str]],
+    routes: dict[tuple[str, str], dict],
+) -> set[tuple[str, str]]:
+    """真实路由里，被"前端拼出来的路径"可能命中的那几条。
+
+    抽取器看得见调用，但记下的路径不是完整路由——两种形状，实测各命中一条：
+
+    1. **模板尾部是变量**：``api.post(`/api/control/${action}`)`` 只能记成
+       ``/api/control/{}``。后端没有这条路由，整条调用掉出 ``matched``，
+       既不进 ``missing`` 也不进 allowlist。代价实测为
+       ``POST /api/control/{pause,resume,stop,validate,doctor}``——前端真实
+       可达（``execActions`` 的按钮就是它们）、无 ``response_model``、两条
+       棘轮都看不见，前端只能靠 ``r.msg || r.message || r.detail`` 猜形状。
+    2. **字面量前缀 + 拼接**：``api.post('/api/mcp/marketplace/tools/' + id +
+       '/install')`` 被截成 ``/api/mcp/marketplace/tools``，一个后端不存在的
+       幻影路径；真实的 ``POST /api/mcp/marketplace/tools/{}/install`` 因此
+       从未被审计。
+
+    两种都按"同动词 + 路径前缀"展开到真实路由。宁可过近似也不留盲区——这条
+    门禁的立场一直是"看不见的 URL 让构建失败"，不是"看不见就当没有"。
+
+    展开是有界的：前缀至少三段（``/api/x/``），且幻影路径后面必须还有段。
+    ``/api/{}`` 或 ``POST /api/health`` 那种不是拼出来的，展开只会把整个审计
+    面拖进来；真正的死端点该由前端修，不该在这里被静默吸收。
+    """
+    targets: set[tuple[str, str]] = set()
+    for verb, path in calls:
+        if (verb, path) in routes:
+            continue
+        if path.endswith("{}"):
+            prefix = path[:-2]
+            if prefix.count("/") < 3:
+                continue
+            targets |= {key for key in routes if key[0] == verb and key[1].startswith(prefix)}
+            continue
+        if path.count("/") < 3:
+            continue
+        targets |= {key for key in routes if key[0] == verb and key[1].startswith(path + "/")}
+    return targets
+
+
 def coverage() -> tuple[set[tuple[str, str]], set[tuple[str, str]], set[tuple[str, str]]]:
     """Return (missing, calls, matched) for frontend-called routes."""
     calls = frontend_calls()
     routes = route_schema()
-    matched = {key: op for key, op in routes.items() if key in calls}
+    reachable = calls | reachable_targets(calls, routes)
+    matched = {key: op for key, op in routes.items() if key in reachable}
     exempt = load_entries(NON_JSON)
     missing = {
         key for key, op in matched.items()
@@ -514,6 +561,71 @@ def test_gate_sees_the_endpoints_it_previously_missed():
         ("GET", "/api/stream/dag/{}"),
     ):
         assert key in calls, key
+
+
+def test_reachable_targets_expands_only_the_bounded_shapes():
+    """展开逻辑本身要能被证伪：只展开"拼出来的"路径，且不越界。
+
+    纯函数判据，不依赖 dashboard 的真实路由面——否则这条测试只能证明
+    "今天的仓库里恰好没有反例"。
+    """
+    routes: dict[tuple[str, str], dict] = {
+        ("POST", "/api/a/b/pause"): {},
+        ("POST", "/api/a/b/stop"): {},
+        ("GET", "/api/a/b/pause"): {},
+        ("POST", "/api/mcp/tools/{}/install"): {},
+    }
+    # 模板尾部：同动词、同前缀的兄弟全部展开，动词不同不展开。
+    assert reachable_targets({("POST", "/api/a/b/{}")}, routes) == {
+        ("POST", "/api/a/b/pause"),
+        ("POST", "/api/a/b/stop"),
+    }
+    # 字面量前缀 + 拼接：幻影路径展开到它后面真正的段。
+    assert reachable_targets({("POST", "/api/mcp/tools")}, routes) == {
+        ("POST", "/api/mcp/tools/{}/install"),
+    }
+    # 精确命中的路由不是拼出来的，不展开。
+    assert reachable_targets({("POST", "/api/a/b/pause")}, routes) == set()
+    # 前缀太短不展开：``/api/{}`` 会把整个审计面拖进来。
+    assert reachable_targets({("POST", "/api/{}")}, routes) == set()
+    # 段太少的幻影路径不展开：``POST /api/health`` 是前端调了死端点，不是拼接。
+    assert reachable_targets({("POST", "/api/health")}, routes) == set()
+
+
+def test_dynamically_dispatched_endpoints_are_not_invisible():
+    """前端拼出来的路径，它可能命中的真实路由必须在审计面里且已定型。
+
+    这条钉的不是"抽取器看得见调用"——``api.post(`/api/control/${action}`)``
+    一直看得见，只是记成 ``/api/control/{}`` 这个后端不存在的路径，于是整批
+    掉出 ``matched``。判据落在真实路由上：它们必须既被算进审计面，又已定型。
+    """
+    routes = route_schema()
+    calls = frontend_calls()
+    targets = reachable_targets(calls, routes)
+    assert targets, "没有任何拼出来的路径被识别——这条判据失去了被测对象"
+
+    # ControlPanel 的 execActions 按钮就是这几条；marketplace 的安装路径是拼接。
+    for key in (
+        ("POST", "/api/control/pause"),
+        ("POST", "/api/control/resume"),
+        ("POST", "/api/control/stop"),
+        ("POST", "/api/control/validate"),
+        ("POST", "/api/control/doctor"),
+        ("POST", "/api/mcp/marketplace/tools/{}/install"),
+    ):
+        assert key in targets, key
+        assert key in routes, key
+
+    _missing, _calls, matched = coverage()
+    assert targets <= matched, sorted(targets - matched)
+    # 已定型，或**显式登记**在 burn-down 表里。``POST /api/control/maintain``
+    # 是后者：它的返回由 MAINTAIN_HANDLERS 的多个 handler 拼出，键集不封闭，
+    # 收窄成模型会截断字段。判据不能要求"全部已定型"，否则只能靠删掉这条
+    # 断言来变绿——那样盲区会重新长回来。
+    allowlist = load_entries(ALLOWLIST)
+    untyped = {key for key in targets if not has_typed_response(routes[key])}
+    assert untyped <= allowlist, f"动态可达、无 response_model、又没登记: {sorted(untyped - allowlist)}"
+    assert untyped, "本判据已无被测对象——若有端点补上模型，删掉这两行而不是留空断言"
 
 
 def test_referenced_but_unattributable_urls_are_listed():

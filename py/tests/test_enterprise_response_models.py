@@ -48,6 +48,7 @@ from tests.test_frontend_response_models import (
     has_typed_response,
     load_entries,
     normalize_path,
+    reachable_targets,
     scan_source_dir,
 )
 
@@ -69,7 +70,10 @@ def coverage() -> tuple[set[tuple[str, str]], set[tuple[str, str]], set[tuple[st
     """Return (missing, calls, matched) for enterprise routes the UI calls."""
     calls = scan_source_dir(FRONTEND_SRC)[0]
     routes = _routes()
-    matched = {key for key in routes if key in calls}
+    # 与个人版同一口径：模板尾部是变量的调用（``/api/x/${y}``）展开到它可能
+    # 命中的真实路由。这条门禁当前没有动态分发的路由，但两半口径必须一致，
+    # 否则日后企业侧出现一处拼接就会单独失明。
+    matched = {key for key in routes if key in calls | reachable_targets(calls, routes)}
     exempt = load_entries(NON_JSON)
     missing = {
         key for key in matched
