@@ -101,6 +101,30 @@ M-SIM M0 演练抓到的最后一条真缺口：`wiring.run_workflow` 在默认�
 测试：resolver 5 例 + 告警 5 例；ruff/mypy/零漂移全过。排查报告「未闭环」
 四项中三项已收口（含 turns=4 根因），剩余前端交互运行时抽查待下轮。
 
+### 缓存命中明细进台账 + 成本对账独立成模块（2026-11-08）
+
+外部 CLI 的提示侧消耗里 `cache_read` 常占九成以上（copilot 实测
+19328/19853 = 97.4%）。它是「token 用量节省」**唯一可验证的指标** —— 没有它，
+"省了多少"只能靠总量倒推，无法区分「上下文真的变短」与「缓存命中率变高」。
+
+- `CostTracker.record_actual_cost` 新增 `cache_read_tokens` /
+  `cache_write_tokens`，写进 `cost_entries.metadata`；**非零才写**，未启用
+  缓存的 agent 不产生两个恒为 0 的噪声字段。
+- `_budget_reconciliation` 从 `MaopResult.usage` 读出并透传；`run.cost`
+  事件带同口径字段，控制台与台账不再各说各话。
+- **`_budget_reconciliation` 拆到 `py/maop/cost_reconciliation.py`**：
+  `maop_loop_phases.py` 已卡在 800 行规模门禁线上（加完 cache 透传后 809 行），
+  该方法与 phase 编排无耦合、只依赖宿主 `_root`，独立成
+  `CostReconciliationMixin` 后主文件回到 711 行（`ALLOWED_OVERSIZE` 仍为零）。
+
+验证：新增 5 例（落库 / 零值不写键 / 返回值 / usage 透传 / 无键行为不变）；
+未修复基线 **4 红 1 绿**（绿的是「无 cache 键时行为不变」守卫）；成本相关
+回归 88 例全绿；`ruff` / `mypy` 干净；文件规模 0 oversize；文档一致性 passed。
+
+**依赖**：cache 明细由 CLI 原生 usage 出口（copilot 的
+`--usage-output-file`）提供。该出口未启用时 `usage` 里没有这两个键，透传
+恒为 0，行为与既往逐字节一致。
+
 ## [5.6.1] — 2026-11-06
 
 ### GAP-5 修复——并行分支成本台账静默缺行（2026-11-06）
