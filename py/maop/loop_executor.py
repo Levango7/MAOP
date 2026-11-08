@@ -271,10 +271,9 @@ class ExecuteMixin:
                 combined_usage[key] = combined_usage.get(key, 0) + int(u.get(key, 0) or 0)
         if combined_usage is not None and not combined_usage:
             combined_usage = None
-        if combined_usage:
-            # loop 级 [USAGE] 行的实测口径与串行路径（_execute_with_retry 的
-            # 逐 dispatch 累计）保持一致：并行路径在此处累计组合总量。
-            self._tokens_used_measured += int(combined_usage.get("total_tokens", 0))
+        # _tokens_used_measured 此处刻意不累加：逐 dispatch 累加已在
+        # _execute_with_retry 内完成，聚合处再记会双计（#232 曾如此，
+        # loop 级 [USAGE] 虚报 2x）。
 
         return new_result(
             agent=agent, task=task,

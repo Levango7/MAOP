@@ -39,6 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 修 loop 级 token 双计数（并行路径 `[USAGE]` 虚报 2x，2026-11-08）
+
+核 #232 提交记录时发现（本线板面登记先于修复）：`_execute_parallel` 聚合处
+把组合 usage 又累加进 `_tokens_used_measured`，而 `_execute_with_retry` 已按
+dispatch 逐笔累加——并行路径 loop 级 `[USAGE]` 行虚报 2 倍（实测 2×150 tokens
+的并行组：聚合 usage 正确为 300，计数器 600）。影响仅 `LoopResult.tokens_used`
+遥测（`cli_run.py` loop 级 `[USAGE]` 行与 `tokens_source` 判定）；成本台账
+不受影响（聚合只对账一次，非账单双写）。修复 = 删去聚合处累加，逐 dispatch
+累加为唯一口径；`test_gap5_parallel_usage.py` 的 `_execute_with_retry` 桩改为
+镜像生产口径，原 `== 410` 断言不变即双计回归守卫（再累加会变 820）。
+
 ### `refactor/layering-closeout` 追上 master：154 个提交合并 + 基线断点登记（2026-11-05）
 
 该分支长期落后主树（12 领先 / 154 落后），阶段一至四的成果（13 个端点建模、
