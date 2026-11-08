@@ -949,6 +949,116 @@
   views/Integrations.vue,App.vue,i18n/view-integrations.js}` 及对应 4 个测试、
   CHANGELOG `[Unreleased]` 本批段、本登记。
 - **不碰**：#225 与 ZCode 第十九轮三线领地、MAOS 主工作树；本线 #226 独立串行。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：顶栏/对齐整改——UI 批 A）
+- **授权**：用户原话「现在交代一个 新任务，我认为 maop 项目的 UI界面 做的有点别扭。
+  左上角的logo区 右边的刷新按钮要不要位置换一下？居右对齐？？两者之间的 小分割线也去掉？
+  再有就是 对齐，对齐，对齐 左右对齐，上下对齐！有些比较小的机制 我看界面上就不要占据那么大的地方了！」
+- **取证**（dev server :5174 + 真后端 :9079，Playwright 实测 1600×1000，截图存本会话工作区）：
+  - TopBar 控件高度不齐：刷新胶囊 41px / 分析 26px / 偏好 27px / 用户 45px（DOM rect）；
+  - 品牌块 4 行 55px，statusline（在线+v5.6.1）与 AppFooter 重复承载（AppFooter.vue 模板同载）；
+  - 品牌区与刷新胶囊之间 1px 分割线（TopBar.vue `.topbar__divider` 首处）；
+  - 首页 `.stats-grid` 全局 5 列（pages.css:60）只渲染 4 张 StatCard → 右侧空一整列
+    （实测末卡 right=1301，容器 right=1566）；
+  - 首页 hero 与 PageHeader 双「更新于 刚刚」（Overview.vue:36 与 PageHeader actions）。
+- **修法**：刷新右移进右侧工具簇、删品牌区间分割线；顶栏控件统一 32px（DESIGN.md §4
+  小按钮 28-32px）；品牌块降 2 行（删 statusline，页脚已载）；`.stats-grid` 改
+  `repeat(auto-fit, minmax(220px,1fr))`；删 hero 新鲜度重复行；DESIGN.md §9 措辞同步。
+- **领地**：`dashboard-enterprise/src/components/TopBar.vue`、`src/styles/pages.css`
+  （.stats-grid 行）、`src/views/Overview.vue`（hero fresh 行）、`DESIGN.md` §9、本登记。
+- **不碰**：#252 领地（loop_executor.py / test_gap5_parallel_usage.py / CHANGELOG 段）、
+  其它 session 板面条、MAOS 主工作树、后端任何文件、tokens.css 配色（纯布局/尺寸改动）。
+- **验证**：改后同口径复测（rect 对齐/高度一致/网格填满）+ `npm run design:contrast`
+  + `npm run lint` + `npx vue-tsc --noEmit` + 相关 vitest；暗/亮两套主题各截图一张。
+
+### 顶栏/对齐整改批 A 交付回执（2026-11-08，d41ab4d0）
+- **交付**：`d41ab4d0`（`ui/topbar-alignment`，本地提交未推送——用户「做完了再提交吧」
+  只授权提交本批）；6 文件 +63/-116。刷新胶囊右移入右侧工具簇（图标+等宽时间，与
+  prefs/user 12px 等距），品牌区与刷新间分割线删除（全栏仅余工具/用户间 1 条 24px）；
+  品牌块 4 行→2 行；statusline/版本号删除（页脚已载）；顶栏胶囊统一 32px（实测
+  刷新/分析/偏好/用户 t=12 h=32，旧 41/26/27/45 归零）；`.stats-grid` 改
+  auto-fit minmax，4 卡铺满 256→1566（末卡 right=1301 空洞消除）；首页 hero 重复
+  「更新于 刚刚」删除；CoachMarks 失效目标 `.topbar__statusline`→`.topbar__refresh`
+  + 双语教练文案；DESIGN.md §9 响应式措辞同步；旧圆钮整旋 180° 动效改为只转图标
+  （pill 下时间文字会倒置——用户「刷新键翻转」反馈的修正）。
+- **验证**：`npm run design:contrast` PASS；`npm run lint` 0 errors（16 warnings 均在
+  存量无关文件）；`npx vue-tsc --noEmit` PASS；vitest 78 文件/700 例全过；暗/亮两套
+  主题 Playwright 实测截图存本会话工作区（maop-ui-after-topbar-{light,dark}.png）。
+- **未做**：推送（无授权）；#106 loop token 双计数线不受影响。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：概览页对齐整改——UI 批 B）
+- **授权**：用户原话「概览页面 很多地方根本不对齐啊 麻烦解决一下 左右对齐，上下对齐」。
+- **取证**（dev server :5175 + 真后端 :9079，Playwright 实测 1600×1000 light）：
+  - `.chart-card { padding: var(--sp-4) }`（pages.css:765）加在 Card 根上，Card body
+    自带 16px padding → throughput 卡头部下偏 16.6px（703.8 vs 兄弟卡 687.9）、
+    chart-box 双侧各内缩 +16（288.7 vs 正文规范 272.7）——全站唯一双 padding 卡；
+  - `.row` 两列网格装单卡：runtime 行（Overview.vue:120）与 fail-ranking 行（:133）的
+    唯一 Card 只占左列 w=647 x=256，容器右半 919→1566 全空；
+  - 其余实测已对齐：8 个全宽段 x=256/right=1566 统一，段间距 16px，stats 4×315.5、
+    actions 4×318.5 gap 16，split 两卡 y/h 完全一致（687.2/394.6）。
+- **修法**：删 pages.css:765 `.chart-card` padding 行；`.row` 加
+  `.row > :only-child { grid-column: 1 / -1; }` 使单卡行铺满（纯布局，不动配色/文案）。
+- **领地**：`dashboard-enterprise/src/styles/pages.css`、本登记。
+- **不碰**：#106/#252 领地、批 A 已交付的 TopBar/stats-grid、tokens.css 配色、后端任何文件。
+- **验证**：改后同口径复测（runtime 卡铺满/chart 头与兄弟齐平/chart-box 对齐正文规范）
+  + `npm run design:contrast` + `npm run lint` + `npx vue-tsc --noEmit` + vitest；
+  暗/亮两套主题各截图一张存会话工作区。
+
+### 概览页对齐整改批 B 交付回执（2026-11-08，提交 4ae35425）
+- **交付**（仅 `dashboard-enterprise/src/styles/pages.css`，2 行）：
+  ① 删 `.chart-card { padding: var(--sp-4) }`（pages.css:765）——Card 根 padding 与
+  `.card__body` 自带 16px 叠加，致 throughput 卡头下偏 16.6px、chart-box 双侧各内缩
+  +16（全站唯一双 padding 卡）；删后卡头偏移 0.7px 与兄弟卡一致、chart-box 左内缩
+  16.7px 与正文规范一致；
+  ② 加 `.row > :only-child { grid-column: 1 / -1; }`——runtime 行（Overview.vue:120）
+  与 fail-ranking 行（:133）的单卡此前只占左列 w=647、容器右半 919→1566 全空；
+  现铺满（实测 runtime 卡 w=1417.3 right=1673.3=容器右沿）。
+- **验证**（Playwright 实测 1600×1000，dev :5175 + 真后端 :9079）：8 个全宽段
+  x=256/right=1673.3 统一，段间距 16px，split 两卡 y/h 齐平（687.2/362.6）；
+  `npm run design:contrast` PASS / `npm run lint` 0 errors（16 warnings 均存量无关）/
+  `npx vue-tsc --noEmit` PASS / vitest 78 文件 700 例全过（日志
+  maop-ui-batchB-gates.log）；暗/亮全页截图存会话工作区
+  （maop-ui-batchB-overview-{light,dark}.png；亮色首抓因 chart.js 入场动画未见曲线，
+  稳定后复测确认 teal 线亮色正常）。
+- **未做**：推送（无授权）；CHANGELOG（批 A 先例：UI 对齐批不入）；
+  DESIGN.md（无规则变更——删的是违反 §1 单层 padding 的离规样式）。
+- **不碰**：#106/#252 线（#246 仍 OPEN；#252 mergeable=MERGEABLE、BLOCKED 仅因
+  `CI merge gate` needs 含排队中的 pip-audit/SBOM，required 四件中 scope/secret-scan/
+  docs-gate 已绿、gate 待上报）。
+- **后记（分辨率事件）**：验证中曾把驱动浏览器 resize 到 2559 CSS px（本机 2559 物理
+  /150% 缩放 = 1706 CSS），窗口溢出屏幕被用户发现「分辨率又出问题」；已还原
+  1707×876（native）并复验 zoom=1 / topbar DOM 计数=1 / 无横向溢出。fullPage 截图
+  「双顶栏」为 sticky 元素缝合伪影，非页面 bug。/operate、/capability/agents 跳转非
+  本线导航（驱动窗口在用户桌面），已停回 /home。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：#106 loop 级 token 双计数——合入回执）
+- **合入**：PR #252（`fix/parallel-token-double-count` @ e77df85b）→ master，merge commit
+  `5027554d945230d043b49d08a080e779746cb6f0`，2026-11-08T08:12:56Z；命令
+  `gh pr merge 252 --merge --match-head-commit e77df85b24a2fb92562333fcf8bdf7c34f803de0`
+  （用户「确定没问题再 merge」授权，核验通过后执行）。
+- **核验**（合入前即时读回）：mergeable=MERGEABLE、mergeStateStatus=CLEAN；required 四件
+  （CI scope / Secret Scan / Docs consistency gate / CI merge gate）全 COMPLETED/SUCCESS；
+  非必需 pending=0；#246 仍 OPEN（无 CHANGELOG 抢合风险）。
+- **未做**：推送本地 `ui/topbar-alignment`（批 A/B 提交均无推送授权）；master 本地指针
+  未同步（服务器侧合并，按需再 fetch）。
+- 任务 #106 关闭。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：批 A/B + #106 合入回执——推送回执）
+- **推送**（用户「确认做的很完善，没有风险，没有冲突再提交、推送」授权）：
+  `git push -u origin ui/topbar-alignment` 新建远程分支并设 upstream；remote head
+  de911cd1a55806a7d49255e1b1d248057051181f 与本地 HEAD 双读回一致，
+  origin/master..origin/ui/topbar-alignment 恰为下列 6 笔。
+- **推送内容**（授权时分支状态已向用户列明：含批 A 代码）：
+  d1422829 领地登记批 A / d41ab4d0 批 A 代码 / 96589a38 批 A DONE 回执 /
+  4ae35425 批 B 代码 / 6b374956 批 B DONE 回执 / de911cd1 #106 合入回执。
+- **冲突核验**：merge-base(origin/master, HEAD)=0ccc9983；分支改动 7 文件
+  （AGENT-COORD.md + dashboard-enterprise 下 DESIGN.md / CoachMarks.vue /
+  TopBar.vue / i18n/index.js / pages.css / Overview.vue）；master 自分叉点未动
+  pages.css（diff 为空）；#252 合并 5027554d 只动 AGENT-COORD.md / CHANGELOG.md /
+  py/maop/loop_executor.py / py/tests/test_gap5_parallel_usage.py，代码面零重叠；
+  分支 diff 无私钥材料（grep BEGIN PRIVATE KEY 与 maop_enterprise_prod 均空）。
+- **未做**：开 PR（未授权）；rebase 到最新 master（behind 14 均为他人线合并，
+  分支独立推送无冲突；未来 PR 时按追加段对账 AGENT-COORD.md）。
 ## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：GAP-5 后续——loop 级 token 双计数收口）
 
 - **授权**：用户「先板面登记再开 PR」（2026-11-08）；问题由本线核 #232 提交
@@ -967,3 +1077,18 @@
   CHANGELOG `[Unreleased]` 本批段、本登记。
 - **不碰**：#232 聚合透传本体与对账硬化（v5.6.1 已发布）；#241/#246 成本台账
   provenance/缓存明细线（OPEN，文件不交叠）；M-SIM soak 线。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：批 A/B 交付——PR #257 开立）
+- **PR**：#257 https://github.com/Levango7/MAOP/pull/257，ui/topbar-alignment -> master，
+  8 笔提交（交付 6 + 推送回执 22070a31 + 合并提交 a69daee0）。开立授权＝用户「授权」
+  （针对上一条汇报中唯一标注的「未做：开 PR（未授权）」；仅开 PR，不含合并）。
+- **冲突处置**：开 PR 初判 mergeable=CONFLICTING；`git merge origin/master` 后仅
+  AGENT-COORD.md 冲突（双方追加段撞车，台账惯例），解法＝删三行冲突标记、双方内容全留
+  （union）；Overview.vue 自动合干净；合并后树重跑四道门禁（design:contrast / lint /
+  vue-tsc / vitest）全 EXIT=0（日志 maop-ui-merge-gates.log）后才落合并提交 a69daee0
+  并推送。
+- **状态快照**（2026-11-08 开立后即时读回）：mergeable=MERGEABLE /
+  mergeStateStatus=BLOCKED——required 检查 pending（CI scope / Secret Scan 等起跑中），
+  属正常未绿态、非红。
+- **未做**：合并（无授权；按「确定没问题再 merge」口径，绿灯后另行授权）；rebase
+  （合入式保 sha，台账引用不变）。
