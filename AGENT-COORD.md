@@ -1030,3 +1030,15 @@
   1707×876（native）并复验 zoom=1 / topbar DOM 计数=1 / 无横向溢出。fullPage 截图
   「双顶栏」为 sticky 元素缝合伪影，非页面 bug。/operate、/capability/agents 跳转非
   本线导航（驱动窗口在用户桌面），已停回 /home。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：#106 loop 级 token 双计数——合入回执）
+- **合入**：PR #252（`fix/parallel-token-double-count` @ e77df85b）→ master，merge commit
+  `5027554d945230d043b49d08a080e779746cb6f0`，2026-11-08T08:12:56Z；命令
+  `gh pr merge 252 --merge --match-head-commit e77df85b24a2fb92562333fcf8bdf7c34f803de0`
+  （用户「确定没问题再 merge」授权，核验通过后执行）。
+- **核验**（合入前即时读回）：mergeable=MERGEABLE、mergeStateStatus=CLEAN；required 四件
+  （CI scope / Secret Scan / Docs consistency gate / CI merge gate）全 COMPLETED/SUCCESS；
+  非必需 pending=0；#246 仍 OPEN（无 CHANGELOG 抢合风险）。
+- **未做**：推送本地 `ui/topbar-alignment`（批 A/B 提交均无推送授权）；master 本地指针
+  未同步（服务器侧合并，按需再 fetch）。
+- 任务 #106 关闭。
