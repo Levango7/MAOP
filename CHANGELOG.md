@@ -149,7 +149,11 @@ stderr 的 `Tokens ↑ 19.9k` 一致（525 + 19328 = 19853）。只取 `input` �
 | `cache_write_tokens` | 不可见 | 11628 |
 
 测试：新增 16 例（解析边界 12 + 端到端 4，含临时目录清理与「未声明格式行为
-不变」守卫）；受影响模块 68 + 149 例全绿；ruff / mypy 干净。
+不变」守卫）+ 3 例配置契约守卫（`tests/test_usage_config_contract.py`）：
+`{usage_file}` 与 `usage_format` 必须成对、格式名必须真有解析器、`{usage_file}`
+必须排在 task 占位符之前。这三条都只改 `config/agents.yaml` 就会静默失效，
+已逐个变异验证（顺序改错 / 格式名拼错 / 删掉 `usage_format` 各转红一次）。
+受影响模块 68 + 149 例全绿；ruff / mypy 干净。
 
 **边界**：`cache_read_tokens` / `cache_write_tokens` 已随 `MaopResult.usage`
 返回，但尚未透传到 `cost_entries.metadata` 与 `[USAGE]` 行 —— 该处与 #241
