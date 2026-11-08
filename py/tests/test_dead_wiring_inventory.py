@@ -69,9 +69,7 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     ),
     # ── 写了但没接线（真正待决策的一批） ──
     "maop.ab_test_framework": ("unwired", "生产 A/B 走 core/evolution/ab_test.py，本模块仅测试引用"),
-    "maop.concurrency": ("unwired", "TaskPool/TaskQueue 无生产调用方"),
     "maop.config.agents_validator": ("unwired", "agents.yaml 校验未接入启动/CI 路径"),
-    "maop.control.plane": ("unwired", "ControlPlane 仅测试引用；dashboard 控制面走 system_service"),
     "maop.core.agent.auth.harness_auth": ("unwired", "harness 鉴权未接入调度链"),
     "maop.core.agent.billing.quota_alert": ("unwired", "配额告警阈值/通知链无生产调用方"),
     "maop.core.agent.ops.capability_probe": ("unwired", "agent ops 子包整组未接线"),
@@ -149,7 +147,6 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
             "所以这条链整体都到不了运行时"
         ),
     ),
-    "maop.dashboard.provider": ("unwired", "dashboard 旧 provider 入口（v4.0.0 起 create_app 已废弃）"),
     "maop.dashboard.routers.error_handler": ("unwired", "路由层错误处理未挂到 app"),
     "maop.dashboard.static": ("unwired", "静态文件挂载未接入 server.py"),
     # 2026-10-29 移出清单：ws_blackboard_bridge 已由 lifespan 接线
@@ -160,6 +157,18 @@ KNOWN_ORPHANS: dict[str, tuple[str, str]] = {
     "maop.maop_execute": ("unwired", "全仓零生产调用方（权限门已改由 dispatch_gate 承担）"),
     "maop.maop_loop_config": ("unwired", "主循环配置走 loop_models.LoopConfig，本模块为并存实现"),
     "maop.memory.unified": ("unwired", "统一记忆协议未接入读路径"),
+    # 2026-11-08 移除三条（maop.concurrency / maop.control.plane /
+    # maop.dashboard.provider）：它们不是被接线了，是**此前根本扫不出来**。
+    # 本仓有 17 个 .py 带 UTF-8 BOM，而这里用 "utf-8" 解码 + `except: continue`，
+    # 那 17 个文件的出边全部消失：
+    #   * concurrency ← core/reliability/streaming.py（BOM），而 streaming 被
+    #     delegate/drivers.py 直接导入 —— 这条是**活的**，旧登记"无生产调用方"是错的；
+    #   * dashboard.provider ← dashboard/__init__.py（BOM）**无条件**导入，
+    #     任何 `import maop.dashboard.*` 都会加载它 —— 旧登记同样是错的；
+    #   * control.plane ← control/__init__.py（BOM），而 control 包自己仍是孤儿，
+    #     所以它真实可达性仍为否，只是原因从"零导入方"变成"只被孤儿导入"。
+    # 解码改为 utf-8-sig 后这三条不再满足本工具口径，故移出；control.plane 的
+    # "只被孤儿导入"属于上面 cost_router 注里说的同一类口径缺陷，不重复登记。
     # M-X2 E2-a（2026-11-01）：orchestration 包已接线——temporal_adapter 经
     # wiring.run_workflow 被 cli_workflow（maop workflow run）生产消费，
     # 此前"先行定义"孤儿条目随之销除；base/temporal_adapter/wiring 三件
@@ -210,10 +219,20 @@ def compute_orphans() -> dict[str, str]:
 
     for p, m in files.items():
         pkg = m if p.name == "__init__.py" else m.rsplit(".", 1)[0]
+        # utf-8-sig 而不是 utf-8：本仓有 17 个 .py 以 UTF-8 BOM（EF BB BF）开头，
+        # 解释器会吃掉它，`ast.parse` 不会 —— 用 "utf-8" 解码时 U+FEFF 留在字符串首位，
+        # 直接抛 SyntaxError。此前这里是 `except SyntaxError: continue`，于是这 17 个
+        # 文件的**出边全部消失**，三个模块因此被误判成孤儿（见 KNOWN_ORPHANS 的注）。
+        #
+        # 现在解析失败直接抛：这份清单是"哪些模块没人用"的判决，**部分数据不得产出结论**。
+        # 一个读不进来的文件，其导入关系是未知，不是"没有"。
         try:
-            tree = ast.parse(p.read_text(encoding="utf-8"))
-        except SyntaxError:  # 语法坏掉的模块由 lint 负责
-            continue
+            tree = ast.parse(p.read_text(encoding="utf-8-sig"))
+        except SyntaxError as exc:
+            raise RuntimeError(
+                f"无法解析 {p.relative_to(REPO).as_posix()}，孤儿扫描会因此丢掉它全部的"
+                f"出边，判决不可信：{exc}"
+            ) from exc
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for a in node.names:
@@ -260,6 +279,29 @@ def test_scanner_is_not_vacuous() -> None:
         "已知死模块（server.py 自内联了 lifespan，本模块从未被引用）没被扫出来 —— 扫描器失效"
     )
     assert len(orphans) < 120, f"孤儿数 {len(orphans)} 明显异常，扫描口径可能坏了"
+
+
+def test_bom_files_do_not_hide_their_imports() -> None:
+    """带 BOM 的源文件不许被整份跳过——它们的出边是真实存在的。
+
+    本仓有 17 个 .py 以 ``EF BB BF`` 开头。解释器会吃掉 BOM，``ast.parse`` 不会：
+    用 ``"utf-8"`` 解码时 U+FEFF 留在字符串首位，直接抛 SyntaxError。旧代码
+    ``except SyntaxError: continue`` 把这 17 个文件整份跳过，于是它们的**出边
+    全部消失**，三个模块被误判成孤儿（其中两个其实是活的）。
+
+    这里用三条**只经由 BOM 文件才成立**的导入边做正对照。任一文件被跳过，对应
+    模块就会重新出现在孤儿集合里 —— 这条判据不是"跑通就行"，它对着一个真实
+    发生过的缺陷。
+    """
+    orphans = compute_orphans()
+    for mod, via in (
+        ("maop.concurrency", "core/reliability/streaming.py"),
+        ("maop.dashboard.provider", "dashboard/__init__.py"),
+        ("maop.control.plane", "control/__init__.py"),
+    ):
+        assert mod not in orphans, (
+            f"{mod} 又被判成孤儿了 —— {via} 到它的导入边丢了（该文件带 BOM？解码口径？）"
+        )
 
 
 def test_external_launch_entries_are_excluded() -> None:
