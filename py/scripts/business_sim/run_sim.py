@@ -270,13 +270,20 @@ def collect_alert_evidence():
         from maop.core.alert_ingest import count_alerts, list_alerts, record_alerts
 
         before = count_alerts()
+        # alertname 必须放在 labels 里：record_alerts 只读 labels.alertname /
+        # commonLabels.alertname。2026-11-08 之前这里把名字放在顶层 "name" 键，
+        # 结果静默兜底成 "<unknown>" 落库——仪表板上多出一条永远「触发中」
+        # 却无法处置的告警（record_alerts 现在会为此 WARN，见其 unnamed 计数）。
         record_alerts(
             [
                 {
-                    "name": "BusinessSimCostBudget",
-                    "severity": "warning",
-                    "summary": "M-SIM synthetic cost budget alert",
-                    "labels": {"source": "business-sim"},
+                    "status": "firing",
+                    "labels": {
+                        "alertname": "BusinessSimCostBudget",
+                        "severity": "warning",
+                        "source": "business-sim",
+                    },
+                    "annotations": {"summary": "M-SIM synthetic cost budget alert"},
                 }
             ],
             receiver="business-sim",

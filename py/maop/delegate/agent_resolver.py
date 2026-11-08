@@ -238,6 +238,7 @@ class AgentResolver:
             cli=defn.cli,
             driver=defn.driver,
             cli_args=getattr(defn, 'cli_args', ''),
+            usage_format=str(getattr(defn, 'usage_format', None) or ""),
             capabilities=cast(list[str], getattr(defn, 'capabilities', None) or []),
             timeout_s=defn.timeout_s,
             model=getattr(defn, 'model', ''),

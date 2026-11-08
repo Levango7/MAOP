@@ -24,8 +24,22 @@
       <template #actions><button class="link-btn" @click="refresh">{{ t('common.retry') }}</button></template>
     </Card>
 
-    <!-- ── 层 1: Hero strip — 健康结论 + 关键运行态,一屏之内给答案 ── -->
-    <div v-if="!error" class="ov-hero" :class="heroTone">
+    <!-- ── 层 1: Hero strip — 健康结论 + 关键运行态,一屏之内给答案 ──
+         首载 data 尚未回来时，此前直接渲染 "— 活跃智能体 · — 个任务运行中"，
+         慢网/弱机下与"数据丢失"不可分辨（模板别处的注释写着"skeleton only on
+         first load"，但 hero 条自己并没有骨架分支）。这里补上骨架态与错误态。 -->
+    <div v-if="error" class="ov-hero ov-hero--down" role="alert">
+      <span class="ov-hero__dot" aria-hidden="true"></span>
+      <span class="ov-hero__status">{{ t('view.overview.loadError') }}</span>
+      <span class="ov-hero__fresh muted">{{ error }}</span>
+    </div>
+    <div v-else-if="loading && !data" class="ov-hero ov-hero--skeleton" aria-busy="true">
+      <span class="ov-hero__dot ov-hero__dot--pending" aria-hidden="true"></span>
+      <Skeleton width="96px" height="14px" />
+      <span class="ov-hero__sep" aria-hidden="true"></span>
+      <Skeleton width="180px" height="14px" />
+    </div>
+    <div v-else class="ov-hero" :class="heroTone">
       <span class="ov-hero__dot" aria-hidden="true"></span>
       <span class="ov-hero__status">{{ heroLabel }}</span>
       <span class="ov-hero__sep" aria-hidden="true"></span>
@@ -397,6 +411,10 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); if (pulseTime
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
 }
+/* 首载骨架态：dot 用中性色而非 success/warn/fail——健康结论还没算出来，
+   提前给颜色等于替数据下结论。 */
+.ov-hero--skeleton { color: var(--text-faint); }
+.ov-hero__dot--pending { background: var(--text-faint); }
 .ov-hero__dot {
   width: 8px;
   height: 8px;

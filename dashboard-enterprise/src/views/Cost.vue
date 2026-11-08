@@ -44,6 +44,18 @@
         :loading="loading"
       />
     </div>
+    <!-- 无法计价的条目 cost_usd 必然是 0.0，与"这次真免费"在账面上同形。
+         有这类条目时必须显式说明，否则合计金额会被读成真实总花费。
+         只用共享类（pages.css 单一权威，本文件不引入 scoped 样式）。 -->
+    <p
+      v-if="!loading && summary.unpriced_entries"
+      class="muted"
+      :title="t('view.cost.unpricedTitle')"
+      style="display:flex; align-items:center; gap:var(--sp-2); margin:0 0 var(--sp-4); font-size:var(--fs-sm); color:var(--warn);"
+    >
+      <AppIcon name="alert-triangle" :size="14" aria-hidden="true" />
+      <span>{{ summary.unpriced_entries }} {{ t('view.cost.unpricedHint') }}</span>
+    </p>
 
     <div class="grid-2">
       <Card :title="t('view.cost.budgetStatus')" icon="shield" :margin-bottom="0">
@@ -98,7 +110,10 @@
         <EmptyState v-else-if="!modelKeys.length" icon="cpu" :title="t('view.cost.noModelSpend')" :description="t('view.cost.noModelSpendDesc')" />
         <ul v-else class="breakdown">
           <li v-for="m in modelKeys" :key="m" class="breakdown__item">
-            <span class="breakdown__name">{{ m }}</span>
+            <span class="breakdown__name">
+              {{ m }}
+              <Badge v-if="modelUnpriced(m)" tone="warn" :title="t('view.cost.unpricedTitle')">{{ t('view.cost.unpriced') }}</Badge>
+            </span>
             <div class="breakdown__track"><div class="breakdown__fill" :style="{ width: modelPct(m) + '%' }" /></div>
             <span class="breakdown__val">{{ money(summary.by_model[m].cost) }}</span>
           </li>
@@ -197,6 +212,19 @@ function modelPct(m) {
   if (!info || !total) return 0;
   return Math.min(100, (info.cost / total) * 100);
 }
+// 该模型的条目是否全部无法计价（models.yaml 未收录）——此时 $0.0000 是
+// "无从取价"，不是"免费"，必须与有价模型区分开（2026-11-08）。
+function modelUnpriced(m) {
+  const info = summary.value.by_model?.[m];
+  return !!info && info.unpriced > 0 && info.unpriced >= info.calls;
+}
+// 单条明细是否无法计价。判据与后端 _entry_unpriced 保持一致：priced=false，
+// 或（历史行无 priced 键时）provider 为空。
+function entryUnpriced(e) {
+  const m = e.metadata || {};
+  if ('priced' in m) return !m.priced;
+  return !String(m.provider || '').trim();
+}
 
 const entryCols = [
   { key: 'time', label: t('view.cost.col.time'), type: 'time', width: '180px' },
@@ -213,7 +241,9 @@ const entryRows = computed(() =>
     agent: e.agent || '—',
     model: e.model || '—',
     tokens: formatNum(e.total_tokens),
-    cost: formatUSD(e.cost_usd || 0, 6),
+    // 无法计价（models.yaml 未收录该模型）时不显示 $0.0000，改显示「未计价」：
+    // 否则账面与"这次真免费"完全同形，总成本会被读错（2026-11-08）。
+    cost: entryUnpriced(e) ? t('view.cost.unpriced') : formatUSD(e.cost_usd || 0, 6),
     latency: (e.latency_ms ?? 0) + 'ms',
   }))
 );

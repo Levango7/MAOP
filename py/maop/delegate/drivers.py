@@ -26,6 +26,7 @@ from typing import Any
 from maop.core.agent.delegation.depth import next_depth_env
 from maop.core.agent.usage_protocol import parse_usage_line
 from maop.core.reliability.error_schema import MaopResult, new_result
+from maop.delegate.cli_invocation import discard_usage_dir, prepare_argv, resolve_usage
 from maop.delegate.models import AgentConfig, _escape_for_cmd, _escape_for_ps_command
 
 logger = logging.getLogger(__name__)
@@ -80,38 +81,18 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
         resolved = shutil.which(base_cmd)
         if resolved:
             base_cmd = resolved
-    args_template = config.cli_args or "-p '{task}'"
-    task_placeholder = None
-    for ph in ("'{task}'", "{task}", "{{safePrompt}}"):
-        if ph in args_template:
-            task_placeholder = ph
-            break
-
-    if task_placeholder:
-        # Replace the task placeholder with an unambiguous token, split the
-        # whole template safely, then restore the prompt as a single argument.
-        # This avoids shlex errors when the template contains unmatched quotes
-        # around {task} (e.g. --message "{task}").
-        placeholder = "\x00MAOP_TASK_PLACEHOLDER\x00"
-        safe_template = args_template.replace(task_placeholder, placeholder)
-        try:
-            split_args = shlex.split(safe_template)
-        except ValueError as exc:
-            return new_result(
-                agent=config.name, task=prompt,
-                exit_code=-1, error=f"Invalid cli_args template: {exc}",
-                duration_ms=0,
-            )
-        cli_args = [prompt if arg == placeholder else arg for arg in split_args]
-    else:
-        try:
-            cli_args = shlex.split(args_template)
-        except ValueError as exc:
-            return new_result(
-                agent=config.name, task=prompt,
-                exit_code=-1, error=f"Invalid cli_args template: {exc}",
-                duration_ms=0,
-            )
+    usage_format = getattr(config, "usage_format", "") or ""
+    try:
+        cli_args, usage_dir, usage_file = prepare_argv(
+            config.cli_args or "-p '{task}'", prompt,
+            agent_name=config.name, usage_format=usage_format,
+        )
+    except ValueError as exc:
+        return new_result(
+            agent=config.name, task=prompt,
+            exit_code=-1, error=f"Invalid cli_args template: {exc}",
+            duration_ms=0,
+        )
 
     start = time.monotonic()
     proc = None
@@ -153,7 +134,7 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
                     stdout=streamer.stdout, stderr=streamer.stderr,
                     duration_ms=duration_ms, trace_id=trace_id,
                     driver="cli", model=config.model,
-                    usage=parse_usage_line(streamer.stdout),
+                    usage=resolve_usage(usage_file, usage_format, streamer.stdout),
                 )
 
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
@@ -167,7 +148,7 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
             stdout=out, stderr=err,
             duration_ms=duration_ms, trace_id=trace_id,
             driver="cli", model=config.model,
-            usage=parse_usage_line(out),
+            usage=resolve_usage(usage_file, usage_format, out),
         )
     except asyncio.TimeoutError:
         if proc:
@@ -196,6 +177,10 @@ async def _run_cli(config: AgentConfig, prompt: str, timeout: int,
             duration_ms=int((time.monotonic() - start) * 1000),
             trace_id=trace_id, driver="cli", model=config.model,
         )
+    finally:
+        # 临时目录在 return 表达式求值之后、真正返回之前清理；usage 已在
+        # _resolve_usage 里读完，顺序安全。
+        discard_usage_dir(usage_dir)
 
 
 async def _run_wrapper(config: AgentConfig, prompt: str, timeout: int,

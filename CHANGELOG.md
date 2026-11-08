@@ -39,6 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 修 loop 级 token 双计数（并行路径 `[USAGE]` 虚报 2x，2026-11-08）
+
+核 #232 提交记录时发现（本线板面登记先于修复）：`_execute_parallel` 聚合处
+把组合 usage 又累加进 `_tokens_used_measured`，而 `_execute_with_retry` 已按
+dispatch 逐笔累加——并行路径 loop 级 `[USAGE]` 行虚报 2 倍（实测 2×150 tokens
+的并行组：聚合 usage 正确为 300，计数器 600）。影响仅 `LoopResult.tokens_used`
+遥测（`cli_run.py` loop 级 `[USAGE]` 行与 `tokens_source` 判定）；成本台账
+不受影响（聚合只对账一次，非账单双写）。修复 = 删去聚合处累加，逐 dispatch
+累加为唯一口径；`test_gap5_parallel_usage.py` 的 `_execute_with_retry` 桩改为
+镜像生产口径，原 `== 410` 断言不变即双计回归守卫（再累加会变 820）。
+
 ### `refactor/layering-closeout` 追上 master：154 个提交合并 + 基线断点登记（2026-11-05）
 
 该分支长期落后主树（12 领先 / 154 落后），阶段一至四的成果（13 个端点建模、
@@ -100,6 +111,64 @@ M-SIM M0 演练抓到的最后一条真缺口：`wiring.run_workflow` 在默认�
 
 测试：resolver 5 例 + 告警 5 例；ruff/mypy/零漂移全过。排查报告「未闭环」
 四项中三项已收口（含 turns=4 根因），剩余前端交互运行时抽查待下轮。
+
+### CLI 原生 usage 采集 —— `tokens_source` 从 estimated 变 measured（2026-11-08）
+
+GAP-2 方案 A 解析的是 agent 主动打印的 `[USAGE]` 协议行。那是 MAOP 自定义的
+约定，只有配合它的 stub / 自研 agent 会输出；**真实第三方 CLI 从不输出**，
+因此生产环境该路径恒为 `None`，成本侧只能退回 CJK 启发式 —— `maop run` 的
+`[USAGE]` 行长期是 `tokens=0 source=estimated`。M-SIM 演练里
+`tokensSource=measured` 成立，是因为 stub 自己按协议申报，不代表生产。
+
+本次补上第二条取值链：CLI **自己**的机器可读出口。
+
+- `usage_protocol.parse_usage_file(path, fmt)`：解析 `--usage-output-file`
+  落盘的 usage JSON；未注册格式 / 文件缺失 / 结构不符一律返回 `None`
+  （宁可退回启发式，也不把 0 冒充实测）。
+- `agents.yaml` 新增 `usage_format` 字段，经 `AgentDef → AgentConfig →
+  _make_config` 全程透传（2026-10-11「声明了但没透传」的教训）。
+- `drivers._run_cli` 支持 `{usage_file}` 占位符：`mkdtemp` 给出**尚不存在**
+  的目标文件（避免各 CLI 对「文件已存在」行为不一），进程结束后回读，`finally`
+  清理。占位符在 `shlex.split` **之后**还原 —— cli_args 走 posix 模式，
+  Windows 路径的反斜杠会被当转义符吃掉。
+- copilot 声明 `usage_format: copilot` 并加
+  `--usage-output-file "{usage_file}"`。
+- **模板处理拆到 `delegate/cli_invocation.py`**：加完采集后 `drivers.py` 达 830 行，
+  越过 800 行规模门禁（`scripts/check_file_size.py`；`ALLOWED_OVERSIZE` 已归零，
+  既定方向是不再加白名单）。拆分后 774 行，占位符与取值链成为可独立测试的纯函数。
+
+**参数顺序有讲究（实测踩到）**：`--usage-output-file` 必须排在 `-p "{task}"`
+**之前**。copilot 在 Windows 上是 npm 的 `.CMD` shim，`%*` 传参经 cmd.exe 重新
+分词——prompt 里的换行符会把后续参数**整段截断**。实测一个 316 字符、含
+`[Memory Context]` 与 `\n` 的 prompt，会让 `--allow-all-tools` 与
+`--usage-output-file` 全部丢失，usage 文件根本不生成（`exists=False`），而
+`[USAGE]` 行安静地退回 `estimated`——**不报错、不告警**。这同时说明
+`--allow-all-tools` 此前也可能一直没真正传到。
+
+**口径**：copilot 的 prompt 侧 = `input + cache_read + cache_write`，与其
+stderr 的 `Tokens ↑ 19.9k` 一致（525 + 19328 = 19853）。只取 `input` 会把
+19853 报成 525（低估 37 倍），而且因为「有数」不会被启发式纠正 —— 那是最坏的
+假实测。
+
+**实测对照**（Windows，copilot 1.0.107，同一命令）：
+
+| | 修复前 | 修复后 |
+|---|---|---|
+| `[USAGE]` | `turns=1 tokens=0 source=estimated` | `turns=1 tokens=21463 source=measured` |
+| `cost_entries.prompt_tokens` | 启发式（44） | 实测 |
+| `cache_read_tokens` | 不可见 | 9827 |
+| `cache_write_tokens` | 不可见 | 11628 |
+
+测试：新增 16 例（解析边界 12 + 端到端 4，含临时目录清理与「未声明格式行为
+不变」守卫）+ 3 例配置契约守卫（`tests/test_usage_config_contract.py`）：
+`{usage_file}` 与 `usage_format` 必须成对、格式名必须真有解析器、`{usage_file}`
+必须排在 task 占位符之前。这三条都只改 `config/agents.yaml` 就会静默失效，
+已逐个变异验证（顺序改错 / 格式名拼错 / 删掉 `usage_format` 各转红一次）。
+受影响模块 68 + 149 例全绿；ruff / mypy 干净。
+
+**边界**：`cache_read_tokens` / `cache_write_tokens` 已随 `MaopResult.usage`
+返回，但尚未透传到 `cost_entries.metadata` 与 `[USAGE]` 行 —— 该处与 #241
+（`maop_loop_phases._budget_reconciliation`）同文件，留待其合并后单独做。
 
 ## [5.6.1] — 2026-11-06
 

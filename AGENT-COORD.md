@@ -1059,3 +1059,21 @@
   分支 diff 无私钥材料（grep BEGIN PRIVATE KEY 与 maop_enterprise_prod 均空）。
 - **未做**：开 PR（未授权）；rebase 到最新 master（behind 14 均为他人线合并，
   分支独立推送无冲突；未来 PR 时按追加段对账 AGENT-COORD.md）。
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：GAP-5 后续——loop 级 token 双计数收口）
+
+- **授权**：用户「先板面登记再开 PR」（2026-11-08）；问题由本线核 #232 提交
+  记录时发现并实测复现。
+- **问题**：#232（合入 `d6889fb3`）在 `_execute_parallel` 聚合处又累加了一次
+  `_tokens_used_measured`，而 `_execute_with_retry` 已逐 dispatch 累加
+  （按 `4192a94d` 计约 `loop_executor.py:277` 与 `:396`）⇒ 并行路径 loop 级
+  `[USAGE]` 行虚报 2 倍。实测（master 隔离检出 + 假 dispatcher，2 子任务各
+  150 tokens）：聚合 usage 正确为 300，计数器 600。影响仅遥测
+  （`LoopResult.tokens_used` → `cli_run.py` loop 级 `[USAGE]` 行与
+  `tokens_source` 判定）；`cost_entries` 不受影响（聚合只对账一次，非账单双写）。
+- **修法**：删聚合处累加（逐 dispatch 为唯一口径）；`test_gap5_parallel_usage.py`
+  的 `_execute_with_retry` 桩镜像生产口径（逐笔累加），原 `== 410` 断言不变
+  ⇒ 天然成为双计回归守卫（聚合若再累加会变 820）。
+- **领地**：`py/maop/loop_executor.py`（仅删聚合累加块）、`py/tests/test_gap5_parallel_usage.py`、
+  CHANGELOG `[Unreleased]` 本批段、本登记。
+- **不碰**：#232 聚合透传本体与对账硬化（v5.6.1 已发布）；#241/#246 成本台账
+  provenance/缓存明细线（OPEN，文件不交叠）；M-SIM soak 线。
