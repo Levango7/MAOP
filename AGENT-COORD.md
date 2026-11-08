@@ -1092,3 +1092,9 @@
   属正常未绿态、非红。
 - **未做**：合并（无授权；按「确定没问题再 merge」口径，绿灯后另行授权）；rebase
   （合入式保 sha，台账引用不变）。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：PR #257 合入回执）
+- **合入**：PR #257（`ui/topbar-alignment` @ `db84cb5efe00225e89f42bb023b4f41a74c823cd`）→ master，merge commit `b110ca09754863f9db160c50a14197cdd48d2cbf`，2026-11-08T12:04:59Z；命令 `gh pr merge 257 --merge --match-head-commit db84cb5efe00225e89f42bb023b4f41a74c823cd`（用户「全绿后可以合并」条件授权，条件满足后执行）。
+- **核验**（合入前即时读回）：required 四件（CI scope / Secret Scan (gitleaks) / Docs consistency gate / CI merge gate）全 pass；全仓 checks 无 pending/in_progress/queued；mergeStateStatus=CLEAN、mergeable=MERGEABLE、head sha `db84cb5e…` 未变（合并前无新推送）。
+- **未做**：master 本地指针同步（服务器侧合并，按需再 fetch）；后续线（hallmark 反 AI 味整改 / Agents 分类 taxonomy）未授权不动。
+- 任务 #109 关闭。
