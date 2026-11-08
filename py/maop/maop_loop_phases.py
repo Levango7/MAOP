@@ -444,7 +444,8 @@ class PhasesMixin:
                 # M-X3 归属：成本条目带上 agent 与执行阶段，供三维成本归因聚合；
                 # 此前这两维在账面上是空的（聚合侧只能记 unattributed）。
                 agent=exec_result.agent or "", phase="execute",
-                tokens_source=tokens_source,
+                # priced 判据见下方 run event 的同名字段（models.yaml 未收录 ⇒ False）。
+                tokens_source=tokens_source, priced=bool(model_def),
             )
             record_run_event(
                 trace_id, "run.cost", agent=exec_result.agent or "",
