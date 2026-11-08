@@ -196,6 +196,16 @@ def _lrt_client(monkeypatch: pytest.MonkeyPatch, tasks: list[dict[str, Any]]) ->
     monkeypatch.setattr(session_service, "list_active_long_running_tasks", lambda: tasks)
     monkeypatch.setattr(session_service, "cancel_long_running_task", lambda task_id: True)
     app = FastAPI()
+
+    # 2026-11-08：本路由自此全部端点带 require_admin（此前 submit/cancel 是全库
+    # 唯一零鉴权变更端点）。生产里 request.state.auth_roles 由 ScopeMiddleware
+    # 写入，裸 FastAPI 组装没有那条中间件——这里补一个最薄的 middleware 把
+    # superadmin 角色放上去。**是补齐而非绕过守卫**：守卫本身照跑。
+    @app.middleware("http")
+    async def _inject_admin(request, call_next):
+        request.state.auth_roles = ["superadmin"]
+        return await call_next(request)
+
     app.include_router(lrt_router.router)
     return TestClient(app)
 
@@ -231,10 +241,15 @@ def test_progress_route_has_no_effective_response_model() -> None:
     """
     from pydantic import BaseModel
 
+    # 2026-11-08：同一路径下现在有**两个方法**——GET 是 SSE 进度流，POST 是
+    # 执行器上报进度（长任务子系统此前缺的就是这个上报入口）。原来按"路径条数
+    # == 1"来锁定 SSE 路由，路径一变多就误红；改为**按方法**锁定，语义也更准：
+    # 要钉的从来只有"GET 这条 SSE 不许挂模型"，与同路径上有几个方法无关。
     routes = [
         cast(APIRoute, route)
         for route in lrt_router.router.routes
         if getattr(route, "path", "").endswith("/{task_id}/progress")
+        and "GET" in (getattr(route, "methods", None) or set())
     ]
     assert len(routes) == 1, [r.path for r in routes]
     declared = routes[0].response_model
