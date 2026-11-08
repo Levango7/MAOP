@@ -970,3 +970,18 @@
   其它 session 板面条、MAOS 主工作树、后端任何文件、tokens.css 配色（纯布局/尺寸改动）。
 - **验证**：改后同口径复测（rect 对齐/高度一致/网格填满）+ `npm run design:contrast`
   + `npm run lint` + `npx vue-tsc --noEmit` + 相关 vitest；暗/亮两套主题各截图一张。
+
+### 顶栏/对齐整改批 A 交付回执（2026-11-08，d41ab4d0）
+- **交付**：`d41ab4d0`（`ui/topbar-alignment`，本地提交未推送——用户「做完了再提交吧」
+  只授权提交本批）；6 文件 +63/-116。刷新胶囊右移入右侧工具簇（图标+等宽时间，与
+  prefs/user 12px 等距），品牌区与刷新间分割线删除（全栏仅余工具/用户间 1 条 24px）；
+  品牌块 4 行→2 行；statusline/版本号删除（页脚已载）；顶栏胶囊统一 32px（实测
+  刷新/分析/偏好/用户 t=12 h=32，旧 41/26/27/45 归零）；`.stats-grid` 改
+  auto-fit minmax，4 卡铺满 256→1566（末卡 right=1301 空洞消除）；首页 hero 重复
+  「更新于 刚刚」删除；CoachMarks 失效目标 `.topbar__statusline`→`.topbar__refresh`
+  + 双语教练文案；DESIGN.md §9 响应式措辞同步；旧圆钮整旋 180° 动效改为只转图标
+  （pill 下时间文字会倒置——用户「刷新键翻转」反馈的修正）。
+- **验证**：`npm run design:contrast` PASS；`npm run lint` 0 errors（16 warnings 均在
+  存量无关文件）；`npx vue-tsc --noEmit` PASS；vitest 78 文件/700 例全过；暗/亮两套
+  主题 Playwright 实测截图存本会话工作区（maop-ui-after-topbar-{light,dark}.png）。
+- **未做**：推送（无授权）；#106 loop token 双计数线不受影响。
