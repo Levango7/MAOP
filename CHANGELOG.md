@@ -39,6 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 修 loop 级 token 双计数（并行路径 `[USAGE]` 虚报 2x，2026-11-08）
+
+核 #232 提交记录时发现（本线板面登记先于修复）：`_execute_parallel` 聚合处
+把组合 usage 又累加进 `_tokens_used_measured`，而 `_execute_with_retry` 已按
+dispatch 逐笔累加——并行路径 loop 级 `[USAGE]` 行虚报 2 倍（实测 2×150 tokens
+的并行组：聚合 usage 正确为 300，计数器 600）。影响仅 `LoopResult.tokens_used`
+遥测（`cli_run.py` loop 级 `[USAGE]` 行与 `tokens_source` 判定）；成本台账
+不受影响（聚合只对账一次，非账单双写）。修复 = 删去聚合处累加，逐 dispatch
+累加为唯一口径；`test_gap5_parallel_usage.py` 的 `_execute_with_retry` 桩改为
+镜像生产口径，原 `== 410` 断言不变即双计回归守卫（再累加会变 820）。
+
 ### `refactor/layering-closeout` 追上 master：154 个提交合并 + 基线断点登记（2026-11-05）
 
 该分支长期落后主树（12 领先 / 154 落后），阶段一至四的成果（13 个端点建模、
@@ -174,7 +185,12 @@ stderr 的 `Tokens ↑ 19.9k` 一致（525 + 19328 = 19853）。只取 `input` �
   该方法与 phase 编排无耦合、只依赖宿主 `_root`，独立成
   `CostReconciliationMixin` 后主文件回到 711 行（`ALLOWED_OVERSIZE` 仍为零）。
 
-验证：新增 5 例（落库 / 零值不写键 / 返回值 / usage 透传 / 无键行为不变）；
+验证：新增 6 例（落库 / 零值不写键 / 返回值 / usage 透传 / 无键行为不变 /
+`priced` 调用边守卫）。第 6 例是合并 master 时补的：`f9822c8c` 把
+`priced=bool(model_def)` 加在原 `_budget_reconciliation` 的 `record_actual_cost`
+调用上，本条把该方法拆到独立模块后必须跟着搬，否则台账缺 `priced` 键、成本页
+把「无法计价」显示成「$0.0000 = 免费」；现有 8 条 priced 测试都**直接调**
+`record_actual_cost`，守不住这条调用边。已变异验证（改成 `priced=None` 后该例转红）。
 未修复基线 **4 红 1 绿**（绿的是「无 cache 键时行为不变」守卫）；成本相关
 回归 88 例全绿；`ruff` / `mypy` 干净；文件规模 0 oversize；文档一致性 passed。
 

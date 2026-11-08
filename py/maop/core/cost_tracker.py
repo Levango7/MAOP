@@ -31,6 +31,25 @@ from maop.core.backends.db_utils import get_db_path, sqlite_connect
 logger = logging.getLogger(__name__)
 
 
+def _entry_unpriced(entry: CostEntry) -> bool:
+    """这条成本条目**无法计价**吗（2026-11-08）。
+
+    判据顺序：
+    1. ``metadata["priced"]`` 显式为 False → 无法计价（新写入的条目都带这个键，
+       来自 ``maop_loop_phases`` 的 ``bool(ModelRegistry.get_model(model))``）；
+    2. 没有 ``priced`` 键（2026-11-08 之前写入的历史行）→ 按 ``provider`` 是否为空
+       兜底：provider 空 = models.yaml 没收这个模型 = 无从取价。
+
+    为什么要单独判这一步：无法计价的条目 ``cost_usd`` 必然是 0.0，与"这次真免费"
+    在账面上完全同形。成本页必须能把两者分开，否则运营读到的"总成本 $0.0000"
+    是错的（实测 15 条 cost_entries 里 14 条属于这种）。
+    """
+    meta = entry.metadata or {}
+    if "priced" in meta:
+        return not bool(meta["priced"])
+    return not str(meta.get("provider") or "").strip()
+
+
 class CostEntry(BaseModel):
     id: str = ""
     session_id: str = ""
@@ -55,6 +74,9 @@ class CostSummary(BaseModel):
     by_model: dict[str, dict[str, Any]] = Field(default_factory=dict)
     by_agent: dict[str, dict[str, Any]] = Field(default_factory=dict)
     by_session: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    #: 无法计价的条目数（2026-11-08）：metadata.priced=false 或旧行无 priced 键
+    #: 且 provider 为空。totals 里的金额是"有价部分的合计"，不等于真实总花费。
+    unpriced_entries: int = 0
 
 
 class BudgetStatus(BaseModel):
@@ -425,17 +447,24 @@ class CostTracker:
         by_model: dict[str, dict[str, Any]] = {}
         by_agent: dict[str, dict[str, Any]] = {}
         by_session: dict[str, dict[str, Any]] = {}
+        unpriced = 0
 
         for e in entries:
-            by_model.setdefault(e.model, {"tokens": 0, "cost": 0.0, "calls": 0})
+            # 无法计价 = models.yaml 未收录该模型（provider 为空）。旧行没有 priced
+            # 键，所以这里不依赖新字段，按 provider 兜底判断，历史数据同样算得准。
+            entry_unpriced = _entry_unpriced(e)
+            unpriced += 1 if entry_unpriced else 0
+            by_model.setdefault(e.model, {"tokens": 0, "cost": 0.0, "calls": 0, "unpriced": 0})
             by_model[e.model]["tokens"] += e.total_tokens
             by_model[e.model]["cost"] += e.cost_usd
             by_model[e.model]["calls"] += 1
+            by_model[e.model]["unpriced"] += 1 if entry_unpriced else 0
 
-            by_agent.setdefault(e.agent, {"tokens": 0, "cost": 0.0, "calls": 0})
+            by_agent.setdefault(e.agent, {"tokens": 0, "cost": 0.0, "calls": 0, "unpriced": 0})
             by_agent[e.agent]["tokens"] += e.total_tokens
             by_agent[e.agent]["cost"] += e.cost_usd
             by_agent[e.agent]["calls"] += 1
+            by_agent[e.agent]["unpriced"] += 1 if entry_unpriced else 0
 
             by_session.setdefault(e.session_id, {"tokens": 0, "cost": 0.0, "calls": 0})
             by_session[e.session_id]["tokens"] += e.total_tokens
@@ -452,6 +481,7 @@ class CostTracker:
             by_model=by_model,
             by_agent=by_agent,
             by_session=by_session,
+            unpriced_entries=unpriced,
         )
 
     def get_pricing(self) -> dict[str, dict[str, float]]:
@@ -473,6 +503,7 @@ class CostTracker:
         agent: str = "",
         phase: str = "",
         tokens_source: str = "",
+        priced: bool | None = None,
         cache_read_tokens: int = 0,
         cache_write_tokens: int = 0,
     ) -> dict[str, Any]:
@@ -510,6 +541,13 @@ class CostTracker:
             metadata["phase"] = phase
         if tokens_source:
             metadata["tokens_source"] = tokens_source
+        # priced（2026-11-08）：models.yaml 未收录该模型时，provider/金额都只能是
+        # 空/0.0。此前这个判据只存在于 maop_loop_phases 的 run event 里，台账本身
+        # 没有，于是成本页把「无法计价」显示成「$0.0000」=「免费」——实测 15 条
+        # cost_entries 里 14 条如此（agents.yaml 声明的 14 个模型有 12 个不在
+        # models.yaml）。None = 调用方未声明，不写（旧调用方零改动）。
+        if priced is not None:
+            metadata["priced"] = bool(priced)
         # 缓存命中明细（2026-11-08）：外部 CLI 的提示侧消耗里 cache_read 常占
         # 九成以上（copilot 实测 19328/19853），它是「token 节省」唯一可验证的
         # 指标。只在非零时写，避免给未启用缓存的 agent 增加噪声字段。

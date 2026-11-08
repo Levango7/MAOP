@@ -48,6 +48,11 @@ MAX_ALERTS_PER_WEBHOOK = 1000
 DEFAULT_RETENTION_DAYS = 30
 MAX_ROWS = 10_000
 
+#: 缺 alertname 时的兜底字面量。保留它是为了不破坏既有行与既有前端渲染，
+#: 但 ``record_alerts`` 会把它计数并 WARN——它代表"这条告警无法处置"，
+#: 不是一条正常告警。
+UNKNOWN_ALERTNAME = "<unknown>"
+
 #: 表名一律写成字面量（与 ``run_events`` 同风格）：既避免 f-string 拼 SQL 让
 #: bandit B608 逐条报警、也避免"常量拼出来的 SQL"掩盖真正需要参数化的地方。
 SCHEMA_DDL = """
@@ -109,7 +114,7 @@ def _row_from(alert: dict[str, Any], *, receiver: str, external_url: str,
         _fingerprint(alert, labels),
         status,
         starts_at,
-        _clip(labels.get("alertname") or common_labels.get("alertname") or "<unknown>", MAX_ALERTNAME),
+        _clip(labels.get("alertname") or common_labels.get("alertname") or UNKNOWN_ALERTNAME, MAX_ALERTNAME),
         _clip(labels.get("severity") or common_labels.get("severity") or "", MAX_SEVERITY),
         _clip(labels.get("instance") or common_labels.get("instance") or "", MAX_INSTANCE),
         _clip(labels.get("agent") or common_labels.get("agent") or "", MAX_INSTANCE),
@@ -138,15 +143,23 @@ def record_alerts(alerts: list[dict[str, Any]], *, receiver: str = "",
                   external_url: str = "", common_labels: dict[str, str] | None = None,
                   common_annotations: dict[str, str] | None = None,
                   fallback_status: str = "") -> dict[str, int]:
-    """Persist one inbound batch. Returns ``{"received", "stored", "duplicate"}``.
+    """Persist one inbound batch. Returns ``{"received", "stored", "duplicate", "unnamed"}``.
 
     ``stored`` counts new (事件, 状态) rows; a repeat notification of the same
     incident only refreshes ``received_at`` so a still-firing alert does not age
     out of retention.
+
+    ``unnamed``（2026-11-08）：**既没带 ``labels.alertname`` 也没带
+    ``commonLabels.alertname``** 的条数。这类条过去被 ``_row_from`` 静默兜底成
+    字面量 ``"<unknown>"`` 落库，仪表板上就是一条永远「触发中」、却没有
+    severity/summary 可供处置的告警——实测 business-sim 的合成告警就曾这样写进
+    活动告警存储（调用方把名字放在了顶层 ``name`` 键，而本函数只读
+    ``labels.alertname``）。仍然落库以保持兼容，但**必须显式计数并 WARN**，
+    让"键名写错"这种静默失配在日志里看得见。
     """
     received = len(alerts)
     if received == 0:
-        return {"received": 0, "stored": 0, "duplicate": 0}
+        return {"received": 0, "stored": 0, "duplicate": 0, "unnamed": 0}
     common_labels = {str(k): str(v) for k, v in (common_labels or {}).items()}
     common_annotations = {str(k): str(v) for k, v in (common_annotations or {}).items()}
     rows = [
@@ -155,6 +168,14 @@ def record_alerts(alerts: list[dict[str, Any]], *, receiver: str = "",
                   fallback_status=fallback_status)
         for alert in alerts
     ]
+    # alertname 是 _row_from 返回元组的第 4 个字段（索引 3）。
+    unnamed = sum(1 for row in rows if row[3] == UNKNOWN_ALERTNAME)
+    if unnamed:
+        logger.warning(
+            "[alerts/ingest] %d/%d alert(s) carry no alertname — stored as %r and "
+            "cannot be triaged; pass labels.alertname (or commonLabels.alertname)",
+            unnamed, received, UNKNOWN_ALERTNAME,
+        )
     stored = 0
     try:
         with sqlite_connect(_db_path()) as conn:
@@ -168,8 +189,9 @@ def record_alerts(alerts: list[dict[str, Any]], *, receiver: str = "",
     except (sqlite3.Error, OSError) as exc:
         # 记账失败不能杀掉告警入口：日志已经打过，这里只报告"没存进去"。
         logger.warning("[alerts/ingest] persist failed for %d alert(s): %s", received, exc)
-        return {"received": received, "stored": 0, "duplicate": 0}
-    return {"received": received, "stored": stored, "duplicate": received - stored}
+        return {"received": received, "stored": 0, "duplicate": 0, "unnamed": unnamed}
+    return {"received": received, "stored": stored,
+            "duplicate": received - stored, "unnamed": unnamed}
 
 
 def list_alerts(*, limit: int = 50, status: str = "", severity: str = "",

@@ -100,6 +100,8 @@ class CostReconciliationMixin:
                 # 此前这两维在账面上是空的（聚合侧只能记 unattributed）。
                 agent=exec_result.agent or "", phase="execute",
                 tokens_source=tokens_source,
+                # priced 判据见下方 run.cost 事件（models.yaml 未收录 ⇒ False）。
+                priced=bool(model_def),
                 cache_read_tokens=cache_read,
                 cache_write_tokens=cache_write,
             )

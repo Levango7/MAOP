@@ -50,7 +50,7 @@ def test_record_then_list_returns_the_alert(db: Path) -> None:
     result = alert_ingest.record_alerts(
         [_alert()], receiver="webhook", external_url="http://am:9093",
     )
-    assert result == {"received": 1, "stored": 1, "duplicate": 0}
+    assert result == {"received": 1, "stored": 1, "duplicate": 0, "unnamed": 0}
 
     rows = alert_ingest.list_alerts()
     assert len(rows) == 1
@@ -66,7 +66,7 @@ def test_record_then_list_returns_the_alert(db: Path) -> None:
 
 
 def test_empty_batch_stores_nothing(db: Path) -> None:
-    assert alert_ingest.record_alerts([]) == {"received": 0, "stored": 0, "duplicate": 0}
+    assert alert_ingest.record_alerts([]) == {"received": 0, "stored": 0, "duplicate": 0, "unnamed": 0}
     assert alert_ingest.list_alerts() == []
 
 
@@ -122,7 +122,7 @@ def test_repeat_notification_collapses_and_refreshes(db: Path) -> None:
         conn.execute("UPDATE alertmanager_alerts SET received_at = ?", (time.time() - 7200,))
 
     again = alert_ingest.record_alerts([_alert()])
-    assert again == {"received": 1, "stored": 0, "duplicate": 1}
+    assert again == {"received": 1, "stored": 0, "duplicate": 1, "unnamed": 0}
 
     rows = alert_ingest.list_alerts()
     assert len(rows) == 1
@@ -291,7 +291,7 @@ def test_record_alerts_swallows_storage_failure(
 
     monkeypatch.setattr(alert_ingest, "get_db_path", boom)
     assert alert_ingest.record_alerts([_alert()]) == {
-        "received": 1, "stored": 0, "duplicate": 0,
+        "received": 1, "stored": 0, "duplicate": 0, "unnamed": 0,
     }
 
 
@@ -310,3 +310,46 @@ def test_list_alerts_swallows_read_failure(
 def test_prune_is_idempotent_on_an_empty_ledger(db: Path) -> None:
     assert alert_ingest.prune_alerts() == {"expired": 0, "capped": 0}
     assert alert_ingest.count_alerts() == 0
+
+
+# ── 无名告警：必须被计数，不能静默变成可处置告警 ────────────────────
+# 2026-11-08 实测：business-sim 的合成告警把名字放在顶层 "name" 键，而本模块
+# 只读 labels.alertname，于是静默兜底成 "<unknown>" 落库 —— 仪表板上多出一条
+# 永远「触发中」却没有 severity/summary 可供处置的告警。
+
+
+def test_nameless_alert_is_counted_as_unnamed(db: Path) -> None:
+    result = alert_ingest.record_alerts([_alert(labels={"severity": "warning"})])
+    assert result["received"] == 1
+    # 仍然落库（兼容既有行与前端渲染），但必须显式计数。
+    assert result["stored"] == 1
+    assert result["unnamed"] == 1
+    assert alert_ingest.list_alerts()[0]["alertname"] == alert_ingest.UNKNOWN_ALERTNAME
+
+
+def test_common_labels_alertname_rescues_a_nameless_alert(db: Path) -> None:
+    """批次级 commonLabels.alertname 同样算数——Alertmanager 两种都给。"""
+    result = alert_ingest.record_alerts(
+        [_alert(labels={"severity": "warning"})],
+        common_labels={"alertname": "BusinessSimCostBudget"},
+    )
+    assert result["unnamed"] == 0
+    assert alert_ingest.list_alerts()[0]["alertname"] == "BusinessSimCostBudget"
+
+
+def test_named_alert_is_never_counted_as_unnamed(db: Path) -> None:
+    assert alert_ingest.record_alerts([_alert()])["unnamed"] == 0
+
+
+def test_unnamed_survives_a_storage_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """降级路径也要带 unnamed——调用方拿到的键集合必须稳定。"""
+
+    def boom(*a: Any, **k: Any) -> Path:
+        raise OSError("disk gone")
+
+    monkeypatch.setattr(alert_ingest, "get_db_path", boom)
+    result = alert_ingest.record_alerts([_alert(labels={})])
+    assert result["stored"] == 0
+    assert result["unnamed"] == 1

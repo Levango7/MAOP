@@ -104,6 +104,7 @@ import CommandPalette from './components/CommandPalette.vue';
 // MAOP 独有特效组件: 顶部加载条 + Toast 通知
 import MaopLoadingBar from './components/MaopLoadingBar.vue';
 import MaopToast from './components/MaopToast.vue';
+import { useRouteLoadingBar } from './composables/useMaopEffects.js';
 import { useI18n } from './i18n/index.js';
 import { nav, filterNavByEdition } from './nav.js';
 
@@ -191,7 +192,7 @@ function onSidebarClick(e) {
 }
 
 // Nav active state: matchPaths (e.g. /evolution-history highlights /evolve)
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 const route = useRoute();
 function isActive(item) {
   if (!item.to) return false;
@@ -200,6 +201,20 @@ function isActive(item) {
   if (Array.isArray(item.matchPaths) && item.matchPaths.some((p) => route.path === p || route.path.startsWith(p + '/'))) return true;
   return false;
 }
+
+// ── Route lazy-chunk loading feedback ────────────────────────────────────
+// 2026-11-08 实测缺陷：router 有 55 处动态 import()（路由级分包），首次进入
+// 某路由时 chunk 还没到位，`<router-view>` 整块空白 4–10 秒——用户看到的是
+// "页面坏了"，而不是"在加载"。
+//
+// 修法不是新造轮子：MaopLoadingBar.vue（顶部 2px 流动条）、全局事件
+// maop-loading-start/stop、useLoadingBar() **三样此前都已存在，且组件已渲染在
+// 下方模板里**，缺的只是"谁在导航时触发它"——全仓零调用点，属零件齐全的死
+// 接线。触发器与兜底逻辑抽在 useMaopEffects.useRouteLoadingBar()，此处只调用
+// （另有钉子测试 src/__tests__/route-loading-bar.test.js 钉住行为）。
+const router = useRouter();
+useRouteLoadingBar(router);
+
 
 // ── Navigation ────────────────────────────────────────────────────────────
 // `nav` is imported from ./nav.js (single source of truth shared with PageHeader).

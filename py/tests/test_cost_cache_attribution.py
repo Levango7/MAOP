@@ -137,3 +137,25 @@ def test_reconciliation_without_cache_keys_is_unchanged(tmp_path, monkeypatch) -
     entry = CostTracker(root_dir=tmp_path).get_entries(agent="copilot", limit=1)[0]
     assert "cache_read_tokens" not in entry.metadata
     assert "cache_write_tokens" not in entry.metadata
+
+
+def test_reconciliation_passes_priced_flag_to_ledger(tmp_path, monkeypatch) -> None:
+    """拆分后的 _budget_reconciliation 必须把 priced 判据传给台账。
+
+    f9822c8c 把 ``priced=bool(model_def)`` 加在 maop_loop_phases 的
+    ``record_actual_cost`` 调用上；#246 把该方法整体拆到
+    ``cost_reconciliation.py`` 后，这个参数若没跟着搬过来，
+    ``cost_entries.metadata`` 就没有 priced 键，成本页会把「无法计价」
+    显示成「$0.0000 = 免费」。现有 8 条 priced 测试都是**直接调**
+    ``record_actual_cost``，守不住这条调用边——本例端到端钉死它。
+    """
+    monkeypatch.setattr("maop.cost_reconciliation.record_run_event", lambda *a, **k: None)
+
+    host = _Host(str(tmp_path))
+    result = _ExecResult(usage={"prompt_tokens": 100, "completion_tokens": 10})
+    host._budget_reconciliation(result, "t-priced-loop")
+
+    entry = CostTracker(root_dir=tmp_path).get_entries(agent="copilot", limit=1)[0]
+    # 不依赖 models.yaml 收录了哪些模型：调用方传了 priced，键必定存在且为
+    # bool；没传则 metadata 里根本没有这个键（record_actual_cost 的 None 分支）。
+    assert isinstance(entry.metadata.get("priced"), bool)
