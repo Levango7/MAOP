@@ -1130,3 +1130,14 @@
 - **上链清单**：`1e26b1f0`（批 1 数据面）、`806bf494`（批 2 呈现面）、`d48bb7e6`（批 1/2 回执）、`1699721d`（批 3 hallmark 空数据降级）、`0235e502`（批 3 回执）。
 - **注**：推送触发分支 CI；若红按内容红/环境红/门禁未启动三态分诊再报。
 - **未做**：本回执提交留本地未推（逐批授权制）。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-09：批 4 前端布局/状态残留整改）
+- **授权**：用户 2026-11-09「不行并行吗？？一边等ci，一边做？？」（针对上一条汇报列出的前端审计缺口清单；授权含本批所列修复的端到端决定权；0235e502 的 CI 看守并行继续，互不阻塞）。
+- **范围**（均来自同一会话四路审计的 file:line 证据；假阳性已剔除并写明理由：Examples 纯静态无异步、Run 反馈在子视图、WorkflowEditor 无初始化拉取）：
+  - pages.css:63 `:only-child` 泛化到 `.grid-2`/`.two-col`（治 Models.vue:19 单 EmptyState 右列空洞类）
+  - AgentRegistry.vue:1003 / AgentBilling.vue:1021 / AlertRules.vue:685 / AgentGateway.vue:673 容器 `overflow: hidden` → `overflow-x: auto`（对齐 DESIGN.md:198 表格可横向滚动）
+  - Overview.vue:111 死类 `chart-card`（其 CSS 已于 4ae35425 删除，全仓仅此一处引用）
+  - WorkflowEditor.vue:4,6 死 prop `:loading="false"` / `:empty="false"`（该视图无初始化拉取，默认值即语义）
+  - DESIGN.md:102,237 卡片 padding 20px → 与 Card.vue:71 实 `--sp-4` 对齐（DESIGN.md:121 自认 tokens.css 优先）
+- **不碰**：后端 py/、i18n、其他视图、CI/CD、分支保护；pending 态泛化、长列表虚拟化、路由懒加载空白（P2-3）、他页 idle 降级等口味/设计项留待后续批裁决，本批不发明。
+- **批次**：本批一次交付，分两笔提交（布局残留 / 死代码+文档同步）+ 门禁证据 + 本登记；回执带 sha；推送逐批授权。
