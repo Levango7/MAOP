@@ -167,8 +167,36 @@ stderr 的 `Tokens ↑ 19.9k` 一致（525 + 19328 = 19853）。只取 `input` �
 受影响模块 68 + 149 例全绿；ruff / mypy 干净。
 
 **边界**：`cache_read_tokens` / `cache_write_tokens` 已随 `MaopResult.usage`
-返回，但尚未透传到 `cost_entries.metadata` 与 `[USAGE]` 行 —— 该处与 #241
-（`maop_loop_phases._budget_reconciliation`）同文件，留待其合并后单独做。
+返回；写进 `cost_entries.metadata` 与 `run.cost` 事件的部分见下一条。
+
+### 缓存命中明细进台账 + 成本对账独立成模块（2026-11-08）
+
+外部 CLI 的提示侧消耗里 `cache_read` 常占九成以上（copilot 实测
+19328/19853 = 97.4%）。它是「token 用量节省」**唯一可验证的指标** —— 没有它，
+"省了多少"只能靠总量倒推，无法区分「上下文真的变短」与「缓存命中率变高」。
+
+- `CostTracker.record_actual_cost` 新增 `cache_read_tokens` /
+  `cache_write_tokens`，写进 `cost_entries.metadata`；**非零才写**，未启用
+  缓存的 agent 不产生两个恒为 0 的噪声字段。
+- `_budget_reconciliation` 从 `MaopResult.usage` 读出并透传；`run.cost`
+  事件带同口径字段，控制台与台账不再各说各话。
+- **`_budget_reconciliation` 拆到 `py/maop/cost_reconciliation.py`**：
+  `maop_loop_phases.py` 已卡在 800 行规模门禁线上（加完 cache 透传后 809 行），
+  该方法与 phase 编排无耦合、只依赖宿主 `_root`，独立成
+  `CostReconciliationMixin` 后主文件回到 711 行（`ALLOWED_OVERSIZE` 仍为零）。
+
+验证：新增 6 例（落库 / 零值不写键 / 返回值 / usage 透传 / 无键行为不变 /
+`priced` 调用边守卫）。第 6 例是合并 master 时补的：`f9822c8c` 把
+`priced=bool(model_def)` 加在原 `_budget_reconciliation` 的 `record_actual_cost`
+调用上，本条把该方法拆到独立模块后必须跟着搬，否则台账缺 `priced` 键、成本页
+把「无法计价」显示成「$0.0000 = 免费」；现有 8 条 priced 测试都**直接调**
+`record_actual_cost`，守不住这条调用边。已变异验证（改成 `priced=None` 后该例转红）。
+未修复基线 **4 红 1 绿**（绿的是「无 cache 键时行为不变」守卫）；成本相关
+回归 88 例全绿；`ruff` / `mypy` 干净；文件规模 0 oversize；文档一致性 passed。
+
+**依赖**：cache 明细由 CLI 原生 usage 出口（copilot 的
+`--usage-output-file`）提供。该出口未启用时 `usage` 里没有这两个键，透传
+恒为 0，行为与既往逐字节一致。
 
 ## [5.6.1] — 2026-11-06
 

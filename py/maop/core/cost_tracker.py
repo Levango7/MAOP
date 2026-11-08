@@ -504,6 +504,8 @@ class CostTracker:
         phase: str = "",
         tokens_source: str = "",
         priced: bool | None = None,
+        cache_read_tokens: int = 0,
+        cache_write_tokens: int = 0,
     ) -> dict[str, Any]:
         """Post-execution cost reconciliation.
 
@@ -546,6 +548,13 @@ class CostTracker:
         # models.yaml）。None = 调用方未声明，不写（旧调用方零改动）。
         if priced is not None:
             metadata["priced"] = bool(priced)
+        # 缓存命中明细（2026-11-08）：外部 CLI 的提示侧消耗里 cache_read 常占
+        # 九成以上（copilot 实测 19328/19853），它是「token 节省」唯一可验证的
+        # 指标。只在非零时写，避免给未启用缓存的 agent 增加噪声字段。
+        if cache_read_tokens:
+            metadata["cache_read_tokens"] = cache_read_tokens
+        if cache_write_tokens:
+            metadata["cache_write_tokens"] = cache_write_tokens
 
         self.record(
             agent=agent,
@@ -572,6 +581,8 @@ class CostTracker:
             "discrepancy": discrepancy,
             "tokens_in": actual_tokens_in,
             "tokens_out": actual_tokens_out,
+            "cache_read_tokens": cache_read_tokens,
+            "cache_write_tokens": cache_write_tokens,
         }
 
     # ── Internal ────────────────────────────────────────────────
