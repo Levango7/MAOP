@@ -985,3 +985,48 @@
   存量无关文件）；`npx vue-tsc --noEmit` PASS；vitest 78 文件/700 例全过；暗/亮两套
   主题 Playwright 实测截图存本会话工作区（maop-ui-after-topbar-{light,dark}.png）。
 - **未做**：推送（无授权）；#106 loop token 双计数线不受影响。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：概览页对齐整改——UI 批 B）
+- **授权**：用户原话「概览页面 很多地方根本不对齐啊 麻烦解决一下 左右对齐，上下对齐」。
+- **取证**（dev server :5175 + 真后端 :9079，Playwright 实测 1600×1000 light）：
+  - `.chart-card { padding: var(--sp-4) }`（pages.css:765）加在 Card 根上，Card body
+    自带 16px padding → throughput 卡头部下偏 16.6px（703.8 vs 兄弟卡 687.9）、
+    chart-box 双侧各内缩 +16（288.7 vs 正文规范 272.7）——全站唯一双 padding 卡；
+  - `.row` 两列网格装单卡：runtime 行（Overview.vue:120）与 fail-ranking 行（:133）的
+    唯一 Card 只占左列 w=647 x=256，容器右半 919→1566 全空；
+  - 其余实测已对齐：8 个全宽段 x=256/right=1566 统一，段间距 16px，stats 4×315.5、
+    actions 4×318.5 gap 16，split 两卡 y/h 完全一致（687.2/394.6）。
+- **修法**：删 pages.css:765 `.chart-card` padding 行；`.row` 加
+  `.row > :only-child { grid-column: 1 / -1; }` 使单卡行铺满（纯布局，不动配色/文案）。
+- **领地**：`dashboard-enterprise/src/styles/pages.css`、本登记。
+- **不碰**：#106/#252 领地、批 A 已交付的 TopBar/stats-grid、tokens.css 配色、后端任何文件。
+- **验证**：改后同口径复测（runtime 卡铺满/chart 头与兄弟齐平/chart-box 对齐正文规范）
+  + `npm run design:contrast` + `npm run lint` + `npx vue-tsc --noEmit` + vitest；
+  暗/亮两套主题各截图一张存会话工作区。
+
+### 概览页对齐整改批 B 交付回执（2026-11-08，提交 4ae35425）
+- **交付**（仅 `dashboard-enterprise/src/styles/pages.css`，2 行）：
+  ① 删 `.chart-card { padding: var(--sp-4) }`（pages.css:765）——Card 根 padding 与
+  `.card__body` 自带 16px 叠加，致 throughput 卡头下偏 16.6px、chart-box 双侧各内缩
+  +16（全站唯一双 padding 卡）；删后卡头偏移 0.7px 与兄弟卡一致、chart-box 左内缩
+  16.7px 与正文规范一致；
+  ② 加 `.row > :only-child { grid-column: 1 / -1; }`——runtime 行（Overview.vue:120）
+  与 fail-ranking 行（:133）的单卡此前只占左列 w=647、容器右半 919→1566 全空；
+  现铺满（实测 runtime 卡 w=1417.3 right=1673.3=容器右沿）。
+- **验证**（Playwright 实测 1600×1000，dev :5175 + 真后端 :9079）：8 个全宽段
+  x=256/right=1673.3 统一，段间距 16px，split 两卡 y/h 齐平（687.2/362.6）；
+  `npm run design:contrast` PASS / `npm run lint` 0 errors（16 warnings 均存量无关）/
+  `npx vue-tsc --noEmit` PASS / vitest 78 文件 700 例全过（日志
+  maop-ui-batchB-gates.log）；暗/亮全页截图存会话工作区
+  （maop-ui-batchB-overview-{light,dark}.png；亮色首抓因 chart.js 入场动画未见曲线，
+  稳定后复测确认 teal 线亮色正常）。
+- **未做**：推送（无授权）；CHANGELOG（批 A 先例：UI 对齐批不入）；
+  DESIGN.md（无规则变更——删的是违反 §1 单层 padding 的离规样式）。
+- **不碰**：#106/#252 线（#246 仍 OPEN；#252 mergeable=MERGEABLE、BLOCKED 仅因
+  `CI merge gate` needs 含排队中的 pip-audit/SBOM，required 四件中 scope/secret-scan/
+  docs-gate 已绿、gate 待上报）。
+- **后记（分辨率事件）**：验证中曾把驱动浏览器 resize 到 2559 CSS px（本机 2559 物理
+  /150% 缩放 = 1706 CSS），窗口溢出屏幕被用户发现「分辨率又出问题」；已还原
+  1707×876（native）并复验 zoom=1 / topbar DOM 计数=1 / 无横向溢出。fullPage 截图
+  「双顶栏」为 sticky 元素缝合伪影，非页面 bug。/operate、/capability/agents 跳转非
+  本线导航（驱动窗口在用户桌面），已停回 /home。
