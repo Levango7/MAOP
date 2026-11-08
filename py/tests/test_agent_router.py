@@ -95,15 +95,62 @@ class TestRoutingContext:
     """RoutingContext 模型测试。"""
 
     def test_default_values(self) -> None:
-        """默认构造：空能力列表、空偏好、low 成本、要求健康。"""
+        """默认构造：空能力列表、空偏好、any 成本、要求健康。
+
+        2026-11-08：默认成本档从 "low" 改为 "any"。原默认只允许
+        FREE/SUBSCRIPTION，而 billing_model 默认 BLACKBOX ⇒ 未显式设置
+        billing_model 的 agent 会被成本过滤全部筛空，默认构造的 ctx 路由
+        恒失败（真机实证 /api/agent-router/route 返回 primary=null）。
+        """
         ctx = RoutingContext()
         assert ctx.required_capabilities == []
         assert ctx.preferred_agent == ""
         assert ctx.excluded_agents == []
-        assert ctx.max_cost_tier == "low"
+        assert ctx.max_cost_tier == "any"
         assert ctx.require_healthy is True
         assert ctx.session_id == ""
         assert ctx.metadata == {}
+
+
+
+    def test_default_context_does_not_filter_out_undescribed_agents(self) -> None:
+        """默认 ctx 不能把未声明 billing_model 的 agent 筛空（2026-11-08 回归）。
+
+        病灶：max_cost_tier 默认 "low" 与 billing_model 默认 BLACKBOX 叠加 ⇒
+        过滤链第 4 步清空候选，route() 返回 "no candidates after filtering"。
+        三个 HTTP 用例当年全靠显式传 "any" 才通，正说明默认值不可用。
+        """
+        from maop.core.agent.registry.agent_catalog import (
+            AgentCapability,
+            AgentCatalog,
+            AgentDescriptor,
+        )
+        catalog = AgentCatalog()
+        catalog.register(AgentDescriptor(
+            name="copilot", capabilities=[AgentCapability.CODE_GENERATION], healthy=True,
+        ))
+        router = AgentRouter(catalog=catalog)
+        result = router.route(RoutingContext())  # 全部默认值
+        assert result.primary is not None, f"默认 ctx 选不出 agent: {result.reason}"
+        assert result.reason != "no candidates after filtering"
+
+    def test_explicit_low_tier_still_filters(self) -> None:
+        """显式传 low 仍应严格过滤——默认放行不等于丢掉这个能力。"""
+        from maop.core.agent.registry.agent_catalog import (
+            AgentCapability,
+            AgentCatalog,
+            AgentDescriptor,
+        )
+        catalog = AgentCatalog()
+        catalog.register(AgentDescriptor(
+            name="copilot", capabilities=[AgentCapability.CODE_GENERATION], healthy=True,
+        ))
+        router = AgentRouter(catalog=catalog)
+        ctx = RoutingContext(max_cost_tier="low")
+        result = router.route(ctx, strategy=RoutingStrategy.CAPABILITY_MATCH)
+        # BLACKBOX 优先级 5 > low 上限 1 ⇒ 全部筛空
+        assert result.primary is None
+        assert result.reason == "no candidates after filtering"
 
     def test_with_capabilities(self) -> None:
         """带能力列表构造。"""
@@ -646,3 +693,108 @@ class TestRoutingStrategy:
         """策略是 str Enum（可比较字符串）."""
         assert RoutingStrategy.COST_OPTIMIZED == "cost_optimized"
         assert isinstance(RoutingStrategy.PRIORITY, str)
+
+
+# ── 2026-11-08 接线回归：acquire/release 与 _active_count ──────────────
+# acquire/release 与 _active_count 一直存在，但全仓零调用方 ⇒ LOAD_BALANCED
+# 的排序键第一项恒 0（退化成字典序）、max_concurrent 从未被强制执行。
+
+
+class TestActiveCountWiring:
+    """dispatch 侧槽位占位接线。"""
+
+    def test_singleton_roundtrip(self) -> None:
+        from maop.core.agent.router.agent_router import (
+            get_agent_router,
+            set_agent_router,
+        )
+        one = get_agent_router()
+        assert get_agent_router() is one  # 同一进程同一实例
+        set_agent_router(None)
+        assert get_agent_router() is not None  # 清空后重新惰性创建
+        set_agent_router(one)
+
+    def test_acquire_release_moves_active_count(self) -> None:
+        from maop.core.agent.registry.agent_catalog import (
+            AgentCapability,
+            AgentCatalog,
+            AgentDescriptor,
+        )
+        catalog = AgentCatalog()
+        catalog.register(AgentDescriptor(
+            name="copilot", capabilities=[AgentCapability.CODE_GENERATION],
+            healthy=True, max_concurrent=2,
+        ))
+        router = AgentRouter(catalog=catalog)
+        assert router.get_active_count("copilot") == 0
+        assert router.acquire("copilot") is True
+        assert router.get_active_count("copilot") == 1
+        router.release("copilot")
+        assert router.get_active_count("copilot") == 0
+
+    def test_acquire_respects_max_concurrent(self) -> None:
+        from maop.core.agent.registry.agent_catalog import (
+            AgentCapability,
+            AgentCatalog,
+            AgentDescriptor,
+        )
+        catalog = AgentCatalog()
+        catalog.register(AgentDescriptor(
+            name="copilot", capabilities=[AgentCapability.CODE_GENERATION],
+            healthy=True, max_concurrent=1,
+        ))
+        router = AgentRouter(catalog=catalog)
+        assert router.acquire("copilot") is True
+        assert router.acquire("copilot") is False  # 满载
+        router.release("copilot")
+        assert router.acquire("copilot") is True
+
+    def test_dispatch_slot_helpers_are_non_blocking(self) -> None:
+        """acquire 失败/agent 不存在都不得抛——接线不能成为新故障点。"""
+        from maop.core.agent.registry.agent_catalog import AgentCatalog
+        from maop.core.agent.router.agent_router import AgentRouter, set_agent_router
+        from maop.delegate.dispatch_impl import DispatchImplMixin
+
+        set_agent_router(AgentRouter(catalog=AgentCatalog()))
+        mixin = DispatchImplMixin()
+        assert mixin._acquire_agent_slot("no-such-agent") is False
+        mixin._release_agent_slot("no-such-agent")  # 不得抛
+        set_agent_router(None)
+
+    def test_load_balanced_sees_active_count_after_wiring(self) -> None:
+        """接线后 LOAD_BALANCED 真的按负载选人（而非恒按字典序）。
+
+        这是本条修复的核心断言：占满 zulu 后，primary 必须离开 zulu。
+        """
+        from maop.core.agent.registry.agent_catalog import (
+            AgentCapability,
+            AgentCatalog,
+            AgentDescriptor,
+        )
+        from maop.core.agent.router.agent_router import set_agent_router
+        from maop.delegate.dispatch_impl import DispatchImplMixin
+
+        catalog = AgentCatalog()
+        for n in ("zulu", "mike", "alpha"):
+            catalog.register(AgentDescriptor(
+                name=n, capabilities=[AgentCapability.CODE_GENERATION],
+                healthy=True, max_concurrent=2,
+            ))
+        router = AgentRouter(catalog=catalog)
+        set_agent_router(router)
+        mixin = DispatchImplMixin()
+        try:
+            before = router.route(RoutingContext(), strategy=RoutingStrategy.LOAD_BALANCED)
+            assert before.primary is not None
+            # 占满 before.primary（max_concurrent=2）
+            for _ in range(2):
+                assert mixin._acquire_agent_slot(before.primary.name) is True
+            after = router.route(RoutingContext(), strategy=RoutingStrategy.LOAD_BALANCED)
+            assert after.primary is not None
+            assert after.primary.name != before.primary.name, (
+                "满载后 primary 未切换 —— 负载数据没被消费"
+            )
+        finally:
+            for _ in range(2):
+                mixin._release_agent_slot(before.primary.name)
+            set_agent_router(None)
