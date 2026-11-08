@@ -57,8 +57,10 @@
       </router-link>
     </nav>
 
-    <!-- KPI grid — only real runtime metrics (no codebase vanity numbers) -->
-    <div class="stats-grid">
+    <!-- KPI grid — only real runtime metrics (no codebase vanity numbers).
+         空数据降级（hallmark empty-data gate）：系统尚未产生活动时，全零指标卡只是
+         占位感，换成一条说明条 + 行动指引；运行时事实（版本/uptime/平台）仍保留。 -->
+    <div v-if="!idleSystem" class="stats-grid">
       <div v-for="s in stats" :key="s.label" class="stat-cell">
         <StatCard
           :label="s.label" :value="s.value" :unit="s.unit" :icon="s.icon" :tone="s.tone" :accent="s.accent" :loading="loading"
@@ -66,9 +68,14 @@
         />
       </div>
     </div>
+    <div v-else class="ov-idle">
+      <AppIcon name="moon" :size="16" />
+      <span class="ov-idle__title">{{ t('view.overview.idleTitle') }}</span>
+      <span class="ov-idle__hint">{{ t('view.overview.noActivityHint') }}</span>
+    </div>
 
-    <!-- Main rows -->
-    <div v-if="!error" class="row">
+    <!-- Main rows（idle 时隐藏：健康指标与近期委派同为全零/空，留着只是占位） -->
+    <div v-if="!error && !idleSystem" class="row">
       <!-- System health -->
       <Card icon="cpu" :title="t('view.overview.systemHealth')" :badge="healthScore + '%'" :badge-tone="healthTone">
         <div v-if="loading" class="health-skel">
@@ -99,8 +106,8 @@
       </Card>
     </div>
 
-    <!-- ── 层 3: 图表 (2/3) + 活动流 (1/3) 并排 — 上下文不再独占整行 ── -->
-    <div v-if="!error" class="ov-split">
+    <!-- ── 层 3: 图表 (2/3) + 活动流 (1/3) 并排 — 上下文不再独占整行（idle 时隐藏） ── -->
+    <div v-if="!error && !idleSystem" class="ov-split">
       <Card icon="activity" :title="t('view.overview.throughput')" class="chart-card">
         <div class="chart-box">
           <Line v-if="chartData.labels.length" :data="chartData" :options="chartOptions" />
@@ -343,6 +350,20 @@ const chartData = computed(() => ({
     pointHoverRadius: 4,
   }],
 }));
+
+// 空数据降级判定：委派/智能体/近期事件/故障/时序全部为空 ⇒ 系统尚未产出任何
+// 活动，KPI 全零卡与健康卡只剩占位感，整区降级为一条说明条。运行时信息不受影响。
+const idleSystem = computed(() => {
+  const d = data.value;
+  if (!d) return false;
+  return !(
+    Number(d.delegations_total || 0) > 0 ||
+    Number(d.agents_total || 0) > 0 ||
+    (d.recent_delegations || []).length > 0 ||
+    (d.fail_ranking || []).length > 0 ||
+    chartData.value.labels.length > 0
+  );
+});
 const chartOptions = computed(() => baseLineOptions({
   muted: chartMuted(),
   grid: chartGridColor(),

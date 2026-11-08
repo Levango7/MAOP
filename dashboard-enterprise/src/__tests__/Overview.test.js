@@ -71,6 +71,10 @@ describe('Overview.vue', () => {
     mockFetch(defaultRoutes());
     const wrapper = await mountOverview();
     expect(wrapper.find('.overview').exists()).toBe(true);
+    // Active system: KPI grid + split (chart/activity) render
+    expect(wrapper.find('.stats-grid').exists()).toBe(true);
+    expect(wrapper.find('.ov-split').exists()).toBe(true);
+    expect(wrapper.find('.ov-idle').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -95,10 +99,31 @@ describe('Overview.vue', () => {
     wrapper.unmount();
   });
 
-  it('handles empty data without crashing and shows chart EmptyState', async () => {
-    mockFetch(defaultRoutes({ '/api/overview': {} }));
+  it('degrades idle system to a single strip instead of all-zero KPI cards', async () => {
+    // Faithful idle payload: bridge returns zeros/empty arrays, not missing fields
+    mockFetch(defaultRoutes({ '/api/overview': {
+      status: 'ok',
+      agents_total: 0, delegations_total: 0, success_rate: 0.0, avg_latency_ms: 0,
+      recent_delegations: [], fail_ranking: [], timeseries: [],
+      version: '1.0.0', uptime: '10m', python_ver: '3.11.5', platform: 'linux',
+    }}));
     const wrapper = await mountOverview();
-    expect(wrapper.find('.overview').exists()).toBe(true);
+    // KPI grid / health row / chart+activity split all degrade away…
+    expect(wrapper.find('.stats-grid').exists()).toBe(false);
+    expect(wrapper.find('.ov-split').exists()).toBe(false);
+    // …replaced by one honest idle strip…
+    expect(wrapper.find('.ov-idle').exists()).toBe(true);
+    // …while real runtime facts stay visible (no placeholder feel).
+    expect(wrapper.text()).toContain('linux');
+    wrapper.unmount();
+  });
+
+  it('shows chart EmptyState when timeseries is empty but system is active', async () => {
+    // Non-idle payload with empty timeseries: chart card keeps its EmptyState
+    mockFetch(defaultRoutes({ '/api/overview': { ...overviewData, timeseries: [] } }));
+    const wrapper = await mountOverview();
+    expect(wrapper.find('.stats-grid').exists()).toBe(true);
+    expect(wrapper.find('.ov-idle').exists()).toBe(false);
     // Empty timeseries → EmptyState rendered for the throughput chart
     expect(wrapper.findComponent(EmptyState).exists()).toBe(true);
     wrapper.unmount();

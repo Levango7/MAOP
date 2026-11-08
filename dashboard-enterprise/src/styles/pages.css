@@ -65,6 +65,22 @@
 .ss-sep { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
 .ss-item { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); }
 
+/* ── Overview idle 降级条：系统尚无活动时替代全零 KPI 卡/空图表行 ── */
+.ov-idle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.ov-idle__title { font-weight: 600; }
+.ov-idle__hint { color: var(--text-faint); }
+
 /* ── Activity timeline (replaces redundant status-strip) ───────────── */
 .activity-feed {
   display: flex;
