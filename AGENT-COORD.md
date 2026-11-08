@@ -1042,3 +1042,20 @@
 - **未做**：推送本地 `ui/topbar-alignment`（批 A/B 提交均无推送授权）；master 本地指针
   未同步（服务器侧合并，按需再 fetch）。
 - 任务 #106 关闭。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：批 A/B + #106 合入回执——推送回执）
+- **推送**（用户「确认做的很完善，没有风险，没有冲突再提交、推送」授权）：
+  `git push -u origin ui/topbar-alignment` 新建远程分支并设 upstream；remote head
+  de911cd1a55806a7d49255e1b1d248057051181f 与本地 HEAD 双读回一致，
+  origin/master..origin/ui/topbar-alignment 恰为下列 6 笔。
+- **推送内容**（授权时分支状态已向用户列明：含批 A 代码）：
+  d1422829 领地登记批 A / d41ab4d0 批 A 代码 / 96589a38 批 A DONE 回执 /
+  4ae35425 批 B 代码 / 6b374956 批 B DONE 回执 / de911cd1 #106 合入回执。
+- **冲突核验**：merge-base(origin/master, HEAD)=0ccc9983；分支改动 7 文件
+  （AGENT-COORD.md + dashboard-enterprise 下 DESIGN.md / CoachMarks.vue /
+  TopBar.vue / i18n/index.js / pages.css / Overview.vue）；master 自分叉点未动
+  pages.css（diff 为空）；#252 合并 5027554d 只动 AGENT-COORD.md / CHANGELOG.md /
+  py/maop/loop_executor.py / py/tests/test_gap5_parallel_usage.py，代码面零重叠；
+  分支 diff 无私钥材料（grep BEGIN PRIVATE KEY 与 maop_enterprise_prod 均空）。
+- **未做**：开 PR（未授权）；rebase 到最新 master（behind 14 均为他人线合并，
+  分支独立推送无冲突；未来 PR 时按追加段对账 AGENT-COORD.md）。
