@@ -107,6 +107,7 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
         priority: int = 3,
         deadline_ms: int | None = None,
         dry_run: bool = False,
+        _slot_reserved: bool = False,
     ) -> DispatchResult:
         """Dispatch a task to the specified agent.
 
@@ -180,7 +181,8 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
                                                         workdir=workdir, timeout_seconds=timeout_seconds,
                                                         trace_id=trace_id, streamer=streamer,
                                                         priority=priority, deadline_ms=deadline_ms,
-                                                        dry_run=dry_run)
+                                                        dry_run=dry_run,
+                                                        _slot_reserved=_slot_reserved)
 
             # Phase γ-4: set span attributes + persist decision record.
             # The dispatcher span is the PARENT of the routing chain —
@@ -237,6 +239,7 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
         sla_tier: str = "standard",
         _failover_depth: int = 0,
         dry_run: bool = False,
+        _slot_reserved: bool = False,
     ) -> DispatchResult:
         """Inner dispatch implementation (Phase γ-1).
 
@@ -244,6 +247,10 @@ class Dispatcher(DispatchPriorityMixin, DispatchRecordingMixin, DispatchImplMixi
         the call in a ``try/finally`` for SLA metric cleanup. SLA params
         are in scope for LoadBalancer SLA recording — see ``lb.record_start``
         below.
+
+        ``_slot_reserved``（2026-11-09）：由 :meth:`_dispatch_impl` 传入，表示
+        并发槽位已由队列排空路径代为申请。inner 本身不使用它——它只保证签名
+        能接收，防止调用方多传一个关键字就 TypeError。
         """
         # Resolve lazy-subsystem helper through the dispatcher namespace so
         # that ``patch("maop.delegate.dispatcher._get_load_balancer")`` in

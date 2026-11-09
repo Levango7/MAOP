@@ -407,7 +407,15 @@ class TestDispatcherPriorityIntegration:
 
     async def _enqueue(self, d, *args, **kw):
         """Schedule dispatch_priority as a background task and yield once so
-        its synchronous push-to-queue runs before we return."""
+        its synchronous push-to-queue runs before we return.
+
+        2026-11-09：显式带 ``auto_drain=False``。``dispatch_priority`` 默认会在
+        入队后安排一次自排空（保证活性：否则入队者 await 一个永不结算的 future
+        会永久挂起）。但本类的用例测的是「**先攒一批、再一次性按优先级排空**」，
+        且 ``_enqueue`` 会 ``await asyncio.sleep(0)`` 让出控制权——默认自排空会
+        在这时先跑掉一轮，批被切碎。所以攒批场景必须显式关掉自排空。
+        """
+        kw.setdefault("auto_drain", False)
         task = asyncio.ensure_future(d.dispatch_priority(*args, **kw))
         # Let the coroutine run up to its `await fut` so the push happens.
         await asyncio.sleep(0)
@@ -464,11 +472,18 @@ class TestDispatcherPriorityIntegration:
 
         d.dispatch = fake_dispatch  # type: ignore[method-assign]
 
-        await self._enqueue(d, "claude", "far-dl", priority=3, deadline_ms=10_000)
-        await self._enqueue(d, "claude", "near-dl", priority=3, deadline_ms=1_000)
+        # deadline_ms 的契约是「**绝对**纪元毫秒」（PriorityTask docstring 与
+        # sla_monitor 同口径）。原测试传 1000 / 10_000 —— 那是 1970 年的时间点，
+        # 早已过期；此前 drain 不检查死线所以能过，现在会（正确地）按过期失败
+        # 结算。改用相对现在的绝对值，测的仍是「同优先级下更早死线先跑」。
+        import time as _t
+
+        now_ms = int(_t.time() * 1000)
+        await self._enqueue(d, "claude", "far-dl", priority=3, deadline_ms=now_ms + 600_000)
+        await self._enqueue(d, "claude", "near-dl", priority=3, deadline_ms=now_ms + 60_000)
 
         await d.drain_pending(limit=2)
-        # near-dl (deadline 1000) is more urgent than far-dl (deadline 10000)
+        # near-dl（60s 后到期）比 far-dl（600s 后到期）更紧急
         assert order == ["near-dl", "far-dl"]
 
     @pytest.mark.asyncio

@@ -409,8 +409,14 @@ class TestDispatcherSimpleMethods:
 class TestDispatchPriority:
     @pytest.mark.asyncio
     async def test_dispatch_priority_no_queue_falls_back(self):
-        """Without a queue, dispatch_priority calls dispatch directly."""
-        dispatcher = Dispatcher()
+        """Without a queue, dispatch_priority calls dispatch directly.
+
+        2026-11-09：``Dispatcher()`` 现在**默认挂载**优先级队列（此前默认
+        None，导致整套机制零调用方、PRIORITY 只是枚举里的一个名字）。所以
+        「无队列」这条路径必须**显式请求**：``priority_queue=None``。被测行为
+        本身没有变化（无队列 ⇒ 直调 dispatch）。
+        """
+        dispatcher = Dispatcher(priority_queue=None)
         with patch.object(dispatcher, "dispatch", AsyncMock(return_value=_ok_result())) as mock_d:
             result = await dispatcher.dispatch_priority("claude", "task")
             mock_d.assert_awaited_once()
