@@ -1452,3 +1452,24 @@
 - **验收**：probe5 场景 B（/apikeys→/home）CSP 错误=0 且 styleSheets>0；54 路由烟测复绿
   无新增 bad response；dashboard 四门（design:contrast / eslint / vue-tsc / vitest）EXIT=0。
 - **提交计划**：板面 CLAIM（chore）→ 代码单文件提交 → 板面 DONE 回执带 sha（chore）；不推远端、不开 PR。
+
+## 审计整改批 7（2026-11-10）— DONE
+- **提交**：`9be878d2371a1d8a213caea0293d384c11b1b343` fix(vite)：代理键 `'/api'` → `'^/api/'`
+  （dashboard-enterprise/vite.config.js 单文件，3+/1-；工作树核过仅此改动，
+  `data/admin_password_once.txt` 非本线未动未提交）。
+- **验收 1（probe5 三场景，后端重启后复跑）**：A 直连 /home 0 CSP 错误 / styleSheets=27；
+  B /apikeys→/home 0 错误 / 27（修前 27 错误 / 0）；C 强制企业版 /apikeys 0 错误 / 30
+  （含 ApiKeys.vue?vue&type=style css 200，finalUrl=/apikeys 不再裸页）。
+- **验收 2（全路由烟测，:5174 真栈）**：52 路由仅 2 处标记，均为预存设计内降级、与本改动无关——
+  `/api/debate/history`、`/api/n8n/health` 404 系后端 router 从未挂载（server.py 无对应
+  include_router；debate.py:150 / n8n.py:12 仅文件存在），前端有显式降级
+  （Debate.vue:278 注释「404 = ServiceContainer has no DebateDispatcher」+ view-debate.js:31 i18n
+  「调度器未配置」、edition.js:18 n8n 探针）。/apikeys 的 CSP 裸页标记已消除（企业版守卫下
+  个人版重定向 /home 属设计）。字符串 '/api' 前缀同样匹配这两路径 ⇒ 代理键改动不可能改变其行为。
+- **过程异常留痕**：中途后端被我重启时漏带环境变量，冒烟出 401（/api/info/config 等）；
+  按板面批 5 口径（:1180-1181）补 `MAOP_AUTH_ENABLED=0` + `MAOP_OWNER_MODE=1` +
+  `MAOP_MULTIMODAL_PROVIDER=hash` 重启后复绿；/api/info/config 实证 `"auth_enabled":false`。
+- **验收 3（四门禁，修后工作树实测）**：design:contrast 164/164 ALL PASS · eslint 0 error
+  （16 warning 既有基线）· vue-tsc exit 0 · vitest 707 passed（79 文件口径同批 6）。
+- **未做**：推送 / 开 PR（未授权，本分支 push 不触发 CI）；第 4 条生产 CSP report-only 观测
+  等用户二裁；第 5/6 条按授权不动。
