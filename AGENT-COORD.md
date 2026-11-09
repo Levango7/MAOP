@@ -1229,3 +1229,7 @@
 - **未做**：修 S-2（动活库数据，需用户点名）；开 PR / 推送（未授权）；models.yaml 补定价
   （需真实单价）。
 - **清理**：harness/探针 `zz_*` 与根 `zz_ci_watch.sh` 全删（scratch 不入库）。
+  - 路径更正（2026-11-09 同日）：回执首版把证据目录写成 `/f/tmp/maop-gui-20261109/`，
+    实际落盘在 `/f/f/tmp/maop-gui-20261109/`（MSYS 双重挂载 `F:\f\tmp` 伪影）。
+    已整体移至 `/f/tmp/maop-gui-20261109/`（与 11-08 束同级），12 张截图 + summary.json
+    （25 项全 ok）清点无误；探针残留 `/f/f/tmp/b5-alert-probe/` 已删。
