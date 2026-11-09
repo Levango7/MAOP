@@ -1247,3 +1247,54 @@
 - **待用户二裁**：models.yaml 现有 agnes-2.5-pro 价（0.01/0.03）无来源标注，本批不动；
   若「agnes 保留未计价」含清掉该存量价，需用户明示（删价会翻转成本页既有行显示）。
 - **门槛**：批 5 四道门禁 + 相关 py 测试 + 浏览器复跑成本页。
+
+## 批 6 交付回执（2026-11-09）——3 个型号补录官网列表价，4 个未核型号登记不入表
+- **授权**：用户「开批6：全量声明集，官网列表价，agnes保留未计价」（CLAIM a2ab1f69）。
+- **交付**：`config/models.yaml` +35 行（提交 `cb78389c`，工作树仅此一文件改动），3 条目均钉
+  source URL + fetched_at 2026-11-09：
+  - MiniMax-M3 $0.0003/$0.0012（MiniMax 国际站按量页 Standard ≤512K 档刊例 $0.60/$2.40 永久五折
+    ÷1000；国内站同口径 ¥2.10/¥8.40）；provider=minimax。
+  - qwen3.5-plus $0.0004/$0.0024（阿里云百炼国际站官方价目 ≤256K 档；agents.yaml codex 注明
+    StepFun proxy 路由）；provider=stepfun。
+  - gpt-5.4 $0.0025/$0.015（OpenAI 官网标准处理价 <270K 上下文；直连 403，经官方页索引快照钉值；
+    copilot CLI 自带模型无 ProviderConfig，provider 仅作来源标注）。
+  - provider 归属先定后落（agents.yaml 上下文 + docs/integrations/omniroute.md）；键名与
+    agents.yaml `model:` 字符串逐字一致（加载器 registry.py:159 精确匹配）。
+  - 其余 4 个声明型号（minimax-m2.7 / mimo-v2.5 / deepseek-v4-flash-free / omniroute-auto-coding）
+    查无官方来源 → 按审计条 3「不可臆造」登记未核、**不入表**（grep 实证：新块仅含 3 键）；
+    控制值 auto/native/built-in/n/a 非型号不入；agnes 族不动（agnes-2.5-pro 存量价 0.01/0.03
+    原样保留＝「待用户二裁」项默认动作）。
+- **隔离验证**：
+  - 计价路径探针 `/f/tmp/maop-b6-pricing-probe.py` 8/8 PASS（复刻 maop_loop_phases.py:429-453：
+    3 新模型 priced=True 且金额精确（$1.5/$2.8/$17.5 @1M/1M），4 未核 + agnes-2.0-flash 控制项
+    priced=False / provider='' / cost=0.0）。
+  - 相关 py 测试 256 passed（config / validation / registry / model_management /
+    model_router_contracts / cost_router / cost_tracker_whitebox / cost_attribution / hot_reload /
+    model_api_contract / adr010 / budget）。
+  - 浏览器复跑成本页（真栈 :9079 + vite :5174；按生产路径种子 9 条：4 已计价含 agnes-2.5-pro
+    存量价控制 + 5 未计价）：15/15 PASS——横幅「5 条明细无法计价…」与 API
+    unpriced_entries=5 一致；MiniMax-M3 $0.0456 / qwen3.5-plus $0.0528 / gpt-5.4 $0.0825 /
+    agnes-2.5-pro $0.4500 均有金额无 Badge；5 条未计价行全挂未计价 Badge；by_agent
+    b6-priced 无 Badge / b6-unpriced 挂 Badge；合计 $0.6309；明细表未计价叶节点显「未计价」、
+    $0.0000 出现 0 次。截图 + summary.json：`/f/tmp/maop-b6-browser/`。
+  - 运行时目录服务证据：后端（14:28 启动于 models.yaml 落稿之后）/api/model/registry stats =
+    6 模型（stepfun:3 / minimax:1 / agnes:1），新价已上线。
+- **门禁**（修后工作树实测）：design:contrast 164/164 · eslint 0 error（16 warning 全为既有——
+  `git diff db6eabd3..HEAD -- dashboard-enterprise/` 为空，自批 5 回执以来 dashboard 树无字节级
+  改动；批 5 回执记「6 warning 基线」系可 --fix 子集口径，本批逐条列示 16 条无新增）·
+  vue-tsc exit 0 · vitest 79 文件/707 用例全绿。
+- **完整性清单**：仅覆盖 maop/enterprise .py 模块集（tests/test_module_integrity.py），
+  models.yaml 在清单外 ⇒ 无需重签。
+- **数据卫生**：计价探针曾把 16 条 b6-probe 合成行写进活库 data/maop.db（探针默认数据目录所致），
+  已全部删除（cost_entries 归 0）；浏览器验证种子 9 条（b6-priced/b6-unpriced）同规则已删。
+  后端 PID 39308（14:28 启动）与 vite :5174 系上批真栈残留，未杀。
+- **登记项（如实留痕，本批不修）**：
+  - S-6（呈现层，非本批引入）：成本页「按模型成本」列中，未计价型号名过长时
+    （deepseek-v4-flash-free / omniroute-auto-coding）名称省略号截断把未计价 Badge 挤出可视区
+    （DOM 内 Badge 存在、文本断言通过），是否按 S-1 同款修法对齐需用户定。
+  - 待用户二裁（继承 CLAIM）：agnes-2.5-pro 存量价（0.01/0.03）无来源标注，本批原样保留；
+    清掉需用户明示。
+- **未做**：推送 / 开 PR（未授权；本分支 push 本就不触发 CI，ci.yml branches 过滤已录）；
+  4 个未核型号定价（无官方来源，不臆造）。
+- **清理**：探针 / 种子 / 浏览器脚本（/f/tmp/maop-b6-*.py、maop-b6-browser-check.js）均仓外
+  scratch 不入库；证据目录 /f/tmp/maop-b6-browser/（cost-page.png + summary.json）保留。
