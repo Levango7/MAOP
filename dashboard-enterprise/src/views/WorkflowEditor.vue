@@ -1,9 +1,7 @@
 <template>
   <div class="workflow-page">
     <ListPageLayout
-      :loading="false"
       :error="error"
-      :empty="false"
       :error-title="t('view.workflow.importFailed', { msg: error })"
     >
       <template #badges>
