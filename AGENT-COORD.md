@@ -1346,6 +1346,16 @@
 - PR #263：https://github.com/Levango7/MAOP/pull/263（base master ← ui/topbar-alignment，22 笔全量）。
   base=master 命中 ci.yml branches 过滤 ⇒ PR 触发 CI（本分支直推不触发）；合并按用户指令执行，未自合。
 
+## 批 6 追加 PR 合并回执（2026-11-10 01:29 北京）
+- PR #263 MERGED：base master ← ui/topbar-alignment（head 3864fdd67c83c7bde3bee6d4ff3f162ad486e45e），
+  merge commit 27e61fe98d79a46128b54dc060d7e15c679cd652，mergedAt 2026-11-09T17:29:21Z。
+- 条件式授权执行（用户「绿了 就合并吧」）：看守首 iter 即 mergeState=CLEAN（0 pending / 0 fail），
+  gh pr merge 263 --merge --match-head-commit 3864fdd67c83c7bde3bee6d4ff3f162ad486e45e，MERGE_EXIT=0。
+- CI 终态（gh pr view statusCheckRollup 实证）：全 SUCCESS——含 pytest 12 条（win/ubuntu/macOS ×
+  py3.10/3.11/3.12/3.13）、Required checks satisfiability canary、Playwright E2E、Lint(ruff+mypy)、
+  Alembic migrations、Lock drift、pip-audit、SAST(bandit)、Secret Scan(gitleaks)、SBOM、Wheel install；
+  4 条 SKIPPED（Release Assets / Publish to PyPI / Publish tag (manual) / Macroscope）系设计内。
+
 ## 领地登记（Qoder-Desktop 会话 1973591b，2026-11-10：第一轮三源对账 + K1/K2 复验）
 - **身份**：本会话＝早先 J/K 批（#162 修复 `cd6c1e0e`、K1 DAG 租户归属 #169、K2 分桶治时钟 #170）
   的执行者，与板内「Qoder-CN 17ef022a」（前端/棘轮线）非同一会话，不承接其领地。
