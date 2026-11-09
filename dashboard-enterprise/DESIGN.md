@@ -99,7 +99,7 @@ components:
     backgroundColor: "{colors.surface}"
     borderColor: "{colors.border}"
     borderRadius: 8px
-    padding: 20px
+    padding: 16px
   input:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.text}"
@@ -234,7 +234,7 @@ components:
 
 ### 卡片
 
-`--surface` 底、1px `--border`、`--r-lg`、内边距 `--sp-5`(20px)。标题 14/600，可带
+`--surface` 底、1px `--border`、`--r-lg`、内边距 `--sp-4`（暗 16px / 亮 12px）。标题 14/600，可带
 16px 图标。卡片之间间距 `--sp-4`，不嵌套超过两层。
 
 ### 输入框

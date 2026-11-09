@@ -65,6 +65,9 @@ class RegisteredAgent(BaseModel):
     extracts_queries: bool = False        # 该 agent 是否从输入中提取子查询
     supports_regeneration: bool = False   # 该 agent 是否支持结果再生成
     results_merge: bool = False           # 该 agent 是否合并多个子结果
+    # 分类桶（general 多场景 / specialized 单场景 / platform 平台组件），
+    # 事实源为 config/agents.yaml 的 category 键，/api/agents 依此透传
+    category: str = ""
 
 
 class AgentRegistry:
@@ -105,7 +108,8 @@ class AgentRegistry:
                     last_latency_ms INTEGER DEFAULT 0,
                     consecutive_failures INTEGER DEFAULT 0,
                     registered_at TEXT DEFAULT '',
-                    source TEXT DEFAULT 'scanned'
+                    source TEXT DEFAULT 'scanned',
+                    category TEXT DEFAULT ''
                 )
             """)
             conn.execute("""
@@ -138,6 +142,7 @@ class AgentRegistry:
             ("extracts_queries", "INTEGER DEFAULT 0"),
             ("supports_regeneration", "INTEGER DEFAULT 0"),
             ("results_merge", "INTEGER DEFAULT 0"),
+            ("category", "TEXT DEFAULT ''"),
         ]
         for col_name, col_def in new_cols:
             if col_name not in existing_cols:
@@ -197,6 +202,7 @@ class AgentRegistry:
                 extracts_queries=bool(entry.get("extracts_queries", False)),
                 supports_regeneration=bool(entry.get("supports_regeneration", False)),
                 results_merge=bool(entry.get("results_merge", False)),
+                category=entry.get("category", ""),
                 source="config",
                 health="unknown",
             )
@@ -417,8 +423,8 @@ class AgentRegistry:
                     model, driver, cli_args, timeout_s, enabled, health,
                     last_health_check, last_latency_ms, consecutive_failures,
                     registered_at, source,
-                    extracts_queries, supports_regeneration, results_merge)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,?,?)""",
+                    extracts_queries, supports_regeneration, results_merge, category)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,?,?,?)""",
                 (agent.name, agent.cli_path, agent.version, agent.provider,
                  json.dumps(agent.capabilities), agent.description,
                  agent.model, agent.driver, agent.cli_args, agent.timeout_s,
@@ -427,7 +433,7 @@ class AgentRegistry:
                  agent.consecutive_failures, agent.registered_at, agent.source,
                  1 if agent.extracts_queries else 0,
                  1 if agent.supports_regeneration else 0,
-                 1 if agent.results_merge else 0),
+                 1 if agent.results_merge else 0, agent.category),
             )
 
     @staticmethod
@@ -441,6 +447,13 @@ class AgentRegistry:
             """从 sqlite3.Row 安全读取布尔列（兼容旧库无此列的情况）。"""
             try:
                 return bool(row[key])
+            except (KeyError, IndexError):
+                return default
+
+        def _get_str(key: str, default: str = "") -> str:
+            """从 sqlite3.Row 安全读取字符串列（兼容旧库无此列的情况）。"""
+            try:
+                return row[key] or ""
             except (KeyError, IndexError):
                 return default
 
@@ -458,4 +471,5 @@ class AgentRegistry:
             extracts_queries=_get_bool("extracts_queries"),
             supports_regeneration=_get_bool("supports_regeneration"),
             results_merge=_get_bool("results_merge"),
+            category=_get_str("category"),
         )

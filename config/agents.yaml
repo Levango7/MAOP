@@ -14,6 +14,7 @@ agents:
     - pipeline
     - vision
     - multimodal
+    category: general
     cli: python
     cli_args: -m maop.cli run --task "{task}"
     description: MAOP self-referential agent — can delegate to itself (max_self_ref_depth=3)
@@ -39,6 +40,7 @@ agents:
     - codegen
     - chat
     - quickfix
+    category: specialized
     cli: autoclaw -n -y
     cli_args: chat {task}
     description: Autoclaw v0.1.6 headless (verified, ~3.2s)
@@ -53,6 +55,7 @@ agents:
     - search
     - review
     - fileops
+    category: general
     cli: cline
     cli_args: --print '{task}'
     description: Cline CLI v3.0.46 (headless, ~1.5s)
@@ -68,6 +71,7 @@ agents:
     - deploy
     - cloudops
     - fileops
+    category: specialized
     cli: cloudbase
     cli_args: '{task}'
     description: CloudBase CLI v3.6.3 (腾讯云, ~2.6s)
@@ -84,6 +88,7 @@ agents:
     - quickfix
     - explain
     - chat
+    category: specialized
     cli: codebuddy
     cli_args: --print '{task}'
     description: CodeBuddy v2.123.1 (腾讯, fastest cold-start ~123ms)
@@ -95,6 +100,7 @@ agents:
     - codegen
     - fileops
     - quickfix
+    category: specialized
     cli: codewhale
     cli_args: '{task}'
     description: Codewhale v0.9.0 (auth may be broken in v0.8.65)
@@ -112,6 +118,7 @@ agents:
     - review
     - planning
     - explain
+    category: general
     cli: codex
     cli_args: exec {task}
     description: Codex CLI v0.144.6 + StepFun proxy
@@ -131,6 +138,7 @@ agents:
     - planning
     - refactor
     - quickfix
+    category: general
     cli: copilot
     cli_args: --usage-output-file "{usage_file}" --allow-all-tools -p "{task}"
     usage_format: copilot
@@ -145,6 +153,7 @@ agents:
     - chat
     - explain
     - search
+    category: specialized
     cli: crush
     cli_args: run '{task}'
     description: Crush v0.86.0 (Charmbracelet terminal AI, ~1.8s)
@@ -158,6 +167,7 @@ agents:
     - fileops
     - search
     - chat
+    category: general
     cli: agent
     cli_args: -p {task}
     description: Cursor Agent CLI v3.12.17
@@ -182,6 +192,7 @@ agents:
     - search
     - review
     - explain
+    category: specialized
     cli: deepcode
     cli_args: -p {task}
     description: 'DISABLED: not registered / no auth (2026-07-22). 计划启用：用户注册 deepcode
@@ -197,6 +208,7 @@ agents:
     - techdoc
     - research
     - verify
+    category: platform
     cli: python
     cli_args: -c "from maop.delegate.doc_pipeline_adapter import run_pipeline; import
       json,sys; r=run_pipeline(pipeline_name=sys.argv[1], input_file=sys.argv[2]);
@@ -215,6 +227,7 @@ agents:
     - codegen
     - quickfix
     - explain
+    category: specialized
     cli: forge
     cli_args: '{task}'
     description: Forge v2.13.18 (ForgeCode, ~1.7s)
@@ -230,6 +243,7 @@ agents:
     - explain
     - vision
     - multimodal
+    category: general
     cli: gemini
     cli_args: --skip-trust -p '{task}'
     description: Gemini CLI（一号用户本机实测 2026-08-31；headless 需 --skip-trust 信任工作区，否则新版
@@ -249,6 +263,7 @@ agents:
     - search
     - review
     - fileops
+    category: general
     cli: goose
     cli_args: run --no-session -q -t '{task}'
     description: Goose v1.43.0 (agnes-2.0-flash via custom_agnes provider, ~1.3s)
@@ -265,6 +280,7 @@ agents:
     - planning
     - review
     - explain
+    category: general
     cli: hermes
     cli_args: -z {task}
     description: Hermes CLI v0.19.0 (AgnesAI backend, ~1.3s)
@@ -278,6 +294,7 @@ agents:
     - chat
     - quickfix
     - explain
+    category: specialized
     cli: kilo
     cli_args: run --prompt {task}
     description: Kilo CLI v7.4.11 (OpenCode, free model, ~2.5s)
@@ -291,6 +308,7 @@ agents:
     - search
     - review
     - planning
+    category: specialized
     cli: kimi
     cli_args: --print -p {task}
     description: Kimi CLI v1.48.0 + StepFun step-3.7-flash
@@ -305,6 +323,7 @@ agents:
     - explain
     - search
     - review
+    category: specialized
     cli: langcli
     cli_args: -p "{task}"
     description: 'DISABLED: no Anthropic API key, no VPN (2026-07-22). 计划启用：配置 Anthropic
@@ -319,6 +338,7 @@ agents:
     - chat
     - explain
     - search
+    category: specialized
     cli: lh
     cli_args: '{task}'
     description: LobeHub CLI v0.0.45 (~0.8s)
@@ -330,6 +350,7 @@ agents:
     - codegen
     - chat
     - quickfix
+    category: specialized
     cli: meoo
     cli_args: '{task}'
     description: Meoo v0.3.4 (阿里秒悟, ~2s)
@@ -341,6 +362,7 @@ agents:
     - codegen
     - chat
     - quickfix
+    category: specialized
     cli: mimo
     cli_args: --print {task}
     description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
@@ -359,6 +381,7 @@ agents:
     - search
     - review
     - explain
+    category: general
     cli: mmx
     cli_args: text chat --non-interactive --output text --message "{task}"
     description: MiniMax CLI v1.0.18 (mmx, authenticated, global region)
@@ -371,6 +394,7 @@ agents:
     - chat
     - search
     - explain
+    category: specialized
     cli: nanobot
     cli_args: agent -m "{task}"
     description: nanobot v0.2.2 (requires API key in ~/.nanobot/config.json)
@@ -387,6 +411,7 @@ agents:
     - search
     - reasoning
     - tool_use
+    category: platform
     cli: ''
     description: OmniRoute local gateway - 160+ providers with auto failover
     driver: cli
@@ -415,6 +440,7 @@ agents:
     - quickfix
     - fileops
     - memory
+    category: general
     cli: openclaw
     cli_args: agent --json -m {task}
     description: OpenClaw v2026.7.1 (StepFun backend, ~0.2s, requires Node >=22.22.3)
@@ -429,6 +455,7 @@ agents:
     - explain
     - search
     - fileops
+    category: general
     cli: opencode
     cli_args: run '{task}'
     description: OpenCode v1.18.4 (MiniMax, ~0.5s)
@@ -441,6 +468,7 @@ agents:
     - chat
     - quickfix
     - explain
+    category: specialized
     cli: pi
     cli_args: '{task}'
     description: Pi v0.81.1 (Earendil Works, ~12s cold start)
@@ -457,6 +485,7 @@ agents:
     - explain
     - chat
     - refactor
+    category: general
     cli: qoderclicn
     cli_args: -p {task}
     description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
@@ -476,6 +505,7 @@ agents:
     - review
     - explain
     - chat
+    category: general
     cli: qwen
     cli_args: -p '{{safePrompt}}' -o json --safe-mode
     description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
@@ -495,6 +525,7 @@ agents:
     - review
     - explain
     - chat
+    category: general
     cli: qwenpaw
     cli_args: '{task}'
     description: QwenPaw v2.0.1b1 (AgentScope framework, ~1.6s)

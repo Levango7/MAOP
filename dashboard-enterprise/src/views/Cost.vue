@@ -111,7 +111,7 @@
         <ul v-else class="breakdown">
           <li v-for="m in modelKeys" :key="m" class="breakdown__item">
             <span class="breakdown__name">
-              {{ m }}
+              <span class="breakdown__model">{{ m }}</span>
               <Badge v-if="modelUnpriced(m)" tone="warn" :title="t('view.cost.unpricedTitle')">{{ t('view.cost.unpriced') }}</Badge>
             </span>
             <div class="breakdown__track"><div class="breakdown__fill" :style="{ width: modelPct(m) + '%' }" /></div>
@@ -126,7 +126,10 @@
       <EmptyState v-else-if="!agentKeys.length" icon="bot" :title="t('view.cost.noAgentSpend')" :description="t('view.cost.noAgentSpendDesc')" />
       <div v-else class="agent-grid">
         <div v-for="a in agentKeys" :key="a" class="agent-card">
-          <span class="agent-card__name">{{ a || t('view.cost.unknown') }}</span>
+          <span class="agent-card__name">
+            {{ a || t('view.cost.unknown') }}
+            <Badge v-if="agentUnpriced(a)" tone="warn" :title="t('view.cost.unpricedTitle')">{{ t('view.cost.unpriced') }}</Badge>
+          </span>
           <span class="agent-card__cost">{{ money(summary.by_agent[a].cost) }}</span>
           <span class="agent-card__meta">{{ formatNum(summary.by_agent[a].tokens) }} {{ t('view.cost.tokens') }} · {{ summary.by_agent[a].calls }} {{ t('view.cost.calls') }}</span>
         </div>
@@ -216,6 +219,12 @@ function modelPct(m) {
 // "无从取价"，不是"免费"，必须与有价模型区分开（2026-11-08）。
 function modelUnpriced(m) {
   const info = summary.value.by_model?.[m];
+  return !!info && info.unpriced > 0 && info.unpriced >= info.calls;
+}
+// 该智能体的条目是否全部无法计价——与 modelUnpriced 同判据。by_agent 维度此前裸显
+// $0.0000 与"免费"同形（批 5 运行时 S-1，2026-11-09）。
+function agentUnpriced(a) {
+  const info = summary.value.by_agent?.[a];
   return !!info && info.unpriced > 0 && info.unpriced >= info.calls;
 }
 // 单条明细是否无法计价。判据与后端 _entry_unpriced 保持一致：priced=false，

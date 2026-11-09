@@ -60,10 +60,26 @@
 .stats-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: stretch; }
 .two-col { display: grid; gap: var(--sp-4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
 .row { display: grid; gap: var(--sp-4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
-.row > :only-child { grid-column: 1 / -1; }
+.row > :only-child, .grid-2 > :only-child, .two-col > :only-child { grid-column: 1 / -1; }
 .status-strip { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; padding: var(--sp-3) var(--sp-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
 .ss-sep { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
 .ss-item { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); }
+
+/* ── Overview idle 降级条：系统尚无活动时替代全零 KPI 卡/空图表行 ── */
+.ov-idle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+.ov-idle__title { font-weight: 600; }
+.ov-idle__hint { color: var(--text-faint); }
 
 /* ── Activity timeline (replaces redundant status-strip) ───────────── */
 .activity-feed {
@@ -1010,6 +1026,12 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 /* Capability chips (shared by scanned + detail) */
 .caps { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
 .cap-chip { font-size: var(--fs-xs); padding: 2px var(--sp-2); border-radius: var(--r-full); background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); white-space: nowrap; }
+.cat-bar { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+.cat-chip { font-size: var(--fs-xs); padding: 3px var(--sp-3); border-radius: var(--r-full); background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: var(--sp-1); }
+.cat-chip:hover { border-color: var(--border-card-hover); color: var(--text); }
+.cat-chip:active { transform: translateY(1px); }
+.cat-chip.active { background: var(--brand-solid); border-color: var(--brand-solid); color: var(--brand-contrast); }
+.cat-count { font-family: var(--font-mono); opacity: .75; }
 
 /* Table mode */
 .agent-table { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
@@ -1249,7 +1271,9 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .budget__val { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text); text-align: right; white-space: nowrap; }
 /* Cost-by-model breakdown (shares .breakdown flex column from ThreeLayerMemory block) */
 .breakdown__item { display: grid; grid-template-columns: minmax(80px, 1.4fr) 3fr auto; gap: var(--sp-3); align-items: center; }
-.breakdown__name { font-size: var(--fs-sm); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.breakdown__name { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; font-size: var(--fs-sm); color: var(--text); }
+.breakdown__model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.breakdown__name .badge { flex-shrink: 0; }
 .breakdown__track { height: 6px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
 .breakdown__fill { height: 100%; border-radius: var(--r-full); background: linear-gradient(90deg, var(--brand), var(--brand-strong)); transition: width var(--motion) var(--ease-out); box-shadow: 0 0 8px color-mix(in srgb, var(--brand) 30%, transparent); }
 .breakdown__val { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); text-align: right; white-space: nowrap; }

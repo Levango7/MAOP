@@ -94,6 +94,31 @@ describe('Cost.vue', () => {
     wrapper.unmount();
   });
 
+  it('marks fully-unpriced agents with a badge instead of a bare $0.0000', async () => {
+    mockFetch(defaultRoutes({
+      '/api/cost/summary': {
+        summary: {
+          total_cost_usd: 0, total_tokens: 7210, total_calls: 15, avg_latency_ms: 0,
+          by_model: {},
+          by_agent: {
+            copilot: { cost: 0, tokens: 7196, calls: 14, unpriced: 14 },
+            mmx: { cost: 0, tokens: 14, calls: 1, unpriced: 0 },
+          },
+        },
+      },
+    }));
+    const wrapper = await mountCost();
+    const cards = wrapper.findAll('.agent-card');
+    expect(cards).toHaveLength(2);
+    const copilot = cards.find((c) => c.text().includes('copilot'));
+    const mmx = cards.find((c) => c.text().includes('mmx'));
+    // 全未计价智能体必须挂标记（i18n 文案随 locale 取 未计价/unpriced）
+    expect(copilot.text()).toMatch(/未计价|unpriced/);
+    // 已定价但零花费的智能体不得挂标记
+    expect(mmx.text()).not.toMatch(/未计价|unpriced/);
+    wrapper.unmount();
+  });
+
   it('shows empty state when no agent spend is returned', async () => {
     mockFetch(defaultRoutes({
       '/api/cost/summary': { summary: { total_cost_usd: 0, total_tokens: 0, total_calls: 0, avg_latency_ms: 0, by_model: {}, by_agent: {} } },

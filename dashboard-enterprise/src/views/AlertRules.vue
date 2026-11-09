@@ -683,7 +683,7 @@ onMounted(() => {
 /* ── 列表表格 ── */
 .al-table {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
-  overflow: hidden;
+  overflow-x: auto;
 }
 .al-row {
   display: grid;

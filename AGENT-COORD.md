@@ -1092,3 +1092,256 @@
   属正常未绿态、非红。
 - **未做**：合并（无授权；按「确定没问题再 merge」口径，绿灯后另行授权）；rebase
   （合入式保 sha，台账引用不变）。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：PR #257 合入回执）
+- **合入**：PR #257（`ui/topbar-alignment` @ `db84cb5efe00225e89f42bb023b4f41a74c823cd`）→ master，merge commit `b110ca09754863f9db160c50a14197cdd48d2cbf`，2026-11-08T12:04:59Z；命令 `gh pr merge 257 --merge --match-head-commit db84cb5efe00225e89f42bb023b4f41a74c823cd`（用户「全绿后可以合并」条件授权，条件满足后执行）。
+- **核验**（合入前即时读回）：required 四件（CI scope / Secret Scan (gitleaks) / Docs consistency gate / CI merge gate）全 pass；全仓 checks 无 pending/in_progress/queued；mergeStateStatus=CLEAN、mergeable=MERGEABLE、head sha `db84cb5e…` 未变（合并前无新推送）。
+- **未做**：master 本地指针同步（服务器侧合并，按需再 fetch）；后续线（hallmark 反 AI 味整改 / Agents 分类 taxonomy）未授权不动。
+- 任务 #109 关闭。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-08：Agents 分类 taxonomy + 空数据降级（用户「授权，做吧」））
+- **授权**：用户 2026-11-08「授权，做吧」（针对上一条汇报末尾挂起的两项：hallmark 反 AI 味整改 / Agents 分类 taxonomy；授权含两个裁决的端到端决定权）。
+- **裁决 1（category 维护方）**：`config/agents.yaml` 为唯一事实源，每 agent 增 `category` 键；后端 /api/agents 透传（未知字段不得被 response_model 吞掉，若吞则修）；前端 Agents.vue 消费 category 做过滤芯片 + 分组计数。不设新管理面（无 UI 改分类）。
+- **裁决 2（platform 组件归属）**：cloudbase / omniroute / doc-pipeline 留在智能体页，归入独立 platform 桶（不进 general）；不动 MCP 工具页、不动路由表。判据：general＝caps≥5 且多主域（含 codegen）；specialized＝CLI agent 不满足 general；platform＝cli 为空或 driver 非 cli 的基建/适配器。
+- **领地**：config/agents.yaml（31 agent 各加 category）、py/maop/dashboard/routers/agents/* 与 agent_service（透传）、dashboard-enterprise/src/views/Agents.vue（芯片+分组）、src/i18n/view-agents.js（文案）、本登记。
+- **不碰**：MCP 工具页、routing/loops/workflows 段、其他视图、CI/CD、分支保护。
+- **批次**：批 1 数据面（yaml+后端透传）；批 2 呈现面（前端芯片+i18n）；批 3 hallmark 空数据降级（取证后单列）。每批独立提交+回执。
+
+## 交付回执（2026-11-08：批 1 数据面，sha 1e26b1f0）
+- **提交**：`1e26b1f0` feat(agents): category 分类桶透传（yaml 为事实源 → registry → /api/agents），+105/-5。
+- **内容**：config/agents.yaml 31 agent 各加 category（general 14 / specialized 15 / platform 2；cloudbase 归 specialized、omniroute/doc-pipeline 归 platform，符合「通用桶不得含 cloudbase/omniroute」口味约束）；RegisteredAgent 加 category 字段（model/DDL/_migrate_schema 新列/_upsert_db INSERT/_row_to_agent/register_from_config 六处）；新增白盒 3 测（config→DB→新实例回读、空缺省 ''、迁移列重建后数据不丢）。
+- **门禁**：pytest 10 passed（7 旧 + 3 新）；ruff 净；mypy 全仓 exit 0；yaml 解析 + 分桶计数核验。
+
+## 交付回执（2026-11-08：批 2 呈现面，sha 806bf494）
+- **提交**：`806bf494` feat(agents): category 过滤芯片 + 空分类降级（批 2 呈现面），+59/-2。
+- **内容**：Agents.vue .cat-bar 芯片组（全部/通用/专用/平台组件，带计数，aria-label，重复点击取消过滤）+ categoryFilter ref + filteredAgents computed（grid/table 同源）+ 空分类 EmptyState；view-agents.js 8 键 en+zh；pages.css .cat-bar/.cat-chip/.cat-count。
+- **门禁**：design:contrast 164 对全 PASS；lint 0 error（16 warning 全在他文件，预存）；Agents.test.js 7 passed；vue-tsc TSC_EXIT=0；vitest 705 passed VITEST_EXIT=0。
+- **未做**：推送（逐批授权制）；批 3 hallmark 空数据降级（取证后单列）。
+
+## 交付回执（2026-11-09：批 3 hallmark 空数据降级，sha 1699721d）
+- **提交**：`1699721d` feat(overview): idle 空数据降级——说明条替代全零 KPI/居中占位卡（批 3 hallmark），+73/-9（Overview.vue / view-overview.js / pages.css / Overview.test.js）。
+- **取证**（忠实 idle payload＝/api/overview 全零+空数组+timeseries:[]，与 hourly_rollup 空转口径一致；vite build + 同源 stub + 真浏览器 A/B）：整改前三 tell 全 LIVE——4 张全零 KPI 卡、系统健康 0% 徽章+4 条零填充条、近期委派 .dt__empty 与活动流 EmptyState 两张居中空卡。整改后 idle：`.ov-idle` 说明条 44px（标题「系统尚未产生活动数据」+ 复用 noActivityHint 行动指引），stats-grid/健康行/ov-split 整体消失、canvas 0、运行时卡保留（版本/uptime/Python/平台为真事实非占位）；active A/B：4 KPI（5/120/98.5%/150ms）+ 健康 99% + 委派表 3 行 + 12 点曲线 canvas 全恢复。T2（无系列吞吐量卡）复核为既有 label 空守卫已覆盖（active+时序空 → EmptyState），非可达缺陷，不改动并以单测钉住。
+- **门禁**：vitest 706/706（新增 idle 降级 + active 时序空 EmptyState 两例，概览文件 7 例）；eslint 0 error（16 warning 预存他文件）；vue-tsc 净；design:contrast 164/164 PASS。
+- **环境注**：取证用 stub/探针/截图（zz_*）已全部删除；stub 服务器按 PID 精确杀掉（先 Get-CimInstance 核对 CommandLine）。期间一次进程清理误伤过用户 WorkBuddy 的 node 进程（已自发恢复），与产品改动无关。
+- **未做**：推送（连前批共 5 笔待推，逐批授权制）。
+
+## 推送回执（2026-11-09：ui/topbar-alignment 5 笔上链）
+- **授权与执行**：用户授权推送本批 5 笔；`git push origin ui/topbar-alignment` 一次成功 `ada80977..0235e502`；读回 remote ref == local HEAD `0235e502233ab463ea8b689973440a0f21ff174c`，分支不再 ahead。
+- **上链清单**：`1e26b1f0`（批 1 数据面）、`806bf494`（批 2 呈现面）、`d48bb7e6`（批 1/2 回执）、`1699721d`（批 3 hallmark 空数据降级）、`0235e502`（批 3 回执）。
+- **注**：推送触发分支 CI；若红按内容红/环境红/门禁未启动三态分诊再报。
+- **未做**：本回执提交留本地未推（逐批授权制）。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-09：批 4 前端布局/状态残留整改）
+- **授权**：用户 2026-11-09「不行并行吗？？一边等ci，一边做？？」（针对上一条汇报列出的前端审计缺口清单；授权含本批所列修复的端到端决定权；0235e502 的 CI 看守并行继续，互不阻塞）。
+- **范围**（均来自同一会话四路审计的 file:line 证据；假阳性已剔除并写明理由：Examples 纯静态无异步、Run 反馈在子视图、WorkflowEditor 无初始化拉取）：
+  - pages.css:63 `:only-child` 泛化到 `.grid-2`/`.two-col`（治 Models.vue:19 单 EmptyState 右列空洞类）
+  - AgentRegistry.vue:1003 / AgentBilling.vue:1021 / AlertRules.vue:685 / AgentGateway.vue:673 容器 `overflow: hidden` → `overflow-x: auto`（对齐 DESIGN.md:198 表格可横向滚动）
+  - Overview.vue:111 死类 `chart-card`（其 CSS 已于 4ae35425 删除，全仓仅此一处引用）
+  - WorkflowEditor.vue:4,6 死 prop `:loading="false"` / `:empty="false"`（该视图无初始化拉取，默认值即语义）
+  - DESIGN.md:102,237 卡片 padding 20px → 与 Card.vue:71 实 `--sp-4` 对齐（DESIGN.md:121 自认 tokens.css 优先）
+- **不碰**：后端 py/、i18n、其他视图、CI/CD、分支保护；pending 态泛化、长列表虚拟化、路由懒加载空白（P2-3）、他页 idle 降级等口味/设计项留待后续批裁决，本批不发明。
+- **批次**：本批一次交付，分两笔提交（布局残留 / 死代码+文档同步）+ 门禁证据 + 本登记；回执带 sha；推送逐批授权。
+
+## 交付回执（2026-11-09：批 4 前端布局/状态残留整改，sha d71334ea / 79ce4549）
+- **提交**：`d71334ea` fix(frontend): 单孩子网格铺满+4 宽表横向滚动（6 文件 +6/-6）；`79ce4549` fix(frontend): 清 WorkflowEditor 死 prop + DESIGN.md 卡片 padding 对齐实现（2 文件 +2/-4）。CLAIM＝`89b76184`。
+- **内容**：pages.css:63 `:only-child` 泛化到 `.grid-2`/`.two-col`（治 Models.vue:19 单 EmptyState 右列空洞类，对齐既有 `.row` 模式）；AgentRegistry.vue:1003 / AgentBilling.vue:1020 / AlertRules.vue:686 / AgentGateway.vue:672 表格容器 `overflow:hidden`→`overflow-x:auto`（对齐 DESIGN.md 表格可横向滚动，圆角裁切由 overflow 自动保持）；Overview.vue:111 删死类 chart-card（全仓仅此引用）；WorkflowEditor.vue:4,6 删 `:loading="false"`/`:empty="false"`（该视图无初始化拉取，默认值同义）；DESIGN.md:102,237 卡片 padding 20px/--sp-5 → 16px/--sp-4（Card.vue:71 实现；暗 16px/亮 12px，tokens.css:149,327）。
+- **假阳性剔除（不改）**：Examples 纯静态无异步（Examples.vue:53 静态 import）；Run 反馈在 KeepAlive 子视图内（Run.vue:27-30）；WorkflowEditor 无初始化拉取（onMounted/api.get 零命中）。
+- **门禁**：design:contrast 164/164 PASS；eslint 0 error（16 warning 预存他文件）；vue-tsc EXIT=0；vitest 706/706（79 文件）。
+- **核验**：git diff --stat 8 文件 +8/-10；diff 内 CR 0 行（无 CRLF 夹带）；zz_ci_watch.sh 未入提交。
+- **未做**：推送（逐批授权制）；P2-3 路由懒加载空白、pending 态泛化、长列表虚拟化、他页 idle 降级等运行时项留待后续批（需浏览器复跑取证）。
+- **并行**：本批与 0235e502 的 CI 看守并行执行，互不阻塞；看守落定后另行汇报。
+
+## 推送回执（2026-11-09：批 4 四笔上链 ui/topbar-alignment）
+- **授权与执行**：用户「授权推送这4笔」；`git push origin ui/topbar-alignment` 一次成功
+  `0235e502..9a4d8efd`；读回 remote ref == local HEAD
+  `9a4d8efdfa89f20edec111ce140a686eceee69ef`，分支不再 ahead；工作树仅余未跟踪
+  `zz_ci_watch.sh`（看守脚本，按纪律不入提交）。
+- **上链清单**：`89b76184` 批 4 CLAIM / `d71334ea` 布局残留 / `79ce4549` 死代码+文档同步 /
+  `9a4d8efd` 批 4 交付回执。推送前核 diff 9 文件 +34/-10、零私钥材料
+  （grep BEGIN PRIVATE KEY / maop_enterprise_prod 均 0 命中）。
+- **CI 事实更正（重要）**：`.github/workflows/ci.yml:10-11` push 触发仅
+  `branches: [main, master, develop]`，PR 触发同列表 ⇒ 本分支 push **不触发任何工作流**
+  （实证：`gh run list --branch ui/topbar-alignment` 对 0235e502 零 run；全仓仅 ci.yml +
+  nightly.yml，后者 schedule/dispatch）。本批验证依据＝本地四道门禁（批 4 回执已录全绿）；
+  若需 CI 结论须开 PR（未授权，不动）。
+- **未做**：开 PR / 合并（未授权）；rebase（逐批授权制）。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-09：批 5——P2/P3 清单真栈运行时复跑）
+- **授权**：用户「开批5修P2-3清单 / 用浏览器复跑交互验证」（2026-11-09，与推送授权同条）。
+- **取证发现（避免重复施工）**：审计（`docs/audits/frontend-runtime-spotcheck-2026-11-08.md`
+  §一 P2-1/P2-2/P3-2/P2-3/P3-1）列的五项**代码面修复已由仓库 owner 提交落地且已在
+  origin/master**：
+  - P2-1/P2-2/P3-2 ← `f9822c8c`（2026-11-08 11:17）：`cost_tracker.py` `record_actual_cost`
+    priced 入 metadata + CostSummary.unpriced_entries 与逐模型/逐 agent 计数 + 历史行
+    provider 空兜底（`_entry_unpriced` :34）；`alert_ingest.py` record_alerts unnamed 计数+WARN
+    （:146-194）；`run_sim.py` labels.alertname 键名修正；`Cost.vue` 未计价展示+i18n；8 条新钉测。
+  - P2-3/P3-1 ← `be226d00`（2026-11-08 12:31）：`App.vue` useRouteLoadingBar 接线 +
+    `route-loading-bar.test.js` 142 行钉子 + `Overview.vue` hero/KPI/健康/表格骨架三分支。
+- **批 5 范围（本批真正交付）**：真栈（`py/start_dashboard.py` @9079 + vite dev @5174，
+  `MAOP_AUTH_ENABLED=0` + `MAOP_OWNER_MODE=1` + `MAOP_MULTIMODAL_PROVIDER=hash`）浏览器级复跑——
+  1. 五项逐条运行时取证（P2-1 未计价展示 / P2-2 sim 告警实名且不再新增 <unknown> /
+     P2-3 懒加载进度条实显实灭 / P3-1 首载骨架而非 — / P3-2 $0.0000→未计价）；
+  2. 11-08 抽查 §二 T1-T9 基线复跑（防批 4 布局改动回归）；
+  3. 存活项（例：DB 历史 <unknown> 行是否仍占运营视图、sim 采集可清理性）按证据修或如实登记不修。
+- **不碰**：已落地修复的代码本体（除非运行时证伪）；models.yaml 补定价（需真实单价，不可臆造）；
+  配置漂移门禁（涉 CI 改造，需用户另行授权）；分支保护/CI/CD；他线领地（#258/#240/#239 OPEN 不交叠）。
+- **批次**：证据先行（截图+DOM 断言+API/DB 读数），存活项整改单独提交，回执带 sha；推送逐批授权。
+
+## 批 5 交付回执（2026-11-09）——P2/P3 五项运行时复跑全绿，S-1 当场修复上链 1fd1cd7f
+- **授权**：用户「授权推送这4笔 / 开批5修P2-3清单 / 用浏览器复跑交互验证」（2026-11-09）。
+- **方法**：真栈（`py/start_dashboard.py` @9079 + vite dev @5174，`MAOP_AUTH_ENABLED=0` +
+  `MAOP_OWNER_MODE=1` + `MAOP_MULTIMODAL_PROVIDER=hash`）；Playwright 1.64.1（仓内
+  `dashboard-enterprise/node_modules`，executablePath 本机 Chrome）；懒加载用路由级 route stall
+  模拟（只断"有无反馈"不断真实耗时）；P2-2 ingest 语义用隔离 `MAOP_DATA_DIR` 的
+  `record_alerts` 直调探针（webhook 端点对未设秘钥 fail-closed，不能走活栈）。
+- **五项裁决**（首跑 26 项 24 绿 2 红＝同一发现 S-1；修复后复跑 25/25 绿；截图+summary.json：
+  `/f/tmp/maop-gui-20261109/`）：
+  - P2-1 PASS：横幅「14 条明细无法计价，因此该合计并非真实总花费」与
+    `GET /api/cost/summary.unpriced_entries=14` 一致；按模型 unknown 行挂未计价 Badge。
+  - P2-2 PASS（代码层 6/6）：旧形状（顶层 name）→ `unnamed=1` + WARN 落库兼容；
+    `labels.alertname` / commonLabels 兜底 → `unnamed=0`；`run_sim.py:281-282` 已实名。
+  - P2-3 PASS：Cost.vue chunk stall 1.6s 全程 `.maop-loading-bar` 可见，URL 停 /home，
+    chunk 到位即渲染。
+  - P3-1 PASS：`/api/overview` stall 1.5s 首屏 `.ov-hero--skeleton` 可见、无 `—` 占位；
+    数据到位「31 活跃智能体 · 0 个任务运行中」。
+  - P3-2 PASS（含 S-1 修复）：明细 16 处未计价叶节点；已定价零花费行（agnes-2.5-pro/mmx）
+    `$0.0000` 属实；未定价行均有标记。
+- **T1-T9 基线复跑全过**：导航 42=nav.js 51−9 `enterprise:true`（11-08 轮「58」口径不同，
+  本轮按 nav.js 推导自洽）；黑板四签 快照/域/历史/统计；记忆搜索 GRAPH 10 条结果 167ms；
+  设置页 license→personal (no_license_key) 诚实展示；深色模式 data-theme=dark；运行页控件齐；
+  告警页存量 1 行 `<unknown>` 系修复前数据（f9822c8c 兼容保留，渲染属预期）。
+- **B4 宽表 overflow 回归**：al-table/ar-table 活表 overflowX=auto；gw-table/records-table
+  本 DB 空态走 EmptyState 无活表，改 CSSOM 级联取证 `.gw-table[data-v-…]→auto`、
+  `.records-table[data-v-…]→auto`。
+- **S-1 发现与修复（本批唯一代码改动）**：运行时证伪 P3-2 闭环——按智能体卡
+  `Cost.vue:130` 无条件 `money(by_agent[a].cost)`，copilot 14/14 次调用全部未计价却裸显
+  `$0.0000`。修法与 modelUnpriced 对称（agentUnpriced + 同款 Badge 挂名称侧），钉 1 条
+  （全未计价挂标记 / 已定价零花费不挂）。提交 `1fd1cd7f`。
+- **门禁**（修后工作树实测）：design:contrast 164/164 PASS · eslint 0 error（6 warning 基线）·
+  vue-tsc exit 0 · vitest 79 文件/706 用例全绿 exit 0。CI 口径：两 owner 修复
+  `f9822c8c`/`be226d00` 均为 origin/master `1bb3bdb3`（PR #256 run success）祖先；本分支 push
+  不触发 CI（ci.yml branches 过滤，上批已录）；本批无代码合并动作。
+- **登记项（如实留痕，本批不修）**：
+  - S-2（数据面非代码）：GAP-2 sim 库存量 `<unknown>` firing 行（received_at 1793746430）
+    系修复前落库，建议清理 sim 采集写库或独立 test receiver。
+  - S-3（噪音）：vitest 偶发 unhandled-error（一次 31 条/一次 15 条，均系负向测试 stderr
+    逃逸，复跑 0 条 exit 0，非断言失败）。
+- **未做**：修 S-2（动活库数据，需用户点名）；开 PR / 推送（未授权）；models.yaml 补定价
+  （需真实单价）。
+- **清理**：harness/探针 `zz_*` 与根 `zz_ci_watch.sh` 全删（scratch 不入库）。
+  - 路径更正（2026-11-09 同日）：回执首版把证据目录写成 `/f/tmp/maop-gui-20261109/`，
+    实际落盘在 `/f/f/tmp/maop-gui-20261109/`（MSYS 双重挂载 `F:\f\tmp` 伪影）。
+    已整体移至 `/f/tmp/maop-gui-20261109/`（与 11-08 束同级），12 张截图 + summary.json
+    （25 项全 ok）清点无误；探针残留 `/f/f/tmp/b5-alert-probe/` 已删。
+
+## 批 6 CLAIM（2026-11-09）——models.yaml 补齐全量声明集定价
+- **授权**：用户「开批6：全量声明集，官网列表价，agnes保留未计价」（接批 5 回执待裁决项）。
+- **范围**：agents.yaml 声明集中 7 个未收录具体型号（MiniMax-M3 / minimax-m2.7 /
+  qwen3.5-plus / gpt-5.4 / deepseek-v4-flash-free / mimo-v2.5 / omniroute-auto-coding）。
+  控制值 auto/native/built-in/n/a 非型号不入；agnes 族不动（用户裁定保留未计价）；
+  已收录 yi-large / step-3.7-flash 本批不复核。
+- **口径**：官网列表价（list price），每条钉 source URL + fetched_at；查不到官方来源的
+  型号登记「未核」，不臆造（审计条 3 原话）。
+- **前置**：先定各型号 provider 归属（agents.yaml 上下文 / docs/integrations/omniroute.md）
+  再落 models.yaml；加载器对未知键容忍度先读 `py/maop/config/loader.py`。
+- **待用户二裁**：models.yaml 现有 agnes-2.5-pro 价（0.01/0.03）无来源标注，本批不动；
+  若「agnes 保留未计价」含清掉该存量价，需用户明示（删价会翻转成本页既有行显示）。
+- **门槛**：批 5 四道门禁 + 相关 py 测试 + 浏览器复跑成本页。
+
+## 批 6 交付回执（2026-11-09）——3 个型号补录官网列表价，4 个未核型号登记不入表
+- **授权**：用户「开批6：全量声明集，官网列表价，agnes保留未计价」（CLAIM a2ab1f69）。
+- **交付**：`config/models.yaml` +35 行（提交 `cb78389c`，工作树仅此一文件改动），3 条目均钉
+  source URL + fetched_at 2026-11-09：
+  - MiniMax-M3 $0.0003/$0.0012（MiniMax 国际站按量页 Standard ≤512K 档刊例 $0.60/$2.40 永久五折
+    ÷1000；国内站同口径 ¥2.10/¥8.40）；provider=minimax。
+  - qwen3.5-plus $0.0004/$0.0024（阿里云百炼国际站官方价目 ≤256K 档；agents.yaml codex 注明
+    StepFun proxy 路由）；provider=stepfun。
+  - gpt-5.4 $0.0025/$0.015（OpenAI 官网标准处理价 <270K 上下文；直连 403，经官方页索引快照钉值；
+    copilot CLI 自带模型无 ProviderConfig，provider 仅作来源标注）。
+  - provider 归属先定后落（agents.yaml 上下文 + docs/integrations/omniroute.md）；键名与
+    agents.yaml `model:` 字符串逐字一致（加载器 registry.py:159 精确匹配）。
+  - 其余 4 个声明型号（minimax-m2.7 / mimo-v2.5 / deepseek-v4-flash-free / omniroute-auto-coding）
+    查无官方来源 → 按审计条 3「不可臆造」登记未核、**不入表**（grep 实证：新块仅含 3 键）；
+    控制值 auto/native/built-in/n/a 非型号不入；agnes 族不动（agnes-2.5-pro 存量价 0.01/0.03
+    原样保留＝「待用户二裁」项默认动作）。
+- **隔离验证**：
+  - 计价路径探针 `/f/tmp/maop-b6-pricing-probe.py` 8/8 PASS（复刻 maop_loop_phases.py:429-453：
+    3 新模型 priced=True 且金额精确（$1.5/$2.8/$17.5 @1M/1M），4 未核 + agnes-2.0-flash 控制项
+    priced=False / provider='' / cost=0.0）。
+  - 相关 py 测试 256 passed（config / validation / registry / model_management /
+    model_router_contracts / cost_router / cost_tracker_whitebox / cost_attribution / hot_reload /
+    model_api_contract / adr010 / budget）。
+  - 浏览器复跑成本页（真栈 :9079 + vite :5174；按生产路径种子 9 条：4 已计价含 agnes-2.5-pro
+    存量价控制 + 5 未计价）：15/15 PASS——横幅「5 条明细无法计价…」与 API
+    unpriced_entries=5 一致；MiniMax-M3 $0.0456 / qwen3.5-plus $0.0528 / gpt-5.4 $0.0825 /
+    agnes-2.5-pro $0.4500 均有金额无 Badge；5 条未计价行全挂未计价 Badge；by_agent
+    b6-priced 无 Badge / b6-unpriced 挂 Badge；合计 $0.6309；明细表未计价叶节点显「未计价」、
+    $0.0000 出现 0 次。截图 + summary.json：`/f/tmp/maop-b6-browser/`。
+  - 运行时目录服务证据：后端（14:28 启动于 models.yaml 落稿之后）/api/model/registry stats =
+    6 模型（stepfun:3 / minimax:1 / agnes:1），新价已上线。
+- **门禁**（修后工作树实测）：design:contrast 164/164 · eslint 0 error（16 warning 全为既有——
+  `git diff db6eabd3..HEAD -- dashboard-enterprise/` 为空，自批 5 回执以来 dashboard 树无字节级
+  改动；批 5 回执记「6 warning 基线」系可 --fix 子集口径，本批逐条列示 16 条无新增）·
+  vue-tsc exit 0 · vitest 79 文件/707 用例全绿。
+- **完整性清单**：仅覆盖 maop/enterprise .py 模块集（tests/test_module_integrity.py），
+  models.yaml 在清单外 ⇒ 无需重签。
+- **数据卫生**：计价探针曾把 16 条 b6-probe 合成行写进活库 data/maop.db（探针默认数据目录所致），
+  已全部删除（cost_entries 归 0）；浏览器验证种子 9 条（b6-priced/b6-unpriced）同规则已删。
+  后端 PID 39308（14:28 启动）与 vite :5174 系上批真栈残留，未杀。
+- **登记项（如实留痕，本批不修）**：
+  - S-6（呈现层，非本批引入）：成本页「按模型成本」列中，未计价型号名过长时
+    （deepseek-v4-flash-free / omniroute-auto-coding）名称省略号截断把未计价 Badge 挤出可视区
+    （DOM 内 Badge 存在、文本断言通过），是否按 S-1 同款修法对齐需用户定。
+  - 待用户二裁（继承 CLAIM）：agnes-2.5-pro 存量价（0.01/0.03）无来源标注，本批原样保留；
+    清掉需用户明示。
+- **未做**：推送 / 开 PR（未授权；本分支 push 本就不触发 CI，ci.yml branches 过滤已录）；
+  4 个未核型号定价（无官方来源，不臆造）。
+- **清理**：探针 / 种子 / 浏览器脚本（/f/tmp/maop-b6-*.py、maop-b6-browser-check.js）均仓外
+  scratch 不入库；证据目录 /f/tmp/maop-b6-browser/（cost-page.png + summary.json）保留。
+
+## 批 6 追加 CLAIM（2026-11-09）——用户三项裁决 + 残留栈归属裁定
+- **裁决 1（推送）**：批 6 两提交（cb78389c、3b1a8aff）可推送；PR 视情况（本分支当前无
+  open PR，#257 已 MERGED）。
+- **裁决 2（agnes-2.5-pro 定价）**：按官网刊例价，不一致就改。官网
+  https://agnes-ai.com/zh-Hans/docs/pricing（fetched_at 2026-11-09）：agnes-2.5-pro 输入
+  $0.45/M、输出 $0.90/M、缓存命中 $0.045/M（刊例＝现价）。models.yaml 存量 0.01/0.03
+  （＝$10/$30 per M）与官网不一致 → 改 0.00045/0.0009 并钉来源。
+- **裁决 3（S-6）**：修齐。成本页「按模型成本」长未计价型号名省略号截断挤出未计价 Badge
+  （DOM 断言过、视觉被裁）。
+- **残留栈归属裁定**：:9079 后端 PID 39308（start_dashboard.py，今日 14:28:58，本仓
+  data 目录 API 往返实证）与 :5174 vite PID 63332（dashboard-enterprise vite，今日
+  09:16:02）均系本线批 5/6 真栈残留；modulo-habit :1430/:5180、FS-dep-triage :5180 的
+  node/vite 属他线，不动。裁定：两者留作 S-6 复跑验证，验证完即停。
+
+## 批 6 追加回执（2026-11-09）——三项裁决执行完 + 残留栈停运
+- **裁决 1（推送）**：`722d3d0e..dbb225ea` 已推 origin/ui/topbar-alignment（共 6 笔：a2ab1f69 CLAIM /
+  cb78389c 批 6 交付 / 3b1a8aff 批 6 回执 / e3b97a4e 追加 CLAIM / f891828a agnes 对齐 / dbb225ea S-6）。
+  本分支无 open PR（#257 已 MERGED）；ci.yml branches 过滤 ⇒ 推送不触发 CI，验证以本门禁为准。
+- **裁决 2（agnes 官网价对齐）**：f891828a——models.yaml agnes-2.5-pro 0.01/0.03 → 0.00045/0.0009，
+  注释钉 https://agnes-ai.com/zh-Hans/docs/pricing (fetched_at 2026-11-09) 与缓存命中口径。
+  实证：生产路径种子 30k/5k → data/maop.db cost_usd=0.018、/api/cost/summary by_model
+  agnes-2.5-pro cost 0.018 unpriced=0；成本页 val=$0.0180、无 Badge。
+- **裁决 3（S-6 修齐）**：dbb225ea——Cost.vue 模型名拆进 .breakdown__model 独撑 ellipsis，
+  pages.css .breakdown__name 改 flex + Badge flex-shrink:0。实证：浏览器门两条长名断言
+  deepseek-v4-flash-free / omniroute-auto-coding Badge 盒 955.53+53.34 全落在行盒 861+538 内。
+- **浏览器门（真栈 :9079 + :5174，9 条生产路径种子）**：17/17 PASS——较批 6 的 15 条新增 2 条
+  S-6 断言；agnes 期望值 $0.4500→$0.0180、合计 $0.6309→$0.1989 随裁决 2 更新。
+  截图与 summary.json：/f/tmp/maop-b6-browser/。
+- **门禁（两笔改动后工作树实测）**：design:contrast 164/164 · eslint 0 error/16 warning（与批 6
+  同数，且 Cost.vue/pages.css 命中 0 条，无新增）· vue-tsc exit 0 · vitest 79 文件/707 用例全绿 ·
+  相关 py 298 passed（registry / cost_tracker_whitebox / cost_attribution / cost_ledger_provenance /
+  hot_reload / model_management / model_router_contracts / dispatcher / maop_loop /
+  behavioral_contracts）。
+- **残留栈处置**：停运前 Win32_Process CommandLine 复核——PID 39308 = python start_dashboard.py、
+  PID 86876 = dashboard-enterprise vite，均本线批 5/6 栈；Stop-Process -Force 后双消失。
+  modulo-habit :1430/:5180、FS-dep-triage :5180 他线进程未动。
+- **数据卫生**：种子 9 条（b6-priced/b6-unpriced，trace_id b6-browser-00..08）已删
+  （cost_entries 9→0，wal_checkpoint(TRUNCATE)）；data/maop.db 被 ignore，树净。
+  注：种子脚本 root_dir 硬编码仓库默认 data 目录，MAOP_DATA_DIR 隔离对该脚本不生效
+  （/f/tmp/maop-b6-data 从未创建），故按活库清除同规则处理。
+- **登记项销账**：S-6 已修（销）；agnes-2.5-pro 存量价「待用户二裁」项已按裁决 2 执行（销）。
+- **未做**：开 PR（未授权）。
+
+## 批 6 追加 PR 登记（2026-11-09）
+- PR #263：https://github.com/Levango7/MAOP/pull/263（base master ← ui/topbar-alignment，22 笔全量）。
+  base=master 命中 ci.yml branches 过滤 ⇒ PR 触发 CI（本分支直推不触发）；合并按用户指令执行，未自合。

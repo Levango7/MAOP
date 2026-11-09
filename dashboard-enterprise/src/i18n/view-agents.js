@@ -121,6 +121,14 @@ export const messages = {
     'view.agents.topology.subtitle': 'Routing relationships between agents (primary → fallback → tertiary)',
     'view.agents.topology.ariaLabel': 'Agent routing topology diagram',
     'view.agents.topology.empty': 'No agents to visualize',
+    // ── 分类 taxonomy（批 2）──
+    'view.agents.category.title': 'Category',
+    'view.agents.category.all': 'All',
+    'view.agents.category.general': 'General',
+    'view.agents.category.specialized': 'Specialized',
+    'view.agents.category.platform': 'Platform',
+    'view.agents.noAgentsInCategory': 'No agents in this category',
+    'view.agents.noAgentsInCategoryHint': 'Pick another category or clear the filter',
 
   },
 
@@ -244,6 +252,14 @@ export const messages = {
     'view.agents.topology.subtitle': 'Agent 之间的路由关系（主 → 备 → 三级）',
     'view.agents.topology.ariaLabel': 'Agent 路由拓扑图',
     'view.agents.topology.empty': '暂无可视化的 Agent',
+    // ── 分类 taxonomy（批 2）──
+    'view.agents.category.title': '分类',
+    'view.agents.category.all': '全部',
+    'view.agents.category.general': '通用',
+    'view.agents.category.specialized': '专用',
+    'view.agents.category.platform': '平台组件',
+    'view.agents.noAgentsInCategory': '该分类下暂无智能体',
+    'view.agents.noAgentsInCategoryHint': '请选择其他分类或清除筛选',
 
   },
 };
