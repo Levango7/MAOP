@@ -153,6 +153,41 @@ def setup_security_middleware(app: FastAPI) -> dict[str, Any]:
         report_uri=_csp_report_uri,
         connect_src=_csp_connect_src,
     )
+
+    # ── 可观测性中间件（2026-11-10 补装）──────────────────────────────
+    # MetricsMiddleware / TraceContextMiddleware 此前**从未被安装**：全仓只有
+    # 它们的定义、observability/__init__ 的导出、以及测试——没有任何
+    # app.add_middleware。而两者 docstring 都写着 "Installed via
+    # app.add_middleware(...)"，属**文档声明了、代码没做**。后果：真实流量的
+    # HTTP 请求数/延迟不进 /api/prometheus；请求头里的 traceparent/W3C trace
+    # context 永不被提取（分布式追踪在 HTTP 边界断链）。
+    #
+    # 装在这个位置是有意的：Starlette 的 add_middleware 是**前置插入**，最后
+    # 添加的最外层、最先执行。安全栈现有注册顺序使执行顺序为
+    # CSP → Auth → Quota → RateLimit → CORS；可观测性在其后再添加 ⇒ 执行顺序
+    # 变为 TraceContext → Metrics → CSP → Auth → …。这样指标能覆盖被鉴权拒绝的
+    # 请求（401 恰恰是最该被看到的），trace 上下文也包住整条链路。
+    #
+    # 两者都按"绝不成为新故障点"实现：Metrics 用 try/finally 且记录本身有兜底；
+    # TraceContext 在 tracing 关闭时短路、opentelemetry 缺失时静默降级。
+    try:
+        from maop.core.observability.metrics import MetricsMiddleware
+        from maop.core.observability.tracing import TraceContextMiddleware
+
+        # 开关走 settings（与同函数的 auth_enabled 同口径）：本仓 config-drift
+        # 棘轮要求环境变量读取收敛到 maop/config/settings.py，不在此处直读。
+        _http_metrics_enabled = _get_settings().http_metrics
+        app.add_middleware(MetricsMiddleware, enabled=_http_metrics_enabled)
+        # 不传 enabled ⇒ 跟随 tracing_enabled()（该类 docstring 的既定语义）
+        app.add_middleware(TraceContextMiddleware)
+        logger.info(
+            "[server] 可观测性中间件已注册 (http_metrics=%s, trace_context=auto)",
+            _http_metrics_enabled,
+        )
+    except ImportError as _e:
+        # 可观测性装不上不该挡住服务启动
+        logger.warning("[server] 可观测性中间件未注册 (import error: %s)", _e)
+
     return {
         "auth_enabled": _auth_enabled,
         "rl_enabled": _rl_enabled,
