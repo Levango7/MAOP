@@ -1312,3 +1312,32 @@
   data 目录 API 往返实证）与 :5174 vite PID 63332（dashboard-enterprise vite，今日
   09:16:02）均系本线批 5/6 真栈残留；modulo-habit :1430/:5180、FS-dep-triage :5180 的
   node/vite 属他线，不动。裁定：两者留作 S-6 复跑验证，验证完即停。
+
+## 批 6 追加回执（2026-11-09）——三项裁决执行完 + 残留栈停运
+- **裁决 1（推送）**：`722d3d0e..dbb225ea` 已推 origin/ui/topbar-alignment（共 6 笔：a2ab1f69 CLAIM /
+  cb78389c 批 6 交付 / 3b1a8aff 批 6 回执 / e3b97a4e 追加 CLAIM / f891828a agnes 对齐 / dbb225ea S-6）。
+  本分支无 open PR（#257 已 MERGED）；ci.yml branches 过滤 ⇒ 推送不触发 CI，验证以本门禁为准。
+- **裁决 2（agnes 官网价对齐）**：f891828a——models.yaml agnes-2.5-pro 0.01/0.03 → 0.00045/0.0009，
+  注释钉 https://agnes-ai.com/zh-Hans/docs/pricing (fetched_at 2026-11-09) 与缓存命中口径。
+  实证：生产路径种子 30k/5k → data/maop.db cost_usd=0.018、/api/cost/summary by_model
+  agnes-2.5-pro cost 0.018 unpriced=0；成本页 val=$0.0180、无 Badge。
+- **裁决 3（S-6 修齐）**：dbb225ea——Cost.vue 模型名拆进 .breakdown__model 独撑 ellipsis，
+  pages.css .breakdown__name 改 flex + Badge flex-shrink:0。实证：浏览器门两条长名断言
+  deepseek-v4-flash-free / omniroute-auto-coding Badge 盒 955.53+53.34 全落在行盒 861+538 内。
+- **浏览器门（真栈 :9079 + :5174，9 条生产路径种子）**：17/17 PASS——较批 6 的 15 条新增 2 条
+  S-6 断言；agnes 期望值 $0.4500→$0.0180、合计 $0.6309→$0.1989 随裁决 2 更新。
+  截图与 summary.json：/f/tmp/maop-b6-browser/。
+- **门禁（两笔改动后工作树实测）**：design:contrast 164/164 · eslint 0 error/16 warning（与批 6
+  同数，且 Cost.vue/pages.css 命中 0 条，无新增）· vue-tsc exit 0 · vitest 79 文件/707 用例全绿 ·
+  相关 py 298 passed（registry / cost_tracker_whitebox / cost_attribution / cost_ledger_provenance /
+  hot_reload / model_management / model_router_contracts / dispatcher / maop_loop /
+  behavioral_contracts）。
+- **残留栈处置**：停运前 Win32_Process CommandLine 复核——PID 39308 = python start_dashboard.py、
+  PID 86876 = dashboard-enterprise vite，均本线批 5/6 栈；Stop-Process -Force 后双消失。
+  modulo-habit :1430/:5180、FS-dep-triage :5180 他线进程未动。
+- **数据卫生**：种子 9 条（b6-priced/b6-unpriced，trace_id b6-browser-00..08）已删
+  （cost_entries 9→0，wal_checkpoint(TRUNCATE)）；data/maop.db 被 ignore，树净。
+  注：种子脚本 root_dir 硬编码仓库默认 data 目录，MAOP_DATA_DIR 隔离对该脚本不生效
+  （/f/tmp/maop-b6-data 从未创建），故按活库清除同规则处理。
+- **登记项销账**：S-6 已修（销）；agnes-2.5-pro 存量价「待用户二裁」项已按裁决 2 执行（销）。
+- **未做**：开 PR（未授权）。
