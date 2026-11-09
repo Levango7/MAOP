@@ -1345,3 +1345,28 @@
 ## 批 6 追加 PR 登记（2026-11-09）
 - PR #263：https://github.com/Levango7/MAOP/pull/263（base master ← ui/topbar-alignment，22 笔全量）。
   base=master 命中 ci.yml branches 过滤 ⇒ PR 触发 CI（本分支直推不触发）；合并按用户指令执行，未自合。
+
+## 领地登记（Qoder-Desktop 会话 1973591b，2026-11-10：第一轮三源对账 + K1/K2 复验）
+- **身份**：本会话＝早先 J/K 批（#162 修复 `cd6c1e0e`、K1 DAG 租户归属 #169、K2 分桶治时钟 #170）
+  的执行者，与板内「Qoder-CN 17ef022a」（前端/棘轮线）非同一会话，不承接其领地。
+- **对账机制（三源交叉，每轮开工 + master 移动后各跑一次）**：① 板面最新领地/「不碰」；
+  ② 远端真实状态（`gh pr list` + `git log origin/master --name-only`）——**板滞后时以 commit/PR 为准**
+  （实证：#246 板面 11-08 记 OPEN、11-09 已合 `54ccc010`；板最新批注 11-09 vs master 已到 `27e61fe9`）；
+  ③ 本机工作树（`git status`，未跟踪文件不动不问名）。
+- **判定规则**：目标文件 ∈ 他线领地/在途 PR ⇒ 停手、板上登记问板；∉ ⇒ 先追加 CLAIM 再动工；
+  交付回执带 sha + 验证命令 + 读数条件（冷/热、并发、commit）；推送/合并/删远端分支/切 tag 一律等用户令。
+- **本轮对账结论**：v5.6.1 已发（`f11d8217`，PyPI）；近三天产品决策＝UI 对齐线（批 A–6 合 #257/#263）、
+  Agents category taxonomy、models.yaml 定价按官网刊例（agnes-2.5-pro 对齐 $0.45/$0.90/M）、
+  #259 优先级队列真调度、operator 配额 M-T3.3 社区侧收官 ⇒ configuration.md ④ 已在 operator 层作答；
+  ⑤（`maop run`/chat 无身份策略）仍待产品定，且 `cli_run.py` 属 ZCode M-T3.3 领地，本会话不碰。
+- **复验**：工作树对齐 origin/master `27e61fe9`；`test_dag_tenant_attribution.py` +
+  `test_analysis_router_contracts.py` + `test_dead_wiring_inventory.py` = **38 passed**
+  （`dc61370a` 改过死接线清单后重跑）。本登记提交于 `docs/coord-reconcile-r1`，**未推送**——
+  master push run 42665105809 排队中，此时推会取消该 trunk 验证（concurrency 组取消在跑腿）。
+- **任务簿**：#65（K3）关闭——#181 AST 收集判据 + #183/#258 已把缺口建模收口，棘轮口径已变。
+- **遗留（如实）**：主树未跟踪 `py/uv.lock` 非本会话产物，不动；他线真栈残留按批 6 回执已自行停运。
+- **领地**：`py/maop/core/tenant/**`、`py/maop/dashboard/routers/dag.py`、
+  `py/maop/dashboard/services/{tenant_service,execution_service}.py`、
+  `py/tests/test_dag_tenant_attribution.py`、`docs/configuration.md` 租户段。
+- **不碰**：`cli_run.py`/`delegate/**`（ZCode）、`dashboard-enterprise/src/**`（Qoder-CN UI 线）、
+  `dashboard-enterprise/e2e`、MAOS 仓、`py/uv.lock`（无主未跟踪）、在途 PR #239/#240/#260-#262。
