@@ -106,6 +106,41 @@ models:
     capabilities:
     - codegen
     latency_tier: fast
+  # ── 批 6：全量声明集官网列表价补录（2026-11-09）──
+  # 口径：官网列表价（USD/1M ÷ 1000 = USD/1K），逐条钉 source URL + fetched_at。
+  # 查无官方来源的声明型号按审计条 3「不可臆造」登记未核、不入表：minimax-m2.7
+  # （官方价目表已下架，M2.x 退役）、mimo-v2.5（官方公告 2026-10-21 下线、旧名
+  # 失效）、deepseek-v4-flash-free（第三方免 Key 渠道别名，非 DeepSeek 官方
+  # SKU）、omniroute-auto-coding（网关路由别名，无单一列表价）。
+  MiniMax-M3:
+    model_id: MiniMax-M3
+    provider: minimax
+    family: minimax
+    # 国际站按量页 Standard ≤512K 档现价（刊例 $0.60/$2.40 永久五折）；
+    # >512K 档 $0.60/$2.40 与 Priority 1.5x 档未收录（单值取基础档）。
+    # source: https://platform.minimax.io/docs/guides/pricing-paygo (fetched_at 2026-11-09)
+    # 国内站同口径：刊例 ¥4.20/¥16.80，五折现价 ¥2.10/¥8.40
+    # source: https://platform.minimax.cn/docs/guides/pricing (fetched_at 2026-11-09)
+    cost_per_1k_input: 0.0003
+    cost_per_1k_output: 0.0012
+  qwen3.5-plus:
+    model_id: qwen3.5-plus
+    provider: stepfun
+    family: qwen
+    # 阿里云百炼国际站官方价目（agents.yaml codex 注明 StepFun proxy 路由）。
+    # ≤256K 档非思考/思考同价 $0.40/$2.40；256K-1M 档 $0.50/$3.00 未收录。
+    # source: https://www.alibabacloud.com/help/zh/model-studio/model-pricing (fetched_at 2026-11-09)
+    cost_per_1k_input: 0.0004
+    cost_per_1k_output: 0.0024
+  gpt-5.4:
+    model_id: gpt-5.4
+    provider: openai
+    family: openai
+    # 官网标准处理价（<270K 上下文）：$2.50/$15.00，缓存输入 $0.25。
+    # copilot CLI 自带模型，无对应 ProviderConfig；provider 仅作来源标注。
+    # source: https://openai.com/api/pricing/ (fetched_at 2026-11-09; 直连 403，经官方页索引快照钉值)
+    cost_per_1k_input: 0.0025
+    cost_per_1k_output: 0.015
 policies:
   default: {}
   codegen:
