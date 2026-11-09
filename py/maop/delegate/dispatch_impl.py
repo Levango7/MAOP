@@ -65,6 +65,13 @@ class DispatchImplMixin:
         - ``self.dispatch`` — synchronous dispatch coroutine
     """
 
+    #: 类级默认值（2026-11-09）：``Dispatcher.__new__(Dispatcher)`` 这种**绕过
+    #: ``__init__`` 手工装配**的构造方式在本仓是真实存在的用法（端到端健康门禁
+    #: 测试就这么建实例）。若无类级默认，任何直接读 ``self._priority_queue`` 的
+    #: 代码路径都会当场 AttributeError——这不是测试问题，是"属性只在 __init__ 里
+    #: 定义"这一约定的脆弱面。给它一个类级 None，绕过 __init__ 的实例也安全。
+    _priority_queue: Any = None
+
     def __init__(
         self,
         maop_config: Any | None = None,
@@ -301,8 +308,13 @@ class DispatchImplMixin:
         except (ImportError, sqlite3.Error, OSError, ValueError, TypeError) as exc:
             logger.debug("[dispatch] release slot failed (ignored): %s", exc)
             return
+        # ``_schedule_drain`` 定义在 DispatchPriorityMixin 上。裸 ``DispatchImplMixin()``
+        # 实例（本仓测试确实这么建）没有这个兄弟 mixin，硬调用会 AttributeError。
+        # 用 getattr 探测：有就触发排空，没有就跳过——release 本身仍然成功。
         if self._priority_queue is not None:
-            self._schedule_drain()
+            _schedule = getattr(self, "_schedule_drain", None)
+            if callable(_schedule):
+                _schedule()
 
     async def delegate_to_subagent(
         self,

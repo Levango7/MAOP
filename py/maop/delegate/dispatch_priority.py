@@ -89,13 +89,25 @@ class DispatchPriorityMixin:
         streamer: Any | None = None,
         priority: int = 3,
         deadline_ms: int | None = None,
+        auto_drain: bool = True,
     ):
         """Enqueue a dispatch request with priority metadata (Phase γ-2).
 
-        If no priority queue is attached (the default), this falls back to
-        a direct :meth:`dispatch` call, preserving the original synchronous
-        behaviour — so callers can switch to priority dispatch without
-        branching on configuration.
+        If no priority queue is attached, this falls back to a direct
+        :meth:`dispatch` call, preserving the original synchronous behaviour
+        — so callers can switch to priority dispatch without branching on
+        configuration.
+
+        ``auto_drain``（2026-11-09）：入队后是否立即安排一次排空。
+        **默认 True，为的是活性**——本方法是 ``await``-able 的公开 API，
+        若入队后没有任何排空者，调用方会 `await` 一个永不结算的 future 而
+        永久挂起。默认自排空让"有事件循环且槽位可用"时必定能推进。
+
+        **攒批场景请显式传 ``auto_drain=False``**：先连续入队 N 条、再调用
+        :meth:`drain_pending` 一次性按优先级排空（这正是优先级队列的意义，
+        见 ``tests/test_preemption.py::test_dispatch_priority_enqueues_with_queue``）。
+        若入队过程中让出控制权（``await`` 任何东西），默认的自动排空会在
+        批未攒齐时就先跑掉一轮——顺序仍是优先级正确，但批被切成多波。
 
         When a queue is attached, the request is wrapped in a
         :class:`~maop.core.priority_queue.PriorityTask` and pushed; the
@@ -175,8 +187,11 @@ class DispatchPriorityMixin:
             "[dispatch] 入队 agent=%s priority=%s depth=%s trace=%s",
             agent, priority, self._queue_depth(), trace_id,
         )
-        # 尝试立即排空一次（可能已有空闲槽位），失败不影响入队本身。
-        self._schedule_drain()
+        # 活性优先：默认安排一次排空，避免"入队后无人排空 ⇒ future 永不结算
+        # ⇒ 调用方永久挂起"（2026-11-09 实测到过这个形态）。攒批场景用
+        # auto_drain=False 关掉它，语义见 docstring。
+        if auto_drain:
+            self._schedule_drain()
         return await fut
 
     # ── 队列可观测性 / 死线结果（2026-11-09）──────────────────────
