@@ -176,6 +176,19 @@ class MAOPSettings(BaseSettings):
     rate_limit_rps: float = Field(default=30.0, description="Requests per second", gt=0)
     rate_limit_burst: int = Field(default=60, description="Max burst size", gt=0)
 
+    # ── Observability ─────────────────────────────────────────────
+    # HTTP 指标中间件开关（env: MAOP_HTTP_METRICS）。
+    # 2026-11-10：MetricsMiddleware 此前从未被安装；装上时若在中间件栈里直接
+    # os.environ.get("MAOP_HTTP_METRICS")，会撞 config-drift 棘轮（env 直读必须
+    # 收敛到本模块）。按 auth_enabled 的先例：字段名语义化 + validation_alias
+    # 指向对外承诺的环境变量名（否则 env_prefix 会派生出 MAOP_HTTP_METRICS_ENABLED
+    # 这个并不存在的名字）。
+    http_metrics_enabled: bool = Field(
+        default=True,
+        description="Enable HTTP metrics middleware (env: MAOP_HTTP_METRICS)",
+        validation_alias=AliasChoices("MAOP_HTTP_METRICS"),
+    )
+
     # ── CORS ──────────────────────────────────────────────────────
     cors_origins: str = Field(
         default="http://localhost:9079,http://127.0.0.1:9079",

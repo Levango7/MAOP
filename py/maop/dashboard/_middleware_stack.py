@@ -174,7 +174,9 @@ def setup_security_middleware(app: FastAPI) -> dict[str, Any]:
         from maop.core.observability.metrics import MetricsMiddleware
         from maop.core.observability.tracing import TraceContextMiddleware
 
-        _http_metrics_enabled = os.environ.get("MAOP_HTTP_METRICS", "1") == "1"
+        # 开关走 settings（与同函数的 auth_enabled 同口径）：本仓 config-drift
+        # 棘轮要求环境变量读取收敛到 maop/config/settings.py，不在此处直读。
+        _http_metrics_enabled = _get_settings().http_metrics_enabled
         app.add_middleware(MetricsMiddleware, enabled=_http_metrics_enabled)
         # 不传 enabled ⇒ 跟随 tracing_enabled()（该类 docstring 的既定语义）
         app.add_middleware(TraceContextMiddleware)
