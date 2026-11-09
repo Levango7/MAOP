@@ -1271,7 +1271,9 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .budget__val { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text); text-align: right; white-space: nowrap; }
 /* Cost-by-model breakdown (shares .breakdown flex column from ThreeLayerMemory block) */
 .breakdown__item { display: grid; grid-template-columns: minmax(80px, 1.4fr) 3fr auto; gap: var(--sp-3); align-items: center; }
-.breakdown__name { font-size: var(--fs-sm); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.breakdown__name { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; font-size: var(--fs-sm); color: var(--text); }
+.breakdown__model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.breakdown__name .badge { flex-shrink: 0; }
 .breakdown__track { height: 6px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
 .breakdown__fill { height: 100%; border-radius: var(--r-full); background: linear-gradient(90deg, var(--brand), var(--brand-strong)); transition: width var(--motion) var(--ease-out); box-shadow: 0 0 8px color-mix(in srgb, var(--brand) 30%, transparent); }
 .breakdown__val { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-muted); text-align: right; white-space: nowrap; }

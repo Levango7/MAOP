@@ -111,7 +111,7 @@
         <ul v-else class="breakdown">
           <li v-for="m in modelKeys" :key="m" class="breakdown__item">
             <span class="breakdown__name">
-              {{ m }}
+              <span class="breakdown__model">{{ m }}</span>
               <Badge v-if="modelUnpriced(m)" tone="warn" :title="t('view.cost.unpricedTitle')">{{ t('view.cost.unpriced') }}</Badge>
             </span>
             <div class="breakdown__track"><div class="breakdown__fill" :style="{ width: modelPct(m) + '%' }" /></div>
