@@ -1370,3 +1370,22 @@
   `py/tests/test_dag_tenant_attribution.py`、`docs/configuration.md` 租户段。
 - **不碰**：`cli_run.py`/`delegate/**`（ZCode）、`dashboard-enterprise/src/**`（Qoder-CN UI 线）、
   `dashboard-enterprise/e2e`、MAOS 仓、`py/uv.lock`（无主未跟踪）、在途 PR #239/#240/#260-#262。
+
+### 2026-11-10 更正（同会话追加销账，用户当轮裁决后）
+- **⑤ 策略已定稿**（销「仍待产品定」）：用户裁定权下放 ⇒ 同一**分档**语义适用于
+  `maop run`/chat 两条入口（无身份＝第一档放行；接线＝ owner 做第 ①②③ 步工程活）。
+  已写入 `docs/configuration.md` ⑤ 行。`cli_run.py` 属 ZCode M-T3.3 领地，本会话不碰，
+  接线协调待板。
+- **删分支（第 2 项授权）**：用户批删 `feat/tenant-attribution-dag` /
+  `fix/task-trends-clock-determinism`；实测两分支**远端已不存在**
+  （`gh api git/ref/heads/<b>` 均 404 + `git fetch` 报 couldn't find remote ref），
+  对应 PR #169/#170 均 MERGED（mc `00f9a41cdc` / `262544ea29`，10-27 合）⇒ 删除无需执行，销账。
+- **trunk run 42665105809 已出结论**（销「排队中」）：除 `CI merge gate` 结构红外全绿
+  （push 事件上 PR-only 腿缺失触发，`docs/ci-gates.md` 已载，非回归）。
+- **本笔随推送落地**：原登记「未推送——此时推会取消 trunk 验证」的前提（run 在飞）已不成立；
+  concurrency 组按 ref 隔离，推 `docs/coord-reconcile-r1` 不影响 master 的 run。
+- **dependabot 三 PR 实测口径**（第 3 项，处置待用户裁）：#260 npm-minor 全绿 CLEAN；
+  #261 jsdom 30→31 major 全绿 CLEAN（含 Frontend Build 内 vitest coverage 门 + Playwright E2E，
+  上一轮「无 CI vitest 覆盖」判断作废）；#262 pip-minor BLOCKED，根因单一＝
+  `test_dev_extra_and_ci_pin_the_same_versions` 抓 ruff 口径漂移（pyproject 0.17.4 vs ci.yml 0.17.3），
+  另有 gitleaks install 504 瞬断腿。

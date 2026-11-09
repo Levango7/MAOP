@@ -554,7 +554,7 @@ agent_versions 等）据此过滤查询结果；`TenantManager` 另提供 `Tenan
 | ② 服务层签名 | `execution_service.execute_dag(*, nodes, edges, tenant_id="")`，keyword-only、默认空串，既有调用点零改动 |
 | ③ 作用域覆盖 | `tenant_context(tenant_id)` 包住 `Engine.run(...)`，因此步骤执行器与 `Dispatcher.dispatch` 都读得到 `current_tenant()`。刻意**不**把 `tenant_id` 塞进模板 `context` 字典 —— 那会让一个叫 `tenant_id` 的 DAG 变量被静默覆盖 |
 | ④ 漏斗里的 `check_agent_access` | **未做**。企业版 `TenantManager` 压根没有这个方法（它只有 `check_quota` / `get_usage` / CRUD），而 core 版那个读的是 `data/maop.db` 的 `tenants` 表，与仪表盘的 PG 注册表**不是同一个数据源**。照原计划接上，得到的是"按一个没人写的表来放行/拦截"的门 |
-| ⑤ 无身份时的策略 | 本次入口采取**分档**而非全局开关：无身份 = 不管（个人版/认证关闭本来就没有租户边界）；有身份且登记表非空 = 未登记即拒、`suspended`/`terminated` 即拒；登记表为空 = 不管（否则打死所有没接租户库的部署）。`maop run` 与 chat 两条入口**还没接**，它们的第 ⑤ 步策略仍待产品定 |
+| ⑤ 无身份时的策略 | 本次入口采取**分档**而非全局开关：无身份 = 不管（个人版/认证关闭本来就没有租户边界）；有身份且登记表非空 = 未登记即拒、`suspended`/`terminated` 即拒；登记表为空 = 不管（否则打死所有没接租户库的部署）。2026-11-10 产品裁决：同一分档语义**同样适用于 `maop run` 与 chat 两条入口**（无身份 = 第一档放行；接线由 owner 做第 ①②③ 步工程活，策略本身不再待定） |
 
 响应体随之多了 `tenant_id`（见 `docs/API_CHANGELOG.md`）。契约由
 `py/tests/test_dag_tenant_attribution.py` 钉住，其中一条专门盯"G-07 越权口子不许重新打开"：
