@@ -1141,3 +1141,12 @@
   - DESIGN.md:102,237 卡片 padding 20px → 与 Card.vue:71 实 `--sp-4` 对齐（DESIGN.md:121 自认 tokens.css 优先）
 - **不碰**：后端 py/、i18n、其他视图、CI/CD、分支保护；pending 态泛化、长列表虚拟化、路由懒加载空白（P2-3）、他页 idle 降级等口味/设计项留待后续批裁决，本批不发明。
 - **批次**：本批一次交付，分两笔提交（布局残留 / 死代码+文档同步）+ 门禁证据 + 本登记；回执带 sha；推送逐批授权。
+
+## 交付回执（2026-11-09：批 4 前端布局/状态残留整改，sha d71334ea / 79ce4549）
+- **提交**：`d71334ea` fix(frontend): 单孩子网格铺满+4 宽表横向滚动（6 文件 +6/-6）；`79ce4549` fix(frontend): 清 WorkflowEditor 死 prop + DESIGN.md 卡片 padding 对齐实现（2 文件 +2/-4）。CLAIM＝`89b76184`。
+- **内容**：pages.css:63 `:only-child` 泛化到 `.grid-2`/`.two-col`（治 Models.vue:19 单 EmptyState 右列空洞类，对齐既有 `.row` 模式）；AgentRegistry.vue:1003 / AgentBilling.vue:1020 / AlertRules.vue:686 / AgentGateway.vue:672 表格容器 `overflow:hidden`→`overflow-x:auto`（对齐 DESIGN.md 表格可横向滚动，圆角裁切由 overflow 自动保持）；Overview.vue:111 删死类 chart-card（全仓仅此引用）；WorkflowEditor.vue:4,6 删 `:loading="false"`/`:empty="false"`（该视图无初始化拉取，默认值同义）；DESIGN.md:102,237 卡片 padding 20px/--sp-5 → 16px/--sp-4（Card.vue:71 实现；暗 16px/亮 12px，tokens.css:149,327）。
+- **假阳性剔除（不改）**：Examples 纯静态无异步（Examples.vue:53 静态 import）；Run 反馈在 KeepAlive 子视图内（Run.vue:27-30）；WorkflowEditor 无初始化拉取（onMounted/api.get 零命中）。
+- **门禁**：design:contrast 164/164 PASS；eslint 0 error（16 warning 预存他文件）；vue-tsc EXIT=0；vitest 706/706（79 文件）。
+- **核验**：git diff --stat 8 文件 +8/-10；diff 内 CR 0 行（无 CRLF 夹带）；zz_ci_watch.sh 未入提交。
+- **未做**：推送（逐批授权制）；P2-3 路由懒加载空白、pending 态泛化、长列表虚拟化、他页 idle 降级等运行时项留待后续批（需浏览器复跑取证）。
+- **并行**：本批与 0235e502 的 CI 看守并行执行，互不阻塞；看守落定后另行汇报。
