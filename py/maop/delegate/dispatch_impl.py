@@ -47,6 +47,10 @@ from maop.delegate.sla_monitor import SLAMonitor
 # pre-split behaviour (tests / dashboards key on this logger name).
 logger = logging.getLogger("maop.delegate.dispatcher")
 
+# 哨兵：区分"调用方没传 priority_queue"（→ 默认挂载）与"显式传 None"
+# （→ 关掉队列、退回槽位竞争时降级执行）。用 None 当默认值就无法表达后者。
+_UNSET_QUEUE: Any = object()
+
 # P3-fix: 常量提升——将魔法数字/字符串提为模块级常量，便于统一维护与调优。
 _DEFAULT_DISPATCH_CONCURRENCY: int = 10  # 默认并发限制（settings 加载失败时降级使用）
 _DEFAULT_MAX_SUBAGENT_DEPTH: int = 5     # 子代理递归委派最大深度
@@ -70,7 +74,9 @@ class DispatchImplMixin:
         *,
         registry: Any | None = None,
         capability_matcher: Any | None = None,
-        priority_queue: Any | None = None,
+        # 哨兵默认值：让"没传"与"显式传 None"可区分。若直接用 None 当默认，
+        # 就无法表达"我就是要关掉队列、退回降级执行"（2026-11-09 实测踩到）。
+        priority_queue: Any | None = _UNSET_QUEUE,
         # P3-4 fix: 保留 MAOP_config 作为向后兼容的别名（PEP8 违规参数名）。
         MAOP_config: Any | None = None,
     ) -> None:
@@ -90,11 +96,30 @@ class DispatchImplMixin:
             registry=registry, capability_matcher=capability_matcher,
         )
         self._sla = SLAMonitor()
-        # Phase γ-2: optional priority queue for priority-aware dispatch.
-        # When None (default), dispatch() executes synchronously as before.
-        # When set, dispatch_priority() enqueues and drain_pending() pops in
-        # priority order. Kept optional to preserve backward compatibility.
+        # Phase γ-2: priority queue for priority-aware dispatch.
+        #
+        # 2026-11-09：**默认改为挂载**（此前默认 None，导致 `set_priority_queue`
+        # 全仓零调用方、`dispatch_priority`/`drain_pending` 也零生产调用方——
+        # PRIORITY 策略只是枚举里的一个名字，实际从不发生）。
+        #
+        # 挂载后行为变化的边界很窄，且只在"槽位竞争"时出现：
+        #   · 有空闲槽位（常态）→ 直接执行，与过去逐字一致；
+        #   · 槽位被占满 → 入队等待，由槽位释放触发的 drain 按
+        #     (priority, deadline, FIFO) 拉起，而不是降级超发。
+        # 想彻底关掉：传 `priority_queue=None` 或用 `set_priority_queue(None)`，
+        # 回到"降级执行"语义（保留给显式选择该行为的部署）。
+        if priority_queue is _UNSET_QUEUE:
+            try:
+                from maop.core.reliability.priority_queue import PriorityTaskQueue
+                priority_queue = PriorityTaskQueue()
+            except Exception as exc:  # 队列不可用不代表不能派发
+                logger.warning(
+                    "[dispatch] 优先级队列构造失败，退回同步派发: %s", exc,
+                )
+                priority_queue = None
         self._priority_queue = priority_queue
+        # 自动排空的去重标记（_schedule_drain 用）：同一时刻只安排一个排空任务。
+        self._drain_scheduled = False
         # P2 fix: global concurrency limiter to prevent overwhelming downstream LLM APIs.
         # Uses settings.dispatch_concurrency (env: MAOP_DISPATCH_CONCURRENCY, default: 10).
         # P1-fix: get_settings 异常保护——配置文件损坏/加载失败时降级到默认并发值，
@@ -153,6 +178,7 @@ class DispatchImplMixin:
         deadline_ms: int | None = None,
         _failover_depth: int = 0,
         dry_run: bool = False,
+        _slot_reserved: bool = False,
     ) -> DispatchResult:
         # Phase γ-1: derive SLA tier, log SLA context, and record
         # in-flight gauges. The finally block at the end of this method
@@ -169,18 +195,43 @@ class DispatchImplMixin:
             },
         )
 
-        # ── 并发槽位占位（2026-11-08 接线）────────────────────────────
+        # ── 并发槽位占位（2026-11-08 接线，2026-11-09 加队列分支）─────────
         # acquire/release 与 AgentRouter._active_count 一直都存在，但**全仓没有
         # 任何调用方**，于是两个后果：① RoutingStrategy.LOAD_BALANCED 的排序键
         # 第一项恒为 0，实际退化成 agent 名字典序（用户选"负载均衡"拿到字母序
         # 第一）；② AgentDescriptor.max_concurrent 从未被强制执行。
         # 这里补上调用点，让两件事第一次真正发生。
         #
-        # 刻意设计为**降级而非拒绝**：acquire 失败时不阻断派发（那会改变既有
-        # 行为、打翻大量用例），而是记一条审计后照常执行——负载数据先真实起来，
-        # 是否升级为硬限额留给产品决策。
+        # 拿到槽位时按原路执行；**拿不到时分两种**：
+        #   · 未挂优先级队列（默认）→ 保持 11-08 的降级语义：记一条审计后照常
+        #     执行。这保住了全部既有行为与测试，硬限额仍留给产品决策。
+        #   · 挂了队列 → **入队等待**而非超发。这是 PRIORITY 策略从"仅为标注"
+        #     变成真实调度语义的那一步：调用方 await 同一个调用，任务按
+        #     (priority, deadline, FIFO) 排队，槽位一空就由 drain 拉起执行。
         _slot_agent = agent
-        _slot_held = self._acquire_agent_slot(_slot_agent)
+        # 队列排空路径已代为申请槽位（drain_pending 里 acquire 过），
+        # 用 _slot_reserved 告知 inner：不要再申请、也不要再入队，否则活锁。
+        _slot_held = _slot_reserved or self._acquire_agent_slot(_slot_agent)
+
+        # "拿不到槽位"有两种完全不同的原因，处理也必须不同：
+        #   · **agent 不在 catalog**（未配置 / 拼错 / 未注册）→ acquire 必然 False。
+        #     这时入队等于把一个"注定失败"的请求塞进队列，而且**永无排空**——
+        #     没有槽位曾被 acquire 成功，就没有 release 来触发 drain，调用方
+        #     await 的 future 永远不会结算（2026-11-09 实测：unknown agent 的
+        #     派发在 dispatch() 内部挂死，13 条存量用例因此超时）。
+        #     ⇒ 这种情况必须**照原路往下走**，让 inner 自己给出"agent not found"。
+        #   · agent 在 catalog、只是并发已满 → 才是真正的"槽位竞争"，入队等待。
+        _agent_known = self._agent_is_tracked(_slot_agent)
+        if not _slot_held and self._priority_queue is not None and _agent_known:
+            # 槽位竞争 → 入队。dispatch_priority 内部会：死线/容量预检、
+            # 包 PriorityTask、push、并尝试立即排空一次。
+            return await self.dispatch_priority(
+                agent, task,
+                routing_key=routing_key, workdir=workdir,
+                timeout_seconds=timeout_seconds, trace_id=trace_id,
+                streamer=streamer,
+                priority=priority, deadline_ms=deadline_ms,
+            )
 
         try:
             return await self._dispatch_impl_inner(
@@ -192,6 +243,7 @@ class DispatchImplMixin:
                 sla_tier=sla_tier,
                 _failover_depth=_failover_depth,
                 dry_run=dry_run,
+                _slot_reserved=_slot_held,
             )
         finally:
             if _slot_held:
@@ -220,14 +272,37 @@ class DispatchImplMixin:
             logger.debug("[dispatch] acquire slot unavailable (non-blocking): %s", exc)
         return False
 
+    def _agent_is_tracked(self, agent_name: str) -> bool:
+        """该 agent 是否在 catalog 中登记（即" acquire 失败"是竞争还是不存在）。
+
+        只有**已登记**的 agent 才谈得上"槽位竞争"；未登记时 acquire 必 False，
+        此时入队会把一个注定失败的请求永久留在队列里（无槽位曾被占用 ⇒ 无
+        release ⇒ 无 drain ⇒ future 永不结算）。查不到时保守返回 True，
+        让调用方按既有路径走完（inner 会给出 not-found 结果）。
+        """
+        try:
+            from maop.core.agent.registry.agent_catalog import AgentCatalog
+            catalog = AgentCatalog.default()
+            return catalog.get(agent_name) is not None
+        except (ImportError, sqlite3.Error, OSError, ValueError, TypeError):
+            # 查不了就当作"已登记"——宁可走原路让 inner 报错，也不要凭猜测入队。
+            return True
+
     def _release_agent_slot(self, agent_name: str) -> None:
-        """释放并发槽位。与 :meth:`_acquire_agent_slot` 严格配对。"""
+        """释放并发槽位。与 :meth:`_acquire_agent_slot` 严格配对。
+
+        释放后立刻尝试排空一次队列——槽位刚空出来，队列里可能正有同 agent 的
+        任务在等（2026-11-09）。没有运行中的事件循环时跳过，等下次显式排空。
+        """
         try:
             from maop.core.agent.router.agent_router import get_agent_router
             router = get_agent_router()
             router.release(agent_name)
         except (ImportError, sqlite3.Error, OSError, ValueError, TypeError) as exc:
             logger.debug("[dispatch] release slot failed (ignored): %s", exc)
+            return
+        if self._priority_queue is not None:
+            self._schedule_drain()
 
     async def delegate_to_subagent(
         self,
