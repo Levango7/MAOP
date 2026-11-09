@@ -1017,7 +1017,7 @@ onMounted(() => {
   width: 100%;
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
-  overflow: hidden;
+  overflow-x: auto;
 }
 .records-table__head,
 .records-table__row {

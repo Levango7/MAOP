@@ -60,7 +60,7 @@
 .stats-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: stretch; }
 .two-col { display: grid; gap: var(--sp-4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
 .row { display: grid; gap: var(--sp-4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
-.row > :only-child { grid-column: 1 / -1; }
+.row > :only-child, .grid-2 > :only-child, .two-col > :only-child { grid-column: 1 / -1; }
 .status-strip { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; padding: var(--sp-3) var(--sp-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
 .ss-sep { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
 .ss-item { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-sm); color: var(--text-muted); }

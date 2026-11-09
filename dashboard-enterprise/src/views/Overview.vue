@@ -108,7 +108,7 @@
 
     <!-- ── 层 3: 图表 (2/3) + 活动流 (1/3) 并排 — 上下文不再独占整行（idle 时隐藏） ── -->
     <div v-if="!error && !idleSystem" class="ov-split">
-      <Card icon="activity" :title="t('view.overview.throughput')" class="chart-card">
+      <Card icon="activity" :title="t('view.overview.throughput')">
         <div class="chart-box">
           <Line v-if="chartData.labels.length" :data="chartData" :options="chartOptions" />
           <EmptyState v-else icon="activity" :title="t('view.overview.noTimeseries')" :description="t('view.overview.throughputUnavailable')" />

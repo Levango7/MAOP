@@ -1000,7 +1000,7 @@ onMounted(() => {
   width: 100%;
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
-  overflow: hidden;
+  overflow-x: auto;
 }
 .ar-table__head,
 .ar-table__row {
