@@ -1150,3 +1150,39 @@
 - **核验**：git diff --stat 8 文件 +8/-10；diff 内 CR 0 行（无 CRLF 夹带）；zz_ci_watch.sh 未入提交。
 - **未做**：推送（逐批授权制）；P2-3 路由懒加载空白、pending 态泛化、长列表虚拟化、他页 idle 降级等运行时项留待后续批（需浏览器复跑取证）。
 - **并行**：本批与 0235e502 的 CI 看守并行执行，互不阻塞；看守落定后另行汇报。
+
+## 推送回执（2026-11-09：批 4 四笔上链 ui/topbar-alignment）
+- **授权与执行**：用户「授权推送这4笔」；`git push origin ui/topbar-alignment` 一次成功
+  `0235e502..9a4d8efd`；读回 remote ref == local HEAD
+  `9a4d8efdfa89f20edec111ce140a686eceee69ef`，分支不再 ahead；工作树仅余未跟踪
+  `zz_ci_watch.sh`（看守脚本，按纪律不入提交）。
+- **上链清单**：`89b76184` 批 4 CLAIM / `d71334ea` 布局残留 / `79ce4549` 死代码+文档同步 /
+  `9a4d8efd` 批 4 交付回执。推送前核 diff 9 文件 +34/-10、零私钥材料
+  （grep BEGIN PRIVATE KEY / maop_enterprise_prod 均 0 命中）。
+- **CI 事实更正（重要）**：`.github/workflows/ci.yml:10-11` push 触发仅
+  `branches: [main, master, develop]`，PR 触发同列表 ⇒ 本分支 push **不触发任何工作流**
+  （实证：`gh run list --branch ui/topbar-alignment` 对 0235e502 零 run；全仓仅 ci.yml +
+  nightly.yml，后者 schedule/dispatch）。本批验证依据＝本地四道门禁（批 4 回执已录全绿）；
+  若需 CI 结论须开 PR（未授权，不动）。
+- **未做**：开 PR / 合并（未授权）；rebase（逐批授权制）。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-09：批 5——P2/P3 清单真栈运行时复跑）
+- **授权**：用户「开批5修P2-3清单 / 用浏览器复跑交互验证」（2026-11-09，与推送授权同条）。
+- **取证发现（避免重复施工）**：审计（`docs/audits/frontend-runtime-spotcheck-2026-11-08.md`
+  §一 P2-1/P2-2/P3-2/P2-3/P3-1）列的五项**代码面修复已由仓库 owner 提交落地且已在
+  origin/master**：
+  - P2-1/P2-2/P3-2 ← `f9822c8c`（2026-11-08 11:17）：`cost_tracker.py` `record_actual_cost`
+    priced 入 metadata + CostSummary.unpriced_entries 与逐模型/逐 agent 计数 + 历史行
+    provider 空兜底（`_entry_unpriced` :34）；`alert_ingest.py` record_alerts unnamed 计数+WARN
+    （:146-194）；`run_sim.py` labels.alertname 键名修正；`Cost.vue` 未计价展示+i18n；8 条新钉测。
+  - P2-3/P3-1 ← `be226d00`（2026-11-08 12:31）：`App.vue` useRouteLoadingBar 接线 +
+    `route-loading-bar.test.js` 142 行钉子 + `Overview.vue` hero/KPI/健康/表格骨架三分支。
+- **批 5 范围（本批真正交付）**：真栈（`py/start_dashboard.py` @9079 + vite dev @5174，
+  `MAOP_AUTH_ENABLED=0` + `MAOP_OWNER_MODE=1` + `MAOP_MULTIMODAL_PROVIDER=hash`）浏览器级复跑——
+  1. 五项逐条运行时取证（P2-1 未计价展示 / P2-2 sim 告警实名且不再新增 <unknown> /
+     P2-3 懒加载进度条实显实灭 / P3-1 首载骨架而非 — / P3-2 $0.0000→未计价）；
+  2. 11-08 抽查 §二 T1-T9 基线复跑（防批 4 布局改动回归）；
+  3. 存活项（例：DB 历史 <unknown> 行是否仍占运营视图、sim 采集可清理性）按证据修或如实登记不修。
+- **不碰**：已落地修复的代码本体（除非运行时证伪）；models.yaml 补定价（需真实单价，不可臆造）；
+  配置漂移门禁（涉 CI 改造，需用户另行授权）；分支保护/CI/CD；他线领地（#258/#240/#239 OPEN 不交叠）。
+- **批次**：证据先行（截图+DOM 断言+API/DB 读数），存活项整改单独提交，回执带 sha；推送逐批授权。
