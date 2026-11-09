@@ -1341,3 +1341,7 @@
   （/f/tmp/maop-b6-data 从未创建），故按活库清除同规则处理。
 - **登记项销账**：S-6 已修（销）；agnes-2.5-pro 存量价「待用户二裁」项已按裁决 2 执行（销）。
 - **未做**：开 PR（未授权）。
+
+## 批 6 追加 PR 登记（2026-11-09）
+- PR #263：https://github.com/Levango7/MAOP/pull/263（base master ← ui/topbar-alignment，22 笔全量）。
+  base=master 命中 ci.yml branches 过滤 ⇒ PR 触发 CI（本分支直推不触发）；合并按用户指令执行，未自合。
