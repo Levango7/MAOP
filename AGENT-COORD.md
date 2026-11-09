@@ -1186,3 +1186,46 @@
 - **不碰**：已落地修复的代码本体（除非运行时证伪）；models.yaml 补定价（需真实单价，不可臆造）；
   配置漂移门禁（涉 CI 改造，需用户另行授权）；分支保护/CI/CD；他线领地（#258/#240/#239 OPEN 不交叠）。
 - **批次**：证据先行（截图+DOM 断言+API/DB 读数），存活项整改单独提交，回执带 sha；推送逐批授权。
+
+## 批 5 交付回执（2026-11-09）——P2/P3 五项运行时复跑全绿，S-1 当场修复上链 1fd1cd7f
+- **授权**：用户「授权推送这4笔 / 开批5修P2-3清单 / 用浏览器复跑交互验证」（2026-11-09）。
+- **方法**：真栈（`py/start_dashboard.py` @9079 + vite dev @5174，`MAOP_AUTH_ENABLED=0` +
+  `MAOP_OWNER_MODE=1` + `MAOP_MULTIMODAL_PROVIDER=hash`）；Playwright 1.64.1（仓内
+  `dashboard-enterprise/node_modules`，executablePath 本机 Chrome）；懒加载用路由级 route stall
+  模拟（只断"有无反馈"不断真实耗时）；P2-2 ingest 语义用隔离 `MAOP_DATA_DIR` 的
+  `record_alerts` 直调探针（webhook 端点对未设秘钥 fail-closed，不能走活栈）。
+- **五项裁决**（首跑 26 项 24 绿 2 红＝同一发现 S-1；修复后复跑 25/25 绿；截图+summary.json：
+  `/f/tmp/maop-gui-20261109/`）：
+  - P2-1 PASS：横幅「14 条明细无法计价，因此该合计并非真实总花费」与
+    `GET /api/cost/summary.unpriced_entries=14` 一致；按模型 unknown 行挂未计价 Badge。
+  - P2-2 PASS（代码层 6/6）：旧形状（顶层 name）→ `unnamed=1` + WARN 落库兼容；
+    `labels.alertname` / commonLabels 兜底 → `unnamed=0`；`run_sim.py:281-282` 已实名。
+  - P2-3 PASS：Cost.vue chunk stall 1.6s 全程 `.maop-loading-bar` 可见，URL 停 /home，
+    chunk 到位即渲染。
+  - P3-1 PASS：`/api/overview` stall 1.5s 首屏 `.ov-hero--skeleton` 可见、无 `—` 占位；
+    数据到位「31 活跃智能体 · 0 个任务运行中」。
+  - P3-2 PASS（含 S-1 修复）：明细 16 处未计价叶节点；已定价零花费行（agnes-2.5-pro/mmx）
+    `$0.0000` 属实；未定价行均有标记。
+- **T1-T9 基线复跑全过**：导航 42=nav.js 51−9 `enterprise:true`（11-08 轮「58」口径不同，
+  本轮按 nav.js 推导自洽）；黑板四签 快照/域/历史/统计；记忆搜索 GRAPH 10 条结果 167ms；
+  设置页 license→personal (no_license_key) 诚实展示；深色模式 data-theme=dark；运行页控件齐；
+  告警页存量 1 行 `<unknown>` 系修复前数据（f9822c8c 兼容保留，渲染属预期）。
+- **B4 宽表 overflow 回归**：al-table/ar-table 活表 overflowX=auto；gw-table/records-table
+  本 DB 空态走 EmptyState 无活表，改 CSSOM 级联取证 `.gw-table[data-v-…]→auto`、
+  `.records-table[data-v-…]→auto`。
+- **S-1 发现与修复（本批唯一代码改动）**：运行时证伪 P3-2 闭环——按智能体卡
+  `Cost.vue:130` 无条件 `money(by_agent[a].cost)`，copilot 14/14 次调用全部未计价却裸显
+  `$0.0000`。修法与 modelUnpriced 对称（agentUnpriced + 同款 Badge 挂名称侧），钉 1 条
+  （全未计价挂标记 / 已定价零花费不挂）。提交 `1fd1cd7f`。
+- **门禁**（修后工作树实测）：design:contrast 164/164 PASS · eslint 0 error（6 warning 基线）·
+  vue-tsc exit 0 · vitest 79 文件/706 用例全绿 exit 0。CI 口径：两 owner 修复
+  `f9822c8c`/`be226d00` 均为 origin/master `1bb3bdb3`（PR #256 run success）祖先；本分支 push
+  不触发 CI（ci.yml branches 过滤，上批已录）；本批无代码合并动作。
+- **登记项（如实留痕，本批不修）**：
+  - S-2（数据面非代码）：GAP-2 sim 库存量 `<unknown>` firing 行（received_at 1793746430）
+    系修复前落库，建议清理 sim 采集写库或独立 test receiver。
+  - S-3（噪音）：vitest 偶发 unhandled-error（一次 31 条/一次 15 条，均系负向测试 stderr
+    逃逸，复跑 0 条 exit 0，非断言失败）。
+- **未做**：修 S-2（动活库数据，需用户点名）；开 PR / 推送（未授权）；models.yaml 补定价
+  （需真实单价）。
+- **清理**：harness/探针 `zz_*` 与根 `zz_ci_watch.sh` 全删（scratch 不入库）。
