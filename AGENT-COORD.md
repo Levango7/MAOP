@@ -1233,3 +1233,17 @@
     实际落盘在 `/f/f/tmp/maop-gui-20261109/`（MSYS 双重挂载 `F:\f\tmp` 伪影）。
     已整体移至 `/f/tmp/maop-gui-20261109/`（与 11-08 束同级），12 张截图 + summary.json
     （25 项全 ok）清点无误；探针残留 `/f/f/tmp/b5-alert-probe/` 已删。
+
+## 批 6 CLAIM（2026-11-09）——models.yaml 补齐全量声明集定价
+- **授权**：用户「开批6：全量声明集，官网列表价，agnes保留未计价」（接批 5 回执待裁决项）。
+- **范围**：agents.yaml 声明集中 7 个未收录具体型号（MiniMax-M3 / minimax-m2.7 /
+  qwen3.5-plus / gpt-5.4 / deepseek-v4-flash-free / mimo-v2.5 / omniroute-auto-coding）。
+  控制值 auto/native/built-in/n/a 非型号不入；agnes 族不动（用户裁定保留未计价）；
+  已收录 yi-large / step-3.7-flash 本批不复核。
+- **口径**：官网列表价（list price），每条钉 source URL + fetched_at；查不到官方来源的
+  型号登记「未核」，不臆造（审计条 3 原话）。
+- **前置**：先定各型号 provider 归属（agents.yaml 上下文 / docs/integrations/omniroute.md）
+  再落 models.yaml；加载器对未知键容忍度先读 `py/maop/config/loader.py`。
+- **待用户二裁**：models.yaml 现有 agnes-2.5-pro 价（0.01/0.03）无来源标注，本批不动；
+  若「agnes 保留未计价」含清掉该存量价，需用户明示（删价会翻转成本页既有行显示）。
+- **门槛**：批 5 四道门禁 + 相关 py 测试 + 浏览器复跑成本页。
