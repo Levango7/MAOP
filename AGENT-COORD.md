@@ -1435,3 +1435,20 @@
 - **知会回执（07:10:08Z）**：OpsMesh 线回执——无在途交付需进本版（#262 dependabot 已 MERGED b5dae53d 随 master 进版；批 5/批 6 交付均已合：#257 MERGED、ui/topbar-alignment dbb225ea 已推）；板面无其 open CLAIM；打 tag 闸三齐常驻登记（838da089）在案。**无异议，按闸执行**；并附条件「若打 tag 前 required 四件或 NOTICE 核对有变，请照板面纪律更新并回执」——已照办：#265 出现即登记停手（b24a6dba）。
 - **知会回执（08:09:52Z）**：corps 线回执——其在途交付全在 Corps 仓（RLS 姿态脚本 PR #320 已合 main 11a9bf9、survey §12 口径三选项 PR #321 在飞，均与 MAOP 无关）；MAOP 侧无在途交付需进本版（#262 接管已随 b5dae53d 合入且 trunk 首验绿，板面有实录）；板上无其 open CLAIM、无其 open PR/未合枝。**无异议，窗内无登记事项**。
 - **打 tag 闸裁决（用户，08:57:21Z）**：裁 **A**——等 #265 合入或关闭再打 tag v5.7.0。守望机制：后台哨兵每 5 min 核 #265 state（MERGED/CLOSED 即触发收尾流程：新 tip 重跑 trunk CI 全绿 ⇒ required 四件双端核 ⇒ 板 NOTICE 更新 ⇒ 异议窗 ⇒ 打 tag）。若 12h 内 #265 未落地，哨兵超时**回报用户再裁**（不自动转 B）。当前快照：#265 PR run 全绿（42768022291 completed/success）、mergeable=UNKNOWN 在算、owner 近 24h 活跃（#264 合/#265 开）。
+
+
+## 审计整改批 7（2026-11-10）— CLAIM
+- **owner**：Qoder-CN `17ef022a`（前端审计线，用户原话「前端 疯狂检索啊！」）。
+- **授权**：用户 2026-11-10「可以，做吧」——仅限清单第 3 条（修开发态 /apikeys 裸页）；
+  第 4 条生产 CSP 先 report-only 观测再二裁；第 5/6 条不动。
+- **改什么**：`dashboard-enterprise/vite.config.js` 代理键 `'/api'`（字符串前缀）→ 正则 `'^/api/'`。
+  前缀冲突使开发态 /apikeys 被 '/api' 代理误匹配 → 拿到后端裸 index.html（无 /@vite/client）
+  + 严格 CSP 响应头 → 全页无样式（30 条 CSP 错误）且同文档后续 SPA 页被污染
+  （probe5：/apikeys→/home 27 errors / styleSheets=0，直连 /home 0 errors / 27）。
+- **证据**：F:\tmp\maop-audit-smoke\smoke.json（54 路由仅 3 处异常，/apikeys=34 CSP 错误）；
+  curl :5174/apikeys vs :5174/home 响应头/体对比；/f/tmp/maop-csp-probe5.js。
+- **范围边界**：仅此 1 文件；不碰 dashboard-enterprise/src/**（Examples 会话 / Nex 领地）、
+  不碰 py/**（ZCode 领地）；树中唯一未跟踪 data/admin_password_once.txt 非本线、不入提交。
+- **验收**：probe5 场景 B（/apikeys→/home）CSP 错误=0 且 styleSheets>0；54 路由烟测复绿
+  无新增 bad response；dashboard 四门（design:contrast / eslint / vue-tsc / vitest）EXIT=0。
+- **提交计划**：板面 CLAIM（chore）→ 代码单文件提交 → 板面 DONE 回执带 sha（chore）；不推远端、不开 PR。
