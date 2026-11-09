@@ -177,16 +177,21 @@ class MAOPSettings(BaseSettings):
     rate_limit_burst: int = Field(default=60, description="Max burst size", gt=0)
 
     # ── Observability ─────────────────────────────────────────────
-    # HTTP 指标中间件开关（env: MAOP_HTTP_METRICS）。
-    # 2026-11-10：MetricsMiddleware 此前从未被安装；装上时若在中间件栈里直接
-    # os.environ.get("MAOP_HTTP_METRICS")，会撞 config-drift 棘轮（env 直读必须
-    # 收敛到本模块）。按 auth_enabled 的先例：字段名语义化 + validation_alias
-    # 指向对外承诺的环境变量名（否则 env_prefix 会派生出 MAOP_HTTP_METRICS_ENABLED
-    # 这个并不存在的名字）。
-    http_metrics_enabled: bool = Field(
+    # HTTP 指标中间件开关，环境变量为 MAOP_HTTP_METRICS（True=启用）。
+    #
+    # 字段名刻意**不带 _enabled 后缀**：本仓两道门禁合起来要求"字段派生出的环境
+    # 变量名"必须恰好等于对外承诺的名字——
+    #   ① config-drift 棘轮要求 env 读取收敛到本模块（不能在中间件栈里直读）；
+    #   ② test_env_example_drift 会为**每个**字段无条件派生 MAOP_<字段名大写>，
+    #      并额外收集 AliasChoices 里写的名字。所以用 http_metrics_enabled + 别名
+    #      MAOP_HTTP_METRICS 会同时被扫出**两个**变量名（MAOP_HTTP_METRICS_ENABLED
+    #      与 MAOP_HTTP_METRICS），要求两个都写进 .env.example，而其中派生名其实
+    #      并不被读取——那会变成文档撒谎。
+    #      ⇒ 让字段名与承诺名对齐（http_metrics → MAOP_HTTP_METRICS），一个变量、
+    #      一行文档、无别名。2026-11-10 实测踩过上述两个名字的形态。
+    http_metrics: bool = Field(
         default=True,
         description="Enable HTTP metrics middleware (env: MAOP_HTTP_METRICS)",
-        validation_alias=AliasChoices("MAOP_HTTP_METRICS"),
     )
 
     # ── CORS ──────────────────────────────────────────────────────
