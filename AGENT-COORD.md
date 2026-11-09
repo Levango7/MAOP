@@ -1298,3 +1298,17 @@
   4 个未核型号定价（无官方来源，不臆造）。
 - **清理**：探针 / 种子 / 浏览器脚本（/f/tmp/maop-b6-*.py、maop-b6-browser-check.js）均仓外
   scratch 不入库；证据目录 /f/tmp/maop-b6-browser/（cost-page.png + summary.json）保留。
+
+## 批 6 追加 CLAIM（2026-11-09）——用户三项裁决 + 残留栈归属裁定
+- **裁决 1（推送）**：批 6 两提交（cb78389c、3b1a8aff）可推送；PR 视情况（本分支当前无
+  open PR，#257 已 MERGED）。
+- **裁决 2（agnes-2.5-pro 定价）**：按官网刊例价，不一致就改。官网
+  https://agnes-ai.com/zh-Hans/docs/pricing（fetched_at 2026-11-09）：agnes-2.5-pro 输入
+  $0.45/M、输出 $0.90/M、缓存命中 $0.045/M（刊例＝现价）。models.yaml 存量 0.01/0.03
+  （＝$10/$30 per M）与官网不一致 → 改 0.00045/0.0009 并钉来源。
+- **裁决 3（S-6）**：修齐。成本页「按模型成本」长未计价型号名省略号截断挤出未计价 Badge
+  （DOM 断言过、视觉被裁）。
+- **残留栈归属裁定**：:9079 后端 PID 39308（start_dashboard.py，今日 14:28:58，本仓
+  data 目录 API 往返实证）与 :5174 vite PID 63332（dashboard-enterprise vite，今日
+  09:16:02）均系本线批 5/6 真栈残留；modulo-habit :1430/:5180、FS-dep-triage :5180 的
+  node/vite 属他线，不动。裁定：两者留作 S-6 复跑验证，验证完即停。
