@@ -1402,3 +1402,20 @@
     ⇒ conclusion=cancelled ⇒ CI merge gate fail-closed 显红。同树 PR #262 E2E 腿 4m27s 通过
     ⇒ runner/apt 环境抖动而非代码；`gh run rerun --failed` 后 E2E 通过，全 run completed/success，
     required 四件全绿（首验落定，`b5dae53d` 即 master 验证基线）。
+
+## 2026-11-10 深夜：删除闸执行 + 打 tag 闸登记（用户令「确定完全没用再删／消停+知会+确认无误再打 tag」）
+- **归属核查（删前实证）**：远 dependabot 枝仅剩 `…/jsdom-31.0.0`@`bbf0a4aa`（#260/#262 的 dependabot
+  枝已被 bot 自清）；`gh pr view 261` state=MERGED、mergeCommit `fb15612c`、head `bbf0a4aa`＝枝 tip
+  ⇒ 内容随 squash 合入；无 open PR 引用（仅 #239/#240 在飞，均 owner 他枝）；板面无他线 CLAIM。
+- **已删**：worktree `/f/Nexus/MAOP-dep261`（jsdom-31）、`/f/Nexus/MAOP-dep262`（dependabot/pip…；
+  其未跟踪 `py/uv.lock` 哈希 `33b756a1…` 删前备份至 `/f/tmp/dep262-py-uv.lock.bak`）；本地枝
+  `jsdom-31`、`dependabot/pip/py/python-minor-41dc0db167`；远枝 `dependabot/npm_and_yarn/
+  dashboard-enterprise/jsdom-31.0.0`。删后复核：dep worktree 0、本地 dep 枝 0、远 dependabot 枝 0。
+- **未动（如实）**：远枝 `fix/routing-load-balanced-and-cost-tier`@`a26b6a4`（已是 master 祖先＝全合，
+  但归属者不明，交 owner）；其余 26 个 worktree / 大量本地枝非本会话资产；主树未跟踪 `py/uv.lock`
+  按「无主未跟踪」不动。
+- **打 tag 闸（用户令，常驻）**：三齐才动手——① 事项消停（无在飞 run／无新 CLAIM／无他线在途交付）；
+  ② 知会各 agent（板面 NOTICE 行＋等待窗）；③ 确认无误（版本号与 VERSION_SITES 一致＋required 四件
+  绿＋发版前置如实，不粉饰）。当前快照（12:25 +0800 重读）：#239 已于 12:20:22+0800 由 owner 合入
+  `28bcd3da`（docs/quickstart.md，docs-only）；open PR 仅剩 owner 的 #240、无在飞 run、无栈端口
+  残留、无新 CLAIM ⇒ 消停态成立；但**无版本号令** ⇒ 未打任何 tag（最近 tag `v5.6.1`）。
