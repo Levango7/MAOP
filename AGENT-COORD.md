@@ -1560,3 +1560,25 @@
 - **裁 A 条件已触发但常驻闸仍拦（21:28:11Z 核）**：#265 已于 21:24:31Z 由 owner 合入（merge 03c4c7c2；其 PR run 42768022291 全绿在前）。但 master 持续在动：#266（ui/topbar-alignment＝批 7 CSP/vite 修复集）21:01:12Z 合入 24d86156、#268（docs/b7-merge-receipt 批 7 合并回执）OPEN、81fcd964..tip 共 12 笔、03c4c7c2 trunk run 42904757223 pending、24d86156 run 42900897911 queued ⇒ 「消停」与「required 四绿按当前 tip」两齐仍不成立 ⇒ **继续停手**。版本站不受 #265/#266 影响（均不动四处版本站）⇒ v5.7.0 仍有效。后台哨兵两度被环境 killed，守望改 Monitor 常驻（tip/run/#268/openPR 数变化才报行）。
 - **二次快照（21:30:56Z）**：tip 已至 b69fe5c5（#267 merge：feat(supervisor,debate) 两项能力开关 c8140a40——owner 又合一笔 feat，版本内容仍在膨胀，「消停」更不成立，继续停手）。前条快照的 run 状态已过时，以 Monitor 报行为准。板面不再每变追行，待消停评估时点落最终快照。守望机制改 Monitor 常驻（后台哨兵两度被环境 killed）。
 - **CI 验证缺口登记（21:39:27Z，自伤报告）**：master 三笔代码提交（#265 03c4c7c / #266 24d8615 / #267 b69fe5c）的 trunk run 全被 cancel、零代码腿验证。前两刀＝owner 连环合并的同 ref 互 cancel（GitHub 机制）；**第三刀＝我**——21:31:08Z 推板 d37dc80d 时 b69fe5c run（42905245050）pending，concurrency 组把它掐了（推板前我已读到 pending 仍推，纪律失误，自发报告）。补救：消停窗口内由我推一条 --allow-empty 空提交（message 写明目的）触发全量代码 CI（scope 保守分支 code=true），其全绿前不打 tag。注：#268 等 docs-only merge 也会 cancel 在飞代码 run，故空提交必须等消停窗口。补证：d37dc80d docs run 42905815253 success。
+
+## 审计整改批 7 合并回执（2026-11-10）— PR #266
+- **授权**：用户「可以合并 继续做吧」（条件式：CI 绿后按协议合并）。
+- **合并**：`gh pr merge 266 --merge --match-head-commit a91720e44266011b361772a056d37b5cca93cfd1`，MERGE_EXIT=0，
+  merge commit 24d8615627d9c59cbe2f80efd46480c60c668151，mergedAt 2026-11-10T21:01:12Z。
+- **合并前核（直探实证，非看守落定行）**：`gh pr view 266 --json mergeStateStatus,statusCheckRollup` ⇒
+  mergeState=CLEAN；required 四件（CI scope / Secret Scan / Docs consistency / CI merge gate）全 COMPLETED+SUCCESS；
+  全 rollup 25 SUCCESS + 7 SKIPPED（Release Assets / Publish to PyPI / Publish tag (manual) / Macroscope /
+  Docker build / Container Scan / Compose Smoke，均设计内）。看守两轮遭本机环境杀死（bbr66hhj4 无声 exit 1；
+  b16ou5agj GH-FAIL exit 2，api.github.com 连接超时），直探时网络已恢复（gh api user=Levango7 通过）。
+- **rebase 链（如实）**：9c9419a8 →（rebase→28985859）3a12bce7 →（rebase→81fcd964）a91720e4。
+  两次均仅 AGENT-COORD.md append 区相撞，按「追加日志冲突保留双方」解决；代码树与首推逐字节一致
+  （git diff 3a12bce7 a91720e4 -- . ':(exclude)AGENT-COORD.md' 为空）。PR 正文/评论已同步现行 sha。
+- **sha 映射（板面历史回执对账用）**：6cfba502→48b61a95（批6回执）、5a30a6eb→71c8d55e（CLAIM）、
+  9be878d2→6bcf682e（vite 修复）、a0c67161→be7f4d27（DONE-9be878d2）、caa19928→51914055（NOTE）、
+  b6617f67→4d1187ae（CLAIM-CSP）、808b8713→0df464fb（CSP 修复）、dd1f2b39→3dca8bb9（DONE-808b8713）、
+  9c9419a8→a91720e4（推送回执）。
+- **交付内容**：① dashboard-enterprise/vite.config.js 代理键 '/api'（字符串前缀）→ '^/api/'（开发态
+  /apikeys 裸页修复）；② py/maop/core/security/middleware/_csp.py style-src 加 8 个 sha256 白名单
+  （vis-network 运行时注入的 7 个 <style> + 空串 hash；vendor-vis 升级后须重算，代码注释+DONE 回执双钉）。
+- **验收回指**：批 7 DONE 回执（9be878d2/808b8713 两笔）之四门/门禁/浏览器复跑/像素 diff 证据链不变；
+  rebase 后 CI 在 a91720e4 重跑全绿即终验。
