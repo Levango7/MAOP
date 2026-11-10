@@ -83,8 +83,8 @@ def _get_debate_dispatcher() -> Any:
             raise HTTPException(
                 status_code=404,
                 detail="DebateDispatcher not configured. "
-                       "Instantiate a DebateDispatcher and register it "
-                       "with ServiceContainer to enable.",
+                       "Enable it with MAOP_DEBATE_ENABLED=1 and restart "
+                       "(debate costs N agents x rounds per question).",
             )
         return dispatcher
     except HTTPException:

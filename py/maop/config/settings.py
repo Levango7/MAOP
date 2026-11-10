@@ -176,6 +176,39 @@ class MAOPSettings(BaseSettings):
     rate_limit_rps: float = Field(default=30.0, description="Requests per second", gt=0)
     rate_limit_burst: int = Field(default=60, description="Max burst size", gt=0)
 
+    # ── 主动监督 / 辩论（2026-11-10 接线审计）────────────────────────
+    # 这两项此前是"能力建好了、但**只能改 Python 代码**才能打开"：
+    #   · Supervisor：全仓无任何 settings/env 开关，唯一开启途径是
+    #     `Supervisor(...)` + `set_supervisor(...)` 写进代码
+    #   · DebateDispatcher：只有 EvolutionLoop 的构造参数，无 env 开关，
+    #     且全仓没有一处传它
+    # 结果是 /api/supervisor/* 与 /api/debate/* 恒 404、patrol 循环永不启动。
+    #
+    # 默认**一律关**（这是刻意的，不是遗漏）：
+    #   · Supervisor 会真的 replace / terminate agent —— 破坏性动作不能靠默认值
+    #     替既有部署决定；
+    #   · Debate 是 N 个 agent × 轮数的**成本乘数**。
+    # 开关的作用是把"不可达"变成"可显式开启"。
+    #
+    # 字段名与派生出的环境变量名一一对应（env_prefix=MAOP_），
+    # 这也是 test_env_example_drift 要求的形态：不要字段名与别名并存，
+    # 否则会派生出两个名字、其中一个是假的。
+    supervisor_enabled: bool = Field(
+        default=False,
+        description="Enable proactive Supervisor (patrol loop). env: MAOP_SUPERVISOR_ENABLED",
+    )
+    #: 破坏性动作（replace / terminate / upgrade / degrade）的第二道闸。
+    #: supervisor_enabled=1 且本项=0 时，patrol 只跑 warn —— 把"能力可达"与
+    #: "破坏性已授权"分成两件事。
+    supervisor_actions_armed: bool = Field(
+        default=False,
+        description="Arm destructive supervisor actions. env: MAOP_SUPERVISOR_ACTIONS_ARMED",
+    )
+    debate_enabled: bool = Field(
+        default=False,
+        description="Enable multi-agent DebateDispatcher. env: MAOP_DEBATE_ENABLED",
+    )
+
     # ── Observability ─────────────────────────────────────────────
     # HTTP 指标中间件开关，环境变量为 MAOP_HTTP_METRICS（True=启用）。
     #
