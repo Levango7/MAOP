@@ -1507,3 +1507,21 @@
   - 注：dist index.html:4 自带 meta CSP（style-src 含 unsafe-inline），与 HTTP 头并存取交集，
     HTTP 头更严 ⇒ 修法只改后端响应头即可生效，meta 不提供额外保护。
 - **处置**：后端保持 enforcing（与生产一致）；未做任何策略修改，等用户二裁。
+
+## 审计整改批 7 追加 CLAIM（2026-11-10）— 生产 CSP style-src sha256 白名单（用户二裁选 d）
+- **授权**：批 7 CLAIM 既定「第 4 条生产 CSP 先 report-only 观测再二裁」；观测完成（NOTE 同日），
+  用户聊天二裁「我不要最小（否 d'）…需要决策的话，你自己给推荐选项。然后直接决策」⇒ 选 (d)。
+- **改什么**：`py/maop/core/security/middleware/_csp.py` :154 `style-src 'self'` 后追加 8 个 sha256
+  （7 个 vis-network 动态 `<style>` 内容 hash + 1 个空串 hash 47DEQpj8…＝注入瞬间的空块）。
+  取证：/capability/skills 拓扑 tab 企业版生产路径 :9079 直连，两次加载 hash 全等
+  （/f/tmp/maop-csp-fix/extract.json）；console 14 条/加载 = 7 空块插入 + 7 内容填充，
+  建议 hash 与 DOM 算得 hash 逐字一致；report-uri 通道 2 份全 style-src-elem；
+  105 个 style 属性经 CSSOM 赋值（el.style.*）不受 style-src-attr 约束、零违规
+  （classify.json；icon 内联仅 width/height 尺寸，enforce 与 report-only 截图像素一致已由 NOTE 钉死）。
+- **安全面**：hash 源只放行这 8 个固定内容的内联 `<style>`，不放行 style 属性、不放行任意内联；
+  内容是 vendor-vis-B-SI3wVL.js 编译期常量、与数据无关；vendor-vis 升级后须重算（注释里钉死）。
+  meta/header 并存取交集，头放宽即生效；pytest 双断言（test_middleware.py:88-89 子串口径）保持绿。
+- **验收**：report-only 复跑 skills 零 console 零 report；52 路由观测无新增；enforce 复验渲染无回归；
+  py 相关测试 + ruff 绿；单文件显式路径提交；板面 DONE 回执带 sha。后端最终保持 enforcing（生产同款）。
+- **边界**：仅 _csp.py 1 文件；不碰 dashboard-enterprise/src/**（Examples/Nex 领地）、不碰其他 py；
+  data/admin_password_once.txt 他线未跟踪文件不入提交；不开 PR 不推送。
