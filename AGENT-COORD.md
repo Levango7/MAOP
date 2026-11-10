@@ -1473,3 +1473,37 @@
   （16 warning 既有基线）· vue-tsc exit 0 · vitest 707 passed（79 文件口径同批 6）。
 - **未做**：推送 / 开 PR（未授权，本分支 push 不触发 CI）；第 4 条生产 CSP report-only 观测
   等用户二裁；第 5/6 条按授权不动。
+
+## 审计整改批 7 追加 NOTE（2026-11-10）— 生产 CSP report-only 观测完成，二裁材料就绪
+- **授权口径**：CLAIM 既定「第 4 条生产 CSP 先 report-only 观测再二裁」——观测为前置动作，
+  本次只做观测与材料，修法裁决仍归用户；零代码改动、零 py/** 触碰、未碰生产环境。
+- **方法**：`npm run build` 重建 dashboard/dist-enterprise（gitignore:82，树净）；后端按板面批 5
+  口径（:1180-1181）带 `MAOP_AUTH_ENABLED=0`+`MAOP_OWNER_MODE=1`+`MAOP_MULTIMODAL_PROVIDER=hash`
+  并加 `MAOP_CSP_REPORT_ONLY=1`+`MAOP_CSP_REPORT_URI=http://127.0.0.1:9079/api/csp-report` 重启；
+  Playwright 直连 :9079（生产同款文档链路：SPA fallback + dist 产物 + CSPMiddleware 头）遍历
+  52 路由 × 个人版/企业版双场景；双通道采集（report-uri POST 体 + GET /api/csp-violations 缓冲 +
+  console 文本）。证据：/f/tmp/maop-csp-observe/（summary.json / reports-raw.json / followup.json /
+  geom-*.json / skills-reportonly.png / skills-enforce.png）；探针 /f/tmp/maop-csp-observe.js、
+  /f/tmp/maop-csp-followup.js、/f/tmp/maop-csp-geom.js（仓外 scratch 不入库）。
+- **观测结果**：唯一真实违规 = `/capability/skills` 拓扑 tab，`style-src-elem`，blocked=inline，
+  source=assets/vendor-vis-*.js:1（vis-network 库运行时动态注入 7 个 `<style>` 标签，含 1 个空块
+  ——console 里 sha256-47DEQpj8… 即空串 hash）；2 份 report-uri 报告 + 14 条 console 文本双场景
+  （personal/enterprise）一致；其余 51 路由零违规。报告 original-policy 与响应头逐字一致、
+  disposition=report，report-only 生效无疑。
+- **噪声排除**：首轮 5 条个人版 NAV 超时（/capability/evolve·mcp·plugins·subagents·routing）经
+  对照复跑 5/5 ok（546–1221ms，followup.json）+ curl 直连 200（TTFB 0.2s，evolve 首次 3.6s 暖机）
+  定性为探针冷启动伪影，非生产缺陷；首轮「仅企业版触发」系后端冷启动时序伪影，复验 personal 同 14 条。
+- **enforce 复验**（同页同指标切换 enforcing 后端重采）：report-only 与 enforce 两版截图像素 diff
+  唯一落在顶栏时钟区（bbox 1254,24-1282,32，124px 为时刻差异），其余全图零差异；vis 容器几何
+  两模式均 1124×598。图谱区空白系数据层（服务:1/工具:0/连接:0）而非拦截所致 ⇒ 当前生产 enforce
+  姿态对该页渲染无增量损害，violation 是合规债而非功能缺陷。
+- **二裁材料**（修法落点全部在后端 CSP 指令串 py/maop/core/security/middleware/_middleware_stack.py
+  指令构造 = ZCode 领地；前端侧 vis 库行为无 class 可改）：
+  - (b) style-src 整体加 'unsafe-inline'：全局放行内联样式，XSS 注入样式无拦；最粗。
+  - (c) class rewrite：vis-network 第三方库运行时注入，不可行。
+  - (d) sha256 白名单：7 个 `<style>` 内容固定可 hash（含空串 hash），库升级即失效需重算。
+  - (d') style-src-elem 'self' 'unsafe-inline' + style-src-attr 不加：CSP3 指令分拆，只放行
+    `<style>` 元素注入（vis 所为），style 属性注入仍拦——最小放行面，推荐。
+  - 注：dist index.html:4 自带 meta CSP（style-src 含 unsafe-inline），与 HTTP 头并存取交集，
+    HTTP 头更严 ⇒ 修法只改后端响应头即可生效，meta 不提供额外保护。
+- **处置**：后端保持 enforcing（与生产一致）；未做任何策略修改，等用户二裁。
