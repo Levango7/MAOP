@@ -1369,7 +1369,8 @@
   `py/maop/dashboard/services/{tenant_service,execution_service}.py`、
   `py/tests/test_dag_tenant_attribution.py`、`docs/configuration.md` 租户段。
 - **不碰**：`cli_run.py`/`delegate/**`（ZCode）、`dashboard-enterprise/src/**`（Qoder-CN UI 线）、
-  `dashboard-enterprise/e2e`、MAOS 仓、`py/uv.lock`（无主未跟踪）、在途 PR #239/#240/#260-#262。
+  `dashboard-enterprise/e2e`、MAOS 仓、`py/uv.lock`（无主未跟踪）、在途 PR #239/#240
+  （#260-#262 已于 11-10 合入 master，见下）。
 
 ### 2026-11-10 更正（同会话追加销账，用户当轮裁决后）
 - **⑤ 策略已定稿**（销「仍待产品定」）：用户裁定权下放 ⇒ 同一**分档**语义适用于
@@ -1384,8 +1385,20 @@
   （push 事件上 PR-only 腿缺失触发，`docs/ci-gates.md` 已载，非回归）。
 - **本笔随推送落地**：原登记「未推送——此时推会取消 trunk 验证」的前提（run 在飞）已不成立；
   concurrency 组按 ref 隔离，推 `docs/coord-reconcile-r1` 不影响 master 的 run。
-- **dependabot 三 PR 实测口径**（第 3 项，处置待用户裁）：#260 npm-minor 全绿 CLEAN；
-  #261 jsdom 30→31 major 全绿 CLEAN（含 Frontend Build 内 vitest coverage 门 + Playwright E2E，
-  上一轮「无 CI vitest 覆盖」判断作废）；#262 pip-minor BLOCKED，根因单一＝
-  `test_dev_extra_and_ci_pin_the_same_versions` 抓 ruff 口径漂移（pyproject 0.17.4 vs ci.yml 0.17.3），
-  另有 gitleaks install 504 瞬断腿。
+- **dependabot 三 PR 终局（2026-11-10 全部合入 master）**：#260 npm-minor 合 `085346f3`；
+  #261 jsdom 30→31 major 合 `fb15612c`（01:27:20Z，head `bbf0a4aa`）；#262 pip-minor 合
+  `b5dae53d`（02:06:00Z，head `81922710`；diff fb15612c..b5dae53d ＝ ci.yml / py/pyproject.toml /
+  py/requirements.frozen.txt / py/tests/test_enterprise_test_surface.py）。合并条件齐：PR 级
+  required 四件全绿（CI scope / Secret Scan / Docs consistency / CI merge gate）+ MERGEABLE + CLEAN。
+  #262 接管经过：核仅 dependabot[bot] 11-09 一笔 commit、零人评论/提交 ⇒ 对方没做（用户裁
+  「确定对方没做 你就接管吧」）。修法＝ci.yml Lint 作业 ruff pin 0.17.3→0.17.4（一笔两处同源，
+  pyproject dev extra 已是 0.17.4）＋ `test_enterprise_test_surface.py:89` SIM102 按 ruff 建议
+  合并为单条件（0.17.4 升级带出的存量问题）；本地 `uv run --extra dev pytest
+  tests/test_lint_toolchain_pins.py` = 7 passed（436s，改后；改前 CI 全平台红为对照，射程成立）；
+  临时 worktree /f/Nexus/MAOP-dep262，py/uv.lock 未跟踪未动。
+  - **trunk 首验（b5dae53d）**：push run 42740380135 的 Playwright E2E 腿两次撞本作业
+    `timeout-minutes: 10`（02:08:36→02:18:52 与 02:50:25→03:00:39，均 10m14-16s），死在
+    `npx playwright install-deps`——apt 已报「0 newly installed」后 npm 进程挂起至超时被杀
+    ⇒ conclusion=cancelled ⇒ CI merge gate fail-closed 显红。同树 PR #262 E2E 腿 4m27s 通过
+    ⇒ runner/apt 环境抖动而非代码；`gh run rerun --failed` 后 E2E 通过，全 run completed/success，
+    required 四件全绿（首验落定，`b5dae53d` 即 master 验证基线）。
