@@ -1557,3 +1557,4 @@
 - **推送**：`6cfba502..dd1f2b39` → origin/ui/topbar-alignment（9 笔：批 7 全弧 CLAIM/vite 修复/DONE/NOTE/CLAIM/CSP 修复/DONE + 批 6 尾两笔板面 chore）；工作树仅余他线未跟踪 data/admin_password_once.txt，未入提交。
 - **PR**：#266 https://github.com/Levango7/MAOP/pull/266（base master ← ui/topbar-alignment），含两项修复证据链与登记项（vendor-vis 升级须重算 8 个 hash）。
 - **CI**：base=master 命中 ci.yml branches ⇒ PR 触发全量门禁（本分支直推不触发，口径同批 6）。合并未授权，等用户指令。
+- **裁 A 条件已触发但常驻闸仍拦（21:28:11Z 核）**：#265 已于 21:24:31Z 由 owner 合入（merge 03c4c7c2；其 PR run 42768022291 全绿在前）。但 master 持续在动：#266（ui/topbar-alignment＝批 7 CSP/vite 修复集）21:01:12Z 合入 24d86156、#268（docs/b7-merge-receipt 批 7 合并回执）OPEN、81fcd964..tip 共 12 笔、03c4c7c2 trunk run 42904757223 pending、24d86156 run 42900897911 queued ⇒ 「消停」与「required 四绿按当前 tip」两齐仍不成立 ⇒ **继续停手**。版本站不受 #265/#266 影响（均不动四处版本站）⇒ v5.7.0 仍有效。后台哨兵两度被环境 killed，守望改 Monitor 常驻（tip/run/#268/openPR 数变化才报行）。
