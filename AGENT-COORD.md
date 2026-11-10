@@ -1551,3 +1551,9 @@
 - **登记项**：vendor-vis bundle 升级后 8 个 hash 须重算（代码注释＋本回执双钉）；dist
   index.html:4 meta CSP 未动（并存取交集，头放宽即生效）。
 - **未做**：推送 / 开 PR（未授权；本分支 ci.yml branches 过滤不触发 CI，门禁以本回执为准）。
+
+## 审计整改批 7 推送回执（2026-11-10）— PR #266
+- **授权**：用户「可以 提交推送、开pr」（2026-11-10，批 7 交付之后）。
+- **推送**：`6cfba502..dd1f2b39` → origin/ui/topbar-alignment（9 笔：批 7 全弧 CLAIM/vite 修复/DONE/NOTE/CLAIM/CSP 修复/DONE + 批 6 尾两笔板面 chore）；工作树仅余他线未跟踪 data/admin_password_once.txt，未入提交。
+- **PR**：#266 https://github.com/Levango7/MAOP/pull/266（base master ← ui/topbar-alignment），含两项修复证据链与登记项（vendor-vis 升级须重算 8 个 hash）。
+- **CI**：base=master 命中 ci.yml branches ⇒ PR 触发全量门禁（本分支直推不触发，口径同批 6）。合并未授权，等用户指令。
