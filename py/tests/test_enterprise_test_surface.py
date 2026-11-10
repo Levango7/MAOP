@@ -86,9 +86,8 @@ def _has_skip_mechanism(tree: ast.Module) -> bool:
             name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
             if name == "importorskip":
                 return True
-        elif isinstance(node, ast.Attribute):
-            if node.attr in {"skip", "skipif"}:
-                return True
+        elif isinstance(node, ast.Attribute) and node.attr in {"skip", "skipif"}:
+            return True
     return False
 
 
