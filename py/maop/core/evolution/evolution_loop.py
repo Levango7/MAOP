@@ -111,7 +111,7 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
         heal_threshold: int = 2,
         suggest_threshold: int = 3,
         *,
-        debate_enabled: bool = False,
+        debate_enabled: bool | None = None,
         debate_dispatcher: Any | None = None,
         debate_participants: list[str] | None = None,
     ) -> None:
@@ -123,9 +123,31 @@ class EvolutionLoop(EvolutionCollectorsMixin, EvolutionAnalyzersMixin, Evolution
         self._auto_consolidate = auto_consolidate
         self._heal_threshold = heal_threshold
         self._suggest_threshold = suggest_threshold
-        # C-2: DEBATE 阶段插入配置。默认禁用（向后兼容），
-        # 启用时才在 SUGGEST 与 EVALUATE 之间插入 _phase_debate()。
-        self._debate_enabled = debate_enabled
+        # C-2: DEBATE 阶段插入配置。启用时才在 SUGGEST 与 EVALUATE 之间插入
+        # _phase_debate()。
+        #
+        # 2026-11-10 接线审计：此前 debate_enabled 默认 False 且**无 env 开关**，
+        # debate_dispatcher 更是全仓无一处传入 ⇒ 这个阶段在演化里永不运行。
+        # 现在：未显式传参时跟随 MAOP_DEBATE_ENABLED（默认仍 False ⇒ 零行为变化），
+        # 未传 dispatcher 时从 ServiceContainer 取（容器工厂同样受该开关门控）。
+        if debate_enabled is None:
+            try:
+                from maop.config.settings import get_settings
+
+                debate_enabled = get_settings().debate_enabled
+            except (ImportError, OSError, ValueError, TypeError):
+                debate_enabled = False
+        if debate_enabled and debate_dispatcher is None:
+            try:
+                from maop.core.reliability.services import ServiceContainer
+
+                debate_dispatcher = ServiceContainer(
+                    root_dir=str(self._root)
+                ).get("debate_dispatcher", raise_on_failure=False)
+            except (ImportError, OSError, ValueError, TypeError) as exc:
+                logger.debug("[evolution] debate dispatcher unavailable: %s", exc)
+                debate_dispatcher = None
+        self._debate_enabled = bool(debate_enabled)
         self._debate_dispatcher = debate_dispatcher
         self._debate_participants = debate_participants or []
         # T3.1-e：把历史读取能力注入 mixin —— EVALUATE 阶段据此把上一轮

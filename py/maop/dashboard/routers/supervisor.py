@@ -54,7 +54,9 @@ def _get_supervisor_or_404() -> Any:
         raise HTTPException(
             status_code=404,
             detail="Supervisor not configured (passive-only mode). "
-                   "Instantiate a Supervisor and call set_supervisor() to enable.",
+                   "Enable it with MAOP_SUPERVISOR_ENABLED=1 and restart "
+                   "(add MAOP_SUPERVISOR_ACTIONS_ARMED=1 to also allow "
+                   "degrade/replace/terminate/upgrade).",
         )
     # 保持与原 router 一致的 isinstance 检查
     from maop.core.scheduling.supervisor import Supervisor
@@ -62,7 +64,9 @@ def _get_supervisor_or_404() -> Any:
         raise HTTPException(
             status_code=404,
             detail="Supervisor not configured (passive-only mode). "
-                   "Instantiate a Supervisor and call set_supervisor() to enable.",
+                   "Enable it with MAOP_SUPERVISOR_ENABLED=1 and restart "
+                   "(add MAOP_SUPERVISOR_ACTIONS_ARMED=1 to also allow "
+                   "degrade/replace/terminate/upgrade).",
         )
     return sup
 

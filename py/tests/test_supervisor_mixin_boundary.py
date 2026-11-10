@@ -38,7 +38,12 @@ class _Probe:
 class TestSupervisorMixinBoundary(unittest.TestCase):
     def setUp(self):
         self.detector = FailurePatternDetector(window_size=10, recovery_consecutive_successes=2)
-        self.sup = Supervisor(detector=self.detector)
+        # actions_armed=True（2026-11-10）：本类测的是**动作分发逻辑本身**
+        # （terminate 后 check_before_dispatch 拒绝、replace 改写路由、upgrade 升版本…），
+        # 显式 arm 以隔离被测面。默认未 arm 时的抑制策略由
+        # tests/test_proactive_switches_wiring.py 专门钉住——那里用"一碰就炸"的桩
+        # 断言未 arm 时破坏性动作确实没有被执行。
+        self.sup = Supervisor(detector=self.detector, actions_armed=True)
 
     def _run(self, coro):
         return asyncio.run(coro)

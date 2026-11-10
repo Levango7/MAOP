@@ -282,6 +282,52 @@ async def lifespan(app: FastAPI) -> Any:
             target=_warm_multimodal, name="maop-multimodal-warmup", daemon=True
         ).start()
 
+    # ── 主动监护器（2026-11-10 接线审计）────────────────────────
+    # 此前 Supervisor 整块不可达：全仓无任何 settings/env 开关，唯一开启途径是
+    # 把 Supervisor(...) + set_supervisor(...) 写进代码 ⇒ patrol 循环永不启动、
+    # 6 个控制动作永不自动发生、/api/supervisor/* 恒 404。
+    #
+    # 两档开关，**默认都关**（它会真的 replace/terminate agent，破坏性动作不该
+    # 由默认值替既有部署决定）：
+    #   MAOP_SUPERVISOR_ENABLED=1                → patrol 跑起来，但只 warn
+    #   MAOP_SUPERVISOR_ACTIONS_ARMED=1（叠加）  → 放开 degrade/replace/terminate/upgrade
+    #
+    # 放在 _bg_enabled 闸内：patrol 是后台循环，多 worker 下每个 worker 起一份会
+    # 造成重复巡检与重复动作（与 backup / log-rotate 同一个理由）。
+    _supervisor = None
+    try:
+        from maop.config.settings import get_settings as _get_settings
+
+        _sup_cfg = _get_settings()
+        if _sup_cfg.supervisor_enabled and not _bg_enabled:
+            logger.warning(
+                "[lifespan] Supervisor 已配置但 MAOP_BACKGROUND_TASKS=0 —— 跳过启动"
+                "（多 worker 下避免重复巡检；要单点运行请设 MAOP_BACKGROUND_TASKS=1）"
+            )
+        elif _sup_cfg.supervisor_enabled:
+            from maop.core.scheduling.failure_detector import set_supervisor
+            from maop.core.scheduling.supervisor import Supervisor
+
+            _supervisor = Supervisor(
+                actions_armed=_sup_cfg.supervisor_actions_armed,
+            )
+            set_supervisor(_supervisor)
+            await _supervisor.start_patrol_loop()
+            logger.info(
+                "[lifespan] Supervisor 已启用（patrol 运行中，actions_armed=%s）",
+                _sup_cfg.supervisor_actions_armed,
+            )
+        else:
+            logger.info(
+                "[lifespan] Supervisor 未启用（MAOP_SUPERVISOR_ENABLED=0）；"
+                "被动失败检测仍生效，/api/supervisor/* 返回 404 并提示开关名"
+            )
+    except (ImportError, OSError, RuntimeError, ValueError, TypeError) as exc:
+        # 接线失败不该拖垮服务启动：被动检测（drain/weight）独立工作。
+        # 收窄到现实失败面（本仓宽 except 是棘轮：新增一条即红）。
+        logger.warning("[lifespan] Supervisor 启动失败（已跳过）: %s", exc)
+        _supervisor = None
+
     # ── Auto-start backup & log-rotation schedulers ────────────
     _backup_scheduler = None
     _log_rotate_scheduler = None
@@ -360,6 +406,14 @@ async def lifespan(app: FastAPI) -> Any:
         _autoconnect = getattr(app.state, "mcp_autoconnect_task", None)
         await drain_cancelled(_autoconnect, _ws_manager._ws_push_task)
         _ws_manager._ws_push_task = None
+        # ── Stop supervisor patrol (2026-11-10) ────────────────
+        if _supervisor is not None:
+            try:
+                await _supervisor.stop_patrol_loop()
+            except (RuntimeError, OSError, ValueError, TypeError) as exc:
+                # 收窄（宽 except 是棘轮）。CancelledError 继承 BaseException，
+                # 本就不该被吞掉。
+                logger.warning("[shutdown] Supervisor patrol stop failed: %s", exc)
         # ── Stop schedulers on shutdown ────────────────────────
         if _backup_scheduler is not None:
             try:

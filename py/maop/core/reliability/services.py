@@ -68,6 +68,13 @@ class ServiceContainer:
         # guarantees the pool is constructed before the manager tries to
         # dispatch. See ADR-013.
         self.register("a2a_manager", self._make_a2a_manager)
+        # 2026-11-10 接线审计：容器此前**没有** debate_dispatcher 这个名字。
+        # 全仓没有一处构造 DebateDispatcher，而 dashboard 路由正是按名字取它
+        # （chat_service.resolve_debate_dispatcher）⇒ /api/debate/* 恒 404、
+        # 演化循环里 debate 的条件也永不成立。注册工厂即补上取用路径；
+        # 默认关（debate 是 N 个 agent × 轮数的成本乘数），由
+        # MAOP_DEBATE_ENABLED=1 显式开启。
+        self.register("debate_dispatcher", self._make_debate_dispatcher)
 
     def register(self, name: str, factory: Callable[[], Any]) -> None:
         self._factories[name] = factory
@@ -219,6 +226,28 @@ class ServiceContainer:
         except Exception as exc:
             logger.warning("Failed to load hooks from YAML: %s", exc)
         return mgr
+
+    def _make_debate_dispatcher(self):
+        """辩论调度器（2026-11-10 接线审计）。
+
+        默认**关**，且关的时候是**显式报错**而非返回一个哑对象：
+        ``get(..., raise_on_failure=False)`` 会把异常吞成 ``None``，而路由把
+        ``None`` 映射成 404 —— 于是"未开启"在 API 面就是 404，与"功能不存在"
+        可区分（路由的文案现已指明该设哪个开关）。
+
+        为什么默认关：debate 是 N 个 agent × 轮数的**成本乘数**，默认打开会在
+        无人预期时放大账单。开关的作用是把"无法开启"变成"可显式开启"。
+        """
+        from maop.config.settings import get_settings
+
+        if not get_settings().debate_enabled:
+            raise RuntimeError(
+                "debate disabled — set MAOP_DEBATE_ENABLED=1 to enable"
+            )
+        # 复用容器里已构造好的 Dispatcher（惰性导入避免 core→delegate 的循环依赖）
+        from maop.delegate.dispatch_debate import DebateDispatcher
+
+        return DebateDispatcher(dispatcher=self.get("dispatcher"))
 
     def _make_a2a_manager(self):
         """F6b (2026-07-22, Phase F): construct A2AManager with the

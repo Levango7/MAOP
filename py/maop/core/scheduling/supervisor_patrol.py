@@ -152,7 +152,27 @@ class SupervisorPatrolMixin:
         return probes
 
     async def _apply_rule(self, rule: SupervisorRule, probe: HealthProbe) -> None:
-        """Execute the action associated with a matched rule."""
+        """Execute the action associated with a matched rule.
+
+        ``actions_armed`` 闸（2026-11-10）：未授权时**不执行**破坏性动作
+        （degrade / replace / terminate / upgrade），而是记成一条 warn 说明
+        "本应执行 X（未授权）"。刻意不静默跳过——warn-only 模式的价值就在于让
+        运营看见"监督器想做什么"，静默跳过等于把能力关掉还看不见。
+        """
+        if rule.action != SupervisorAction.ALERT and not self._actions_armed:
+            await self.warn(
+                probe.agent_id,
+                reason=f"{rule.name}: would {rule.action.value} (actions not armed)",
+                level=rule.alert_level,
+                extra={
+                    "rule_id": rule.rule_id,
+                    "suppressed_action": rule.action.value,
+                    "armed": False,
+                    "hint": "set MAOP_SUPERVISOR_ACTIONS_ARMED=1 to execute",
+                },
+            )
+            return
+
         if rule.action == SupervisorAction.ALERT:
             await self.warn(
                 probe.agent_id,

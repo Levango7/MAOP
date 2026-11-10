@@ -161,7 +161,12 @@ class Supervisor(
         evolution_cooldown_s: float = _EVOLUTION_TRIGGER_COOLDOWN_S,
         agent_registry: Any = None,
         routing_store: Any = None,
+        actions_armed: bool = False,
     ) -> None:
+        # 破坏性动作闸（2026-11-10）。False = 只跑 warn：patrol 照跑、告警与
+        # 历史照记，但 replace / terminate / upgrade / degrade **不执行**，
+        # 而是记成"本应执行 X（未授权）"的告警——既不静默丢弃，也不擅自动手。
+        self._actions_armed = bool(actions_armed)
         # Passive detector (composed, not inherited). Defaults to the
         # process-wide failure-detector singleton.
         self._detector: FailurePatternDetector = detector or get_failure_detector()

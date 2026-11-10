@@ -72,6 +72,13 @@ async def lifespan(app: FastAPI) -> Any:
         except Exception as exc:
             logger.warning("[lifespan] Failed to start log-rotate scheduler: %s", exc)
 
+    # 注（2026-11-10）：**主动监护器的接线不在本文件**。
+    # 本模块的 lifespan 在生产路径上并未被挂载——server.py 自带一个 lifespan
+    # （server.py:222）且 `FastAPI(lifespan=lifespan)` 用的是它自己那个；本文件
+    # 这个只有测试在跑（test_lifespan_coverage / test_coverage_boost）。
+    # 把接线写在这里会变成"看起来做了、生产其实不生效"的假路径。
+    # ⇒ Supervisor 的启停见 server.py 的 lifespan（且在其 MAOP_BACKGROUND_TASKS
+    #    闸内，因为 patrol 是后台任务，多 worker 下不能每个 worker 跑一份）。
     try:
         yield
     finally:
