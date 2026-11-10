@@ -317,6 +317,44 @@ class TestRunMaintenance:
             with pytest.raises(RuntimeError, match="boom"):
                 queue_worker._run_maintenance({"job": "cleanup_dead_letters"})
 
+    # ── recover_unacked（2026-11-10 接线）───────────────────────────
+    # 接线前：recover_unacked 有实现但**无人调用**，而按名字请求它会落到
+    # "unknown job" 分支静默变 no-op（照常 ACK）——调用方以为恢复了，其实没有。
+    # 真机实证过它的必要性：消费者已死、无人再轮询的 topic，卡在 processing 的
+    # 消息不会被私有 _reclaim_unacked（只在 dequeue 时按 topic 触发）救到，
+    # 只有这次全表扫描能把它退回 pending。
+
+    def test_recover_unacked_success(self):
+        mq = MagicMock()
+        mq.recover_unacked = MagicMock(return_value=2)
+        with patch("maop.core.reliability.message_queue.MessageQueue", return_value=mq):
+            queue_worker._run_maintenance({"job": "recover_unacked"})
+        mq.recover_unacked.assert_called_once_with(timeout_buffer=10.0)
+
+    def test_recover_unacked_buffer_passthrough(self):
+        mq = MagicMock()
+        mq.recover_unacked = MagicMock(return_value=0)
+        with patch("maop.core.reliability.message_queue.MessageQueue", return_value=mq):
+            queue_worker._run_maintenance({"job": "recover_unacked", "timeout_buffer": 30.0})
+        mq.recover_unacked.assert_called_once_with(timeout_buffer=30.0)
+
+    def test_recover_unacked_failure_raises(self):
+        mq = MagicMock()
+        mq.recover_unacked = MagicMock(side_effect=RuntimeError("db locked"))
+        with patch("maop.core.reliability.message_queue.MessageQueue", return_value=mq):  # noqa: SIM117
+            with pytest.raises(RuntimeError, match="db locked"):
+                queue_worker._run_maintenance({"job": "recover_unacked"})
+
+    def test_recover_unacked_is_registered_not_noop(self):
+        """守住"不许再退回静默 no-op"：必须真的调到实现，而不是被 ACK 掉。"""
+        mq = MagicMock()
+        mq.recover_unacked = MagicMock(return_value=1)
+        with patch("maop.core.reliability.message_queue.MessageQueue", return_value=mq):
+            queue_worker._run_maintenance({"job": "recover_unacked"})
+        assert mq.recover_unacked.call_count == 1, (
+            "recover_unacked 没被调用 —— 说明它又落回了 unknown-job 的静默 no-op 分支"
+        )
+
 
 # ── _consume_messages ─────────────────────────────────────────
 
