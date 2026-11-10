@@ -52,7 +52,9 @@ export default defineConfig({
       allow: ['..'],
     },
     proxy: {
-      '/api': {
+      // 正则键而非字符串前缀：字符串 '/api' 会误配 /apikeys 等同前缀路由，
+      // 令其打到后端拿裸 index.html + 严格 CSP 头（开发态整页无样式）。
+      '^/api/': {
         target: 'http://localhost:9079',
         changeOrigin: true,
         ws: true,

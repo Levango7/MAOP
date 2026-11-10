@@ -1346,6 +1346,16 @@
 - PR #263：https://github.com/Levango7/MAOP/pull/263（base master ← ui/topbar-alignment，22 笔全量）。
   base=master 命中 ci.yml branches 过滤 ⇒ PR 触发 CI（本分支直推不触发）；合并按用户指令执行，未自合。
 
+## 批 6 追加 PR 合并回执（2026-11-10 01:29 北京）
+- PR #263 MERGED：base master ← ui/topbar-alignment（head 3864fdd67c83c7bde3bee6d4ff3f162ad486e45e），
+  merge commit 27e61fe98d79a46128b54dc060d7e15c679cd652，mergedAt 2026-11-09T17:29:21Z。
+- 条件式授权执行（用户「绿了 就合并吧」）：看守首 iter 即 mergeState=CLEAN（0 pending / 0 fail），
+  gh pr merge 263 --merge --match-head-commit 3864fdd67c83c7bde3bee6d4ff3f162ad486e45e，MERGE_EXIT=0。
+- CI 终态（gh pr view statusCheckRollup 实证）：全 SUCCESS——含 pytest 12 条（win/ubuntu/macOS ×
+  py3.10/3.11/3.12/3.13）、Required checks satisfiability canary、Playwright E2E、Lint(ruff+mypy)、
+  Alembic migrations、Lock drift、pip-audit、SAST(bandit)、Secret Scan(gitleaks)、SBOM、Wheel install；
+  4 条 SKIPPED（Release Assets / Publish to PyPI / Publish tag (manual) / Macroscope）系设计内。
+
 ## 领地登记（Qoder-Desktop 会话 1973591b，2026-11-10：第一轮三源对账 + K1/K2 复验）
 - **身份**：本会话＝早先 J/K 批（#162 修复 `cd6c1e0e`、K1 DAG 租户归属 #169、K2 分桶治时钟 #170）
   的执行者，与板内「Qoder-CN 17ef022a」（前端/棘轮线）非同一会话，不承接其领地。
@@ -1425,3 +1435,125 @@
 - **知会回执（07:10:08Z）**：OpsMesh 线回执——无在途交付需进本版（#262 dependabot 已 MERGED b5dae53d 随 master 进版；批 5/批 6 交付均已合：#257 MERGED、ui/topbar-alignment dbb225ea 已推）；板面无其 open CLAIM；打 tag 闸三齐常驻登记（838da089）在案。**无异议，按闸执行**；并附条件「若打 tag 前 required 四件或 NOTICE 核对有变，请照板面纪律更新并回执」——已照办：#265 出现即登记停手（b24a6dba）。
 - **知会回执（08:09:52Z）**：corps 线回执——其在途交付全在 Corps 仓（RLS 姿态脚本 PR #320 已合 main 11a9bf9、survey §12 口径三选项 PR #321 在飞，均与 MAOP 无关）；MAOP 侧无在途交付需进本版（#262 接管已随 b5dae53d 合入且 trunk 首验绿，板面有实录）；板上无其 open CLAIM、无其 open PR/未合枝。**无异议，窗内无登记事项**。
 - **打 tag 闸裁决（用户，08:57:21Z）**：裁 **A**——等 #265 合入或关闭再打 tag v5.7.0。守望机制：后台哨兵每 5 min 核 #265 state（MERGED/CLOSED 即触发收尾流程：新 tip 重跑 trunk CI 全绿 ⇒ required 四件双端核 ⇒ 板 NOTICE 更新 ⇒ 异议窗 ⇒ 打 tag）。若 12h 内 #265 未落地，哨兵超时**回报用户再裁**（不自动转 B）。当前快照：#265 PR run 全绿（42768022291 completed/success）、mergeable=UNKNOWN 在算、owner 近 24h 活跃（#264 合/#265 开）。
+
+
+## 审计整改批 7（2026-11-10）— CLAIM
+- **owner**：Qoder-CN `17ef022a`（前端审计线，用户原话「前端 疯狂检索啊！」）。
+- **授权**：用户 2026-11-10「可以，做吧」——仅限清单第 3 条（修开发态 /apikeys 裸页）；
+  第 4 条生产 CSP 先 report-only 观测再二裁；第 5/6 条不动。
+- **改什么**：`dashboard-enterprise/vite.config.js` 代理键 `'/api'`（字符串前缀）→ 正则 `'^/api/'`。
+  前缀冲突使开发态 /apikeys 被 '/api' 代理误匹配 → 拿到后端裸 index.html（无 /@vite/client）
+  + 严格 CSP 响应头 → 全页无样式（30 条 CSP 错误）且同文档后续 SPA 页被污染
+  （probe5：/apikeys→/home 27 errors / styleSheets=0，直连 /home 0 errors / 27）。
+- **证据**：F:\tmp\maop-audit-smoke\smoke.json（54 路由仅 3 处异常，/apikeys=34 CSP 错误）；
+  curl :5174/apikeys vs :5174/home 响应头/体对比；/f/tmp/maop-csp-probe5.js。
+- **范围边界**：仅此 1 文件；不碰 dashboard-enterprise/src/**（Examples 会话 / Nex 领地）、
+  不碰 py/**（ZCode 领地）；树中唯一未跟踪 data/admin_password_once.txt 非本线、不入提交。
+- **验收**：probe5 场景 B（/apikeys→/home）CSP 错误=0 且 styleSheets>0；54 路由烟测复绿
+  无新增 bad response；dashboard 四门（design:contrast / eslint / vue-tsc / vitest）EXIT=0。
+- **提交计划**：板面 CLAIM（chore）→ 代码单文件提交 → 板面 DONE 回执带 sha（chore）；不推远端、不开 PR。
+
+## 审计整改批 7（2026-11-10）— DONE
+- **提交**：`9be878d2371a1d8a213caea0293d384c11b1b343` fix(vite)：代理键 `'/api'` → `'^/api/'`
+  （dashboard-enterprise/vite.config.js 单文件，3+/1-；工作树核过仅此改动，
+  `data/admin_password_once.txt` 非本线未动未提交）。
+- **验收 1（probe5 三场景，后端重启后复跑）**：A 直连 /home 0 CSP 错误 / styleSheets=27；
+  B /apikeys→/home 0 错误 / 27（修前 27 错误 / 0）；C 强制企业版 /apikeys 0 错误 / 30
+  （含 ApiKeys.vue?vue&type=style css 200，finalUrl=/apikeys 不再裸页）。
+- **验收 2（全路由烟测，:5174 真栈）**：52 路由仅 2 处标记，均为预存设计内降级、与本改动无关——
+  `/api/debate/history`、`/api/n8n/health` 404 系后端 router 从未挂载（server.py 无对应
+  include_router；debate.py:150 / n8n.py:12 仅文件存在），前端有显式降级
+  （Debate.vue:278 注释「404 = ServiceContainer has no DebateDispatcher」+ view-debate.js:31 i18n
+  「调度器未配置」、edition.js:18 n8n 探针）。/apikeys 的 CSP 裸页标记已消除（企业版守卫下
+  个人版重定向 /home 属设计）。字符串 '/api' 前缀同样匹配这两路径 ⇒ 代理键改动不可能改变其行为。
+- **过程异常留痕**：中途后端被我重启时漏带环境变量，冒烟出 401（/api/info/config 等）；
+  按板面批 5 口径（:1180-1181）补 `MAOP_AUTH_ENABLED=0` + `MAOP_OWNER_MODE=1` +
+  `MAOP_MULTIMODAL_PROVIDER=hash` 重启后复绿；/api/info/config 实证 `"auth_enabled":false`。
+- **验收 3（四门禁，修后工作树实测）**：design:contrast 164/164 ALL PASS · eslint 0 error
+  （16 warning 既有基线）· vue-tsc exit 0 · vitest 707 passed（79 文件口径同批 6）。
+- **未做**：推送 / 开 PR（未授权，本分支 push 不触发 CI）；第 4 条生产 CSP report-only 观测
+  等用户二裁；第 5/6 条按授权不动。
+
+## 审计整改批 7 追加 NOTE（2026-11-10）— 生产 CSP report-only 观测完成，二裁材料就绪
+- **授权口径**：CLAIM 既定「第 4 条生产 CSP 先 report-only 观测再二裁」——观测为前置动作，
+  本次只做观测与材料，修法裁决仍归用户；零代码改动、零 py/** 触碰、未碰生产环境。
+- **方法**：`npm run build` 重建 dashboard/dist-enterprise（gitignore:82，树净）；后端按板面批 5
+  口径（:1180-1181）带 `MAOP_AUTH_ENABLED=0`+`MAOP_OWNER_MODE=1`+`MAOP_MULTIMODAL_PROVIDER=hash`
+  并加 `MAOP_CSP_REPORT_ONLY=1`+`MAOP_CSP_REPORT_URI=http://127.0.0.1:9079/api/csp-report` 重启；
+  Playwright 直连 :9079（生产同款文档链路：SPA fallback + dist 产物 + CSPMiddleware 头）遍历
+  52 路由 × 个人版/企业版双场景；双通道采集（report-uri POST 体 + GET /api/csp-violations 缓冲 +
+  console 文本）。证据：/f/tmp/maop-csp-observe/（summary.json / reports-raw.json / followup.json /
+  geom-*.json / skills-reportonly.png / skills-enforce.png）；探针 /f/tmp/maop-csp-observe.js、
+  /f/tmp/maop-csp-followup.js、/f/tmp/maop-csp-geom.js（仓外 scratch 不入库）。
+- **观测结果**：唯一真实违规 = `/capability/skills` 拓扑 tab，`style-src-elem`，blocked=inline，
+  source=assets/vendor-vis-*.js:1（vis-network 库运行时动态注入 7 个 `<style>` 标签，含 1 个空块
+  ——console 里 sha256-47DEQpj8… 即空串 hash）；2 份 report-uri 报告 + 14 条 console 文本双场景
+  （personal/enterprise）一致；其余 51 路由零违规。报告 original-policy 与响应头逐字一致、
+  disposition=report，report-only 生效无疑。
+- **噪声排除**：首轮 5 条个人版 NAV 超时（/capability/evolve·mcp·plugins·subagents·routing）经
+  对照复跑 5/5 ok（546–1221ms，followup.json）+ curl 直连 200（TTFB 0.2s，evolve 首次 3.6s 暖机）
+  定性为探针冷启动伪影，非生产缺陷；首轮「仅企业版触发」系后端冷启动时序伪影，复验 personal 同 14 条。
+- **enforce 复验**（同页同指标切换 enforcing 后端重采）：report-only 与 enforce 两版截图像素 diff
+  唯一落在顶栏时钟区（bbox 1254,24-1282,32，124px 为时刻差异），其余全图零差异；vis 容器几何
+  两模式均 1124×598。图谱区空白系数据层（服务:1/工具:0/连接:0）而非拦截所致 ⇒ 当前生产 enforce
+  姿态对该页渲染无增量损害，violation 是合规债而非功能缺陷。
+- **二裁材料**（修法落点全部在后端 CSP 指令串 py/maop/core/security/middleware/_middleware_stack.py
+  指令构造 = ZCode 领地；前端侧 vis 库行为无 class 可改）：
+  - (b) style-src 整体加 'unsafe-inline'：全局放行内联样式，XSS 注入样式无拦；最粗。
+  - (c) class rewrite：vis-network 第三方库运行时注入，不可行。
+  - (d) sha256 白名单：7 个 `<style>` 内容固定可 hash（含空串 hash），库升级即失效需重算。
+  - (d') style-src-elem 'self' 'unsafe-inline' + style-src-attr 不加：CSP3 指令分拆，只放行
+    `<style>` 元素注入（vis 所为），style 属性注入仍拦——最小放行面，推荐。
+  - 注：dist index.html:4 自带 meta CSP（style-src 含 unsafe-inline），与 HTTP 头并存取交集，
+    HTTP 头更严 ⇒ 修法只改后端响应头即可生效，meta 不提供额外保护。
+- **处置**：后端保持 enforcing（与生产一致）；未做任何策略修改，等用户二裁。
+
+## 审计整改批 7 追加 CLAIM（2026-11-10）— 生产 CSP style-src sha256 白名单（用户二裁选 d）
+- **授权**：批 7 CLAIM 既定「第 4 条生产 CSP 先 report-only 观测再二裁」；观测完成（NOTE 同日），
+  用户聊天二裁「我不要最小（否 d'）…需要决策的话，你自己给推荐选项。然后直接决策」⇒ 选 (d)。
+- **改什么**：`py/maop/core/security/middleware/_csp.py` :154 `style-src 'self'` 后追加 8 个 sha256
+  （7 个 vis-network 动态 `<style>` 内容 hash + 1 个空串 hash 47DEQpj8…＝注入瞬间的空块）。
+  取证：/capability/skills 拓扑 tab 企业版生产路径 :9079 直连，两次加载 hash 全等
+  （/f/tmp/maop-csp-fix/extract.json）；console 14 条/加载 = 7 空块插入 + 7 内容填充，
+  建议 hash 与 DOM 算得 hash 逐字一致；report-uri 通道 2 份全 style-src-elem；
+  105 个 style 属性经 CSSOM 赋值（el.style.*）不受 style-src-attr 约束、零违规
+  （classify.json；icon 内联仅 width/height 尺寸，enforce 与 report-only 截图像素一致已由 NOTE 钉死）。
+- **安全面**：hash 源只放行这 8 个固定内容的内联 `<style>`，不放行 style 属性、不放行任意内联；
+  内容是 vendor-vis-B-SI3wVL.js 编译期常量、与数据无关；vendor-vis 升级后须重算（注释里钉死）。
+  meta/header 并存取交集，头放宽即生效；pytest 双断言（test_middleware.py:88-89 子串口径）保持绿。
+- **验收**：report-only 复跑 skills 零 console 零 report；52 路由观测无新增；enforce 复验渲染无回归；
+  py 相关测试 + ruff 绿；单文件显式路径提交；板面 DONE 回执带 sha。后端最终保持 enforcing（生产同款）。
+- **边界**：仅 _csp.py 1 文件；不碰 dashboard-enterprise/src/**（Examples/Nex 领地）、不碰其他 py；
+  data/admin_password_once.txt 他线未跟踪文件不入提交；不开 PR 不推送。
+
+## 审计整改批 7 追加 DONE 回执（2026-11-10）— 生产 CSP style-src sha256 白名单
+- **提交**：`808b8713` fix(csp): style-src 按 sha256 放行 vis-network 运行时注入的 7 个 <style>
+  （py/maop/core/security/middleware/_csp.py，+22/−1，单文件显式路径；CLAIM d73ac608）。
+- **修法**（用户二裁选 d，否 d' 最小面）：`style-src 'self'` 后追加 8 个 sha256＝7 个 vis-network
+  动态 `<style>` 内容 hash + 空串 hash 47DEQpj8…（注入瞬间的空块）。docstring 同步补记；
+  代码注释钉死 vendor-vis 升级须重算。
+- **取证链**（/f/tmp/maop-csp-fix/）：
+  - extract.json：生产路径 :9079 企业版直连，两次加载 7 个 style 内容 hash 全等；
+    console 14 条/加载＝7 空块插入（空串 hash）＋7 内容填充，DOM 算得 hash 与 Chrome 建议 hash
+    逐字一致；report-uri 通道 2 份全 style-src-elem。
+  - classify.json：105 个 style 属性全由 CSSOM 赋值（el.style.*，如 app-icon 仅 width/height 尺寸），
+    不受 style-src-attr 约束、零违规 ⇒ sha256 白名单覆盖 100% 违规面，无残留类。
+  - postfix.json（report-only 复跑）：企业/个人双版 0 console / 0 report POST / 缓冲 0；7 style 均在位。
+  - sweep/summary.json：52 路由 × 双版复扫，report-post/console/buffer 三通道全 0，0 条 NAV 超时。
+  - enforce-postfix.json（enforcing 后端，生产同款）：0 console / 0 pageerror / 几何 1124×598
+    （与观测 NOTE 记录一致）；skills-enforce-postfix.png 与 postfix-enterprise.png 像素 diff＝0
+    （顶栏时钟区掩码后，pixdiff 脚本同目录）⇒ 被放行的样式在 enforce 下真实生效。
+- **门禁**：ruff check _csp.py 全过；pytest 50（test_middleware+test_server_coverage）＋511
+  （coverage_boost/routers_batch/routers_smoke 三件）全绿；test_middleware.py:88-89 双断言
+  （子串口径）实测通过；响应头实测 8 个 sha256 在位、report-only/enforce 两模式头名正确。
+- **数据卫生**：全部探针只读，/api/csp-violations 缓冲终态 0，无种子写入。后端终态 enforcing
+  （生产同款），日志 0 条 CSP violation。
+- **登记项**：vendor-vis bundle 升级后 8 个 hash 须重算（代码注释＋本回执双钉）；dist
+  index.html:4 meta CSP 未动（并存取交集，头放宽即生效）。
+- **未做**：推送 / 开 PR（未授权；本分支 ci.yml branches 过滤不触发 CI，门禁以本回执为准）。
+
+## 审计整改批 7 推送回执（2026-11-10）— PR #266
+- **授权**：用户「可以 提交推送、开pr」（2026-11-10，批 7 交付之后）。
+- **推送**：`6cfba502..dd1f2b39` → origin/ui/topbar-alignment（9 笔：批 7 全弧 CLAIM/vite 修复/DONE/NOTE/CLAIM/CSP 修复/DONE + 批 6 尾两笔板面 chore）；工作树仅余他线未跟踪 data/admin_password_once.txt，未入提交。
+- **PR**：#266 https://github.com/Levango7/MAOP/pull/266（base master ← ui/topbar-alignment），含两项修复证据链与登记项（vendor-vis 升级须重算 8 个 hash）。
+- **CI**：base=master 命中 ci.yml branches ⇒ PR 触发全量门禁（本分支直推不触发，口径同批 6）。合并未授权，等用户指令。
