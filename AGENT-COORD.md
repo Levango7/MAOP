@@ -1525,3 +1525,29 @@
   py 相关测试 + ruff 绿；单文件显式路径提交；板面 DONE 回执带 sha。后端最终保持 enforcing（生产同款）。
 - **边界**：仅 _csp.py 1 文件；不碰 dashboard-enterprise/src/**（Examples/Nex 领地）、不碰其他 py；
   data/admin_password_once.txt 他线未跟踪文件不入提交；不开 PR 不推送。
+
+## 审计整改批 7 追加 DONE 回执（2026-11-10）— 生产 CSP style-src sha256 白名单
+- **提交**：`808b8713` fix(csp): style-src 按 sha256 放行 vis-network 运行时注入的 7 个 <style>
+  （py/maop/core/security/middleware/_csp.py，+22/−1，单文件显式路径；CLAIM d73ac608）。
+- **修法**（用户二裁选 d，否 d' 最小面）：`style-src 'self'` 后追加 8 个 sha256＝7 个 vis-network
+  动态 `<style>` 内容 hash + 空串 hash 47DEQpj8…（注入瞬间的空块）。docstring 同步补记；
+  代码注释钉死 vendor-vis 升级须重算。
+- **取证链**（/f/tmp/maop-csp-fix/）：
+  - extract.json：生产路径 :9079 企业版直连，两次加载 7 个 style 内容 hash 全等；
+    console 14 条/加载＝7 空块插入（空串 hash）＋7 内容填充，DOM 算得 hash 与 Chrome 建议 hash
+    逐字一致；report-uri 通道 2 份全 style-src-elem。
+  - classify.json：105 个 style 属性全由 CSSOM 赋值（el.style.*，如 app-icon 仅 width/height 尺寸），
+    不受 style-src-attr 约束、零违规 ⇒ sha256 白名单覆盖 100% 违规面，无残留类。
+  - postfix.json（report-only 复跑）：企业/个人双版 0 console / 0 report POST / 缓冲 0；7 style 均在位。
+  - sweep/summary.json：52 路由 × 双版复扫，report-post/console/buffer 三通道全 0，0 条 NAV 超时。
+  - enforce-postfix.json（enforcing 后端，生产同款）：0 console / 0 pageerror / 几何 1124×598
+    （与观测 NOTE 记录一致）；skills-enforce-postfix.png 与 postfix-enterprise.png 像素 diff＝0
+    （顶栏时钟区掩码后，pixdiff 脚本同目录）⇒ 被放行的样式在 enforce 下真实生效。
+- **门禁**：ruff check _csp.py 全过；pytest 50（test_middleware+test_server_coverage）＋511
+  （coverage_boost/routers_batch/routers_smoke 三件）全绿；test_middleware.py:88-89 双断言
+  （子串口径）实测通过；响应头实测 8 个 sha256 在位、report-only/enforce 两模式头名正确。
+- **数据卫生**：全部探针只读，/api/csp-violations 缓冲终态 0，无种子写入。后端终态 enforcing
+  （生产同款），日志 0 条 CSP violation。
+- **登记项**：vendor-vis bundle 升级后 8 个 hash 须重算（代码注释＋本回执双钉）；dist
+  index.html:4 meta CSP 未动（并存取交集，头放宽即生效）。
+- **未做**：推送 / 开 PR（未授权；本分支 ci.yml branches 过滤不触发 CI，门禁以本回执为准）。
