@@ -101,6 +101,23 @@ def _validate_connect_src(connect_src: str, *, production: bool = False) -> None
             logger.warning(msg + "Prefer wss:// in production.")
 
 
+# vis-network（vendor-vis-*.js）在 /capability/skills 拓扑 tab 运行时动态注入 7 个 <style>
+# 块：先以空内容 append（1 次拦截），再填内容（又 1 次），每次页面加载共 14 条 style-src-elem
+# 违规（空串 hash 47DEQpj8… 即注入瞬间的空块）。库为第三方 bundle 不可改写，全局
+# 'unsafe-inline' 又过宽，故按 sha256 精确放行这 8 个内容；均为 vendor 编译期常量、与数据
+# 无关，两次加载实测全等。vendor-vis 升级后须重算（钉源 /f/tmp/maop-csp-fix/extract.json）。
+_CSP_STYLE_SHA256 = (
+    "'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='"
+    " 'sha256-qtFcpLOnO4XrLDW09tfdNGYeNa335EuROUo9mR2Rvpk='"
+    " 'sha256-rB8Lq4CToapxHOA15bZrut123Lsi/3bX70cdZ/7zWuE='"
+    " 'sha256-sHbwpGrA4x8yuE06RmSpXpMnObbUE/L3sSyEaOnVl9I='"
+    " 'sha256-CP28UkLwbNF+eO9xnpx3sh2mXz1RgTzVLx+TEDYhaN4='"
+    " 'sha256-ZWhQSr28Kch6YuER86RvOH+xPr3vQ6O4QSNFFZaIwMA='"
+    " 'sha256-qRCVt2R/fED7QvvvZ+uRa44S3ji4gvFuSQF3nYvvmjY='"
+    " 'sha256-ja21LsX6zZ0ry83OHqlM3MEMAzs+gS8YHR5VT+iyb+c='"
+)
+
+
 class CSPMiddleware(BaseHTTPMiddleware):
     """Content-Security-Policy and security response headers.
 
@@ -117,6 +134,10 @@ class CSPMiddleware(BaseHTTPMiddleware):
     in app-events.js, so script-src no longer needs 'unsafe-inline'.
     Inline style attributes have been migrated to CSS classes in style.css,
     so style-src no longer needs 'unsafe-inline'.
+    The only remaining inline styles are 8 fixed <style> blocks that the
+    vis-network bundle injects at runtime on /capability/skills (topology
+    tab); they are allowed by sha256 (see _CSP_STYLE_SHA256) instead of
+    'unsafe-inline'.
 
     Config (env vars):
       MAOP_CSP=0              Disable CSP entirely
@@ -151,7 +172,7 @@ class CSPMiddleware(BaseHTTPMiddleware):
         directives = [
             "default-src 'self'",
             "script-src 'self'",
-            "style-src 'self'",
+            "style-src 'self' " + _CSP_STYLE_SHA256,
             "img-src 'self' data:",
             "font-src 'self'",
             f"connect-src {connect_src}",
