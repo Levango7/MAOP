@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import sqlite3
 import sys
 import time
 from pathlib import Path
@@ -213,6 +214,32 @@ def _run_maintenance(payload: dict) -> None:
             )
         except Exception:
             logger.exception("[queue-worker] cleanup_dead_letters failed")
+            raise
+    elif job == "recover_unacked":
+        # 2026-11-10 接线：此前的状态是"函数存在但**无人调用**，而按名字请求它
+        # 会静默变成 no-op"（落到下面的 else，只记一行日志然后照常 ACK）。
+        #
+        # 为什么它仍然必要——尽管 dequeue 每次都会调用私有的 _reclaim_unacked：
+        #   · _reclaim_unacked 只覆盖**当前正在 dequeue 的那个 topic**，阈值是
+        #     ack_timeout_s；
+        #   · recover_unacked 覆盖**全表所有 topic**，阈值更保守
+        #     （ack_timeout_s + timeout_buffer），并额外把 retries 已耗尽的
+        #     pending 行扫进死信。
+        # ⇒ 对"消费者已死、且再无人轮询该 topic"的队列，卡在 processing 的消息
+        #   只能靠这次全局扫描回收（否则会一直卡着——不是丢失，是永不再投）。
+        try:
+            from maop.core.reliability.message_queue import MessageQueue
+            mq = MessageQueue(db_path=str(get_db_path("queue")))
+            recovered = mq.recover_unacked(
+                timeout_buffer=payload.get("timeout_buffer", 10.0),
+            )
+            logger.info("[queue-worker] recover_unacked recovered %d messages", recovered)
+        except (ImportError, sqlite3.Error, OSError, ValueError, TypeError):
+            # 收窄到现实失败面（本仓宽 except 是**棘轮**：新增一条即红）。
+            # 这里真实能抛的只有四类：模块导入 / SQLite 与文件 IO /
+            # payload 形状错（外部生产者把 timeout_buffer 传成字符串 ⇒ TypeError）。
+            # 照旧 re-raise：让消息走 NACK→重试→死信，而不是静默 ACK。
+            logger.exception("[queue-worker] recover_unacked failed")
             raise
     else:
         logger.info(
