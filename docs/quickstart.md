@@ -92,12 +92,15 @@ maop start
 
 ## 常见问题
 
-### Q: `maop health` 显示 `memory: degraded`，是不是装坏了？
-**A:** 不是。`memory.db` 在首次使用记忆功能时才创建（`py/maop/deploy.py` 的
-message 明确写 "will be created on first use"）。但当前版本 `maop health` 把任何
-非 `healthy` 组件都判为失败（`py/maop/cli.py` 的 `all_healthy` 判定），所以全新安装
-必然返回 FAIL。判断安装是否成功请看：`[+] database`、`[+] config` 均为 healthy，
-以及 `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:9079/healthz` 是否返回 200。
+### Q: `maop health` 列出多项 `degraded`，是不是装坏了？
+**A:** 不是。全新安装后 `data/maop.db` 与 `data/memory.db` 尚未创建，
+`health_check()` 会把 `database`、`memory` 标为 `degraded`（`py/maop/deploy.py`
+对 `memory.db` 的提示是 "will be created on first use"）。`maop health` 只把
+`unhealthy` 判为失败，`degraded` 仅提示、不改变退出码（见 `py/maop/cli.py` 的
+`cmd_health`），所以输出 `[OK] health 完成 — N 项降级` 属正常。别用 `health`
+的退出码判断服务是否可用：`maop start` 起来后，用
+`curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:9079/api/health`
+确认返回 200，再按第 5 步跑一次 `maop run`。
 
 ### Q: `ModuleNotFoundError: No module named 'maop'`
 **A:** 确认用的是装包的那个 Python：`python -m pip install maop-orchestrator`，
@@ -108,7 +111,7 @@ message 明确写 "will be created on first use"）。但当前版本 `maop heal
 
 ### Q: Agent 执行时报 LLM API 错误
 **A:** 内置 LLM 的凭据在 Dashboard 的密钥/凭据管理页配置（Fernet 加密存储，见
-`py/maop/core/api_key_vault.py`），**不通过 `.env` 的 `MAOP_LLM_API_KEY`**（该变量不存在）。
+`py/maop/core/security/api_key_vault.py`），**不通过 `.env` 的 `MAOP_LLM_API_KEY`**（该变量不存在）。
 只用外部 CLI agent 执行任务时，不需要配置内置 LLM 凭据。
 
 ### Q: 企业版功能（SSO/RBAC/审计）显示 404
@@ -130,11 +133,11 @@ maop start --port 9079
 前端热更新开发：后端 `cd py && python -m maop.dashboard.server`；前端
 `cd dashboard-enterprise && npm run dev`（Vite 默认 5173，需代理到 9079）。
 
-## 已知行为（2026-11-08 在 v5.6.1 干净环境实测，Windows）
+## 已知行为（2026-11-08 在 v5.6.1 干净环境实测，Windows；`health` 相关结论已按当前代码复核）
 
 | 现象 | 原因 | 影响 |
 |---|---|---|
-| `maop health` 全新安装返回 FAIL | `memory.db` 未创建被判 degraded，CLI 又把 degraded 当失败 | 不影响：`healthz` 仍为 200 |
+| `maop health` 全新安装列出多项 `degraded` | `maop.db` / `memory.db` 尚未创建 | 仅提示，退出码仍为 0；用 `/api/health` 是否为 200 判断服务可用 |
 | `maop run` 执行期间无进度输出 | 未接流式进度 | 长任务难以判断是否卡住 |
 | 目标 CLI 未登录或配额耗尽时**长时间无输出、不报错** | 无登录态预检，也不区分「等待中」与「已失败」 | 首跑最易踩：看起来像卡死 |
 | `--agent` 指定不在册 CLI 时静默回退 | failover 机制 | `run_events` 的 agent 标注可能与实际执行者不一致 |
