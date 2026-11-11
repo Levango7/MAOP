@@ -38,14 +38,26 @@
   `/api/debate/*` 404（"Instantiate a DebateDispatcher and register it"）
 - 位置：`core/evolution/evolution_loop.py:129,186,264`、`dashboard/routers/debate.py:71-96`
 
-### P1-3 PreemptableWorkerPool 零实例化
-- 类存在、`__init__` 导出存在、`submit_preemptable()` 存在，但**从未被实例化**
-- ⇒ γ-3 抢占机制整块死，`submit_preemptable` 不可达
+### P1-3 PreemptableWorkerPool 零实例化 — 结论：**不改**（库级 opt-in API）
+- 类存在、`submit_preemptable()` 存在，但**从未被实例化**
+- **复核结论（2026-11-11）**：这不是缺陷，是**库级 API**
+  - 零产品面：`dashboard/` 无路由、前端无页面、settings 无开关
+  - `ROADMAP.md` / `CHANGELOG.md` 均诚实标注「opt-in、默认关、行为不变」
+  - 真抢占会**取消运行中的任务**——对 LLM 调用 / 有副作用的 agent 任务是危险
+    操作，不适合做成产品默认开关
+  - 接线它等于给没有消费者的能力造一个产品旋钮（为接线而接线）
 - 位置：`core/reliability/preemptable_worker_pool.py`
 
-### P2-1 事件联邦整块死
-- `EventFederation(` 生产零实例化 ⇒ `attach_federation()` / `register_bridge()` 永不调用
-- ⇒ 跨实例事件联邦（`FederationBus` / `MAOPEventBusBridge` / `DictEventBridge`）不可达
+### P2-1 事件联邦整块死 — 第一跳已修，子系统仍无消费者
+- `FederationBus(` 生产**零实例化**（7 处全在测试）⇒ `attach_federation()` /
+  `register_bridge()` 在生产中永不调用
+- ✅ **2026-11-11 已修第一跳**：`EventBus` 的裸 `"*"` 订阅此前匹配不到任何事件
+  （`subscribe` 文档承诺尾部通配，实现只处理 `前缀.*`），而
+  `MAOPEventBusBridge` 正是 `subscribe("*", handler)` —— 桥接→联邦这一跳曾经
+  **恒为 0 条**（实测），现已通（2/2），并有反向验证钉子
+- ⚠️ **但能力边界没变**：本模块无任何跨进程传输（无 HTTP/WS/Redis/MQ/socket），
+  只做进程内内存分发；设计初衷是跨**产品**互通（MAOP ↔ MAOS），不是同产品扩容
+- **结论：不立项传输层**；模块 docstring 已写明「未接线 / 仅内存内 / 无跨进程」
 - 位置：`core/reliability/event_federation.py`
 
 ### P2-2 HTTP 指标与 trace 上下文提取从未安装 ✅ 本次已修
@@ -92,17 +104,34 @@
 反之，它也会**漏掉**真缺口——`MetricsMiddleware` 就属于"类对象形式根本没装上"，
 靠人工补查才定论。**机械扫描必须配人工复核，两个方向都会错。**
 
-## 三、建议处置顺序
+## 三、处置结果（2026-11-11 全部结项）
 
-1. ✅ **P2-2 中间件安装**——本次已修（纯增量可观测，无可达性/行为风险；
-   且属"修文档与代码的不一致"）
-2. **P2-3 `recover_unacked` 接线**——先确认有无其他补偿路径（是否真会丢消息），
-   再决定接在哪
-3. **P1-2 DebateDispatcher 注册**——需决定"谁创建、何时创建"，属产品行为
-4. **P1-3 PreemptableWorkerPool**——与 P1-1 同类：需决定默认策略
-5. **P1-1 Supervisor**——**不建议擅自默认开启**：它会 replace / terminate agent，
-   是真实的行为变更，须产品决策（但至少应让 dashboard 页面给出"如何开启"的
-   可见指引，而不是只有 API 404）
+| 项 | 状态 | 说明 |
+|---|---|---|
+| P2-2 中间件安装 | ✅ 已修 | `MetricsMiddleware` / `TraceContextMiddleware` 已 `add_middleware` |
+| P2-3 `recover_unacked` | ✅ 已修 | 经查 `dequeue` 每轮会 `_reclaim_unacked`，**不丢消息**；仍补了巡检入口 |
+| P1-2 DebateDispatcher | ✅ 已修 | `MAOP_DEBATE_ENABLED`（默认关）+ 容器工厂注册 |
+| P1-1 Supervisor | ✅ 已修 | `MAOP_SUPERVISOR_ENABLED` / `_ACTIONS_ARMED`（默认关）；未 arm 时只 warn，且 warn 里带 `suppressed_action` |
+| P3 bb_health 计数 | ✅ 已修 | `record_ks_dispatch` 接黑板真实派发点、`record_dead_letter` 接三条入死信分支；monitor 改进程级单例 |
+| P2-1 事件联邦 | 🔶 第一跳已修 | 裸 `"*"` 通配已修；**子系统仍无生产消费者，无跨进程传输，不立项**；docstring 已标注 |
+| P1-3 PreemptableWorkerPool | ⛔ 不改 | 零产品面、文档已诚实标注 opt-in、真抢占会取消运行中任务 ⇒ 属库级 API |
+
+**三条 P1 的共同形态**：能力建好、代码正确、单元测试也绿，但生产路径上没有任何
+调用点，于是静默地什么都不发生。修复方式分两种——**能给出产品面且风险可控的接线
+并加开关**（Supervisor / Debate），**没有产品面的明确标注为库级 API**（抢占池 /
+联邦）。两者都不该"默认打开"，因为都会改变既有行为。
+
+## 第二轮扫描（2026-11-11 晚，补记）
+
+结项后对 19 个计数方法做了全仓复查，3 条仍零生产者，逐条定性：
+
+| 计数方法 | 复查结论 | 处置 |
+|---|---|---|
+| `record_debate` | 有真实生产者（辩论收尾 `run_debate` 的 verdict 缓存处），只是没接 | ✅ 已接线（随本批提交），converged / rounds 双字段入账，含变异自检 |
+| `record_conflict` | 全仓无任何生产者（冲突检测逻辑本身也不产生调用） | ⛔ 不接：无事件源可接，接了也是恒 0 |
+| `record_trace_export` | 批量导出由 OTel SDK 内部调度，无应用层调用点 | ⛔ 不接：属 SDK 内部行为，应用层无插桩点 |
+
+前端不读 `debates` / `conflicts` 面板 ⇒ 不存在为接线而造假 UI 的问题。
 
 ## 方法边界
 
