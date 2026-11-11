@@ -39,6 +39,31 @@ from maop.core.reliability.blackboard import (
 
 logger = logging.getLogger(__name__)
 
+
+def _health() -> Any:
+    """进程级黑板健康 monitor（2026-11-10 接线审计）。
+
+    取进程级单例而不是在模块里自建一份：dashboard 的 snapshot 读的正是同一个
+    实例，否则 core 记的数永远不会出现在健康面上（此前 record_ks_dispatch /
+    record_dead_letter 就是"实现了但零调用、且没有共享实例"）。
+    取不到时返回静默替身——健康记账绝不阻断派发。
+    """
+    try:
+        from maop.core.reliability.bb_health import get_health_monitor
+
+        return get_health_monitor()
+    except (ImportError, OSError, RuntimeError, ValueError, TypeError) as exc:
+        logger.debug("[bb_converge] health monitor unavailable: %s", exc)
+        return _NullHealth()
+
+
+class _NullHealth:
+    """健康计数不可用时的静默替身（只吞记账，不影响调度）。"""
+
+    def record_ks_dispatch(self, success: bool = True) -> None:
+        return None
+
+
 # ── Type Aliases ──────────────────────────────────────────────────
 
 # A predicate receives the full blackboard + entry and decides whether to fire.
@@ -493,6 +518,8 @@ class BlackboardConvergenceController:
                     await ks.execute(self._bb, entry)
                     rule.mark_dispatched(entry.entry_id)
                     fired += 1
+                    # KS 派发的真实执行点：此前从不上报 ⇒ 健康面 dispatches 恒 0。
+                    _health().record_ks_dispatch(success=True)
                     with self._lock:
                         self._trace.append({
                             "solve_id": self._solve_id,
@@ -508,6 +535,8 @@ class BlackboardConvergenceController:
                         "[bb_converge] KS %s via rule %s failed: %s",
                         ks.name, rule.name, exc,
                     )
+                    # 失败也要计入健康面（errors 与 error_rate 由此而来）。
+                    _health().record_ks_dispatch(success=False)
                     with self._lock:
                         self._trace.append({
                             "solve_id": self._solve_id,

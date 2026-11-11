@@ -18,7 +18,10 @@ import logging
 import uuid
 from typing import Any
 
-from maop.core.reliability.bb_health import BlackboardHealthMonitor, HealthProbes
+from maop.core.reliability.bb_health import (
+    HealthProbes,
+    get_health_monitor,
+)
 from maop.core.reliability.bb_trigger_engine import (
     BlackboardConvergenceController,
     GoalStateCriterion,
@@ -40,7 +43,10 @@ logger = logging.getLogger(__name__)
 
 # ── Module-level singletons (lazy) ──────────────────────────────────
 
-_health_monitor = BlackboardHealthMonitor()
+# 2026-11-10 接线审计：改用**进程级单例**。此前这里自己 new 一份，而
+# record_ks_dispatch / record_dead_letter 的真实调用点在 core 层（黑板 KS 派发、
+# 消息队列入死信）；两份实例各记各的，core 记的数永远到不了这个 snapshot。
+_health_monitor = get_health_monitor()
 _health_probes = HealthProbes()
 _active_controllers: dict[str, BlackboardConvergenceController] = {}
 _solve_tasks: dict[str, asyncio.Task[None]] = {}
