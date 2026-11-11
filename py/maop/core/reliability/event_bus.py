@@ -324,6 +324,14 @@ class EventBus:
 
         # Wildcard match: "execution.*" matches "execution.result"
         for pattern_topic, subs in self._subs.items():
+            # 裸 "*" = 订阅全部（2026-11-10 修复）。subscribe() 的文档写的是
+            # "Supports '*' wildcard at end"——"*" 正是尾部通配的退化形式，但原实现
+            # 只处理 "前缀.*"，于是 subscribe("*", h) **收不到任何事件**。
+            # 这不是改语义，是补齐文档承诺：MAOPEventBusBridge 正是靠它订阅全部事件
+            # 再转进联邦，此前那一跳永远静默为空（实测 0 条）。
+            if pattern_topic == "*":
+                matching_subs.extend(subs)
+                continue
             if pattern_topic.endswith(".*"):
                 prefix = pattern_topic[:-1]  # "execution."
                 if event.topic.startswith(prefix) and pattern_topic != event.topic:

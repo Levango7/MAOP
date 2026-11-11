@@ -33,6 +33,7 @@ from typing import Any, cast
 from pydantic import BaseModel, Field
 
 from maop.core.backends.db_utils import get_db_path, sqlite_connect
+from maop.core.reliability.bb_health import notify_dead_letter
 
 logger = logging.getLogger(__name__)
 
@@ -420,6 +421,7 @@ class MessageQueue:
 
                     if retries > max_retries:
                         self._move_to_dead_letter(conn, msg_id, "exceeded max retries")
+                        notify_dead_letter()
                     else:
                         conn.execute(
                             """UPDATE queue_messages
@@ -483,6 +485,7 @@ class MessageQueue:
 
                 if retries > max_retries:
                     self._move_to_dead_letter(conn, msg_id, error or "nack exceeded max retries")
+                    notify_dead_letter()
                 else:
                     conn.execute(
                         """UPDATE queue_messages
@@ -783,6 +786,7 @@ class MessageQueue:
                     # an unconditional DELETE that could drop a message on a PK
                     # clash between runs.
                     self._move_to_dead_letter(conn, row[0], "exhausted_retries")
+                    notify_dead_letter()
 
                 recovered = cursor.rowcount
                 if recovered > 0:

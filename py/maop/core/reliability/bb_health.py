@@ -16,11 +16,54 @@ Classes
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+# ── 进程级单例（2026-11-10 接线审计）─────────────────────────────
+# 此前 monitor 只被 dashboard service 自己 new 了一个（_health_monitor），
+# 而 record_ks_dispatch / record_dead_letter 的**真实调用点在 core 层**
+# （黑板的 KS 派发与消息队列的死信）——两边各持一份实例的话，core 记的数永远不会
+# 出现在 dashboard 的 snapshot 里。给一个进程级访问器，两边共用同一份。
+#
+# 模式与 core/scheduling/failure_detector.get_failure_detector() 一致。
+_monitor_instance: BlackboardHealthMonitor | None = None
+_monitor_lock = threading.Lock()
+
+
+def get_health_monitor() -> BlackboardHealthMonitor:
+    """Return the process-wide :class:`BlackboardHealthMonitor` singleton."""
+    global _monitor_instance
+    with _monitor_lock:
+        if _monitor_instance is None:
+            _monitor_instance = BlackboardHealthMonitor()
+        return _monitor_instance
+
+
+def set_health_monitor(monitor: BlackboardHealthMonitor | None) -> None:
+    """Replace (or clear with ``None``) the global monitor singleton (tests)."""
+    global _monitor_instance
+    with _monitor_lock:
+        _monitor_instance = monitor
+
+
+def notify_dead_letter(n: int = 1) -> None:
+    """上报 ``n`` 条消息进入死信（2026-11-10 接线审计）。
+
+    ``record_dead_letter`` 此前实现完整但**零调用**，健康面 ``dead_letters``
+    恒为 0 —— 死信在积压却看不出来。真实调用点在 ``message_queue`` 的三处入死信
+    分支，那里用本函数上报。
+
+    记账失败绝不阻断入死信本身（死信是数据安全网，不能被观测性拖垮）。
+    """
+    try:
+        get_health_monitor().record_dead_letter(n)
+    except (OSError, RuntimeError, ValueError, TypeError) as exc:
+        logger.debug("[bb_health] dead-letter record skipped: %s", exc)
 
 
 # ── BlackboardHealthMonitor ────────────────────────────────────────
