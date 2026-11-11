@@ -54,6 +54,29 @@ from maop.delegate.debate_verdict import Adjudicator
 logger = logging.getLogger(__name__)
 
 
+def _health() -> Any:
+    """进程级黑板健康 monitor（2026-11-11 接线审计）。
+
+    与 bb_trigger_engine._health 同口径：计数不可用时静默降级，
+    不影响辩论主流程。record_debate 此前全仓零调用 ⇒ 健康面
+    debates 恒为 0，辩论轮次与收敛数对运营不可见。
+    """
+    try:
+        from maop.core.reliability.bb_health import get_health_monitor
+
+        return get_health_monitor()
+    except (ImportError, OSError, RuntimeError, ValueError, TypeError) as exc:
+        logger.debug("[debate] health monitor unavailable: %s", exc)
+        return _NullHealth()
+
+
+class _NullHealth:
+    """健康计数不可用时的静默替身（只吞记账，不影响辩论）。"""
+
+    def record_debate(self, converged: bool = True, rounds: int = 0) -> None:
+        return None
+
+
 # ── 辩论调度器（DebateDispatcher）──────────────────────────────────
 
 
@@ -494,6 +517,11 @@ class DebateDispatcher:
                     verdict.total_tokens = total_tokens
             # 缓存历史
             self._history[debate_id] = verdict
+            # 辩论完成计数进黑板健康面（2026-11-11 接线审计）：
+            # record_debate 此前全仓零调用 ⇒ debates 恒为 0。
+            _health().record_debate(
+                converged=verdict.consensus, rounds=len(rounds),
+            )
             # 发布辩论完成事件
             await self._publish_event("debate.completed", {
                 "debate_id": debate_id,
