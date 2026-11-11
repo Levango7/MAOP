@@ -12,6 +12,24 @@ The federation bus follows a **fail-closed** design:
 - Incoming events are normalized to a canonical ``FederatedEvent`` before
   dispatch, so bridges don't need to know each other's internal format.
 
+Status (2026-11-11 接线审计)
+----------------------------
+**本模块尚未接入任何生产路径**：``FederationBus`` 全仓零实例化（只有测试在用），
+所以 ``attach_federation()`` / ``register_bridge()`` 在生产中永不调用。把它当作
+现成能力之前，请先读完这段。
+
+**能力边界**：只做「事件归一化 → **进程内**内存订阅分发」。**没有任何跨进程
+传输**——没有 HTTP / WebSocket / Redis / MQ / socket。因此即使接线，它也只在
+同一进程内互联；跨进程或多实例联邦需要另建传输层，当前**不在路线图上**（同产品
+横向扩容还须先替换 SQLite 队列后端，全仓无 Redis/AMQP 后端选项）。
+
+**设计初衷是跨「产品」互通**（MAOP ↔ MAOS 通知总线），不是同产品横向扩容。
+
+**已知并已修**：``EventBus`` 的裸 ``"*"`` 订阅曾匹配不到任何事件（``subscribe``
+文档承诺尾部通配，实现只处理 ``前缀.*``），而 ``MAOPEventBusBridge`` 正是靠
+``subscribe("*", handler)`` 订阅全部事件——那一跳曾经恒为 0 条。2026-11-11 已修，
+并有反向验证钉子（还原修复则测试转红）。
+
 Classes
 -------
 - ``FederatedEvent``: canonical cross-project event envelope.
