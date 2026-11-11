@@ -1583,3 +1583,11 @@
 - **验收回指**：批 7 DONE 回执（9be878d2/808b8713 两笔）之四门/门禁/浏览器复跑/像素 diff 证据链不变；
   rebase 后 CI 在 a91720e4 重跑全绿即终验。
 - **NOTICE v5.7.0 tag-prep（00:47:57Z）**：代码面验证齐：空提交 9ac3aa3b（无代码变更，目的＝ci_path_scope 空变更集保守分支 code=true）触发全量矩阵 run 42922908196 completed/success＝27 success＋4 设计内 skipped（Publish tag manual／Release Assets／Publish to PyPI／Required-canary），success 腿集合与 5d08c036 绿基线逐名 diff rc=0，required 四件 jobs×check-runs 双端 success；版本站 5.7.0 ×4 无 5.6.1 残留、test_version_sync_guard 13 passed。异议窗＝本行落板后 10 min；窗内无异议／无新 CLAIM／无在途交付即按闸 annotated tag v5.7.0 打当时 master tip 并 push。如实登记预期红：tag run Publish to PyPI（trusted publisher 未配，用户外部前置，非 required）。
+
+## 审计整改批 7 合并后动态复验 NOTE（2026-11-11）— master 吸收 #265/#267 后全路由重跑
+- **动机**：批 7 的 52 路由动态证据采于 #265/#266/#267 合入前；master 随后吸收他线 #265（03c4c7c）/#267（b69fe5c）代码，证据过期，按「全量复验」口径对当前 master 重跑（本 NOTE 即 批 4 deferred 口味项之外的自立验证活，用户令「自己找事情做」）。
+- **环境（零干扰隔离）**：ent17 工作树（代码面与 origin/master 逐字一致，git diff 空）`npm run build` 重建 dist（exit 0）；起独立实例 MAOP_DASH_PORT=9081 + MAOP_DATA_DIR=F:/tmp/maop-master-verify/data（空库）+ 批 5 配方（MAOP_AUTH_ENABLED=0/MAOP_OWNER_MODE=1/MAOP_MULTIMODAL_PROVIDER=hash）；他线 9079 后端（CWD=MAOP-op，psutil 核过）与 :5174 vite 全程未碰；验完即停自家实例。
+- **结果（/f/tmp/maop-master-verify/smoke.json + shots/，探针 /f/tmp/maop-master-verify-smoke.js）**：52 路由仅 2 处标记，与批 7 基线完全同态且均为设计内降级——/operate/debate 404 /api/debate/history（Debate.vue:278 注释「404 = ServiceContainer has no DebateDispatcher」+ view-debate.js:120-121 i18n「辩论调度器未配置」）、/operate/integrations 404 /api/n8n/health（edition.js:15,18 n8n 探针三态）；两页 h1/正文均渲染、无 pageError、无非设计内 bad response；个人版守卫下 /audit /rbac /tenants /licenses /sso /quotas /apikeys /users /notifications/config 重定向 /home 同基线。
+- **批 7 两修复现役核验**：生产链路 CSP 响应头 style-src 带 8 个 sha256 白名单（_csp.py，curl :9081/home 实抓，含空串 hash 47DEQpj8…）；/capability/skills（vis-network 注入点）console 0 错误——#266 修复在现行 master 生效；vite 代理键 '^/api/'（6bcf682e）随 #266 在位。
+- **结论**：他线 #265/#267 合入未对前端四问面（请求响应/数据流转/排版/交互反馈）引入回归；master 当前动态面与批 7 基线同态。
+- **遗留**：批 4 deferred 口味项（pending 态泛化/长列表虚拟化/他页 idle 降级）仍待用户裁决开批；S-2（活库数据）/agnes-2.5-pro 存量价等用户点名项未动。
