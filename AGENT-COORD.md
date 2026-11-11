@@ -1608,3 +1608,15 @@
 - **rebase 链（对账用）**：46caf633→d3ed1415、386dfc3b→3d067d4b、76596808→1d8d23aa、06702e78→a64e6aa0；force-push --force-with-lease 已在 #270 PR 内注明。
 - **交付内容**：纯板面两 NOTE（批 7 复验：52 路由重跑同态、#266 修复现役；批 8：Q4 空态 0 命中 / Q1 写路径 E2E 过 / F-8-1 静默降级登记），无代码改动、无版本站触碰。
 - **验收回指**：两 NOTE 证据链不变（探针 /f/tmp/maop-master-verify-*、/f/tmp/maop-b8-*）；F-8-1 修法待 ZCode 认领或用户裁定。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-12：批 4b——deferred 口味三项开批）
+- **授权**：用户 2026-11-12「允许你开」「能做的都做吧」（接批 4 交付回执「未做」行与批 7/8 NOTE 遗留：pending 态泛化/长列表虚拟化/他页 idle 降级待裁决开批）。F-8-1 归 ZCode（用户亲自催），本批不碰。
+- **范围**（dashboard-enterprise/src/** 默认归 Examples/Nex 领地；本批按用户授权 scoped 登记。Nex 在途前端 PR 为零——OPEN 仅 #273 ZCode 接线审计/#240 pi 参数，均不交叠；如施工期撞车按「追加日志保留双方」rebase）：
+  - pending 态泛化：Overview 加载三分支（be226d00 骨架）向其余异步拉取页推广——先取证哪几页加载态裸露，只修实证裸露者
+  - 长列表虚拟化：先取证哪条列表真实长（行数量级），再定方案；不臆造需求
+  - 他页 idle 降级：忠实 idle payload（全零+空数组+timeseries:[]）下复刻 .ov-idle 说明条模式（1699721d）到同态页
+  - S-2 只读取证（不动活库）：核 GAP-2 sim 库存量 <unknown> firing 行（received_at 1793746430）现状与清理路径；清库/独立 test receiver 归 owner（py/** ZCode）或用户裁定
+- **板面纠错（追加留痕）**：批 7/批 8 NOTE 遗留行「agnes-2.5-pro 存量价待用户点名」已过期——批 6 裁决 2 已按官网刊例对齐（f891828a 0.01/0.03→0.00045/0.0009）并销账（本板 1342 行），本批不重复施工。
+- **证据先行**：真栈隔离实例（:9081 + 批 5 配方）+ 浏览器 DOM 断言 + 截图；假阳性剔除写明理由；每项修法带 before/after 实测；探针 /f/tmp/maop-b4b-*。
+- **不碰**：后端 py/、CI/CD、分支保护、版本站、他线在途 PR；i18n 优先复用既有 key，新增文案走双语 key。
+- **批次**：CLAIM → 取证 → 分项提交 → 门禁（vitest/eslint/vue-tsc/design:contrast）+ 浏览器复跑 → 回执带 sha。
