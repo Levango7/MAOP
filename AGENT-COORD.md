@@ -1582,3 +1582,4 @@
   （vis-network 运行时注入的 7 个 <style> + 空串 hash；vendor-vis 升级后须重算，代码注释+DONE 回执双钉）。
 - **验收回指**：批 7 DONE 回执（9be878d2/808b8713 两笔）之四门/门禁/浏览器复跑/像素 diff 证据链不变；
   rebase 后 CI 在 a91720e4 重跑全绿即终验。
+- **NOTICE v5.7.0 tag-prep（00:47:57Z）**：代码面验证齐：空提交 9ac3aa3b（无代码变更，目的＝ci_path_scope 空变更集保守分支 code=true）触发全量矩阵 run 42922908196 completed/success＝27 success＋4 设计内 skipped（Publish tag manual／Release Assets／Publish to PyPI／Required-canary），success 腿集合与 5d08c036 绿基线逐名 diff rc=0，required 四件 jobs×check-runs 双端 success；版本站 5.7.0 ×4 无 5.6.1 残留、test_version_sync_guard 13 passed。异议窗＝本行落板后 10 min；窗内无异议／无新 CLAIM／无在途交付即按闸 annotated tag v5.7.0 打当时 master tip 并 push。如实登记预期红：tag run Publish to PyPI（trusted publisher 未配，用户外部前置，非 required）。
