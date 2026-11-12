@@ -38,14 +38,14 @@
         />
         <StatCard
           :label="t('view.alerts.statTriggeredToday')"
-          :value="statTriggeredToday"
+          :value="statTriggeredToday === null ? '—' : statTriggeredToday"
           icon="activity"
           tone="info"
           :loading="loading"
         />
         <StatCard
           :label="t('view.alerts.statFalsePositiveRate')"
-          :value="statFalsePositiveRate + '%'"
+          :value="statFalsePositiveRate === null ? '—' : statFalsePositiveRate + '%'"
           icon="gauge"
           tone="warn"
           :loading="loading"
@@ -341,14 +341,13 @@ const statTotalRules = computed(() => rules.value.length);
 const statActiveRules = computed(() => rules.value.filter((r) => r.enabled).length);
 const statTriggeredToday = computed(() => {
   const s = stats.value || {};
+  if (s.triggered_today === undefined || s.triggered_today === null) return null;
   return Number(s.triggered_today) || 0;
 });
 const statFalsePositiveRate = computed(() => {
   const s = stats.value || {};
-  if (s.false_positive_rate !== undefined && s.false_positive_rate !== null) {
-    return Math.round(Number(s.false_positive_rate) * 100) / 100;
-  }
-  return 0;
+  if (s.false_positive_rate === undefined || s.false_positive_rate === null) return null;
+  return Math.round(Number(s.false_positive_rate) * 100) / 100;
 });
 
 // ── 工具函数 ──

@@ -16,7 +16,7 @@
     <div v-show="tab === 'main'" class="evolve-main">
       <div class="stats-row">
         <StatCard :label="t('view.evolve.totalEvolutions')" :value="totalEvolutions" icon="activity" tone="brand" :loading="loading" />
-        <StatCard :label="t('view.evolve.avgSuccessRate')" :value="successRate" unit="%" icon="check-circle" tone="success" :loading="loading" />
+        <StatCard :label="t('view.evolve.avgSuccessRate')" :value="successRate" :unit="successRate !== '—' ? '%' : ''" icon="check-circle" tone="success" :loading="loading" />
         <StatCard :label="t('view.evolve.agentsTracked')" :value="agentsTracked" icon="bot" tone="info" :loading="loading" />
         <StatCard :label="t('view.evolve.bestAgent')" :value="bestAgentLabel" icon="star" tone="warn" :loading="loading" />
       </div>
@@ -89,7 +89,9 @@ v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
       <div class="evolve-chart-desc muted">{{ t('view.evolve.timeseries.desc') }}</div>
       <div class="evolve-chart-box">
         <Line v-if="timeseriesChartData.labels.length" :data="timeseriesChartData" :options="timeseriesChartOptions" />
-        <EmptyState v-else icon="activity" :title="t('view.evolve.noData')" :description="t('view.evolve.historyNADesc')" />
+        <!-- 首载 metrics 未回时渲染空态会把"加载中"伪装成"暂无调优数据"（与真实空态同形） -->
+        <EmptyState v-else-if="!loading" icon="activity" :title="t('view.evolve.noData')" :description="t('view.evolve.historyNADesc')" />
+        <Skeleton v-else height="120px" />
       </div>
     </Card>
 
@@ -118,7 +120,8 @@ v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
           </tbody>
         </table>
       </div>
-      <EmptyState v-else icon="grid" :title="t('view.evolve.noData')" :description="t('view.evolve.strategiesNADesc')" />
+      <EmptyState v-else-if="!loading" icon="grid" :title="t('view.evolve.noData')" :description="t('view.evolve.strategiesNADesc')" />
+      <Skeleton v-else height="120px" />
     </Card>
 
     <!-- P2-12: Agent configuration lineage -->
@@ -133,7 +136,8 @@ v-else-if="!loading" icon="gauge" :title="t('view.evolve.noData')"
         row-key="key"
         :empty-text="t('view.evolve.lineage.empty')"
       />
-      <EmptyState v-else-if="!lineage.length" icon="git-branch" :title="t('view.evolve.lineage.empty')" />
+      <EmptyState v-else-if="!lineage.length && !loading" icon="git-branch" :title="t('view.evolve.lineage.empty')" />
+      <Skeleton v-else height="60px" />
     </Card>
 
     <div class="two-col">
@@ -223,7 +227,7 @@ const lineage = ref([]);
 const totalEvolutions = computed(() => byAgent.value.reduce((s, a) => s + (a.total || 0), 0));
 const successRate = computed(() => {
   const total = totalEvolutions.value;
-  if (!total) return 0;
+  if (!total) return '—'; // 零次演化没有成功率可言，0% 是编造值
   const ok = byAgent.value.reduce((s, a) => s + (a.success || 0), 0);
   return Math.round((ok / total) * 1000) / 10;
 });

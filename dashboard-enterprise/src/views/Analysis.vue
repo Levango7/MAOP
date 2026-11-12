@@ -47,7 +47,7 @@
               </div>
               <div class="an-kpi">
                 <span class="an-kpi__label">{{ t('view.analysis.summary.successRate') }}</span>
-                <span class="an-kpi__value" :class="successRateTone">{{ formatPct100(summaryData.success_rate_pct) }}</span>
+                <span class="an-kpi__value" :class="successRateTone">{{ summaryData.total_tasks > 0 ? formatPct100(summaryData.success_rate_pct) : '—' }}</span>
               </div>
               <div class="an-kpi">
                 <span class="an-kpi__label">{{ t('view.analysis.summary.totalCost') }}</span>
@@ -55,7 +55,7 @@
               </div>
               <div class="an-kpi">
                 <span class="an-kpi__label">{{ t('view.analysis.summary.avgLatency') }}</span>
-                <span class="an-kpi__value">{{ formatNum(summaryData.avg_latency_ms) }} ms</span>
+                <span class="an-kpi__value">{{ summaryData.total_tasks > 0 ? formatNum(summaryData.avg_latency_ms) + ' ms' : '—' }}</span>
               </div>
               <div class="an-kpi">
                 <span class="an-kpi__label">{{ t('view.analysis.summary.activeAgents') }}</span>
@@ -410,6 +410,9 @@ function dateRangeParams() {
 const hasSummaryData = computed(() => Object.keys(summaryData.value).length > 0);
 
 const successRateTone = computed(() => {
+  // 成功率着色只在有任务基数时成立；零任务时值渲染为 '—'，
+  // 着色会把它读成失败（红），等于替不存在的数据下结论。
+  if (!summaryData.value.total_tasks) return '';
   const v = Number(summaryData.value.success_rate_pct);
   if (isNaN(v)) return '';
   if (v >= 95) return 'is-ok';

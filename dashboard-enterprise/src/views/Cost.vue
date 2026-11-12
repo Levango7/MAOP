@@ -37,8 +37,8 @@
       />
       <StatCard
         :label="t('view.cost.stat.avgLatency')"
-        :value="(summary.avg_latency_ms || 0).toFixed(0)"
-        unit="ms"
+        :value="summary.total_calls > 0 ? (summary.avg_latency_ms || 0).toFixed(0) : '—'"
+        :unit="summary.total_calls > 0 ? 'ms' : ''"
         icon="gauge"
         tone="warn"
         :loading="loading"
