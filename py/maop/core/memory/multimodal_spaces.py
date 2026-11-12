@@ -89,6 +89,10 @@ class MultimodalSpaceSpec:
     def __post_init__(self) -> None:
         if not self.name or not self.table_name:
             raise ValueError("space name and table_name are required")
+        if not re.fullmatch(r"[a-z_][a-z0-9_]*", self.table_name):
+            raise ValueError(
+                f"space {self.name!r} has invalid table name {self.table_name!r}"
+            )
         if self.dimension <= 0:
             raise ValueError(f"space {self.name!r} dimension must be positive")
         if self.backend not in _BACKENDS:

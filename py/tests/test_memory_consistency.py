@@ -1231,6 +1231,16 @@ class TestMigrationIdempotent:
             cur = conn.execute("SELECT COUNT(*) FROM memory_entries WHERE id = ?", ("id-1",))
             assert cur.fetchone()[0] == 1
 
+    def test_migrate_table_rejects_non_whitelisted_table(self, tmp_root) -> None:
+        """表名白名单钉：非迁移元数据表名在入口处被拒，不进 f-string SQL。"""
+        from maop.migrations.memory_migration import _migrate_table
+
+        with pytest.raises(ValueError, match="is not migratable"):
+            _migrate_table(
+                tmp_root / "src.db", tmp_root / "dst.db",
+                "memory_entries; DROP TABLE x", dry_run=True,
+            )
+
     def test_migrate_with_legacy_episodic_db(self, tmp_root):
         """构造 legacy episodic.db 并迁移。"""
         from maop.migrations.memory_migration import migrate_legacy_episodic_db
