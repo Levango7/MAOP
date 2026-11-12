@@ -1632,3 +1632,4 @@
 - **环境件（如实登记，未改码）**：① /api/agent/upgrade 在隔离栈恒挂起（curl 无响应、服务端无完成日志；py/maop/dashboard/routers/system/agent_admin.py 派生 CLI 探测，属 ZCode 领地 py/**，只登记不动手）→ /run 升级区骨架常驻为诚实 pending，probe5 同栈同态；② probe6 首跑 /home、/analysis 各有一路请求在浏览器侧消失（diag.js 单路由复跑完整 200），判拦截层瞬态，复跑后双相数据齐备；③ /api/analysis/performance-bottlenecks 慢 6.1s 但 200。
 - **门禁**：vitest 0 错 / eslint 0 / vue-tsc 0 / design:contrast 164 对全过（两笔提交同一终态树上跑）。
 - **未触碰**：py/、后端、CI/CD、分支保护、版本站、他线在途 PR；data/admin_password_once.txt（他人未提交件）与 skills/ 未纳入任何提交；i18n 无新增文案（复用既有 key，'—' 为字符非文案）。S-2 只读取证已在 #140 落板，本批不重复。
+- **推送回执（2026-11-12T04:09Z）**：用户口头授权推送后，提交链 3b93a75a…8188a740 已推 origin/ui/b4b-taste-deferred（推送前核验：远程 Levango7/MAOP、分支/提交链/工作树净；推送后 remote head=8188a740 与本地 HEAD 一致）。本回执笔随后同推。未开 PR、未合并（无授权）。
