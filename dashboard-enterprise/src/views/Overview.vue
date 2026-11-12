@@ -77,7 +77,8 @@
     <!-- Main rows（idle 时隐藏：健康指标与近期委派同为全零/空，留着只是占位） -->
     <div v-if="!error && !idleSystem" class="row">
       <!-- System health -->
-      <Card icon="cpu" :title="t('view.overview.systemHealth')" :badge="healthScore + '%'" :badge-tone="healthTone">
+      <!-- 首载 data 未回时角标露 "0%" 等于替数据下结论，先撤掉 -->
+      <Card icon="cpu" :title="t('view.overview.systemHealth')" :badge="data ? healthScore + '%' : null" :badge-tone="healthTone">
         <div v-if="loading" class="health-skel">
           <Skeleton v-for="n in 4" :key="n" height="14px" />
         </div>
@@ -93,7 +94,7 @@
       </Card>
 
       <!-- Recent delegations -->
-      <Card icon="activity" :title="t('view.overview.recentDelegations')" :badge="(data?.recent_delegations || []).length + ''" badge-tone="info">
+      <Card icon="activity" :title="t('view.overview.recentDelegations')" :badge="data ? (data.recent_delegations || []).length + '' : null" badge-tone="info">
         <DataTable
           v-if="!loading"
           :rows="data?.recent_delegations || []"
@@ -110,30 +111,38 @@
     <div v-if="!error && !idleSystem" class="ov-split">
       <Card icon="activity" :title="t('view.overview.throughput')">
         <div class="chart-box">
-          <Line v-if="chartData.labels.length" :data="chartData" :options="chartOptions" />
+          <div v-if="loading && !data" class="blk"><Skeleton v-for="n in 4" :key="n" height="14px" /></div>
+          <Line v-else-if="chartData.labels.length" :data="chartData" :options="chartOptions" />
           <EmptyState v-else icon="activity" :title="t('view.overview.noTimeseries')" :description="t('view.overview.throughputUnavailable')" />
         </div>
       </Card>
 
       <div class="activity-feed">
-        <div v-for="(ev, i) in recentEvents" :key="i" class="activity-item">
-          <div class="activity-dot"></div>
-          <div class="activity-body">
-            <div class="activity-header">
-              <span class="activity-title">{{ ev.title }}</span>
-              <span class="activity-time">{{ ev.time }}</span>
-            </div>
-            <p class="activity-desc">{{ ev.desc }}</p>
-          </div>
+        <!-- 首载时 recentEvents 恒为空数组，不加 loading 分支会把"加载中"
+             渲染成"暂无近期活动"（与空数据同形，不可分辨）。 -->
+        <div v-if="activityLoading" class="blk">
+          <Skeleton v-for="n in 3" :key="n" height="14px" />
         </div>
-        <!-- 2026-09-01: 空活动流此前是一块无提示的空白卡（用户看到"右边不对劲"
-             的一部分）—— 明确告知什么会产生内容 + 去哪产生。 -->
-        <EmptyState
-          v-if="!recentEvents.length"
-          icon="activity"
-          :title="t('view.overview.noActivity')"
-          :description="t('view.overview.noActivityHint')"
-        />
+        <template v-else>
+          <div v-for="(ev, i) in recentEvents" :key="i" class="activity-item">
+            <div class="activity-dot"></div>
+            <div class="activity-body">
+              <div class="activity-header">
+                <span class="activity-title">{{ ev.title }}</span>
+                <span class="activity-time">{{ ev.time }}</span>
+              </div>
+              <p class="activity-desc">{{ ev.desc }}</p>
+            </div>
+          </div>
+          <!-- 2026-09-01: 空活动流此前是一块无提示的空白卡（用户看到"右边不对劲"
+               的一部分）—— 明确告知什么会产生内容 + 去哪产生。 -->
+          <EmptyState
+            v-if="!recentEvents.length"
+            icon="activity"
+            :title="t('view.overview.noActivity')"
+            :description="t('view.overview.noActivityHint')"
+          />
+        </template>
       </div>
     </div>
 
@@ -212,6 +221,7 @@ let pulseTimer = null;
 
 // Activity timeline data — loaded from /api/info/activity
 const recentEvents = ref([]);
+const activityLoading = ref(true);
 
 async function loadActivity() {
   try {
@@ -222,6 +232,8 @@ async function loadActivity() {
   } catch (e) {
     // Non-critical: activity feed degrades gracefully, no error banner
     console.warn('[overview] activity feed unavailable:', e.message);
+  } finally {
+    activityLoading.value = false;
   }
 }
 

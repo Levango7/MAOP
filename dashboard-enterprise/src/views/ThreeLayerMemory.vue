@@ -57,7 +57,8 @@
             {{ topic.key }} <span class="chip-count">{{ topic.value }}</span>
           </button>
         </div>
-        <EmptyState v-else icon="scroll" :title="t('view.tlmemory.noTopics')" :description="t('view.tlmemory.noTopicDesc')" />
+        <EmptyState v-else-if="!loading" icon="scroll" :title="t('view.tlmemory.noTopics')" :description="t('view.tlmemory.noTopicDesc')" />
+        <Skeleton v-else height="60px" />
       </Card>
       <Card :title="t('view.tlmemory.byAgent')" icon="bot" margin-bottom="var(--sp-4)">
         <div v-if="agentEntries.length" class="chip-list">
@@ -65,7 +66,8 @@
             {{ a.key }} <span class="chip-count">{{ a.value }}</span>
           </span>
         </div>
-        <EmptyState v-else icon="bot" :title="t('view.tlmemory.noAgents')" :description="t('view.tlmemory.noAgentDesc')" />
+        <EmptyState v-else-if="!loading" icon="bot" :title="t('view.tlmemory.noAgents')" :description="t('view.tlmemory.noAgentDesc')" />
+        <Skeleton v-else height="60px" />
       </Card>
       <Card :title="t('view.tlmemory.episodicByOutcome')" icon="activity" margin-bottom="var(--sp-4)">
         <div v-if="outcomeEntries.length" class="chip-list">
@@ -73,7 +75,8 @@
             {{ o.key }} <span class="chip-count">{{ o.value }}</span>
           </span>
         </div>
-        <EmptyState v-else icon="activity" :title="t('view.tlmemory.noOutcomes')" :description="t('view.tlmemory.noOutcomeDesc')" />
+        <EmptyState v-else-if="!loading" icon="activity" :title="t('view.tlmemory.noOutcomes')" :description="t('view.tlmemory.noOutcomeDesc')" />
+        <Skeleton v-else height="60px" />
       </Card>
     </div>
 

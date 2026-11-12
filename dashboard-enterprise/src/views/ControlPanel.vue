@@ -560,13 +560,14 @@ async function upgradeAgent(name) {
 
 async function refreshAll() {
   loading.value = true;
-  await loadJobs();
-  loading.value = false;
-  // 命令行发起的运行不在作业列表里，只能从账本读。不占用 loading，
-  // 免得账本读得慢时把任务输入框一起锁住。
+  // 三路并行：此前 loadRuns/checkUpgrade 排在 await loadJobs() 之后，
+  // 首载时 runsLoading/upgradeLoading 仍是初始 false，空列表被当成
+  // "暂无运行记录"/"暂无更新信息"提前渲染（与真实空态同形，不可分辨）。
+  const jobsPromise = loadJobs();
   loadRuns();
-  // CLI version scanning can be slow; never block the task composer on it.
   checkUpgrade();
+  await jobsPromise;
+  loading.value = false;
 }
 
 onMounted(refreshAll);
