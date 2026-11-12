@@ -107,6 +107,21 @@ class DataProxy(
             from maop.core.backends.data import MaopDatabase
             db = MaopDatabase(get_db_path())
             db.init()
+            # F-8-1 (2026-11-12): the breaker and queue DDLs run only when the
+            # owning class is first instantiated, and the dashboard startup
+            # path never instantiated them, so agent_stats()/live() queried
+            # tables that do not exist on a fresh DB. _query_maop_sync then
+            # swallowed the sqlite error as [] and every breaker column
+            # misreported "closed" (config fallback), open_circuit_breakers
+            # stayed [] and queue_depth stayed 0. Build the tables with the
+            # owners' own constructors against the same paths the query layer
+            # reads, so unified and per-module modes both land the DDL where
+            # the queries look. Idempotent: CREATE TABLE IF NOT EXISTS, and
+            # breaker seeding only when the state table is empty.
+            from maop.core.reliability.circuit_breaker import CircuitBreaker
+            from maop.core.reliability.message_queue import MessageQueue
+            CircuitBreaker(get_db_path())
+            MessageQueue(db_path=get_db_path("queue"))
         except Exception as exc:
             # H1 (2026-07-22, Phase H): log the exception instead of silently
             # swallowing it, so schema-init failures surface in logs and are
