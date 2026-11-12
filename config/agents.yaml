@@ -470,7 +470,7 @@ agents:
     - explain
     category: specialized
     cli: pi
-    cli_args: '{task}'
+    cli_args: '-p "{task}"'
     description: Pi v0.81.1 (Earendil Works, ~12s cold start)
     driver: cli
     model: auto

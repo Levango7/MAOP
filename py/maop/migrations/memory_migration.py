@@ -176,6 +176,13 @@ def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
     return cur.fetchone() is not None
 
 
+# _migrate_table 的表名白名单：表名逐字进入 f-string SQL（无占位可绑），
+# 只放行迁移入口实际使用的四张表。
+_MIGRATABLE_TABLES = frozenset(
+    {"memory_entries", "memory_traces", "memory_trajectory", "episodic_memory"}
+)
+
+
 def _table_columns(conn: sqlite3.Connection, table: str) -> list[str]:
     cur = conn.execute(f"SELECT * FROM {table} LIMIT 0")  # nosec B608 — 表名/列名来自迁移元数据自省（已人工核）
     return [d[0] for d in cur.description] if cur.description else []
@@ -233,7 +240,12 @@ def _migrate_table(
 
     使用 ``INSERT OR IGNORE`` 保证幂等。源与目标列定义可以不同——只迁移
     交集列，源独有列被丢弃，目标独有列使用默认值。
+
+    *table* 逐字进入 ``SELECT * FROM {table}`` 等 f-string（无占位可绑），
+    只放行 ``_MIGRATABLE_TABLES`` 白名单。
     """
+    if table not in _MIGRATABLE_TABLES:
+        raise ValueError(f"table {table!r} is not migratable")
     result = TableMigrationResult(
         table=table,
         source=str(src_path),

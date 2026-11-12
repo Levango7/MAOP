@@ -35,6 +35,11 @@ from fastapi.testclient import TestClient
 
 from maop.core.evolution.evolution_loop import EvolutionLoop
 from maop.core.evolution.evolution_loop_types import LoopPhase
+from maop.core.reliability.bb_health import (
+    BlackboardHealthMonitor,
+    get_health_monitor,
+    set_health_monitor,
+)
 from maop.delegate.dispatch_debate import (
     Adjudicator,
     CrossExamination,
@@ -920,3 +925,61 @@ async def test_acceptance_8_auditability():
     for round_ in retrieved.rounds:
         assert hasattr(round_, "positions")
         assert hasattr(round_, "consensus_score")
+
+
+@pytest.mark.asyncio
+async def test_debate_completion_records_health_counters():
+    """接线审计钉子（2026-11-11）：辩论完成须计入黑板健康面。
+
+    此前 record_debate 全仓零调用 ⇒ snapshot() debates 恒为 0；
+    去掉 dispatch_debate 收尾处的接线后本测试转红。
+    """
+    set_health_monitor(BlackboardHealthMonitor())
+    try:
+        responses = {
+            "proposer": '{"stance": "support", "argument": "proposal is good", "confidence": 0.9}',
+            "critic_a": '{"stance": "support", "argument": "agree", "confidence": 0.85}',
+            "critic_b": '{"stance": "support", "argument": "agree", "confidence": 0.88}',
+        }
+        debate = DebateDispatcher(
+            _MockDispatcher(responses),
+            config=DebateConfig(max_rounds=3, min_rounds=1),
+        )
+        verdict = await debate.run_debate(
+            "Should we deploy?",
+            ["proposer", "critic_a", "critic_b"],
+        )
+        assert verdict.consensus is True
+        d = get_health_monitor().snapshot()["debates"]
+        assert d["rounds"] == len(verdict.rounds)
+        assert d["converged"] == 1
+    finally:
+        set_health_monitor(None)
+
+
+@pytest.mark.asyncio
+async def test_debate_stalemate_records_not_converged():
+    """接线审计钉子：未收敛辩论计 converged=0，轮次照实入账。"""
+    set_health_monitor(BlackboardHealthMonitor())
+    try:
+        responses = {
+            "proposer": '{"stance": "oppose", "argument": "no", "confidence": 0.6}',
+            "critic_a": '{"stance": "oppose", "argument": "no", "confidence": 0.7}',
+            "critic_b": '{"stance": "oppose", "argument": "no", "confidence": 0.65}',
+        }
+        debate = DebateDispatcher(
+            _MockDispatcher(responses),
+            adjudicator=Adjudicator(),
+            config=DebateConfig(max_rounds=2, consensus_threshold=0.90, min_rounds=1),
+        )
+        verdict = await debate.run_debate(
+            "Should we deploy?",
+            ["proposer", "critic_a", "critic_b"],
+        )
+        assert verdict.consensus is False
+        d = get_health_monitor().snapshot()["debates"]
+        assert d["rounds"] == len(verdict.rounds)
+        assert d["rounds"] >= 1
+        assert d["converged"] == 0
+    finally:
+        set_health_monitor(None)

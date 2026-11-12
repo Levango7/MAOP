@@ -1608,6 +1608,7 @@
 - **rebase 链（对账用）**：46caf633→d3ed1415、386dfc3b→3d067d4b、76596808→1d8d23aa、06702e78→a64e6aa0；force-push --force-with-lease 已在 #270 PR 内注明。
 - **交付内容**：纯板面两 NOTE（批 7 复验：52 路由重跑同态、#266 修复现役；批 8：Q4 空态 0 命中 / Q1 写路径 E2E 过 / F-8-1 静默降级登记），无代码改动、无版本站触碰。
 - **验收回指**：两 NOTE 证据链不变（探针 /f/tmp/maop-master-verify-*、/f/tmp/maop-b8-*）；F-8-1 修法待 ZCode 认领或用户裁定。
+- **NOTICE v5.7.0 tag 结果登记＋更正陈旧口径（2026-11-11T22:48:03Z）**：tag run 42936085758 completed/success＝31 腿（26 success＋5 设计内 skipped：Compose Smoke／Container Scan (trivy)／Docker build／Publish tag (manual)／Required checks satisfiability canary），零红。**Publish to PyPI 实跑 success**——据此更正上一条 NOTICE「如实登记预期红：tag run Publish to PyPI（trusted publisher 未配…）」之陈旧口径：v5.5.0/v5.6.0/v5.6.1 tag run 该腿均 success、v5.6.1 Release 资产在案，trusted publisher 早已配置，「预期红」不成立。tag v5.7.0（annotated 对象 f4ebd628）→3b77772（＝打 tag 时 master tip）。Release「MAOP v5.7.0」已 publish（非 draft／非 prerelease），双资产 maop_orchestrator-5.7.0-py3-none-any.whl 3,809,597 B／maop_orchestrator-5.7.0.tar.gz 4,889,931 B；本机下载实核 sha256 whl=f368ea927c3c58860a5950c632dea69ad76c1eb2a8d0e6e957a01a7cda281e71、tar.gz=1e76f60e595461d2f51ed4ab9c83e80d98e279c8116f8262ef86e2e1a2851717，wheel METADATA Version=5.7.0。PyPI maop-orchestrator 5.7.0 已上架，两资产 sha256 与 GitHub Release 逐字节一致，latest=5.7.0。注：tag 后 master 已前进（#269/#270/#271/#272 等），v5.7.0 为 3b77772 快照，其后改动属下一版。
 
 ## 领地登记（Qoder-CN 会话 17ef022a，2026-11-12：批 4b——deferred 口味三项开批）
 - **授权**：用户 2026-11-12「允许你开」「能做的都做吧」（接批 4 交付回执「未做」行与批 7/8 NOTE 遗留：pending 态泛化/长列表虚拟化/他页 idle 降级待裁决开批）。F-8-1 归 ZCode（用户亲自催），本批不碰。

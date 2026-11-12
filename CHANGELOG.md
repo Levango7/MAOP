@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.7.0] — 2026-11-11
+
 ### 修 loop 级 token 双计数（并行路径 `[USAGE]` 虚报 2x，2026-11-08）
 
 核 #232 提交记录时发现（本线板面登记先于修复）：`_execute_parallel` 聚合处

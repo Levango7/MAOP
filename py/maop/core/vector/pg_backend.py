@@ -403,6 +403,11 @@ class PgVectorBackend(VectorBackend):
             itype = self._index_type
 
         idx_name = opts.pop("index_name", self._index_name) or self._default_index_name(itype)
+        # The name is interpolated verbatim into the CREATE INDEX SQL below
+        # (CONCURRENTLY forbids bind parameters), so validate at entry — the
+        # DROP-path check alone must not be the only guard.
+        if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", idx_name):
+            raise ValueError(f"invalid index name: {idx_name!r}")
         # Drop existing index (concurrently, non-blocking).
         if not self._drop_index_concurrently(idx_name):
             return False
