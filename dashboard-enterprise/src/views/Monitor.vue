@@ -37,6 +37,9 @@
               <span class="agent-load">{{ a.load }}%</span>
             </div>
           </div>
+          <div v-else-if="firstLoad" class="resource-skel">
+            <Skeleton v-for="n in 4" :key="n" height="20px" />
+          </div>
           <EmptyState v-else icon="bot" :title="t('view.monitor.noAgentStatus')" :description="t('view.monitor.noAgentStatusHint')" />
         </Card>
 

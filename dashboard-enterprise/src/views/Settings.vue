@@ -144,7 +144,7 @@
         </div>
         <div class="setting-row">
           <span class="setting-label">{{ t('view.settings.port') }}</span>
-          <span class="setting-value">{{ config.dash_port || 9079 }}</span>
+          <span class="setting-value">{{ config.dash_port || '—' }}</span>
         </div>
         <div class="setting-row">
           <span class="setting-label">TLS</span>

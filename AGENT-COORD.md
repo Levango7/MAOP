@@ -1616,3 +1616,28 @@
 - **钉法**：新钉文件测 fresh-DataProxy 后四表存在 + 插 probe 行（open breaker / pending queue message）后 agent_stats 的 circuit_breaker 列与 live() 的 open_circuit_breakers / queue_depth 如实反映（拆修复转红、恢复绿）。
 - **隔离环境**：自有实例 :9082 + MAOP_DATA_DIR=F:/tmp/maop-f81/pre（空库），批 5 配方；他线 9079 后端与 :5174 vite 不碰；证据落 F:/tmp/maop-f81/。
 - **基线**：master e7a9b1e8（v5.7.0 后 #274 merge），净树。
+
+## 领地登记（Qoder-CN 会话 17ef022a，2026-11-12：批 4b——deferred 口味三项开批）
+- **授权**：用户 2026-11-12「允许你开」「能做的都做吧」（接批 4 交付回执「未做」行与批 7/8 NOTE 遗留：pending 态泛化/长列表虚拟化/他页 idle 降级待裁决开批）。F-8-1 归 ZCode（用户亲自催），本批不碰。
+- **范围**（dashboard-enterprise/src/** 默认归 Examples/Nex 领地；本批按用户授权 scoped 登记。Nex 在途前端 PR 为零——OPEN 仅 #273 ZCode 接线审计/#240 pi 参数，均不交叠；如施工期撞车按「追加日志保留双方」rebase）：
+  - pending 态泛化：Overview 加载三分支（be226d00 骨架）向其余异步拉取页推广——先取证哪几页加载态裸露，只修实证裸露者
+  - 长列表虚拟化：先取证哪条列表真实长（行数量级），再定方案；不臆造需求
+  - 他页 idle 降级：忠实 idle payload（全零+空数组+timeseries:[]）下复刻 .ov-idle 说明条模式（1699721d）到同态页
+  - S-2 只读取证（不动活库）：核 GAP-2 sim 库存量 <unknown> firing 行（received_at 1793746430）现状与清理路径；清库/独立 test receiver 归 owner（py/** ZCode）或用户裁定
+- **板面纠错（追加留痕）**：批 7/批 8 NOTE 遗留行「agnes-2.5-pro 存量价待用户点名」已过期——批 6 裁决 2 已按官网刊例对齐（f891828a 0.01/0.03→0.00045/0.0009）并销账（本板 1342 行），本批不重复施工。
+- **证据先行**：真栈隔离实例（:9081 + 批 5 配方）+ 浏览器 DOM 断言 + 截图；假阳性剔除写明理由；每项修法带 before/after 实测；探针 /f/tmp/maop-b4b-*。
+- **不碰**：后端 py/、CI/CD、分支保护、版本站、他线在途 PR；i18n 优先复用既有 key，新增文案走双语 key。
+- **批次**：CLAIM → 取证 → 分项提交 → 门禁（vitest/eslint/vue-tsc/design:contrast）+ 浏览器复跑 → 回执带 sha。
+
+## 批 4b 交付回执（2026-11-12T02:15Z）— 分支 ui/b4b-taste-deferred，本地三笔未推（推送未授权）
+- **8215c1ea** fix(dashboard): 首载 pending 态骨架化——4 页空数据话术不再伪装加载中（Overview.vue 图表/活动流骨架+角标撤下、ControlPanel.vue:561 三路并行、ThreeLayerMemory.vue:60,68,76、Monitor.vue:40 firstLoad 骨架）
+- **f35504c8** fix(dashboard): idle 零值不编造——5 页计算型指标改 '—' 守卫（Cost.vue:40、Evolve.vue:19 单位随值收口+:226 零次演化+趋势/热力/世系三区骨架、AlertRules.vue:342-350 null 守卫、Analysis.vue:50,58+successRateTone:412、Settings.vue:147）
+- **他页 idle 降级的实证形态**：同态页的病灶不是缺说明条，而是计算型指标把无基数除法渲染成 0（成功率/均延迟/误报率）与前端硬编码兜底（端口 9079）；修法＝'—' 守卫+真实零保留（计数/$0.00）+企业版门控空态不动。/home 的 .ov-idle 说明条模式已在批 3 落地，本批不重复搬移。
+- **长列表虚拟化＝实证 no-op**：probe5 全路由取证各页列表行数量级均为个位/十位（runs/agents/rules/history 均 <20 行），无可虚拟化长列表，按 CLAIM「先取证、不臆造需求」不施工。
+- **浏览器复跑**：探针 /f/tmp/maop-b4b6/probe6.js（与 probe5 同法同栈：真栈 :9081 隔离实例 + SHELL 即时 + /api/** 延迟 1200ms + 忠实 idle payload）→ probe6-facts.json + shots6/p6_*/i6_*；断言 /f/tmp/maop-b4b6/assert6.js **pass=38 fail=0 skip=0**。before＝probe5.json（修复前 dist 同法取证）。
+- **假阳性剔除（带理由）**：/run/agents 6s 空白=冷懒加载 chunk（栈件）；/capability/evolve 在 probe5 NAV-FAIL=栈瞬态（probe6 同栈复跑正常）；Models.vue 6/7 /api/model/* 挂起=栈瞬态（curl 200 0.92s）；Agents 扫描区「尚未扫描」/AgentBilling 无智能体门控/Integrations 企业版门=输入驱动或设计内静止态；Debate /api/debate/history 404=已有 historyUnconfigured 门；/audit=企业版重定向设计内；/capability/agent-recommend、/docs、/run/workflow、/capability/examples=STATIC 无异步面。
+- **probe6 新实证并入本批**（同罪同策，随 f35504c8 施工）：Evolve 趋势/热力/世系三区 pending 露「暂无调优数据/暂无配置变更记录」→ 骨架化；Analysis 成功率 '—' 被 successRateTone 着失败色 → 零任务基数时撤色。
+- **环境件（如实登记，未改码）**：① /api/agent/upgrade 在隔离栈恒挂起（curl 无响应、服务端无完成日志；py/maop/dashboard/routers/system/agent_admin.py 派生 CLI 探测，属 ZCode 领地 py/**，只登记不动手）→ /run 升级区骨架常驻为诚实 pending，probe5 同栈同态；② probe6 首跑 /home、/analysis 各有一路请求在浏览器侧消失（diag.js 单路由复跑完整 200），判拦截层瞬态，复跑后双相数据齐备；③ /api/analysis/performance-bottlenecks 慢 6.1s 但 200。
+- **门禁**：vitest 0 错 / eslint 0 / vue-tsc 0 / design:contrast 164 对全过（两笔提交同一终态树上跑）。
+- **未触碰**：py/、后端、CI/CD、分支保护、版本站、他线在途 PR；data/admin_password_once.txt（他人未提交件）与 skills/ 未纳入任何提交；i18n 无新增文案（复用既有 key，'—' 为字符非文案）。S-2 只读取证已在 #140 落板，本批不重复。
+- **推送回执（2026-11-12T04:09Z）**：用户口头授权推送后，提交链 3b93a75a…8188a740 已推 origin/ui/b4b-taste-deferred（推送前核验：远程 Levango7/MAOP、分支/提交链/工作树净；推送后 remote head=8188a740 与本地 HEAD 一致）。本回执笔随后同推。未开 PR、未合并（无授权）。
