@@ -389,6 +389,15 @@ class TestPgVectorBackend:
         with pytest.raises(ValueError, match="invalid index name"):
             b.rebuild_index(index_name="bad name!")  # type: ignore[arg-type]
 
+    def test_rebuild_index_entry_check_independent_of_drop(self, monkeypatch) -> None:
+        eng = _make_mock_engine()
+        b = PgVectorBackend(engine=eng, dimension=None)
+        # Defense in depth: entry validation must not rely on the DROP path
+        # running its own check first.
+        monkeypatch.setattr(b, "_drop_index_concurrently", lambda name: True)
+        with pytest.raises(ValueError, match="invalid index name"):
+            b.rebuild_index(index_name="bad name!")  # type: ignore[arg-type]
+
     def test_close_disposes_owned_engine(self) -> None:
         eng = _make_mock_engine()
         b = PgVectorBackend(engine=eng)

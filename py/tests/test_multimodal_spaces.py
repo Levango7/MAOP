@@ -112,6 +112,12 @@ def test_spec_validates_its_own_fields() -> None:
         MultimodalSpaceSpec(name="", table_name="x_entries")
 
 
+def test_spec_rejects_non_identifier_table_name() -> None:
+    # Validation must fire at the spec, not only downstream in the backend.
+    with pytest.raises(ValueError, match="invalid table name"):
+        MultimodalSpaceSpec(name="x", table_name="audio; DROP TABLE x")
+
+
 # ── DDL: defaults unchanged, second space derived ──────────────
 
 
