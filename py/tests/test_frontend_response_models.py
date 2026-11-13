@@ -208,10 +208,73 @@ def _iter_url_literals(text: str) -> list[tuple[str, int]]:
 
 
 def strip_comments(text: str) -> str:
-    text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
-    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.DOTALL)
-    text = re.sub(r"^\s*//.*$", " ", text, flags=re.MULTILINE)
-    return text
+    """Strip JS/HTML comments without being fooled by comment markers in strings.
+
+    正则实现有两个结构性缺陷（2026-11-13 实测，导致 3 个文件 9 条调用失明）：
+
+    1. 块注释正则先于行注释执行，`// ... loop/* ...` 里的 `/*` 会开启一个幽灵
+       块注释，吞掉到下一个 `*/` 之间的**全部代码**；
+    2. 不感知字符串/模板串/HTML 属性，`accept="image/*"`、`'docs/**/*.md'`
+       同样会开启幽灵注释。
+
+    因此改为逐字符状态机：只有不在引号内时，`//` 与 `/*` 才被当作注释起点。
+    注释替换为单个空格以保留 token 边界。
+    """
+    out: list[str] = []
+    i, n = 0, len(text)
+    state: str | None = None  # None / "'" / '"' / '`' / "//" / "/*" / "<!--"
+    while i < n:
+        ch = text[i]
+        two = text[i:i + 2]
+        if state is None:
+            if text[i:i + 4] == "<!--":
+                state = "<!--"
+                i += 4
+                out.append(" ")
+                continue
+            if two == "//":
+                state = "//"
+                i += 2
+                out.append(" ")
+                continue
+            if two == "/*":
+                state = "/*"
+                i += 2
+                out.append(" ")
+                continue
+            if ch in "'\"`":
+                state = ch
+            out.append(ch)
+            i += 1
+        elif state == "<!--":
+            if text[i:i + 3] == "-->":
+                state = None
+                i += 3
+                out.append(" ")
+            else:
+                i += 1
+        elif state == "//":
+            if ch == "\n":
+                state = None
+                out.append(ch)
+            i += 1
+        elif state == "/*":
+            if two == "*/":
+                state = None
+                i += 2
+                out.append(" ")
+            else:
+                i += 1
+        else:  # inside a quoted string: comment markers are literal
+            out.append(ch)
+            if ch == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == state:
+                state = None
+            i += 1
+    return "".join(out)
 
 
 def _rhs_end(text: str, pos: int) -> int:
@@ -797,3 +860,67 @@ def test_a_non_overlay_import_failure_is_never_downgraded() -> None:
     assert overlay_only_modules({"sso": OVERLAY_IMPORT + ".sso_store"}, ("sso",)) == {}
     with pytest.raises(RuntimeError):
         overlay_only_modules({"broken_router": "some_other_package"})
+
+
+# ── 注释剥离的回归守卫（2026-11-13）────────────────────────────────────────
+# 原实现用三个正则按「HTML → 块注释 → 行注释」顺序剥离，且不感知字符串。
+# 于是 `// ... loop/*`、`accept="image/*"`、`'docs/**/*.md'` 里的 `/*` 都会
+# 开启一个幽灵块注释，吞掉到下一个 `*/` 之间的**全部代码**。实测在
+# dashboard-enterprise 上导致 3 个文件、9 条调用完全失明（EvolutionHistory.vue
+# 一个文件就丢了 6 条，且恰好是连续的一段）。
+#
+# 这四条把「剥离器不得越界」钉死：标记之后的真实代码必须仍然可见。
+
+
+def _calls_after_marker(snippet: str) -> set[tuple[str, str]]:
+    """把片段写进临时目录，走真实抽取链路，返回识别到的调用。"""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "probe.js").write_text(snippet, encoding="utf-8")
+        calls, _ = scan_source_dir(root)
+    return calls
+
+
+def test_line_comment_containing_block_opener_does_not_swallow_code() -> None:
+    """`// ... loop/*` 里的 `/*` 不得开启幽灵块注释。
+
+    必须让片段里**存在后续的 `*/`**，否则旧实现的正则匹配不上、不会吞代码，
+    这条守卫就测不到东西（第一版就是这么写成摆设的）。
+    """
+    snippet = (
+        "// 此前前端零页面调用 /api/evolution/loop/* —— 说明文字\n"
+        "const a = await api.get('/api/evolution/loop/status');\n"
+        "/* 下方是真正的块注释，它提供了幽灵注释的终止符 */\n"
+        "const b = await api.post('/api/evolution/loop/trigger', {});\n"
+    )
+    calls = _calls_after_marker(snippet)
+    assert ("GET", "/api/evolution/loop/status") in calls
+    assert ("POST", "/api/evolution/loop/trigger") in calls
+
+
+def test_string_literal_containing_block_opener_does_not_swallow_code() -> None:
+    """HTML 属性里的 `/*` 同样不得开启幽灵块注释（同样需要后续 `*/`）。"""
+    snippet = (
+        '<input type="file" accept="image/*" />\n'
+        "const d = await api.get('/api/chat/sessions');\n"
+        "/* 真正的块注释 */\n"
+        "const e = await api.get('/api/live/two');\n"
+    )
+    calls = _calls_after_marker(snippet)
+    assert ("GET", "/api/chat/sessions") in calls
+    assert ("GET", "/api/live/two") in calls
+
+
+def test_real_comments_are_still_removed() -> None:
+    """收紧剥离器不能把真注释放过去——注释里的路径不得算作调用。"""
+    snippet = (
+        "/* 块注释：旧实现调 /api/legacy/one */\n"
+        "<!-- HTML 注释：/api/legacy/two -->\n"
+        "// 行注释：/api/legacy/three\n"
+        "const d = await api.get('/api/live/one');\n"
+    )
+    calls = _calls_after_marker(snippet)
+    assert ("GET", "/api/live/one") in calls
+    assert {path for _verb, path in calls} == {"/api/live/one"}
