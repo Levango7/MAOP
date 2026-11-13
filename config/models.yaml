@@ -114,6 +114,8 @@ models:
   # （官方价目表已下架，M2.x 退役）、mimo-v2.5（官方公告 2026-10-21 下线、旧名
   # 失效）、deepseek-v4-flash-free（第三方免 Key 渠道别名，非 DeepSeek 官方
   # SKU）、omniroute-auto-coding（网关路由别名，无单一列表价）。
+  # agnes-2.0-flash：agnes 族未计价保留（早前用户裁定），agents.yaml:271 引用
+  # 的豁免登记，不入表（批 7 门禁 M1 认此行）。
   MiniMax-M3:
     model_id: MiniMax-M3
     provider: minimax
