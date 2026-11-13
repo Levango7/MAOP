@@ -1659,3 +1659,9 @@
 
 ## 更正（2026-11-13T04:39:07Z）— 合并回执三笔标题时间戳笔误
 - 5390a86c 那笔「合并回执三笔」标题写成「2026-11-12T2026-11-12T15:17:26ZZ」，实为落板时刻 2026-11-12T15:17:26Z（时间模板替换残留）；段内 sha/计数/时间均原样有效。本更正纯追加 1 节，不改他线行。
+
+## 存量项当前态复核（S-2 / agnes-2.5-pro，2026-11-13T07:05:23Z，只读取证）
+- **基点**：origin/master 0aec580a（trunk run 43367360635 completed/success）。授权＝用户本轮点名两项存量核查；范围＝只读，零活库写入、零代码改动。
+- **S-2 当前态**：板面 #140 结论（该行系修复前落库，建议清理 sim 采集写库或独立 test receiver）维持有效；本次复核＝现存三处 maop.db（仓库 data/、py/data/ 无 alert 表、/f/tmp/maop-a3-data）alertmanager_alerts 行数 0／无表／0，`<unknown>` 零命中；sim home 由 run_sim.py:454 `shutil.rmtree` 用后即删，received_at 1793746430（=2026-11-03T22:53:50Z）行随 home 清理物理消失 ⇒ 清理路径＝无需清理（设计内生命周期）；代码守卫已在（alert_ingest.py:146-171 unnamed 计数+WARN，落库兼容保留）。无遗留动作。
+- **agnes-2.5-pro 当前态**：config/models.yaml:78-85 现值 cost_per_1k_input 0.00045 / output 0.0009，带官网来源批注（fetched_at 2026-11-09）；f891828a 为 master 祖先（merge-base --is-ancestor YES），批 6 回执已销账（本板 1342 行）。如实登记：本机 egress 受限，https://agnes-ai.com/zh-Hans/docs/pricing 当页复取失败（WebFetch fetch failed），活价再核对以 11-09 取证记录为准；models.yaml 批注「现价同刊例价」为彼时状态。
+- **台账卫生**：本线任务 #78/#79 系批 7/8 NOTE 遗留行的 stale 复登（板面早已销账），本次复核后按已闭环关闭，不重复施工。
