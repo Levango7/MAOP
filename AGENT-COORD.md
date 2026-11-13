@@ -1656,3 +1656,35 @@
 - **验收回指**：F:/tmp/maop-f81/——隔离实例 :9082 前后对照（修前 9 表 + stats 全 closed 错报 → 修后 22 表，seeded open breaker failures 7/threshold 3 如实反映、queue_depth 0→1，探针行已清；post-verify.json）；钉子测试 3 绿（拆修复转红/恢复绿）+ 变异电池闭环 + 相邻回归 135 passed；六道本机门全绿（ruff / mypy 622 文件 / config-drift 241==241 / silent-exception 1072-46-0 / file-size 800 行 / docs gate）。
 - **Mimosa 深审回指**：F:/tmp/maop-f81/mimosa-triage.md（scan-2026-11-12T10-16-26.421Z-262dedc32714，seal sha256:c250affe4da635b55565502cef8d0f2f9412b719b6774c07def81c966edfa109）：59 条 findings＝58 误报 + 1 已接受·未接线（sandbox_executor.py:405，生产引用 0）＋**0 真缺口**；本线 diff 两文件零命中。**不宣称项目安全**：static-only 投影（evidenceBoundary=static_only_no_runtime_execution）、run inconclusive、nativeMain 不可用＝引擎边界；发布前仍须重跑完整审计（hook 每次 commit/push 前亦提醒）。
 - **未立项积压（不自启）**：P2-3 懒加载 loading / P3-1 骨架屏 / models.yaml 定价或配置漂移门禁；paused automation-78c5e768 保持停。
+
+## 批 4b 合并后 trunk 动态复验（A2）+ 用户四问终报（A3）— 2026-11-13（Qoder-CN 17ef022a）
+
+**动机**：用户令「就按推荐走 A2+A3」。A2＝#135 先例的合并后 trunk 动态复验（44 路由 probe + 9 路由 38 条外部化断言）；A3＝用户四问终报。**纯验证零改动**：运行时树＝5390a86c（拉取时 origin/master，git diff 空逐字一致）；产物原存 /f/tmp/maop-a2（已被 /f/tmp 周期清理，如实登记；数字以本回执与转录回放为准）+ gitignored dist 重建；他线 9079/5174 未碰；栈进程按 cmdline=maop.dashboard.server + cwd 核 PID 后 taskkill，停后 :9081 已关。
+
+**环境**：批 5 隔离配方 MAOP_AUTH_ENABLED=0 MAOP_OWNER_MODE=1 MAOP_MULTIMODAL_PROVIDER=hash MAOP_DASH_PORT=9081 MAOP_DATA_DIR=F:/tmp/maop-a2-data（独立 :9081 + 空库）；SPA＝dashboard-enterprise `npm run build`（exit 0）→ dashboard/dist-enterprise。收板时 origin/master＝f7aacf90（ZCode docs-only #275 回执，非本复验对象）。
+
+**A2 结果**（probe7，44 路由 pending/idle 双相 + 逐请求状态/延迟；BEFORE＝批 5 前 probe5，原始 JSON 随 /f/tmp 清理已失，数字以转录回放逐路由核对为准，如实登记）：
+
+| 相 | LOADING-OK | STATIC | PENDING-DIFFERS | REDIRECT | NAV-FAIL | EMPTY-MASQUERADE |
+|---|---|---|---|---|---|---|
+| BEFORE | 35 | 4 | 3 | 1 | 1 | 0 |
+| AFTER（5390a86c） | 37 | 4 | 2 | 1 | 0 | 0 |
+
+- 翻正两条：/run/agents PENDING-DIFFERS(pendFb=0)→LOADING-OK(pendFb=8)；/capability/evolve NAV-FAIL→LOADING-OK（before 的 NAV-FAIL 是当时栈瞬态，非代码）。
+- residual 两条如实解释（非缺陷）：/settings pending「端口 = —」→ idle 真实 9081（config 未回不编 9079，Settings.vue:147 守卫）；/operate/integrations 企业版三元门（pending「需要企业版」→ idle「未安装」，edition.js:15,18）。
+- /audit REDIRECT＝个人版守卫设计行为，before/after 一致；STATIC 4 条不变。
+- assert7（9 路由 38 条外部化断言）＝38/38/0。
+
+**拦截层瞬态（如实登记）**：sweep 中 /home、/analysis 出现「请求达服务端 200、Playwright response 事件丢失」瞬态；同栈零延迟复跑 diag7b：home 2/2、analysis 6/6 全 200、failed=0、idle 渲染真实（idleFb=0）→ 定性拦截层偶发，非应用缺陷。直连 curl 佐证：/api/overview 74ms 200、/api/analysis/summary 37ms 200、/api/analysis/perf-bottlenecks 5.7s 200（与批 8 登记慢端点一致）。
+
+**F-8-1 trunk 已修（非我线）**：1e6ef916/#275，py/maop/dashboard/data_proxy.py:104 `_ensure_db_schema` 启动自愈建 circuit_breaker_state 等 4 表 + 101 行测试。本栈空库启动后 4 表齐 + run_events 在，修复实证生效。
+
+**A3 四问终报**：
+1. 前后端请求响应/数据流转——正常。44 路由复验全绿（上表）；soak 1039 轮 99.90% 成功、协议行 vs 成本表 1038/1039 对账、token 2,227,811==2,227,811（business-sim-soak-evidence.md）；直连 curl 三端点 200。
+2. 排版对齐——静态面无异常：54 路由组件全存在、9 处 hex 均 var(--x,#fallback)、0 处 catch{} 空吞、0 处 TODO/FIXME（quality-audit-2026-11-07 §二）；双相截图证 pending 骨架→idle 真值两级渲染。
+3. 按钮/拖拽/滚动反馈——**点击级抽查未做（如实遗留）**；已证层面：骨架/加载/空态/'—' 守卫运行时实证（assert7 38/38）。
+4. AI 味——已消化于批 4b/5 修复：空数据降级（空态不伪装「暂无XX」）、零值不编造（'—' 守卫）、企业版门三元文案；残项＝交互态抽查与措辞统一级收尾。
+
+**结论**：批 4b 修复（8215c1ea 骨架化 + f35504c8 '—' 守卫，合入 e490a7f7/#276）在 trunk 生效，A2 零回归；用户四问三问硬证据闭环，唯一点击级抽查遗留。
+**遗留**：① 10 高频页点击/拖拽/滚动反馈浏览器点击级抽查（下轮起）；② 企业版门文案显著性（措辞级）。
+**收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送将起新 trunk run，其 required 四件绿为最终收口，本回执不宣称 CI 绿。
