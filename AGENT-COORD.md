@@ -1656,3 +1656,6 @@
 - **验收回指**：F:/tmp/maop-f81/——隔离实例 :9082 前后对照（修前 9 表 + stats 全 closed 错报 → 修后 22 表，seeded open breaker failures 7/threshold 3 如实反映、queue_depth 0→1，探针行已清；post-verify.json）；钉子测试 3 绿（拆修复转红/恢复绿）+ 变异电池闭环 + 相邻回归 135 passed；六道本机门全绿（ruff / mypy 622 文件 / config-drift 241==241 / silent-exception 1072-46-0 / file-size 800 行 / docs gate）。
 - **Mimosa 深审回指**：F:/tmp/maop-f81/mimosa-triage.md（scan-2026-11-12T10-16-26.421Z-262dedc32714，seal sha256:c250affe4da635b55565502cef8d0f2f9412b719b6774c07def81c966edfa109）：59 条 findings＝58 误报 + 1 已接受·未接线（sandbox_executor.py:405，生产引用 0）＋**0 真缺口**；本线 diff 两文件零命中。**不宣称项目安全**：static-only 投影（evidenceBoundary=static_only_no_runtime_execution）、run inconclusive、nativeMain 不可用＝引擎边界；发布前仍须重跑完整审计（hook 每次 commit/push 前亦提醒）。
 - **未立项积压（不自启）**：P2-3 懒加载 loading / P3-1 骨架屏 / models.yaml 定价或配置漂移门禁；paused automation-78c5e768 保持停。
+
+## 更正（2026-11-13T04:39:07Z）— 合并回执三笔标题时间戳笔误
+- 5390a86c 那笔「合并回执三笔」标题写成「2026-11-12T2026-11-12T15:17:26ZZ」，实为落板时刻 2026-11-12T15:17:26Z（时间模板替换残留）；段内 sha/计数/时间均原样有效。本更正纯追加 1 节，不改他线行。
