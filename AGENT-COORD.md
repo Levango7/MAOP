@@ -1673,3 +1673,4 @@
 - **发现 2（已知边界，非缺陷）**：`usage_format` 仅 copilot 声明（agents.yaml:143-144），其余 CLI 无原生 usage 出口接线＝模块注记文档化边界。
 - **遗留产品项（不变）**：models.yaml 未定价模型补价需真实单价（用户裁决数据源，本线不臆造）。
 - **建议**：发现 1 是否立项交用户裁；如立项由 dashboard 线出手，本线配合出 API 暴露面证据。
+- **补充（2026-11-14T04:27:23Z，同批审计追加）**：发现 1 精确化——`tokens_source` 经 `cost_entries.metadata` 透传（`record_actual_cost` 写入→`_row_to_entry` 读回→`/api/costs/entries` `model_dump` 暴露），后端 API 层**有**暴露；零消费精确发生在 dashboard-enterprise 前端（修复面＝纯前端，无后端改动）。同批新发现 **B（标签覆盖缺口，同族）**：LLM 直连路径 `llm_factory._record_cost` 两分支 metadata 只写 `{"provider":…}`，实测 token 无 `tokens_source` 标签；`billing_abstraction.py:190` 入账行无 metadata。生产库实查（data/maop.db 只读，最新 3 条 cost_entries）metadata 均无 tokens_source/priced ⇒ 现存行多数走无标签路径。A＝前端渲染（dashboard 线领地）；B＝py/** 后端标签（非本线领地）。两项均只登记不越界修，待用户裁立项与归属。
