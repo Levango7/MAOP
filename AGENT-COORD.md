@@ -1665,3 +1665,11 @@
 - **S-2 当前态**：板面 #140 结论（该行系修复前落库，建议清理 sim 采集写库或独立 test receiver）维持有效；本次复核＝现存三处 maop.db（仓库 data/、py/data/ 无 alert 表、/f/tmp/maop-a3-data）alertmanager_alerts 行数 0／无表／0，`<unknown>` 零命中；sim home 由 run_sim.py:454 `shutil.rmtree` 用后即删，received_at 1793746430（=2026-11-03T22:53:50Z）行随 home 清理物理消失 ⇒ 清理路径＝无需清理（设计内生命周期）；代码守卫已在（alert_ingest.py:146-171 unnamed 计数+WARN，落库兼容保留）。无遗留动作。
 - **agnes-2.5-pro 当前态**：config/models.yaml:78-85 现值 cost_per_1k_input 0.00045 / output 0.0009，带官网来源批注（fetched_at 2026-11-09）；f891828a 为 master 祖先（merge-base --is-ancestor YES），批 6 回执已销账（本板 1342 行）。如实登记：本机 egress 受限，https://agnes-ai.com/zh-Hans/docs/pricing 当页复取失败（WebFetch fetch failed），活价再核对以 11-09 取证记录为准；models.yaml 批注「现价同刊例价」为彼时状态。
 - **台账卫生**：本线任务 #78/#79 系批 7/8 NOTE 遗留行的 stale 复登（板面早已销账），本次复核后按已闭环关闭，不重复施工。
+
+## GAP-2 方案 A 现役一致性审计（2026-11-14T03:25Z 落板，只读，零代码改动）
+- **触发**：用户「GAP-2 按方案 A 开工」→ 核对发现方案 A 已随 v5.6.0 交付现役（第十七/十八轮领地登记 + CHANGELOG 四处），直接开工＝重复施工；改为对现役链路做一致性审计后如实回报。
+- **四环核（当前 master 实测）**：① 解析＝`usage_protocol.py` 单权威（`parse_usage_line`/`parse_usage_file`；取值链 原生 usage 文件→协议行→None，与模块 docstring 一致）；② 回填＝`drivers.py` 6 处 `usage=`（CLI 2 + wrapper 4，`resolve_usage` 顺序正确）；③ 对账＝`run_sim.reconcile_usage` 硬门禁当前树实跑 **11/11 success、5429==5429**（与 11-04 修复轮确定性一致）；④ 兜底＝`cost_reconciliation.py` 启发式 measured/mixed/estimated 三标记 + 双 WARNING 原位，无双实现残留（旧 `_budget_reconciliation` 仅注释引用）。GAP-5（fb238279）与 loop 双计数（e77df85b）均 master 祖先，钉测 `test_gap5_parallel_usage` 3 passed（含 820 双计守卫）。
+- **发现 1（真实缺口，显示面）**：`tokens_source` 全链写入（cost_entries.metadata、LoopResult、operator reconcile）但**零消费**——`py/maop/dashboard/` 与 `dashboard-enterprise/src/` 全域 grep 0 命中 ⇒ 成本页 measured/estimated 行渲染不可辨（数据层诚实、呈现层盲目）。归属＝dashboard 线（dashboard-enterprise 归 Examples/Nex 领地），本线只登记不越界。
+- **发现 2（已知边界，非缺陷）**：`usage_format` 仅 copilot 声明（agents.yaml:143-144），其余 CLI 无原生 usage 出口接线＝模块注记文档化边界。
+- **遗留产品项（不变）**：models.yaml 未定价模型补价需真实单价（用户裁决数据源，本线不臆造）。
+- **建议**：发现 1 是否立项交用户裁；如立项由 dashboard 线出手，本线配合出 API 暴露面证据。
