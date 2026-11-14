@@ -1665,6 +1665,16 @@
 - **S-2 当前态**：板面 #140 结论（该行系修复前落库，建议清理 sim 采集写库或独立 test receiver）维持有效；本次复核＝现存三处 maop.db（仓库 data/、py/data/ 无 alert 表、/f/tmp/maop-a3-data）alertmanager_alerts 行数 0／无表／0，`<unknown>` 零命中；sim home 由 run_sim.py:454 `shutil.rmtree` 用后即删，received_at 1793746430（=2026-11-03T22:53:50Z）行随 home 清理物理消失 ⇒ 清理路径＝无需清理（设计内生命周期）；代码守卫已在（alert_ingest.py:146-171 unnamed 计数+WARN，落库兼容保留）。无遗留动作。
 - **agnes-2.5-pro 当前态**：config/models.yaml:78-85 现值 cost_per_1k_input 0.00045 / output 0.0009，带官网来源批注（fetched_at 2026-11-09）；f891828a 为 master 祖先（merge-base --is-ancestor YES），批 6 回执已销账（本板 1342 行）。如实登记：本机 egress 受限，https://agnes-ai.com/zh-Hans/docs/pricing 当页复取失败（WebFetch fetch failed），活价再核对以 11-09 取证记录为准；models.yaml 批注「现价同刊例价」为彼时状态。
 - **台账卫生**：本线任务 #78/#79 系批 7/8 NOTE 遗留行的 stale 复登（板面早已销账），本次复核后按已闭环关闭，不重复施工。
+- **更正（2026-11-13，ZCode 追加留痕，不改写历史）**：上条首版把 P2-3 / P3-1 列为未立项积压系过期信息——二者已由 owner `be226d00`（2026-11-08 12:31）落地并经批 5 运行时 PASS（L1203/L1205 实证在案；L1186「不碰已落地修复本体」条款继续覆盖其代码）。本条首版的真正未立项项仅 models.yaml 定价/配置漂移门禁一项，已按用户「可以，那就做」（2026-11-13）开批 7（见下 CLAIM）。
+
+## 批 7 CLAIM（ZCode 会话，2026-11-13）——models.yaml 定价/配置漂移门禁
+- **授权**：用户「可以，那就做」（2026-11-13，回应 F-8-1 终态汇报三项积压；P2-3/P3-1 经取证已闭环，本批为唯一真未立项项。批 5 CLAIM L1187 原留项「配置漂移门禁（涉 CI 改造，需用户另行授权）」——本批扩展既有 check_config_drift 脚本，ci.yml「Config drift audit」作业原样跑它，**零 CI 改造**）。
+- **范围（一笔一域）**：仅扩展 py/scripts/check_config_drift.py + config/models.yaml 批 6 登记块追加 agnes-2.0-flash 豁免行（纯注释，不改 YAML 结构）+ 新建 py/tests/test_check_config_drift_models.py。禁动：registry.py / loader.py / 任何运行时路径 / agents.yaml / 他线领地。
+- **证据先行（当前漂移面，2026-11-13 实测）**：① 引用覆盖缺口——agents.yaml:271 `model: agnes-2.0-flash` 在 models.yaml 键/注释均无登记；② 存量无来源定价——yi-large / step-3.7-flash 带价无 source 注释（批 6 明文「本批不复核」的既知缺口）；③ provider 特例——gpt-5.4 的 provider openai 不在 providers 段（L142 注释豁免）；④ 加载器容忍——ModelDef 无 extra=allow（schema.py:162），未知键被 registry.py:159 ModelDef(**entry) 静默丢弃（ProviderDef 反为 extra=allow 数据保全，schema.py:135，故不查 providers 段）。
+- **判据（三道半，绑定形态）**：M1 引用覆盖——agents.yaml agents+workflows 的 model 值 ∈ models 键 ∪ 控制值 {auto,native,built-in,n/a}（census 14 distinct 钉测）∪ models.yaml 段级注释登记的未核豁免（批 6 块 4 型号 + agnes-2.0-flash 豁免行）；M2 结构硬规则——键==model_id、成本成对且 >0、provider ∈ providers 段或块内带「provider 仅作来源标注」豁免注（gpt-5.4 先例）；M3 来源注释棘轮——带价条目块内须含 source: + fetched_at，基线 4 条（agnes-2.5-pro/MiniMax-M3/qwen3.5-plus/gpt-5.4）只增不减，既知缺口实名钉死 {yi-large, step-3.7-flash} 防静默增长；M4 未知键——models 条目键须为 ModelDef 声明字段（钉 schema.py 镜像列表，测试交叉核对 ModelDef.model_fields）。
+- **不碰**：已落地修复的代码本体（除非运行时证伪）；models.yaml 定价数值与结构（只加豁免注释行）；agents.yaml 任何行；他线 PR；分支保护/CI/CD；dashboard-enterprise/src/**（Examples/Nex 领地）。
+- **门槛**：钉测+变异电池（19 例：真实 config 字节级副本 sha256 对账 + 单处外科手术编辑 + 绑定形态断言；含段级/字段级注释分流反向钉 step-3.7-flash 假绿陷阱）；本机六道门（ruff/mypy/config-drift/silent-exception/file-size 800/docs gate）；开 PR 后 CI required 四件绿。
+- **批次**：证据先行（本条即证据）；施工→钉测→本机门→提交→PR→CI 守望→DONE 回执带 sha 映射；合并权按板面纪律留用户指令。
 
 ## GAP-2 方案 A 现役一致性审计（2026-11-14T03:25Z 落板，只读，零代码改动）
 - **触发**：用户「GAP-2 按方案 A 开工」→ 核对发现方案 A 已随 v5.6.0 交付现役（第十七/十八轮领地登记 + CHANGELOG 四处），直接开工＝重复施工；改为对现役链路做一致性审计后如实回报。
