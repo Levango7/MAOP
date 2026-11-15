@@ -1697,3 +1697,55 @@
 - **trunk 收口**：合并触发 trunk run 43600910687（head ccc80b9a，2026-11-14T13:40:06Z 起）completed/success（job 级 27 success + 4 设计内 skipped + 0 红：Publish tag manual / Publish to PyPI / Release Assets / Required-canary；守望日志 round 8 与 gh 直查双证）。
 - **未立项积压（不自启）**：无新增（本批为唯一真未立项项，已闭环）；paused automation-78c5e768 保持停。
 - **落板纪律**：本回执随 docs-only 笔（仅 AGENT-COORD.md）推 master，起新 trunk run，其 required 四件绿为最终收口；落板前核 origin/master＝ccc80b9a 且本追加在 EOF，不覆盖任何他线行。
+
+## DONE 回执（Nex 会话，2026-11-15）— PR #279 已合入 master，前端调用抽取器注释剥离缺陷修复（非「批」序列，单独立项，不占批号）
+
+- **sha 映射**：源提交 `c04e711b`（`fix/frontend-strip-comments-order`，基于 `9e73272f`）→ 与
+  `9e73272f..658a72bb` 五个提交**零文件交集**（`git log --oneline 9e73272f..origin/master -- py/tests/test_frontend_response_models.py` 为空），
+  故未做 rebase 重放，直接推送 → merge commit `8ab6b357`（mergedAt 2026-11-15T05:03:53Z，mergedBy=Levango7 仓共用账号）。
+  **未做 rebase 的理由如实登记**：本机 `git rebase` / `git merge` 在沙箱内必然 SIGTERM 且部分生效，
+  而零交集已足够判定无冲突，硬做 rebase 只会引入中断残留（`index.lock` / `rebase-merge/`）。
+  另有一次 `git rebase` 误报 `dropping c04e711b -- patch contents already upstream`，但 `658a72bb` 上旧正则原封不动，
+  靠 `git show 658a72bb:<path>` 逐字节核对才没丢修复。
+- **合并归因**：用户明示「A」（2026-11-15 13:03），授权本线执行合并；合并方式按仓库既有约定取
+  merge commit（master 上 `Merge pull request #NNN from ...` 为既有形态，非 squash），
+  `--delete-branch=false` 与仓库 `delete_branch_on_merge=false` 一致，分支随后单独核祖先再删。
+- **改动内容**：仅 `py/tests/test_frontend_response_models.py`（+131 / −4）。
+  `strip_comments()` 由三行正则改为逐字符状态机（状态集合：无 / 单引号 / 双引号 / 模板串 / `//` / `/*` / `<!--`），
+  修掉「`// ... loop/*`、`accept="image/*"`、`'docs/**/*.md'` 开启幽灵块注释、吞掉后续 `api.get()` 调用」的静默失明。
+- **判据实证**：
+  - 新增 3 条守卫（`test_line_comment_containing_block_opener_does_not_swallow_code` /
+    `test_string_literal_containing_block_opener_does_not_swallow_code` /
+    `test_real_comments_are_still_removed`），提交内行号 886 / 903 / 916，**三条均做过变异验证**
+    （换回旧实现即转红）。第一版守卫片段内无后续 `*/`，旧正则匹配不上，变异 0/3 转红 → 补终止符后才真复现，
+    这条弯路如实留痕。
+  - 本机 `pytest tests/test_frontend_response_models.py -q -o addopts=""` → **18 passed**。
+  - PR run `43662449395`（head `c04e711b`）：check-run 级 **25 success + 7 设计内 skipped + 0 红**；
+    逐项核对「作业真跑到」而非只看灯：Lint 日志实含 `ruff check maop/ tests/` → `All checks passed!`
+    与 `mypy maop/ --ignore-missing-imports` → `Success: no issues found in 622 source files`；
+    pytest 全量 `11119 passed, 130 skipped, 1 xfailed`。
+- **缺陷的真实影响（复算，勿误读）**：真实语料中 `//` 注释内含 `/*` 的位置 **8 处**
+  （`views/AlertRules.vue` ×4、`i18n/view-alerts.js`、`router/index.js`、`views/Docs.vue`、`views/EvolutionHistory.vue`）；
+  旧实现 **278** 条调用 vs 修正 **284** 条 → **漏检 6 条**：`GET /api/evolution/ab/{}`、
+  `GET /api/evolution/approvals`、`GET /api/evolution/loop/status`、
+  `POST /api/evolution/approvals/{}/decision`、`POST /api/evolution/loop/rollback`、
+  `POST /api/evolution/loop/trigger`。逐条核后端：**全部已有 `response_model`**
+  （`evolution_experiment.py:171/178`、`evolve_insights.py:141/160/174/189/232`）。
+  ⇒ 本次修复**不改变当前门禁结论**，价值在消除静默失明；不得表述为「修掉了一个正在漏检的违规」。
+- **有意留在范围外（如实登记，非遗漏）**：
+  ① `_CALL_HEAD_RE` 仍不认 `api.del`（`stores/api.js` 有 `delete: del` 封装，属真实覆盖漏洞）——
+  补上会让门禁红出 `DELETE /api/mcp/servers/{}` 与 `POST /api/chat/stream` 两条无 `response_model` 端点，
+  需先定处置（前者补模型 / 后者进 allowlist），故单列待裁，不夹带进本 PR；
+  ② `stream`（Chat.vue 的 SSE 助手）是 docstring `:49-51` **明确记录的例外**，作者有意为之，不属漏检。
+- **trunk 收口**：合并触发 trunk run `43679443249`（head `8ab6b357`）→ completed/success
+  （job 级 **27 success + 4 设计内 skipped + 0 红**：Publish tag manual / Publish to PyPI / Release Assets / Required-canary；
+  `Compose Smoke` 步骤 `Compose up (smoke)` + `Run smoke tests` 均 success，非空转；
+  `Docker build` / `Container Scan (trivy)` / `SBOM` / `pip-audit` / `CI merge gate` 全 success）。
+- **口径差（如实登记）**：PR check-run 级 25 success + 7 skipped；trunk 侧为 job 级 27 success + 4 skipped。
+  差异原因是 `compose-smoke` 等作业 `needs: [test, frontend, e2e, docker]` 且 `if` 限 master/develop/main，
+  在 PR 上必然 skipped、在 trunk 上才真跑——**PR 绿灯不构成 compose 冒烟的证据**，故合并后必须盯 trunk。
+  另记一条易误判机制：`gh run view --json jobs` 对 `needs` 未满足的作业**不列出**（不是没触发），
+  曾据此误判「Compose Smoke 不在本 run」，查 `ci.yml:1409` 的 `needs` 才纠正。
+- **未立项积压（不自启）**：新增 1 项——`api.del` 识别头扩展 + 上述两条端点处置，待用户裁是否立项。
+- **落板纪律**：本回执随 docs-only 笔（仅 `AGENT-COORD.md`）推 master，追加在 EOF，不覆盖任何他线行；
+  落板前核 `origin/master` = `8ab6b357`。
