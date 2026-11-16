@@ -357,4 +357,37 @@ describe('McpManager.vue', () => {
     expect(checks[1].checked).toBe(true);
     wrapper.unmount();
   });
+
+  it('deletes a server by name, not by id', async () => {
+    // 两个缺陷叠在一起（2026-11-15 修复）：
+    // ① 调用写的是 api.del，而 stores/api.js 只导出 delete —— 运行时抛
+    //    TypeError，请求根本没发出去；
+    // ② 实参是 s.id，而后端 DELETE /api/mcp/servers/{server_name} 按 name 删
+    //    （remove_server -> find_server_id_by_name），id 是 uuid4().hex[:16]，
+    //    即使请求发出去也是 404。
+    // 本用例同时固定两点：请求真的发出、且路径用 name。
+    mockFetch(defaultRoutes({
+      '/api/mcp/servers': {
+        servers: [{ id: 's1', name: 'svc', url: '', transport: 'stdio', status: 'disconnected' }],
+      },
+      '/api/mcp/servers/svc': { status: 'ok', server: 'svc' },
+    }));
+    const wrapper = await mountMcp();
+
+    const delBtn = wrapper.findAll('button').find((b) => b.classes().includes('icon-btn--danger'));
+    expect(delBtn).toBeTruthy();
+    await delBtn.trigger('click');
+    await flushPromises();
+
+    const confirmBtn = document.querySelector('.btn-danger');
+    expect(confirmBtn).toBeTruthy();
+    confirmBtn.click();
+    await flushPromises();
+    await flushPromises();
+
+    const called = global.fetch.mock.calls.map((c) => String(c[0]));
+    expect(called).toContain('/api/mcp/servers/svc');
+    expect(called.some((u) => u.includes('/api/mcp/servers/s1'))).toBe(false);
+    wrapper.unmount();
+  });
 });

@@ -20,6 +20,7 @@ from maop.dashboard.routers.mcp_schemas import (
     AddServerEnvelope,
     MarketplaceInstallEnvelope,
     MarketplaceListEnvelope,
+    RemoveServerEnvelope,
     ServerDetailEnvelope,
     ServerListEnvelope,
     StatsEnvelope,
@@ -188,7 +189,7 @@ async def update_server(server_id: str, body: ServerCreate, request: Request) ->
     return result
 
 
-@router.delete("/servers/{server_name}")
+@router.delete("/servers/{server_name}", response_model=RemoveServerEnvelope)
 @handle_api_errors
 async def remove_server(server_name: str, request: Request) -> dict[str, Any]:
     require_admin(request)
