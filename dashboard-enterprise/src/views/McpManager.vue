@@ -550,7 +550,7 @@ async function doDeleteServer() {
   if (!deletingServer.value) return;
   serverDeleting.value = true;
   try {
-    await api.del(`/api/mcp/servers/${deletingServer.value.id}`);
+    await api.delete(`/api/mcp/servers/${encodeURIComponent(deletingServer.value.name)}`);
     showDeleteConfirm.value = false;
     deletingServer.value = null;
     await loadServers();

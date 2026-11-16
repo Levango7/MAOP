@@ -61,6 +61,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    （rc/a/b 为预发布；stable/dev/post/无 v 前缀为非）、create 命令带/不带
    `--prerelease`、upload 命令永不带。变异验证：移除 `--prerelease` → 1 failed。
 
+### MCP server 删除按钮从未发出请求（`api.del` 笔误 + 传 id 而非 name，2026-11-15）
+
+`McpManager.vue` 的删除调用写的是 `api.del(...)`，但 `stores/api.js` 导出的对象只有
+`get / post / put / delete`（`del` 只是内部函数名，导出键是 `delete`）。所以每次点确认
+都抛 `TypeError: api.del is not a function`，**请求根本没发出去**——不是 404，是更早的
+崩溃。全仓只有这一处用 `api.del`，其余 4+ 处删除都用 `api.delete`。
+
+修好动词后又暴露出第二个缺陷：实参是 `deletingServer.value.id`，而后端
+`DELETE /api/mcp/servers/{server_name}` 按 **name** 删（`plugin_service.remove_server`
+→ `hub.remove_server(name)` → `find_server_id_by_name`）。`mcp_servers.id` 是
+`uuid4().hex[:16]` 生成的，与 name 无关，所以即使请求发出去也是 404。现改为
+`encodeURIComponent(deletingServer.value.name)`（`GET` / `PUT` 用 `id`、`DELETE` 用
+`name` 的不一致仍在，但既有测试
+`test_router_mcp_evolve_memory_coverage.py::TestMcpServers::test_remove` 以 name 为契约，
+本次不动后端语义）。
+
+**门禁侧的两层修正**：
+
+1. 抽取器识别头补 `del`，并把 `DEL` 归一成 `DELETE`。只补识别头不归一，调用会被记成
+   `DEL /api/x`，没有任何路由以 `DEL` 为键——等于"看得见"却仍然掉出审计面
+   （2026-11-15 实测踩到，守卫 `test_api_del_alias_resolves_to_the_delete_verb`）。
+   保留 `del` 识别的理由是**防御**：这类笔误应当在门禁层可见，而不是等用户点到才炸。
+2. `DELETE /api/mcp/servers/{server_name}` 补 `response_model=RemoveServerEnvelope`。
+   该模型 `mcp_schemas.py` 早已定义却从未被引用（死代码）；不补的话，动词修好后这条
+   调用一旦被门禁看见，就会以"无 response_model 且未登记"转红。
+
+**为什么此前一直没被发现**：同一文件的 `GET /api/mcp/servers/{}` 已把该路径记进
+`placed`，而孤儿检查按**路径**比对，不按动词——所以路径"存在"就没人再问 DELETE 去了
+哪里；再加上 `api.del` 本就不在识别头里，整条调用对门禁不可见。
+
 ## [5.7.0] — 2026-11-11
 
 ### 修 loop 级 token 双计数（并行路径 `[USAGE]` 虚报 2x，2026-11-08）

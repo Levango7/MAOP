@@ -84,9 +84,18 @@ RATCHET_CAP = 72
 
 _QUOTES = {"`": "`", "'": "'", '"': '"'}
 _CALL_HEAD_RE = re.compile(
-    r"\b(?:api\.(get|post|put|patch|delete)|fetch|fetchWithTimeout|EventSource)\s*\("
+    r"\b(?:api\.(get|post|put|patch|delete|del)|fetch|fetchWithTimeout|EventSource)\s*\("
 )
 _METHOD_RE = re.compile(r"""method\s*:\s*['"](GET|POST|PUT|PATCH|DELETE)['"]""", re.IGNORECASE)
+# ``api.del`` 并不是 ``stores/api.js`` 的导出方法（该模块只导出
+# ``get/post/put/delete``；``del`` 只是内部函数名，导出键是 ``delete``）。
+# 2026-11-15 实测：``McpManager.vue`` 写了 ``api.del(...)``，运行时直接
+# ``TypeError: api.del is not a function`` —— 删除按钮从未真正发出请求。
+# 这里仍识别 ``del`` 并归一成 ``DELETE``，理由是**防御**：让这类笔误在门禁层
+# 就可见（记成 ``DELETE /api/x`` 去比对路由），而不是等用户点到才炸。
+# 若不归一，调用会被记成 ``DEL /api/x``，没有任何路由以 ``DEL`` 为键，
+# 等于"看得见"却仍然掉出审计面。
+_VERB_ALIASES = {"DEL": "DELETE"}
 _INTERP_RE = re.compile(r"\$\{(?:[^{}]|\{[^{}]*\})*\}")
 _PLACEHOLDER_RE = re.compile(r"\{[^}]*\}")
 _REF_RE = re.compile(
@@ -417,6 +426,7 @@ def scan_source_dir(root: Path) -> tuple[set[tuple[str, str]], dict[str, set[str
             if not args:
                 continue
             verb = (match.group(1) or "").upper()
+            verb = _VERB_ALIASES.get(verb, verb)
             if not verb:
                 # fetch-family: the verb lives in the options argument.
                 tail = text[args[0][1]:args[-1][1]] if len(args) > 1 else ""
@@ -634,8 +644,33 @@ def test_gate_sees_the_endpoints_it_previously_missed():
         ("GET", "/api/feedback/export"),
         ("GET", "/api/stream/agent/{}"),
         ("GET", "/api/stream/dag/{}"),
+        # ``api.del`` 别名：2026-11-15 之前整条 DELETE 对门禁不可见
+        ("DELETE", "/api/mcp/servers/{}"),
     ):
         assert key in calls, key
+
+
+def test_api_del_alias_resolves_to_the_delete_verb(tmp_path: Path):
+    """``api.del`` 是笔误，不是别名；门禁仍要看见它。
+
+    ``stores/api.js`` 只导出 ``get/post/put/delete``（``del`` 是内部函数名，
+    导出键为 ``delete``）。``McpManager.vue`` 曾写 ``api.del(...)``，运行时抛
+    ``TypeError``，删除按钮从未发出请求。这里固定两件事：
+    ① ``del`` 与 ``delete`` 都被识别；② 动词归一成 ``DELETE`` —— 只加识别头
+    不归一，调用会记成 ``DEL /api/x``，没有任何路由以 ``DEL`` 为键，等于
+    "看得见"却仍然掉出审计面（2026-11-15 实测就是这个结果）。
+    """
+    (tmp_path / "alias.js").write_text(
+        "await api.delete('/api/by-delete');\n"
+        "await api.del('/api/by-del');\n",
+        encoding="utf-8",
+    )
+    calls, unattributed = scan_source_dir(tmp_path)
+    assert ("DELETE", "/api/by-delete") in calls, sorted(calls)
+    assert ("DELETE", "/api/by-del") in calls, sorted(calls)
+    verbs = {verb for verb, _path in calls}
+    assert verbs == {"DELETE"}, sorted(verbs)
+    assert unattributed == {}, unattributed
 
 
 def test_reachable_targets_expands_only_the_bounded_shapes():
