@@ -1763,3 +1763,10 @@
 - **做法**：复刻批 5 隔离栈配方（独立实例 :9081 + hash provider + 空库 + SPA 构建）→ 逐页点击级 probe（pending/idle 双相 + 按钮禁用态/加载态/滚动/拖拽/反馈录制）→ 抽查报告落 F:/tmp/maop-b8/。**只读验证、不改产品代码**；发现真缺口经分诊后另开修复 PR（事前再落板）。
 - **协调**：若 Qoder 线同启此活按板面先到先得；本 CLAIM 即开工。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## 批 8 抽查轮 1 回执 + 分诊（ZCode 线）— 2026-11-16
+
+- **抽查完成**：16 高频页点击级 probe（双相 + 拖拽专项）——0 console error（除 /operate/integrations 个人版深链的 n8n 能力探针设计内 404×2）、0 HTTP 5xx、39 次内容区点击全部有合理反馈、HTML5 拖拽被应用接住（DOM 0→5）。报告与原始 JSON/截图落 F:/tmp/maop-b8/report.md。
+- **真缺口 2 个（分诊后开修，另开修复 PR）**：① `GET /api/agent/upgrade` 子进程扇出（31 agents × cli --version/pip show 5–10s **串行** + 客户端断开不取消）⇒ 版本区骨架 30s 后转空（功能不可用）+ 仪表盘间歇 20–30s 卡顿（upgrade 在飞时 /api/overview 实测 15s 停滞）；② `GET /api/analysis/performance-bottlenecks` 空库 **7.65s**（同步全进程表扫描阻塞事件循环）。修复方向＝有界并发 + TTL 缓存 + 超时收紧／扫描入线程；含钉测。
+- **知情设计（非缺陷）**：企业版深链静默弹回 /home（A2 已登记；导航已按「所见即所得」隐藏菜单）。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
