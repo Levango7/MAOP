@@ -1770,3 +1770,65 @@
 - **真缺口 2 个（分诊后开修，另开修复 PR）**：① `GET /api/agent/upgrade` 子进程扇出（31 agents × cli --version/pip show 5–10s **串行** + 客户端断开不取消）⇒ 版本区骨架 30s 后转空（功能不可用）+ 仪表盘间歇 20–30s 卡顿（upgrade 在飞时 /api/overview 实测 15s 停滞）；② `GET /api/analysis/performance-bottlenecks` 空库 **7.65s**（同步全进程表扫描阻塞事件循环）。修复方向＝有界并发 + TTL 缓存 + 超时收紧／扫描入线程；含钉测。
 - **知情设计（非缺陷）**：企业版深链静默弹回 /home（A2 已登记；导航已按「所见即所得」隐藏菜单）。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## 批 9 收口回执：四笔存量欠账（Nex 线）— 2026-11-17
+
+- **授权**：用户「把未解决的todo 都解决掉」（2026-11-17 02:30）。
+- **落板前核对**：`origin/master` = `34f77fa0`（本回执追加在 EOF，不覆盖任何他线行）。
+
+### 关闭的四项（逐条给证据）
+
+| # | 欠账 | 证据 |
+|---|---|---|
+| 1 | 发布层无灰度通道、无量化回滚预案 | PR **#282** 合并 `d83f4a67`；trunk run `43929933763` completed/success |
+| 2 | `api.del` 笔误 + 门禁看不见 DELETE 调用 | PR **#283** 合并 `1e14c700`；PR 检查 **25 pass / 7 skipping / 0 fail**（run `43930301078`） |
+| 3 | `scripts/` 存量 ruff 违规 + lint 门禁不覆盖该目录 | PR **#285** 提交 `8a108f9d` |
+| 4 | `GET`/`PUT` 用 id、`DELETE` 用 name 的接口不一致 | PR **#285** 提交 `5e1f9181` |
+
+- **PR #285** 合并 `34f77fa0`；PR 检查 **25 pass / 7 skipping / 0 fail**（run `43944500408`）。
+- **trunk 收口**：run `43959091189`（head `34f77fa0`）→ completed/**success**，
+  job 级 **27 success + 4 设计内 skipped + 0 红**。
+  `Compose Smoke` 步骤实跑（`Compose up (smoke)` + `Run smoke tests` 均 success，非空转）——
+  这条只在 master 上跑，PR 侧看不见，故合并后必须单独核。
+
+### 第 5 项（CI 抓到，非原计划）
+
+**17 个带 shebang 的文件无一可执行**（15 个 `.py` + 2 个 `.sh`），长期存量。
+
+根因值得记一笔：ruff 的 `EXE001` **在 Windows 上不报告** —— 可执行位是 POSIX 概念，
+Windows 文件系统没有该位，ruff 直接跳过该规则。于是「本机 ruff 全绿」与「CI Linux 上
+11 条红」可以同时成立。我在 PR #285 上就是这么先绿后红的。
+已统一 `git update-index --chmod=+x`，并新增 `py/tests/test_script_modes.py`
+（只读 `git ls-files -s` 的模式位，跨平台，不依赖 ruff 是否启用该规则）。
+
+### 三条方法论结论（建议后续沿用）
+
+1. **`py/scripts/business_sim/soak_report.py:142` 是真实缺陷，不是风格问题。**
+   f-string 表达式内含反斜杠，PEP 701 之前（<3.12）直接 `SyntaxError`。
+   已用 CPython **3.11.15** 复现 `f-string expression part cannot include a backslash`。
+   项目 `target-version = py310`、CI 矩阵含 3.10/3.11 ⇒ 该脚本在**声明的最低支持版本上
+   根本跑不起来**，只因不在扫描范围内一直没红。
+2. **`ast.parse(feature_version=(3,10))` 不校验该规则**，新旧两版都返回 OK —— 这个探针
+   无效。结论只能来自真实解释器编译。（记此条是为了防止下次有人用同一个探针"验证"后收工。）
+3. **`mcp_servers.name` 无 UNIQUE 约束**（`_MCP_DDL` 只有 `id TEXT PRIMARY KEY`），
+   而 `connect()` 每次生成新 `uuid4().hex[:16]` 且不按名去重 ⇒ 同名多行结构性可能；
+   `find_server_id_by_name` 只命中 `ORDER BY updated_at DESC LIMIT 1`，即"删最新的那条"。
+   故 DELETE 改为 **id/name 双键（name 优先，旧调用逐字不变）**，而非简单换键。
+
+### 环境异常登记
+
+2026-11-17 03:5x–04:3x，代理对 **`github.com` 持续 502**（`CONNECT tunnel failed`），
+而 `api.github.com` 正常 ⇒ `git push` 完全不可用。PR #285 的第三个提交改走
+**Git Data API**（blob → tree → commit → ref），并以 **tree sha 等价**作为内容等价证据：
+API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完全相等**，
+即文件集合/内容/模式逐字节一致，差异只在 author/committer 元数据。
+— 不是"看着像成功"。05:0x 后代理恢复，落板走回正常 git 流程。
+
+### 遗留（未立项，不自启）
+
+- `F:/Nexus/MAOP-stripfix` 目录仍在：`.git` 元数据随 11-15 事故丢失，其内容已随 PR #279
+  合入主干。**是否删除待用户裁**（未擅自删）。
+
+### 收板口径
+
+本回执为 docs-only 笔，直推 master 后由新 trunk run 收口。
