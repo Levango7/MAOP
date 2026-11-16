@@ -87,8 +87,9 @@ def _vector_bytes() -> int:
 
 def measure_pg(url: str, rows: int, prefix: str) -> dict:
     """Insert synthetic rows into PG and measure relation/index/row sizes."""
-    from maop.core.memory.multimodal_pg import PgMultimodalBackend
     from sqlalchemy import text
+
+    from maop.core.memory.multimodal_pg import PgMultimodalBackend
 
     backend = PgMultimodalBackend(dsn=url)
     items = _synthetic_items(rows, prefix)

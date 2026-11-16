@@ -38,7 +38,7 @@ DEMO_STEPS = [
 ]
 
 
-def _recording_executor(node) -> dict:  # noqa: ANN001 — demo 脚本从简
+def _recording_executor(node) -> dict:  # demo 脚本从简，不做完整注解（ANN 规则未启用）
     """M0 记录型执行体：回显节点语义（真实 agent 调度 = 生产集成里程碑）。"""
     return {"step_id": node.step_id, "agent": node.agent, "status": "success"}
 

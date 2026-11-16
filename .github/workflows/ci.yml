@@ -131,7 +131,16 @@ jobs:
       # Success: no issues found in 468 source files）。
       # 缺依赖的类型检查等于没有检查，故补装项目依赖。
       - run: pip install -e .
-      - run: ruff check maop/ tests/
+      # 2026-11-16：把 scripts/ 纳入 lint 范围。此前只有 `maop/ tests/`，于是
+      # `py/scripts/` 与仓库根 `scripts/` 长期无人看管——首次纳入时实测存量 7 处违规，
+      # 其中 `py/scripts/business_sim/soak_report.py` 是**真实语法错误**：
+      # f-string 表达式内含反斜杠，Python 3.10/3.11 直接
+      # `SyntaxError: f-string expression part cannot include a backslash`
+      # （PEP 701 才放开，3.12+）。而 target-version = py310、CI 矩阵也跑 3.10/3.11，
+      # 即该脚本在项目声明的最低支持版本上根本跑不起来，却因为不在扫描范围内一直没红。
+      # 显式 `--config pyproject.toml`：根 `scripts/` 不在 py/ 下，不指定时 ruff 会
+      # 按文件路径就近发现配置（根目录无配置 ⇒ 退化成默认规则集，等于换了一套判据）。
+      - run: ruff check --config pyproject.toml maop/ tests/ scripts/ ../scripts/
       # 显式 --no-warn-unused-ignores：不依赖 pyproject [tool.mypy] 读取
       # （CI 依赖缺失环境下 type:ignore 大量 unused，pyproject 配置若未
       # 生效会误报红）。真实类型错误仍正常拦截。

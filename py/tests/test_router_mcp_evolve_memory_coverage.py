@@ -109,14 +109,38 @@ class TestMcpServers:
         )
         assert resp.status_code == 200
 
-    def test_remove(self, mcp_client):
+    def test_remove(self, mcp_env, mcp_client):
         resp = mcp_client.delete("/api/mcp/servers/test-server")
         assert resp.status_code == 200
+        assert resp.json()["server"] == "test-server"
+        # name 优先：命中后不再走 id 解析分支
+        assert [c.args[0] for c in mcp_env.remove_server.call_args_list] == ["test-server"]
+
+    def test_remove_by_id_resolves_to_name(self, mcp_env, mcp_client):
+        """DELETE 同时接受 id（与 GET/PUT 同源）：按 name 未命中时解析 id → name。
+
+        背景：`GET` / `PUT` 用 `{server_id}`、`DELETE` 原本只认 `{server_name}`，
+        前端要同时持有两个字段，传错那个就是 404。这里钉住"两种键都通"。
+        """
+        mcp_env.remove_server.side_effect = [False, True]
+        mcp_env.get_server_config_by_id = MagicMock(return_value=SimpleNamespace(
+            name="test-server", transport=TransportType.STDIO, url="", command="test",
+            args=[], timeout_s=30.0, enabled=True, auto_connect=False, headers={},
+        ))
+        resp = mcp_client.delete("/api/mcp/servers/server-1")
+        assert resp.status_code == 200
+        assert resp.json()["server"] == "test-server"
+        assert [c.args[0] for c in mcp_env.remove_server.call_args_list] == [
+            "server-1", "test-server"
+        ]
 
     def test_remove_not_found(self, mcp_env, mcp_client):
         mcp_env.remove_server.return_value = False
+        mcp_env.get_server_config_by_id = MagicMock(return_value=None)
         resp = mcp_client.delete("/api/mcp/servers/nonexistent")
         assert resp.status_code == 404
+        # 两种键都试过才报 404（不是只看 name 一次）
+        assert mcp_env.remove_server.call_count == 1
 
 
 class TestMcpTools:

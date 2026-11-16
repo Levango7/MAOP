@@ -145,10 +145,12 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 |------|---|
 | `py/tests/test_ci_path_scope.py` | 变更集分类 + 触发面结构（白名单不许回来） |
 | `py/tests/test_ci_workflow_hygiene.py` | 不许有吞自身失败的步骤（`fail_ci_if_error: false`、未登记的 `continue-on-error`） |
+| `py/tests/test_lint_toolchain_pins.py` | lint 工具链的两面：① **版本口径** —— dev extra 与 `ci.yml` 的 `pip install "ruff==X" "mypy==Y"` 必须逐字相等（抬版本要同一笔改两处）；② **扫描范围** —— `ruff check` 必须覆盖 `maop/ tests/ scripts/ ../scripts/`。第 ② 面是 2026-11-17 补的：此前只扫 `maop/ tests/`，两个 `scripts/` 目录长期在门禁外，存量 7 条诊断无人发现，其中 `py/scripts/business_sim/soak_report.py` 是 Python 3.10/3.11 上的**真实 `SyntaxError`**（f-string 表达式内含反斜杠，PEP 701 才允许），而 `target-version = py310`、CI 矩阵也跑 3.10/3.11。守卫对"命令行缩水"和"找不到 ruff 行"都 fail closed |
 | `py/tests/test_frontend_coverage_gate.py` | 覆盖率门禁在 CI 里、阈值不低于实测、禁全局忽略未处理错误 |
 | `py/tests/test_dependabot_config.py` | dependabot 配置形状 + 同前缀 ≥2 个包的 action 必须成批 |
 | `py/tests/test_requirements_lock_sync.py` | `requirements.lock` 的直依赖段必须逐条镜像 `pyproject.toml` |
 | `py/tests/test_docs_consistency_gate.py` | 文档一致性门禁：范围只来自索引当前章节、豁免必须写理由、注入死路径必须判红、`docs-gate` 作业不许挂 `if` |
+| `py/tests/test_script_modes.py` | **shebang ⇒ git 索引必须 100755**。为什么要独立一条：ruff 的 `EXE001` 在 **Windows 上不报告**（可执行位是 POSIX 概念），于是"本机 lint 全绿"与"CI Linux 上 11 条红"可以同时成立 —— 2026-11-17 把 `scripts/` 纳入 lint 范围时正是这样炸的。本用例只读 `git ls-files -s` 的模式位，不依赖平台、也不依赖 ruff 是否启用该规则 |
 | `py/tests/test_ci_required_checks.py` | required 清单（`.github/ci-required-checks.json`）↔ `ci.yml` 作业形状 ↔ §7.2 散文 三方一致：不许改名/删作业导致上下文永不上报，不许 required 作业在 PR 上恒不产出（沿 needs 链递归查），不许矩阵名当 required |
 | `py/tests/test_ci_merge_gate.py` | 聚合守卫的两面：判定脚本的策略单测（白名单式 + fail closed + docs-only 的 skipped 必须放行），以及 ci.yml 里 gate 的形状（name 稳定、`if: always()` 不许掉、needs 盖住全部重活、不许纳 push-only 作业） |
 | `py/tests/test_delegations_table_readers.py` | `delegations` 表**无写入方**（`insert_delegation` 只有测试调用），所以读它的地方一律报 0。本门禁按 AST 数产品码里"`FROM/INTO/UPDATE/JOIN delegations`"的字符串字面量（**剥掉 docstring 与裸字符串语句**，避免把散文当命中），只准减不准加：① 出现未登记的文件即红；② 总数超基线即红；③ 登记表里某条已不存在也必须同步删（防台账虚账）；④ 自检喂一份合成文件证明探针活着、并断言真树数到的就是基线（防"0 命中"冒充通过） |

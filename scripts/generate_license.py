@@ -50,7 +50,7 @@ def generate_license(
     private_key = serialization.load_pem_private_key(key_data, password=None)
 
     if not isinstance(private_key, Ed25519PrivateKey):
-        raise ValueError("Private key must be Ed25519")
+        raise TypeError("Private key must be Ed25519")
 
     # Build payload
     payload = {

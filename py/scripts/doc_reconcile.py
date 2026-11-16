@@ -37,10 +37,9 @@ def count_core_contents() -> tuple[int, int]:
             continue
         if entry.is_file() and entry.name != "__init__.py":
             files += 1
-        elif entry.is_dir():
+        elif entry.is_dir() and (entry / "__init__.py").is_file():
             # 只统计真实包（含 __init__.py），空目录不计入
-            if (entry / "__init__.py").is_file():
-                subpackages += 1
+            subpackages += 1
     return files, subpackages
 
 

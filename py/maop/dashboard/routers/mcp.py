@@ -189,14 +189,36 @@ async def update_server(server_id: str, body: ServerCreate, request: Request) ->
     return result
 
 
-@router.delete("/servers/{server_name}", response_model=RemoveServerEnvelope)
+@router.delete("/servers/{server_key}", response_model=RemoveServerEnvelope)
 @handle_api_errors
-async def remove_server(server_name: str, request: Request) -> dict[str, Any]:
+async def remove_server(server_key: str, request: Request) -> dict[str, Any]:
+    """删除 MCP server。定位键 **name 优先、id 兜底**。
+
+    为什么不是单一键：`GET` / `PUT` 用 `{server_id}`、`DELETE` 用 `{server_name}`，
+    前端因此要同时持有两个字段，传错那个就是 404。按 name 删还有第二层隐患 ——
+    `mcp_servers.name` **没有 UNIQUE 约束**（`mcp_hub.py` 的 `_MCP_DDL`），而
+    `connect()` 每次生成新 `server_id` 且不按名去重，所以同名多行是结构性可能的；
+    `find_server_id_by_name` 只能命中 `ORDER BY updated_at DESC LIMIT 1` 那一行，
+    即"删掉最新的那条"，未必是用户点的那条。两种键都接受后，调用方可以统一用
+    id（与 GET/PUT 同源），旧调用（name）行为完全不变。
+
+    name 优先而非 id 优先：这是**既有语义**，保持它才叫"新增能力"而不是"改行为"。
+    代价是"某个 server 的 name 恰好等于另一个的 id"时按 name 解释 —— 该情形要求
+    name 是 16 位 hex（与 `uuid4().hex[:16]` 同形），且旧代码同样按 name 处理，
+    故不构成回归。
+    """
     require_admin(request)
-    removed = plugin_service.remove_server(server_name)
-    if not removed:
-        raise HTTPException(status_code=404, detail=f"Server {server_name} not found")
-    return {"status": "ok", "server": server_name}
+    removed_name: str | None = None
+    if plugin_service.remove_server(server_key):
+        removed_name = server_key
+    else:
+        detail = plugin_service.get_server_detail(server_key)
+        resolved = detail.get("name") if isinstance(detail, dict) else None
+        if resolved and plugin_service.remove_server(resolved):
+            removed_name = resolved
+    if removed_name is None:
+        raise HTTPException(status_code=404, detail=f"Server {server_key} not found")
+    return {"status": "ok", "server": removed_name}
 
 
 @router.get("/topology", response_model=TopologyEnvelope)

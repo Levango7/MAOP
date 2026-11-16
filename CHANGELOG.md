@@ -39,6 +39,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI 抓到 11 条 EXE001：Windows 上 ruff 根本不报这条规则（2026-11-17）
+
+把 `scripts/` 纳入 lint 后，本 PR 的 `Lint (ruff + mypy)` 在 **Linux** 上红了 11 条
+`EXE001 Shebang is present but file is not executable`，而同一条命令在**本机 Windows
+上 0 错**——这是我在本地"验证通过"之后才被 CI 抓到的。
+
+根因：可执行位是 POSIX 概念，Windows 文件系统没有这个位，ruff 在 Windows 上直接
+**跳过 EXE001**。⇒「本地 ruff 全绿」不构成「CI lint 会绿」的证据。这与
+「editable 安装结构上测不出 wheel 覆盖问题」是同一类平台盲区：判据本身的可见性
+随平台变化，却仍被当成结论。
+
+实测全仓（`git ls-files -s` 逐条比对）：**17 个带 shebang 的文件无一可执行**
+（15 个 `.py` + 2 个 `.sh`），不是这次改动引入的，是长期存量。统一
+`git update-index --chmod=+x` 改齐（shebang 存在即应当可直接执行）。
+
+新增 `tests/test_script_modes.py`：只读 **git 索引的模式位**，不依赖平台，也不依赖
+ruff 是否启用 EXE001（该规则的可见性随平台/版本变化，不能当判据）。含两条反向变异
+（缺可执行位被点名 / 无 shebang 不误伤）。变异验证：撤掉
+`py/scripts/ci_merge_gate.py` 的可执行位 → 该用例精确转红。
+
+### MCP 删除端点同时接受 id 与 name（2026-11-17）
+
+`GET /api/mcp/servers/{server_id}` 与 `PUT` 同路径都用 **id**，只有
+`DELETE /api/mcp/servers/{server_name}` 用 **name**。前端因此必须同时持有两个字段，
+传错那个就是 404（#283 修的正是"传 id 给只认 name 的端点"）。
+
+按 name 删还有第二层隐患：`mcp_servers.name` **没有 UNIQUE 约束**
+（`mcp_hub.py` 的 `_MCP_DDL` 只有 `id TEXT PRIMARY KEY`），而 `connect()` 每次都
+生成新的 `uuid4().hex[:16]` 且**不按名去重**就直接 INSERT —— 同名多行是结构性
+可能的。`find_server_id_by_name` 只能命中 `ORDER BY updated_at DESC LIMIT 1`
+那一行，即"删掉最新的那条"，未必是用户点的那条。
+
+改为两种键都接受，**name 优先、id 兜底**：
+
+- name 优先是**既有语义**，保持它才叫"新增能力"而不是"改行为"——旧调用逐字不变，
+  前端可以继续传 name，也可以改成与 GET/PUT 同源的 id。
+- 代价：某个 server 的 name 恰好等于另一个的 id 时按 name 解释。该情形要求 name 是
+  16 位 hex（与 `uuid4().hex[:16]` 同形），且旧代码同样按 name 处理，不构成回归。
+- 未命中时两种键都试过才报 404（不是只看 name 一次）。
+
+测试（`tests/test_router_mcp_evolve_memory_coverage.py`）：`test_remove` 补断言
+"name 命中后不再走 id 解析"；新增 `test_remove_by_id_resolves_to_name` 钉住兜底
+路径与调用序列 `["server-1", "test-server"]`。变异验证：摘掉兜底分支 →
+该用例精确转红，其余 4 条仍绿。
+
+### lint 门禁从未扫 `scripts/`：一处 Python 3.10/3.11 真实语法错误（2026-11-17）
+
+`Lint (ruff + mypy)` 作业跑的是 `ruff check maop/ tests/`，`py/scripts/` 与仓库根
+`scripts/` 两个目录**从不在扫描范围内**。首次纳入时实测存量 **7 条诊断 / 6 个独立成因**：
+
+| 位置 | 规则 | 性质 |
+|---|---|---|
+| `py/scripts/business_sim/soak_report.py:142` | invalid-syntax ×2 | **真实缺陷**，见下 |
+| `py/scripts/business_sim/soak_run.py:127` | RUF100 | `# noqa: BLE001` 多余（BLE001 已在 pyproject 全局豁免） |
+| `py/scripts/doc_reconcile.py:40` | SIM102 | 嵌套 `if` 可合并 |
+| `py/scripts/temporal_m0_demo.py:41` | RUF100 | `# noqa: ANN001` 多余（ANN 规则未启用） |
+| `scripts/generate_license.py:53` | TRY004 | 类型不符应抛 `TypeError` |
+| `scripts/measure_multimodal_storage.py:90` | I001 | import 未排序 |
+
+**为什么最上面那条不是风格问题**：该行把 `'\\|'` 写在 f-string 的**表达式**里。
+PEP 701 之前（Python < 3.12）f-string 表达式部分不允许出现反斜杠，于是整个脚本在
+3.10/3.11 上直接 `SyntaxError: f-string expression part cannot include a backslash`，
+连 import 都过不去。项目 `target-version = "py310"`、CI 矩阵也跑 3.10/3.11 ——
+即该脚本在声明的最低支持版本上根本跑不起来，却因为不在扫描范围内一直没红。
+已用 CPython 3.11.15 复现该 `SyntaxError`，修复后 `py_compile` 通过（改动为
+先算 `error` 变量再插值，语义不变）。
+
+**门禁侧**：
+
+1. `ruff check` 扩到 `maop/ tests/ scripts/ ../scripts/`，并**显式** `--config pyproject.toml`。
+   根 `scripts/` 不在 `py/` 下，不指定时 ruff 按文件路径就近发现配置（根目录无配置 ⇒
+   退化成默认规则集），等于同一作业里跑两套判据。
+2. `tests/test_lint_toolchain_pins.py` 新增 3 条守卫：CI 必须覆盖上述四个目录、
+   命令行缩水被逐项点名、找不到 `ruff check` 行时 fail closed（不当作合格）。
+   变异验证：把命令行退回 `ruff check maop/ tests/` →
+   `test_ci_lint_covers_scripts_directories` 精确转红，其余 9 条仍绿。
+
 ### 发布灰度通道与回滚预案（2026-11-16）
 
 此前发布体系只有"tag 触发 → PyPI + GitHub Release"这一条直发路径：
