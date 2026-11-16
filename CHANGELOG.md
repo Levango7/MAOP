@@ -39,6 +39,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI 抓到 11 条 EXE001：Windows 上 ruff 根本不报这条规则（2026-11-17）
+
+把 `scripts/` 纳入 lint 后，本 PR 的 `Lint (ruff + mypy)` 在 **Linux** 上红了 11 条
+`EXE001 Shebang is present but file is not executable`，而同一条命令在**本机 Windows
+上 0 错**——这是我在本地"验证通过"之后才被 CI 抓到的。
+
+根因：可执行位是 POSIX 概念，Windows 文件系统没有这个位，ruff 在 Windows 上直接
+**跳过 EXE001**。⇒「本地 ruff 全绿」不构成「CI lint 会绿」的证据。这与
+「editable 安装结构上测不出 wheel 覆盖问题」是同一类平台盲区：判据本身的可见性
+随平台变化，却仍被当成结论。
+
+实测全仓（`git ls-files -s` 逐条比对）：**17 个带 shebang 的文件无一可执行**
+（15 个 `.py` + 2 个 `.sh`），不是这次改动引入的，是长期存量。统一
+`git update-index --chmod=+x` 改齐（shebang 存在即应当可直接执行）。
+
+新增 `tests/test_script_modes.py`：只读 **git 索引的模式位**，不依赖平台，也不依赖
+ruff 是否启用 EXE001（该规则的可见性随平台/版本变化，不能当判据）。含两条反向变异
+（缺可执行位被点名 / 无 shebang 不误伤）。变异验证：撤掉
+`py/scripts/ci_merge_gate.py` 的可执行位 → 该用例精确转红。
+
 ### MCP 删除端点同时接受 id 与 name（2026-11-17）
 
 `GET /api/mcp/servers/{server_id}` 与 `PUT` 同路径都用 **id**，只有
