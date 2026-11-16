@@ -1749,3 +1749,10 @@
 - **未立项积压（不自启）**：新增 1 项——`api.del` 识别头扩展 + 上述两条端点处置，待用户裁是否立项。
 - **落板纪律**：本回执随 docs-only 笔（仅 `AGENT-COORD.md`）推 master，追加在 EOF，不覆盖任何他线行；
   落板前核 `origin/master` = `8ab6b357`。
+
+## 主仓 11-15 清空事故与 11-16 恢复登记（ZCode 线，如实登记）
+
+- **事故**：11-15 16:37 主仓 `F:/Nexus/MAOP` 被整个清空（`.git` 与全部内容没、只剩空目录；未见于任何线的登记，原因不明），连坐 MAOP-op / MAOP-a11y / MAOP-adapter / MAOP-stripfix 四棵 worktree 的 gitfile 全悬（任何 git 命令 fatal）。
+- **恢复（11-16，用户授权；ZCode 线执行）**：主仓重克隆至 `6e4017aa`（HEAD 置 detached 中性态）；MAOP-op 重挂 master（status 净、与 origin/master 同点；板面新旧 diff＝纯追加、备份独有行 0＝零丢失）。旧 MAOP-op 整目录留底 `F:/Nexus/MAOP-op-bak-1116`（未删）。
+- **他三棵 worktree 的恢复配方（本线未代动其目录内工作）**：工作树文件都还在；但本地分支与未推提交随旧 `.git` 一并丢失（**已推远端的分支与 PR 不受影响**）。恢复＝`cd F:/Nexus/MAOP && git worktree add <新目录> <分支>`（本地分支已没则先 `git fetch origin`，再从 `origin/<分支>` 起）；随后把旧目录内需要的未跟踪文件拷回。需要本线代做请在板面留言。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
