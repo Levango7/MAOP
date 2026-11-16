@@ -39,6 +39,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 发布灰度通道与回滚预案（2026-11-16）
+
+此前发布体系只有"tag 触发 → PyPI + GitHub Release"这一条直发路径：
+`docs/deployment.md` 第 7 章覆盖的是**部署层**的升级/回滚（compose/helm/裸机），
+而**发布层**没有灰度通道，也没有量化的回滚触发条件——"出问题就回滚"不是预案。
+
+补三件：
+
+1. **`docs/release-rollback.md`（新增）**：MAOP 是 PyPI 库而非在线服务，灰度的
+   等价物是 PEP 440 预发布版本（`x.y.zrcN`），默认 `pip install` 不会装到它。
+   文档写明晋级判据（1 个工作日观察窗口 + 无 P0/P1）、量化回滚触发条件
+   （P0 立即、P1 24h 内、P2 不单独回滚）、三条回滚路径（rc 弃用 / PyPI yank +
+   补丁版本 / 复用 deployment.md 的部署层回滚），并如实登记四个已知缺口
+   （无自动 yank、无自动晋级、未演练、Release 标记不可事后修正）。
+2. **`attach_release_assets.py`**：创建 GitHub Release 时对 rc/a/b tag 加
+   `--prerelease`。此前无此参数——PyPI 侧由 PEP 440 自动标预发布，GitHub 侧不会，
+   灰度版本会以正式版姿态出现在 Release 页。已存在的 release 走
+   `gh release upload --clobber`（该命令不支持 `--prerelease`），行为不变。
+3. **`tests/test_release_prerelease.py`（新增 12 条）**：覆盖 tag 形状判定
+   （rc/a/b 为预发布；stable/dev/post/无 v 前缀为非）、create 命令带/不带
+   `--prerelease`、upload 命令永不带。变异验证：移除 `--prerelease` → 1 failed。
+
 ## [5.7.0] — 2026-11-11
 
 ### 修 loop 级 token 双计数（并行路径 `[USAGE]` 虚报 2x，2026-11-08）

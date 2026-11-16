@@ -41,6 +41,7 @@
 | 文档 | 说明 |
 |------|------|
 | [部署指南](./deployment.md) | 全部署方式覆盖：Docker Compose、Kubernetes（Operator/Helm）、裸机（PM2/systemd）、TLS、监控、升级回滚 |
+| [发布灰度与回滚预案](./release-rollback.md) | PyPI 库形态下的 rc tag 灰度通道、晋级判据、量化回滚触发条件与三条回滚路径 |
 | [环境变量配置](./configuration.md) | 全部环境变量权威参考（100+ 变量），含默认值、必填标注、生产检查清单 |
 | [运维手册](./runbook.md) | 生产环境运维 Runbook — PG 故障切换、备份恢复、监控告警 |
 | [故障排查](./troubleshooting.md) | 系统化故障排查手册，含诊断工具、常见问题与解决流程 |

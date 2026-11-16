@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -32,6 +33,17 @@ def expected_files(dist_dir: pathlib.Path) -> list[pathlib.Path]:
     return [p for p in files if p.stat().st_size > 0]
 
 
+# PEP 440 预发布 tag：x.y.zrcN / x.y.zaN / x.y.zbN。PyPI 会自动把这些标为
+# pre-release，但 GitHub Release 不认版本号语义 —— 必须显式传 --prerelease，
+# 否则灰度版本会以正式版姿态出现在 Release 页（2026-11-16 实测缺口）。
+_PRERELEASE_TAG_RE = re.compile(r"^v\d+\.\d+\.\d+(?:a|b|rc)\d+$", re.IGNORECASE)
+
+
+def is_prerelease_tag(tag: str) -> bool:
+    """v5.8.0rc1 -> True；v5.8.0 -> False。只认 PEP 440 a/b/rc，不认 dev/post。"""
+    return bool(_PRERELEASE_TAG_RE.fullmatch(tag.strip()))
+
+
 def build_command(*, tag: str, files: list[pathlib.Path], release_exists: bool) -> list[str]:
     """已存在的 release 用 upload --clobber；不存在则按 tag 创建。"""
     paths = [str(f) for f in files]
@@ -40,6 +52,7 @@ def build_command(*, tag: str, files: list[pathlib.Path], release_exists: bool) 
     return [
         "gh", "release", "create", tag, *paths,
         "--verify-tag",
+        *(["--prerelease"] if is_prerelease_tag(tag) else []),
         "--title", f"MAOP {tag}",
         "--notes", f"MAOP {tag} 发行物（wheel + sdist）。变更内容见仓库 CHANGELOG.md 对应版本段。",
     ]
