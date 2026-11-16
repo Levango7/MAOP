@@ -39,6 +39,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### MCP 删除端点同时接受 id 与 name（2026-11-17）
+
+`GET /api/mcp/servers/{server_id}` 与 `PUT` 同路径都用 **id**，只有
+`DELETE /api/mcp/servers/{server_name}` 用 **name**。前端因此必须同时持有两个字段，
+传错那个就是 404（#283 修的正是"传 id 给只认 name 的端点"）。
+
+按 name 删还有第二层隐患：`mcp_servers.name` **没有 UNIQUE 约束**
+（`mcp_hub.py` 的 `_MCP_DDL` 只有 `id TEXT PRIMARY KEY`），而 `connect()` 每次都
+生成新的 `uuid4().hex[:16]` 且**不按名去重**就直接 INSERT —— 同名多行是结构性
+可能的。`find_server_id_by_name` 只能命中 `ORDER BY updated_at DESC LIMIT 1`
+那一行，即"删掉最新的那条"，未必是用户点的那条。
+
+改为两种键都接受，**name 优先、id 兜底**：
+
+- name 优先是**既有语义**，保持它才叫"新增能力"而不是"改行为"——旧调用逐字不变，
+  前端可以继续传 name，也可以改成与 GET/PUT 同源的 id。
+- 代价：某个 server 的 name 恰好等于另一个的 id 时按 name 解释。该情形要求 name 是
+  16 位 hex（与 `uuid4().hex[:16]` 同形），且旧代码同样按 name 处理，不构成回归。
+- 未命中时两种键都试过才报 404（不是只看 name 一次）。
+
+测试（`tests/test_router_mcp_evolve_memory_coverage.py`）：`test_remove` 补断言
+"name 命中后不再走 id 解析"；新增 `test_remove_by_id_resolves_to_name` 钉住兜底
+路径与调用序列 `["server-1", "test-server"]`。变异验证：摘掉兜底分支 →
+该用例精确转红，其余 4 条仍绿。
+
 ### lint 门禁从未扫 `scripts/`：一处 Python 3.10/3.11 真实语法错误（2026-11-17）
 
 `Lint (ruff + mypy)` 作业跑的是 `ruff check maop/ tests/`，`py/scripts/` 与仓库根
