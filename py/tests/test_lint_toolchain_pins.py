@@ -159,3 +159,50 @@ def test_ci_with_conflicting_pins_is_rejected():
         assert "多个不同 pin" in str(exc), str(exc)
     else:
         raise AssertionError("ci.yml 出现两处不一致的 pin 时应当拒绝判定")
+
+
+# ── lint 扫描范围守卫 ────────────────────────────────────────────────
+#
+# 为什么要有这条：版本 pin 只保证"用哪一版 ruff"，不保证"扫了哪些目录"。
+# 2026-11-16 之前 `ruff check maop/ tests/` 把两个 scripts/ 目录整个漏在门外，
+# 存量 7 处违规无人发现，其中 soak_report.py 是 Python 3.10/3.11 上的
+# SyntaxError。把目录写进命令行只是当下修好；没有这条守卫，下次有人"精简"
+# 命令行时同样会静默缩水——而 lint 作业缩水后仍然是绿的。
+
+_RUFF_RUN_RE = re.compile(r"^\s*-\s*run:\s*ruff check (.+)$", re.MULTILINE)
+
+# 必须被扫描的目录。少任何一个都意味着"门禁绿 ≠ 代码合格"。
+_REQUIRED_LINT_TARGETS = ("maop/", "tests/", "scripts/", "../scripts/")
+
+
+def lint_scope_missing(ci_text: str) -> list[str]:
+    """返回 ci.yml 的 ruff 命令行里缺失的必扫目录（空 = 合格）。"""
+    m = _RUFF_RUN_RE.search(ci_text)
+    if m is None:
+        raise AssertionError(
+            "ci.yml 里找不到 `- run: ruff check ...` 行。若你改了写法，请同步更新本守卫"
+        )
+    tokens = m.group(1).split()
+    return [t for t in _REQUIRED_LINT_TARGETS if t not in tokens]
+
+
+def test_ci_lint_covers_scripts_directories():
+    missing = lint_scope_missing(CI_YML.read_text(encoding="utf-8"))
+    assert not missing, (
+        f"lint 未覆盖 {missing} —— 这些目录里的语法/规则违规不会让 CI 变红"
+    )
+
+
+def test_lint_scope_shrink_is_rejected():
+    # 反向变异：把命令行退回 2026-11-16 之前的形态，必须被点名
+    old = "      - run: ruff check maop/ tests/\n"
+    assert lint_scope_missing(old) == ["scripts/", "../scripts/"]
+
+
+def test_missing_ruff_run_line_is_rejected():
+    try:
+        lint_scope_missing("      - run: echo hi\n")
+    except AssertionError as exc:
+        assert "ruff check" in str(exc), str(exc)
+    else:
+        raise AssertionError("找不到 ruff 命令行时应当拒绝判定，而不是当作合格")

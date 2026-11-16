@@ -124,7 +124,7 @@ def run_soak(
                 "match": protocol > 0 and protocol == delta,
             }
             ok = result["failed"] == 0 and recon["match"]
-        except Exception as exc:  # noqa: BLE001 —— soak 轮级故障是证据，不是崩溃理由
+        except Exception as exc:  # soak 轮级故障是证据，不是崩溃理由（BLE001 已在 pyproject 全局豁免）
             result = {"scenario": name, "failed": -1, "executions": 0,
                       "success": 0, "error": type(exc).__name__ + ": " + str(exc)[:200]}
             recon = {"match": False, "protocol_line_tokens": 0, "cost_table_tokens": 0}

@@ -39,6 +39,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### lint 门禁从未扫 `scripts/`：一处 Python 3.10/3.11 真实语法错误（2026-11-17）
+
+`Lint (ruff + mypy)` 作业跑的是 `ruff check maop/ tests/`，`py/scripts/` 与仓库根
+`scripts/` 两个目录**从不在扫描范围内**。首次纳入时实测存量 **7 条诊断 / 6 个独立成因**：
+
+| 位置 | 规则 | 性质 |
+|---|---|---|
+| `py/scripts/business_sim/soak_report.py:142` | invalid-syntax ×2 | **真实缺陷**，见下 |
+| `py/scripts/business_sim/soak_run.py:127` | RUF100 | `# noqa: BLE001` 多余（BLE001 已在 pyproject 全局豁免） |
+| `py/scripts/doc_reconcile.py:40` | SIM102 | 嵌套 `if` 可合并 |
+| `py/scripts/temporal_m0_demo.py:41` | RUF100 | `# noqa: ANN001` 多余（ANN 规则未启用） |
+| `scripts/generate_license.py:53` | TRY004 | 类型不符应抛 `TypeError` |
+| `scripts/measure_multimodal_storage.py:90` | I001 | import 未排序 |
+
+**为什么最上面那条不是风格问题**：该行把 `'\\|'` 写在 f-string 的**表达式**里。
+PEP 701 之前（Python < 3.12）f-string 表达式部分不允许出现反斜杠，于是整个脚本在
+3.10/3.11 上直接 `SyntaxError: f-string expression part cannot include a backslash`，
+连 import 都过不去。项目 `target-version = "py310"`、CI 矩阵也跑 3.10/3.11 ——
+即该脚本在声明的最低支持版本上根本跑不起来，却因为不在扫描范围内一直没红。
+已用 CPython 3.11.15 复现该 `SyntaxError`，修复后 `py_compile` 通过（改动为
+先算 `error` 变量再插值，语义不变）。
+
+**门禁侧**：
+
+1. `ruff check` 扩到 `maop/ tests/ scripts/ ../scripts/`，并**显式** `--config pyproject.toml`。
+   根 `scripts/` 不在 `py/` 下，不指定时 ruff 按文件路径就近发现配置（根目录无配置 ⇒
+   退化成默认规则集），等于同一作业里跑两套判据。
+2. `tests/test_lint_toolchain_pins.py` 新增 3 条守卫：CI 必须覆盖上述四个目录、
+   命令行缩水被逐项点名、找不到 `ruff check` 行时 fail closed（不当作合格）。
+   变异验证：把命令行退回 `ruff check maop/ tests/` →
+   `test_ci_lint_covers_scripts_directories` 精确转红，其余 9 条仍绿。
+
 ### 发布灰度通道与回滚预案（2026-11-16）
 
 此前发布体系只有"tag 触发 → PyPI + GitHub Release"这一条直发路径：

@@ -145,6 +145,7 @@ functions 55.5 / lines 63.5），**只许往上抬**；要降必须连带改
 |------|---|
 | `py/tests/test_ci_path_scope.py` | 变更集分类 + 触发面结构（白名单不许回来） |
 | `py/tests/test_ci_workflow_hygiene.py` | 不许有吞自身失败的步骤（`fail_ci_if_error: false`、未登记的 `continue-on-error`） |
+| `py/tests/test_lint_toolchain_pins.py` | lint 工具链的两面：① **版本口径** —— dev extra 与 `ci.yml` 的 `pip install "ruff==X" "mypy==Y"` 必须逐字相等（抬版本要同一笔改两处）；② **扫描范围** —— `ruff check` 必须覆盖 `maop/ tests/ scripts/ ../scripts/`。第 ② 面是 2026-11-17 补的：此前只扫 `maop/ tests/`，两个 `scripts/` 目录长期在门禁外，存量 7 条诊断无人发现，其中 `py/scripts/business_sim/soak_report.py` 是 Python 3.10/3.11 上的**真实 `SyntaxError`**（f-string 表达式内含反斜杠，PEP 701 才允许），而 `target-version = py310`、CI 矩阵也跑 3.10/3.11。守卫对"命令行缩水"和"找不到 ruff 行"都 fail closed |
 | `py/tests/test_frontend_coverage_gate.py` | 覆盖率门禁在 CI 里、阈值不低于实测、禁全局忽略未处理错误 |
 | `py/tests/test_dependabot_config.py` | dependabot 配置形状 + 同前缀 ≥2 个包的 action 必须成批 |
 | `py/tests/test_requirements_lock_sync.py` | `requirements.lock` 的直依赖段必须逐条镜像 `pyproject.toml` |

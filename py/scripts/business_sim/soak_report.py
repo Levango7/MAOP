@@ -137,9 +137,13 @@ def render_markdown(summary: dict[str, Any], progress: Path) -> str:
                   "|---|---|---|---|---|---|"]
         for r in failures:
             stderr = (r.get("first_fail_stderr") or "").replace("|", "\\|").replace("\n", " ")
+            # 反斜杠不能出现在 f-string 的表达式里（PEP 701 才允许，Python 3.12+）。
+            # 本项目 target-version = py310、CI 也跑 3.10/3.11，写在表达式内会让
+            # 整个脚本在 <3.12 上是 SyntaxError —— 先算好再插值。
+            error = (r.get("error") or "").replace("|", "\\|")[:120]
             lines.append(
                 f"| {r.get('round')} | {r.get('ts')} | {r.get('scenario')} | "
-                f"{r.get('failed')} | {(r.get('error') or '').replace('|', '\\|')[:120]} | {stderr[:160]} |"
+                f"{r.get('failed')} | {error} | {stderr[:160]} |"
             )
     integrity = summary["integrity_checks"]
     lines += ["", f"## DB 完整性检查（{len(integrity)} 次，每小时一轮）", ""]
