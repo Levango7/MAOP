@@ -1855,3 +1855,17 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 ④ **A 批 #4**:删事件型 useToast(useMaopEffects.js)+ MaopToast.vue + App.vue 挂载 + maop-motion.css 规则。
 ⑤ **缺陷2 不重复做**:upgrade 无界挂起由 ZCode 线 fix/dashboard-upgrade-fanout @ 3646d220 以「有界并发+缓存」实现(agent_admin.py + 2 新测试),与本批目标文件零交集;本批只在 DONE 回执引用登记。
 **门禁**:ruff(改动的 py 文件)+ 针对性 pytest + eslint + vitest 全量 + vite build;dist-enterprise 重建。回执带新 sha 落板;未推送(无授权)。
+
+## DONE — fix/q3-alert-honesty：Q3 重做 + A 批前端诚实化回执（@ 4d703c64）— 2026-11-18（Qoder-CN 17ef022a）
+
+**授权**：用户 2026-11-16/18 收尾追问后按已陈述方案执行（CLAIM 见上）；B 批仅登记。
+**提交**：393ba9f3（CLAIM）+ 4d703c64（代码，11 files，+277/−343，显式路径 add；工作树净；未推送——无推送授权）。
+**事故重做说明**：原 fix/q3-click-audit@ff8ef0c9 随 11-15 主仓 .git 清空丢失（未推送、对象已不在库，不可恢复；见 ccd1de25 事故登记）；本批在新 worktree（主仓 worktree add，基于 master 96bf0a01）重做并重新验证，旧 sha 与旧 DONE 回执（4a5eb9e2，随 MAOP-ent17 目录同失）作废。
+**缺陷1 pause/resume/stop 500**：control_schemas.py 三字段 bool→int（照 system_service 计数写实）；回归 3 条（2 作业必 ≥2 触发旧 bool_parsing）；tests/test_router_control.py = **68 passed**。
+**缺陷3 + A 批契约对齐**：AlertRules.vue save() 发 {condition_type:'threshold', condition:{op,value,window_s,filter}, action, action_config}；inline 选项改后端枚举 notify（标签「应用内」）；删 metric 下拉/表格列/回填键与 cooldown_s（引擎按事件计数、指标无数据源；窗口内 _last_alert_ts 去重已覆盖冷却语义）；email/webhook_id 进 action_config（JSONB 持久化）并在编辑时回填（不再恒默认）；conditionLabel 对齐引擎 op 集合（==/!=，新增 condNe 词条）。
+**A 批 WS 告警 toast**：realtime.js 新增 alertToastFromMessage（alert_id+rule_id 双键识别；快照 type:'snapshot' 排除）→ store 型 toast（severity→tone）；通知链路 notify 名正言顺。
+**A 批 #4 删死接线**：useMaopEffects.js 事件型 useToast + MaopToast.vue + App.vue 挂载/导入 + maop-motion.css toast 规则全删（store 通道 37 视图在用，事件链零调用方，见 Q3 登记第 4 条）。
+**门禁**：ruff 2 文件通过；pytest 68 passed；eslint 7 文件 exit 0；vitest 定向 42 passed + 全量 **80 files / 715 tests passed**（i18n 覆盖首跑 5s 冷缓存超时、单跑 4/4 通过＝环境红非内容红）；vite build exit 0（dist-enterprise 已重建，gitignored）。
+**缺陷2 引用登记（不重复实现）**：upgrade 无界挂起由 ZCode 线 fix/dashboard-upgrade-fanout@3646d220 以「有界并发+缓存」（agent_admin.py + 2 新测试）修复，与本批目标文件零交集。
+**语义缺口（登记，不扩面）**：① email/webhook 投递引擎侧无消费方——通道实现（SMTP/Webhook/InApp+加密存储）已在 MAOS notification 包，缺「引擎命中→通道」接线，属 B 批（MAOS 领地，未授权未动）；② action_config 键契约本批定为 email→{email}、webhook→{webhook_id}，供 B 批消费；③ pytest 运行需 PYTHONPATH 指 worktree（editable 安装现指向主仓 master，验证面须显式覆盖）。
+**未触碰**：master、他线 branch/PR（MAOP-op @ fix/dashboard-upgrade-fanout）、CI/CD、推送；F:/tmp 下探针/日志为仓外副产物。
