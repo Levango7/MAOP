@@ -225,4 +225,126 @@ describe('AlertRules.vue', () => {
     expect(global.fetch.urls).toContain('/api/audit/alert/history?rule_id=r1');
     wrapper.unmount();
   });
+
+  function mockSave(posts) {
+    global.fetch = vi.fn((url, init) => {
+      const u = String(url);
+      if (u === '/api/audit/alert/rules' && init && init.method === 'POST') {
+        posts.push(JSON.parse(init.body));
+      }
+      let body = {};
+      if (u === '/api/audit/alert/rules') body = { rules: [], count: 0 };
+      else if (u.startsWith('/api/audit/alert/history')) body = { alerts: [], count: 0 };
+      else if (u === '/api/hooks') body = { hooks: [], count: 0 };
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: () => Promise.resolve(body),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      });
+    });
+  }
+
+  async function openCreateAndFill(overlay) {
+    const inputs = [...overlay.querySelectorAll('input')];
+    const nameInput = inputs[0];
+    nameInput.value = 'cpu-hot';
+    nameInput.dispatchEvent(new Event('input'));
+    const thresholdInput = inputs.find((i) => i.type === 'number' && i.step === 'any');
+    thresholdInput.value = '90';
+    thresholdInput.dispatchEvent(new Event('input'));
+    await flushPromises();
+    return inputs;
+  }
+
+  it('saves a rule in the backend condition-dict shape with email in action_config', async () => {
+    // Q3 缺陷3(重做):condition 必须是 {op, value, window_s, filter} 对象且带
+    // condition_type,否则后端 dict 校验 422;收件人走 action_config(JSONB)。
+    const posts = [];
+    mockSave(posts);
+    const wrapper = mount(AlertRules);
+    await flushPromises();
+    await flushPromises();
+
+    const createBtn = wrapper.findAll('button').find((b) => b.text().includes('New Rule'));
+    await createBtn.trigger('click');
+    await flushPromises();
+
+    const overlay = document.querySelector('.modal-overlay');
+    const inputs = await openCreateAndFill(overlay);
+    // 默认 channel=email,validate() 拦空/非法邮箱;text 输入依次是 name/description/email。
+    const emailInput = inputs.filter((i) => i.type === 'text')[2];
+    emailInput.value = 'ops@example.com';
+    emailInput.dispatchEvent(new Event('input'));
+    await flushPromises();
+
+    const saveBtn = [...overlay.querySelectorAll('button')].find((b) => b.textContent.includes('Save'));
+    saveBtn.dispatchEvent(new Event('click'));
+    await flushPromises();
+    await flushPromises();
+
+    expect(posts).toHaveLength(1);
+    const payload = posts[0];
+    expect(payload.name).toBe('cpu-hot');
+    expect(payload.condition_type).toBe('threshold');
+    expect(payload.condition).toEqual({ op: '>', value: 90, window_s: 300, filter: {} });
+    expect(payload.action).toBe('email');
+    expect(payload.action_config).toEqual({ email: 'ops@example.com' });
+    wrapper.unmount();
+  });
+
+  it('saves the in-app channel as backend action notify with empty action_config', async () => {
+    // 「应用内」直发后端枚举 notify;不再有必 422 的 'inline'。
+    const posts = [];
+    mockSave(posts);
+    const wrapper = mount(AlertRules);
+    await flushPromises();
+    await flushPromises();
+
+    const createBtn = wrapper.findAll('button').find((b) => b.text().includes('New Rule'));
+    await createBtn.trigger('click');
+    await flushPromises();
+
+    const overlay = document.querySelector('.modal-overlay');
+    await openCreateAndFill(overlay);
+    const selects = [...overlay.querySelectorAll('select')];
+    const channelSelect = selects.find((s) => [...s.options].some((o) => o.value === 'notify'));
+    channelSelect.value = 'notify';
+    channelSelect.dispatchEvent(new Event('change'));
+    await flushPromises();
+
+    const saveBtn = [...overlay.querySelectorAll('button')].find((b) => b.textContent.includes('Save'));
+    saveBtn.dispatchEvent(new Event('click'));
+    await flushPromises();
+    await flushPromises();
+
+    expect(posts).toHaveLength(1);
+    const payload = posts[0];
+    expect(payload.action).toBe('notify');
+    expect(payload.action_config).toEqual({});
+    expect(payload.condition_type).toBe('threshold');
+    wrapper.unmount();
+  });
+
+  it('prefills the email recipient from action_config when editing a rule', async () => {
+    global.fetch = mockFetch();
+    const wrapper = mount(AlertRules);
+    await flushPromises();
+    await flushPromises();
+
+    const editBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Edit');
+    expect(editBtn).toBeTruthy();
+    await editBtn.trigger('click');
+    await flushPromises();
+
+    const overlay = document.querySelector('.modal-overlay');
+    expect(overlay).toBeTruthy();
+    const inputs = [...overlay.querySelectorAll('input')];
+    // name / description / email —— 收件人从 action_config.email 回填,不再恒默认空。
+    const emailInput = inputs.filter((i) => i.type === 'text')[2];
+    expect(emailInput.value).toBe('ops@example.com');
+    const selects = [...overlay.querySelectorAll('select')];
+    const channelSelect = selects.find((s) => [...s.options].some((o) => o.value === 'email'));
+    expect(channelSelect.value).toBe('email');
+    wrapper.unmount();
+  });
 });

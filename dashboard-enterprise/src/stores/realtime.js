@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import { useWebSocket } from '../composables/useWebSocket.js';
+import { useToast } from '../composables/useToast.js';
 
 /**
  * Global realtime store.
@@ -11,6 +12,22 @@ import { useWebSocket } from '../composables/useWebSocket.js';
  * Connection URL is derived from the current page hostname so the same
  * build works in dev and behind a proxy: ws://<hostname>:9079/ws
  */
+/**
+ * 后端审计告警引擎命中即 broadcaster(alert.model_dump()) → /ws 原样 send_json,
+ * 无 type 信封;快照消息带 type:'snapshot'。以 alert_id+rule_id 双键识别告警,
+ * 避免把快照误当告警。返回 toast 文案与 tone,非告警消息返回 null。
+ */
+export function alertToastFromMessage(msg) {
+  if (!msg || typeof msg !== 'object' || !msg.alert_id || !msg.rule_id) return null;
+  const severity = String(msg.severity || '').toLowerCase();
+  const tone = severity === 'critical' || severity === 'error' ? 'error'
+    : severity === 'warning' || severity === 'warn' ? 'warn'
+      : 'info';
+  const rule = (msg.metadata && msg.metadata.rule_name) || msg.rule_id;
+  const text = msg.message ? `${rule}: ${msg.message}` : rule;
+  return { text, tone };
+}
+
 export const useRealtimeStore = defineStore('realtime', () => {
   const connected = ref(false);
   const snapshot = ref(null);
@@ -59,6 +76,12 @@ export const useRealtimeStore = defineStore('realtime', () => {
         snapshot.value = msg;
         lastUpdate.value = Date.now();
         connected.value = ws.connected.value;
+        // 告警引擎命中广播(notify 通道)→ store 型 toast;引擎已在窗口内去重,
+        // 这里不再二次节流。
+        const alertToast = alertToastFromMessage(msg);
+        if (alertToast) {
+          useToast().show(alertToast.text, { tone: alertToast.tone, timeout: 5200 });
+        }
       }
     );
 

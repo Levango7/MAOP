@@ -11,11 +11,10 @@ export const messages = {
     'view.alerts.subtitle': 'Alert rules, thresholds and notification channels',
     'view.alerts.createBtn': 'New Rule',
     'view.alerts.refreshBtn': 'Refresh',
-    'view.alerts.hint': 'Rules evaluate metrics against thresholds and notify via email, webhook or in-app channels.',
+    'view.alerts.hint': 'Rules count matching events in a time window and notify via email, webhook or in-app channels.',
 
     // ── Table columns ───────────────────────────────────────────
     'view.alerts.colName': 'Name',
-    'view.alerts.colMetric': 'Metric',
     'view.alerts.colCondition': 'Condition',
     'view.alerts.colThreshold': 'Threshold',
     'view.alerts.colChannel': 'Channel',
@@ -31,12 +30,13 @@ export const messages = {
     'view.alerts.condLt': '<',
     'view.alerts.condGte': '≥',
     'view.alerts.condLte': '≤',
-    'view.alerts.condEq': '=',
+    'view.alerts.condEq': '==',
+    'view.alerts.condNe': '!=',
 
     // ── Notification channels ───────────────────────────────────
     'view.alerts.channelEmail': 'Email',
     'view.alerts.channelWebhook': 'Webhook',
-    'view.alerts.channelInline': 'In-App',
+    'view.alerts.channelNotify': 'In-App',
 
     // ── Actions ─────────────────────────────────────────────────
     'view.alerts.actionEdit': 'Edit',
@@ -48,13 +48,11 @@ export const messages = {
     'view.alerts.dialogTitleCreate': 'Create Alert Rule',
     'view.alerts.dialogTitleEdit': 'Edit Alert Rule',
     'view.alerts.fieldName': 'Rule Name',
-    'view.alerts.fieldMetric': 'Metric',
     'view.alerts.fieldCondition': 'Condition',
     'view.alerts.fieldThreshold': 'Threshold',
     'view.alerts.fieldChannel': 'Notification Channel',
     'view.alerts.fieldWebhook': 'Webhook',
     'view.alerts.fieldEmail': 'Email Address',
-    'view.alerts.fieldCooldown': 'Cooldown (s)',
     'view.alerts.fieldEnabled': 'Enabled',
     'view.alerts.fieldDescription': 'Description',
     'view.alerts.btnSave': 'Save',
@@ -63,18 +61,9 @@ export const messages = {
     'view.alerts.placeholderEmail': 'ops@example.com',
     'view.alerts.placeholderThreshold': '0',
 
-    // ── Metrics ─────────────────────────────────────────────────
-    'view.alerts.metricCpuUsage': 'CPU Usage (%)',
-    'view.alerts.metricMemoryUsage': 'Memory Usage (%)',
-    'view.alerts.metricLatency': 'Latency (ms)',
-    'view.alerts.metricErrorRate': 'Error Rate (%)',
-    'view.alerts.metricCostDaily': 'Daily Cost',
-    'view.alerts.metricTaskQueue': 'Task Queue Depth',
-    'view.alerts.metricAgentOffline': 'Offline Agents',
-
     // ── Empty / error / loading ────────────────────────────────
     'view.alerts.empty': 'No alert rules configured',
-    'view.alerts.emptyDesc': 'Create a rule to get notified when metrics cross thresholds.',
+    'view.alerts.emptyDesc': 'Create a rule to get notified when event counts cross thresholds.',
     'view.alerts.loadError': 'Failed to load alert rules',
     // 2026-09-23: 后端 /api/audit/alert/* 由 FeatureFlag.AUDIT_LOG 门禁，
     // 个人版返回 404 "Audit enhancement requires enterprise edition"。
@@ -135,11 +124,10 @@ export const messages = {
     'view.alerts.subtitle': '告警规则、阈值与通知渠道',
     'view.alerts.createBtn': '新建规则',
     'view.alerts.refreshBtn': '刷新',
-    'view.alerts.hint': '规则将指标与阈值进行比较，并通过邮件、Webhook 或应用内通知渠道发送告警。',
+    'view.alerts.hint': '规则按时间窗口统计匹配事件数，越过阈值时通过邮件、Webhook 或应用内渠道通知。',
 
     // ── Table columns ───────────────────────────────────────────
     'view.alerts.colName': '名称',
-    'view.alerts.colMetric': '指标',
     'view.alerts.colCondition': '条件',
     'view.alerts.colThreshold': '阈值',
     'view.alerts.colChannel': '通知渠道',
@@ -155,12 +143,13 @@ export const messages = {
     'view.alerts.condLt': '<',
     'view.alerts.condGte': '≥',
     'view.alerts.condLte': '≤',
-    'view.alerts.condEq': '=',
+    'view.alerts.condEq': '==',
+    'view.alerts.condNe': '!=',
 
     // ── Notification channels ───────────────────────────────────
     'view.alerts.channelEmail': '邮件',
     'view.alerts.channelWebhook': 'Webhook',
-    'view.alerts.channelInline': '应用内',
+    'view.alerts.channelNotify': '应用内',
 
     // ── Actions ─────────────────────────────────────────────────
     'view.alerts.actionEdit': '编辑',
@@ -172,13 +161,11 @@ export const messages = {
     'view.alerts.dialogTitleCreate': '新建告警规则',
     'view.alerts.dialogTitleEdit': '编辑告警规则',
     'view.alerts.fieldName': '规则名称',
-    'view.alerts.fieldMetric': '指标',
     'view.alerts.fieldCondition': '条件',
     'view.alerts.fieldThreshold': '阈值',
     'view.alerts.fieldChannel': '通知渠道',
     'view.alerts.fieldWebhook': 'Webhook',
     'view.alerts.fieldEmail': '邮箱地址',
-    'view.alerts.fieldCooldown': '冷却时间 (秒)',
     'view.alerts.fieldEnabled': '启用',
     'view.alerts.fieldDescription': '描述',
     'view.alerts.btnSave': '保存',
@@ -187,18 +174,9 @@ export const messages = {
     'view.alerts.placeholderEmail': 'ops@example.com',
     'view.alerts.placeholderThreshold': '0',
 
-    // ── Metrics ─────────────────────────────────────────────────
-    'view.alerts.metricCpuUsage': 'CPU 使用率 (%)',
-    'view.alerts.metricMemoryUsage': '内存使用率 (%)',
-    'view.alerts.metricLatency': '延迟 (ms)',
-    'view.alerts.metricErrorRate': '错误率 (%)',
-    'view.alerts.metricCostDaily': '日消费',
-    'view.alerts.metricTaskQueue': '任务队列深度',
-    'view.alerts.metricAgentOffline': '离线智能体数',
-
     // ── Empty / error / loading ────────────────────────────────
     'view.alerts.empty': '暂无告警规则',
-    'view.alerts.emptyDesc': '新建规则以在指标越过阈值时收到通知。',
+    'view.alerts.emptyDesc': '新建规则以在事件计数越过阈值时收到通知。',
     'view.alerts.loadError': '加载告警规则失败',
     // 2026-09-23: 见 en 块同名注释
     'view.alerts.requiresEnterprise': '告警规则需要企业版',

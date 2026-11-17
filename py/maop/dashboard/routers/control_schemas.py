@@ -76,19 +76,23 @@ class ControlRunResponse(BaseModel):
 class ControlPauseResponse(BaseModel):
     status: str = "ok"
     action: str = "pause"
-    paused: bool = False
+    # Q3 修复重做：pause_control() 返回「已暂停任务数」int；声明 bool 时 0/1 被
+    # pydantic 静默强转、≥2 抛 ResponseValidationError(bool_parsing) → 500。照 service 返回写实。
+    paused: int = 0
 
 
 class ControlResumeResponse(BaseModel):
     status: str = "ok"
     action: str = "resume"
-    resumed: bool = False
+    # 同 ControlPauseResponse：resume_control() 返回「已恢复任务数」int。
+    resumed: int = 0
 
 
 class ControlStopResponse(BaseModel):
     status: str = "ok"
     action: str = "stop"
-    stopped: bool = False
+    # 同 ControlPauseResponse：stop_control() 返回「已停止任务数」int。
+    stopped: int = 0
 
 
 class ControlValidateResponse(BaseModel):
