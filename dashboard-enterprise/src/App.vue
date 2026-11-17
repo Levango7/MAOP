@@ -82,9 +82,8 @@
     <ConfirmDialog />
     <CoachMarks />
     <CommandPalette />
-    <!-- MAOP 独有特效组件: 顶部加载条 + Toast 通知 (全局事件驱动) -->
+    <!-- MAOP 独有特效组件: 顶部加载条 -->
     <MaopLoadingBar />
-    <MaopToast />
   </div>
 </template>
 
@@ -101,9 +100,8 @@ import ConfirmDialog from './components/ConfirmDialog.vue';
 import AppFooter from './components/AppFooter.vue';
 import CoachMarks from './components/CoachMarks.vue';
 import CommandPalette from './components/CommandPalette.vue';
-// MAOP 独有特效组件: 顶部加载条 + Toast 通知
+// MAOP 独有特效组件: 顶部加载条
 import MaopLoadingBar from './components/MaopLoadingBar.vue';
-import MaopToast from './components/MaopToast.vue';
 import { useRouteLoadingBar } from './composables/useMaopEffects.js';
 import { useI18n } from './i18n/index.js';
 import { nav, filterNavByEdition } from './nav.js';

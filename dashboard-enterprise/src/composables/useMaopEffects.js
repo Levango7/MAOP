@@ -3,7 +3,6 @@
 // 统一管理 MAOP 微交互特效的触发与状态:
 //   - useLoadingBar(): 顶部加载条控制 (派发全局事件)
 //   - useNumberFlip(): 数字翻牌动画 (带状态与定时器清理)
-//   - useToast(): Toast 通知 (派发全局事件, 由 MaopToast.vue 接收)
 //
 // 设计规范: 所有动画统一使用 cubic-bezier(0.4, 0, 0.2, 1) 缓动,
 //           时长 0.15s/0.3s/2s, 色彩用 CSS 变量, 尊重 prefers-reduced-motion。
@@ -106,16 +105,4 @@ export function useNumberFlip() {
   })
 
   return { displayValue, flipClass, update }
-}
-
-// ── Toast 通知 ──────────────────────────────────────────────────────────────
-// 派发全局 CustomEvent, 由 MaopToast.vue 监听并显示。SSR 安全。
-// type: 'info' | 'success' | 'warn' | 'error'
-export function useToast() {
-  function show(message, type = 'info') {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('maop-toast', { detail: { message, type } }))
-    }
-  }
-  return { show }
 }

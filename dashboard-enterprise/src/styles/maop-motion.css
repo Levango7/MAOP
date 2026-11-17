@@ -178,24 +178,6 @@
   to { background-position: -200% 0; }
 }
 
-/* ── 特效11: MAOP 独有: Toast 从右侧滑入 ────────────────────────────────────
- * 非 AI 模板的 fade+scale 弹出, 而是从右侧 16px 滑入。
- * 视觉感受: 通知"递过来"了, 有物理感。 */
-.maop-toast-in {
-  animation: maop-toast-slide var(--motion-slow) var(--ease);
-}
-@keyframes maop-toast-slide {
-  from { opacity: 0; transform: translateX(16px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-.maop-toast-out {
-  animation: maop-toast-slide-out var(--motion-slow) var(--ease) forwards;
-}
-@keyframes maop-toast-slide-out {
-  from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(16px); }
-}
-
 /* ── 特效12: MAOP 独有: 折叠面板 grid 展开动画 ──────────────────────────────
  * 非 AI 模板的 max-height hack, 而是用 grid-template-rows 0fr→1fr。
  * 视觉感受: 面板"展开"了, 内容自然推下来, 无跳变。 */
@@ -261,7 +243,7 @@
   .maop-card-hover, .maop-page-enter, .maop-skeleton-pulse,
   .maop-brand-underline, .maop-status-breath,
   .maop-nav-active, .maop-btn-press, .maop-row-mark,
-  .maop-progress-flow, .maop-toast-in, .maop-toast-out,
+  .maop-progress-flow,
   .maop-collapse, .maop-loading-bar, .maop-number-flip {
     animation: none !important;
     transition: none !important;
