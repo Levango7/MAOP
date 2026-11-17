@@ -148,6 +148,7 @@
         compact
       />
       <div v-else class="blk"><Skeleton block height="14px" /><Skeleton block height="14px" /><Skeleton block height="14px" /></div>
+      <p class="muted">{{ t('view.cost.sourceNote') }}</p>
     </Card>
 
     <p v-if="error" class="view-error">
@@ -234,12 +235,31 @@ function entryUnpriced(e) {
   if ('priced' in m) return !m.priced;
   return !String(m.provider || '').trim();
 }
+// tokens_source 四态呈现（2026-11-14 审计发现 A：台账已写、前端零渲染）。
+// 无键＝历史行或未标注路径＝未知，与 estimated（已知是启发式）分开，不谎报。
+function entrySource(e) {
+  const s = String((e.metadata || {}).tokens_source || '').trim();
+  return (s === 'measured' || s === 'mixed' || s === 'estimated') ? s : '';
+}
+function sourceLabel(raw) {
+  if (raw === 'measured') return t('view.cost.source.measured');
+  if (raw === 'mixed') return t('view.cost.source.mixed');
+  if (raw === 'estimated') return t('view.cost.source.estimated');
+  return t('view.cost.source.unlabeled');
+}
+function sourceTone(raw) {
+  if (raw === 'measured') return 'success';
+  if (raw === 'mixed') return 'info';
+  if (raw === 'estimated') return 'warn';
+  return 'neutral';
+}
 
 const entryCols = [
   { key: 'time', label: t('view.cost.col.time'), type: 'time', width: '180px' },
   { key: 'agent', label: t('view.cost.col.agent'), width: '160px' },
   { key: 'model', label: t('common.model'), width: '160px' },
   { key: 'tokens', label: t('view.cost.col.tokens'), type: 'num', align: 'right' },
+  { key: 'source', label: t('view.cost.col.source'), type: 'badge', tone: (val, row) => sourceTone(row.source_raw), width: '110px' },
   { key: 'cost', label: t('view.cost.col.cost'), type: 'num', align: 'right' },
   { key: 'latency', label: t('common.latency'), align: 'right', width: '100px' },
 ];
@@ -250,6 +270,8 @@ const entryRows = computed(() =>
     agent: e.agent || '—',
     model: e.model || '—',
     tokens: formatNum(e.total_tokens),
+    source: sourceLabel(entrySource(e)),
+    source_raw: entrySource(e),
     // 无法计价（models.yaml 未收录该模型）时不显示 $0.0000，改显示「未计价」：
     // 否则账面与"这次真免费"完全同形，总成本会被读错（2026-11-08）。
     cost: entryUnpriced(e) ? t('view.cost.unpriced') : formatUSD(e.cost_usd || 0, 6),
