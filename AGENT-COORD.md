@@ -1841,3 +1841,17 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **分支清理**：远端已删（回读 404）；本地 ff 后 ancestor 验证 `3646d220` ∈ master；主仓 master 被 Nex 线占用，本线 MAOP-op 置 detached @origin/master 不与其争用；本地 fix 分支已删。
 - **合并前实测**：upgrade 首调 19.4s→缓存 0.010s；bottlenecks 在飞 overview 0.026s；/run/agents 14.2s 骨架清空渲染 96 行（原 30s 后空态）；/analysis 8.1s 清场。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## CLAIM — fix/q3-alert-honesty:Q3 重做(缺陷1/3)+ A 批前端诚实化(告警规则契约对齐 + WS 告警 toast + 删 #4 死接线)(Qoder-CN 17ef022a)— 2026-11-18
+
+**事故背景(如实登记)**:11-15 16:37 主仓 F:/Nexus/MAOP 的 .git 被清空(见 ccd1de25 登记);原 worktree F:/Nexus/MAOP-q3fix 的分支 fix/q3-click-audit @ ff8ef0c9 未推送,随旧 .git 一并丢失,对象已不在新仓;MAOP-ent17 板面仓同为连坐损失(Q3 DONE 回执 4a5eb9e2 不可恢复)。本批为**重做**,内容以会话内原始 diff 为准,重新验证,旧 sha 作废。
+**授权**:用户 2026-11-16 收尾追问(「总不能搁置在这里吧」+「?」)放行 A 批;2026-11-18 追问后继续。B 批(后端引擎→通知通道接线,MAOS 领地)仅登记不动。
+**领地说明**:dashboard-enterprise/src/** 属 Examples/Nex 默认领地,本批只动前端最小面 + 回归测试;py/** 只重做 control_schemas 的 int 计数修复 + 测试。
+**基线**:fix/q3-alert-honesty @ master 96bf0a01(origin/master 同点;fetch 因代理 502/curl 56 失败,以本地已知同步点为准,落 DONE 前重核)。
+**处置**:
+① **缺陷1 重做**:control_schemas.py ControlPause/Resume/StopResponse 的 paused/resumed/stopped bool→int(照 system_service 返回的计数写实;旧 bool 声明下 ≥2 触发 ResponseValidationError(bool_parsing)→500);回归=2 作业 int 计数测试。
+② **缺陷3 + A 批**:AlertRules.vue 对齐真实契约:condition dict 已修(重做),inline 选项 value 直发 notify(标签「应用内」)、删 metric 下拉/列/回填键与 cooldown_s、email/webhook_id 进 action_config(JSONB 持久化,编辑回填读 action_config)。
+③ **A 批 WS toast**:realtime.js 接告警广播(broadcaster 原样 send_json alert.model_dump(),以 alert_id+rule_id 识别)→ store 型 toast。
+④ **A 批 #4**:删事件型 useToast(useMaopEffects.js)+ MaopToast.vue + App.vue 挂载 + maop-motion.css 规则。
+⑤ **缺陷2 不重复做**:upgrade 无界挂起由 ZCode 线 fix/dashboard-upgrade-fanout @ 3646d220 以「有界并发+缓存」实现(agent_admin.py + 2 新测试),与本批目标文件零交集;本批只在 DONE 回执引用登记。
+**门禁**:ruff(改动的 py 文件)+ 针对性 pytest + eslint + vitest 全量 + vite build;dist-enterprise 重建。回执带新 sha 落板;未推送(无授权)。
