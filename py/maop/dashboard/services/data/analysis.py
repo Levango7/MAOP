@@ -13,6 +13,7 @@ used *here* on this module (``services.data.analysis._get_cost_tracker``).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -422,6 +423,26 @@ async def analysis_cost_breakdown(
     }
 
 
+def _scan_top_memory(ps: Any, top_n: int) -> list[dict[str, Any]]:
+    """同步扫描进程表并按 RSS 取前 top_n。
+
+    psutil 为阻塞调用；由调用方经 asyncio.to_thread 入线程执行（批 8 F2 修复）。
+    """
+    procs: list[dict[str, Any]] = []
+    for p in ps.process_iter(attrs=["pid", "name", "memory_info", "cpu_percent"]):
+        mi = p.info.get("memory_info")
+        if mi is None:
+            continue
+        procs.append({
+            "pid": p.info["pid"],
+            "name": p.info["name"],
+            "memory_mb": round(mi.rss / (1024 * 1024), 1),
+            "cpu_percent": p.info.get("cpu_percent", 0.0),
+        })
+    procs.sort(key=lambda x: x["memory_mb"], reverse=True)
+    return procs[:top_n]
+
+
 async def analysis_performance_bottlenecks(
     date_from: str,
     date_to: str,
@@ -486,23 +507,14 @@ async def analysis_performance_bottlenecks(
         note = (note + "; " if note else "") + "agent cost ranking unavailable"
 
     # 3) Top memory consumers via psutil
+    #    批 8 修复（F2）：全进程表扫描原在事件循环内同步执行——空库实测 7.65s
+    #    （同期五个分析端点均 <0.3s），期间全站冻结。扫描移入工作线程，
+    #    字段与排序原样保留。
     top_memory: list[dict[str, Any]] = []
     ps = _safe_psutil()
     if ps is not None:
         try:
-            procs = []
-            for p in ps.process_iter(attrs=["pid", "name", "memory_info", "cpu_percent"]):
-                mi = p.info.get("memory_info")
-                if mi is None:
-                    continue
-                procs.append({
-                    "pid": p.info["pid"],
-                    "name": p.info["name"],
-                    "memory_mb": round(mi.rss / (1024 * 1024), 1),
-                    "cpu_percent": p.info.get("cpu_percent", 0.0),
-                })
-            procs.sort(key=lambda x: x["memory_mb"], reverse=True)
-            top_memory = procs[:top_n]
+            top_memory = await asyncio.to_thread(_scan_top_memory, ps, top_n)
         except Exception as exc:
             logger.debug("[analysis] psutil process scan failed: %s", exc)
             note = (note + "; " if note else "") + "psutil process scan failed"

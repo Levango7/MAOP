@@ -13,6 +13,7 @@ import asyncio
 import logging
 import shutil
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -261,41 +262,75 @@ async def api_agent_upgrade(request: Request, agent: str = Query(..., descriptio
         raise HTTPException(status_code=500, detail="Agent upgrade failed")
 
 
+# 批 8 修复（F1）：原实现 N agents × (cli --version 5s + pip show 10s) 全串行，
+# 任一 CLI 挂起（Windows .CMD shim 常见）时端点分钟级不返回——前端 30s 超时后
+# 版本区永远空态；且客户端断开后服务端扫描仍跑完，挤兑拖慢全站（实测 upgrade
+# 在飞时 /api/overview 停滞 15s）。修复＝有界并发 + 结果 TTL 缓存 + 超时收紧。
+_AGENT_SCAN_CONCURRENCY = 6
+_VERSION_TIMEOUT_S = 3
+_PIP_SHOW_TIMEOUT_S = 5
+_AGENT_LIST_TTL_S = 60.0
+_agent_list_cache: dict[str, Any] = {}
+_agent_list_lock = asyncio.Lock()
+
+
+async def _one_agent_row(
+    name: str, ad: Any, sem: asyncio.Semaphore
+) -> dict[str, Any]:
+    """单个 agent 的 current/latest 版本行（受信号量限流）。"""
+    async with sem:
+        cli_path = shutil.which(ad.cli) if ad.cli else None
+        current = ""
+        if cli_path:
+            try:
+                _rc, _out, _err = await _deps._run_subprocess(
+                    [ad.cli, "--version"], timeout=_VERSION_TIMEOUT_S
+                )
+                current = (_out or _err).strip()[:100]
+            except Exception as exc:
+                logger.warning('Failed to get CLI version: %s', exc)
+        latest = "?"
+        if ad.cli:
+            try:
+                _rc, _out, _err = await _deps._run_subprocess(
+                    [sys.executable, "-m", "pip", "show", ad.cli],
+                    timeout=_PIP_SHOW_TIMEOUT_S,
+                )
+                if _rc == 0:
+                    for line in _out.split("\n"):
+                        if line.startswith("Version:"):
+                            latest = line.split(":", 1)[1].strip()
+                            break
+            except Exception as exc:
+                logger.warning('Failed to get pip package version: %s', exc)
+        return {
+            "name": name, "current": current, "latest": latest,
+            "status": "ok" if cli_path else "unavailable",
+        }
+
+
 @router.get("/api/agent/upgrade")
 @handle_api_errors
 async def api_agent_upgrade_get(request: Request, agent: str = "") -> dict[str, Any]:
     require_admin(request)
     try:
+        now = time.monotonic()
+        async with _agent_list_lock:
+            cached = _agent_list_cache.get("data")
+            cached_at = _agent_list_cache.get("ts", 0.0)
+        if cached is not None and now - cached_at < _AGENT_LIST_TTL_S:
+            return cached
         from maop.config.loader import ConfigLoader
         cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
-        result = []
-        for name, ad in cfg.agents.items():
-            cli_path = shutil.which(ad.cli) if ad.cli else None
-            current = ""
-            if cli_path:
-                try:
-                    _rc, _out, _err = await _deps._run_subprocess([ad.cli, "--version"], timeout=5)
-                    current = (_out or _err).strip()[:100]
-                except Exception as exc:
-                    logger.warning('Failed to get CLI version: %s', exc)
-            latest = "?"
-            if ad.cli:
-                try:
-                    _rc, _out, _err = await _deps._run_subprocess(
-                        [sys.executable, "-m", "pip", "show", ad.cli], timeout=10
-                    )
-                    if _rc == 0:
-                        for line in _out.split("\n"):
-                            if line.startswith("Version:"):
-                                latest = line.split(":", 1)[1].strip()
-                                break
-                except Exception as exc:
-                    logger.warning('Failed to get pip package version: %s', exc)
-            result.append({
-                "name": name, "current": current, "latest": latest,
-                "status": "ok" if cli_path else "unavailable",
-            })
-        return {"status": "ok", "agents": result}
+        sem = asyncio.Semaphore(_AGENT_SCAN_CONCURRENCY)
+        rows = await asyncio.gather(
+            *(_one_agent_row(name, ad, sem) for name, ad in cfg.agents.items())
+        )
+        result = {"status": "ok", "agents": list(rows)}
+        async with _agent_list_lock:
+            _agent_list_cache["data"] = result
+            _agent_list_cache["ts"] = time.monotonic()
+        return result
     except Exception as exc:
         logger.error("Agent upgrade list failed: %s", exc)
         # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
