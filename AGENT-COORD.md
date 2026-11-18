@@ -1869,3 +1869,16 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 **缺陷2 引用登记（不重复实现）**：upgrade 无界挂起由 ZCode 线 fix/dashboard-upgrade-fanout@3646d220 以「有界并发+缓存」（agent_admin.py + 2 新测试）修复，与本批目标文件零交集。
 **语义缺口（登记，不扩面）**：① email/webhook 投递引擎侧无消费方——通道实现（SMTP/Webhook/InApp+加密存储）已在 MAOS notification 包，缺「引擎命中→通道」接线，属 B 批（MAOS 领地，未授权未动）；② action_config 键契约本批定为 email→{email}、webhook→{webhook_id}，供 B 批消费；③ pytest 运行需 PYTHONPATH 指 worktree（editable 安装现指向主仓 master，验证面须显式覆盖）。
 **未触碰**：master、他线 branch/PR（MAOP-op @ fix/dashboard-upgrade-fanout）、CI/CD、推送；F:/tmp 下探针/日志为仓外副产物。
+
+## 更正 — fix/q3-alert-honesty rebase 后 sha 与最终门禁（2026-11-18，Qoder-CN 17ef022a）
+
+为满足「最新基全绿再推」，master 前移（96bf0a01 → 96ae0348，ZCode 批 8 PR #284 合入）后本线已 rebase；rebase 改写了 sha，上节回执内引用作废，以本节为准：
+- CLAIM = **5182d92a**（原 393ba9f3）
+- 代码 = **d4d0a76b**（原 4d703c64；`git show --stat` 新旧逐项相同＝11 files +277/−343，仅换基）
+- DONE 回执本体 = **a27d22bf**
+- 告警保存失败异常路径回归（toast.error + 模态保持）= **6c467dfc**
+- i18n 覆盖扫描超时硬化（describe 级 5s→30s）= **2c42f5a8**（负载机必现环境红：并发 58s 跑时全树同步扫描超 5s；断言本身未变）
+板面合并：本线 CLAIM/DONE 块与 ZCode PR #284 回执块同文件 EOF 并存，无覆盖。
+
+**最终门禁（rebase 后 96ae0348 合并树）**：ruff 2 文件通过；pytest **71 passed**（test_router_control 68 + master 新增 test_agent_upgrade_fanout / test_bottlenecks_scan_thread）；control 套件二次复跑 68 passed（重复验证）；vitest 全量 **80 files / 716 tests passed**；eslint 7 文件 exit 0；vite build exit 0（源码 rebase 前后逐字节一致，新旧 `git show --stat` 相同）。
+**推送**：fix/q3-alert-honesty 已推 origin（用户 2026-11-18「确定没问题 再推送」条件式授权；条件＝上列全绿）。
