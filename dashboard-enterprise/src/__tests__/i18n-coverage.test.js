@@ -87,7 +87,8 @@ function dictionaryKeys() {
   return used;
 }
 
-describe('i18n coverage', () => {
+// 全树同步扫描:负载机上默认 5s 必超(并发跑 58s 时实测必红),给足 30s。
+describe('i18n coverage', { timeout: 30000 }, () => {
   it('every literal key passed to t() exists in the dictionary', () => {
     const dict = dictionaryKeys();
     const used = referencedKeys();
