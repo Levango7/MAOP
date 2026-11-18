@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import AlertRules from '../views/AlertRules.vue';
+import { toastState } from '../composables/useToast.js';
 
 describe('AlertRules.vue', () => {
   let originalFetch;
@@ -345,6 +346,54 @@ describe('AlertRules.vue', () => {
     const selects = [...overlay.querySelectorAll('select')];
     const channelSelect = selects.find((s) => [...s.options].some((o) => o.value === 'email'));
     expect(channelSelect.value).toBe('email');
+    wrapper.unmount();
+  });
+
+  it('surfaces a save failure as an error toast and keeps the modal open', async () => {
+    // 异常输出面：后端 4xx/5xx 时 toast.error 且模态保持打开——不假装成功。
+    toastState.items.splice(0, toastState.items.length);
+    global.fetch = vi.fn((url, init) => {
+      const u = String(url);
+      if (u === '/api/audit/alert/rules' && init && init.method === 'POST') {
+        return Promise.resolve({
+          ok: false, status: 500,
+          json: () => Promise.resolve({ error: 'boom' }),
+          text: () => Promise.resolve('boom'),
+        });
+      }
+      let body = {};
+      if (u === '/api/audit/alert/rules') body = { rules: [], count: 0 };
+      else if (u.startsWith('/api/audit/alert/history')) body = { alerts: [], count: 0 };
+      else if (u === '/api/hooks') body = { hooks: [], count: 0 };
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: () => Promise.resolve(body),
+        text: () => Promise.resolve(JSON.stringify(body)),
+      });
+    });
+    const wrapper = mount(AlertRules);
+    await flushPromises();
+    await flushPromises();
+
+    const createBtn = wrapper.findAll('button').find((b) => b.text().includes('New Rule'));
+    await createBtn.trigger('click');
+    await flushPromises();
+
+    const overlay = document.querySelector('.modal-overlay');
+    const inputs = await openCreateAndFill(overlay);
+    const emailInput = inputs.filter((i) => i.type === 'text')[2];
+    emailInput.value = 'ops@example.com';
+    emailInput.dispatchEvent(new Event('input'));
+    await flushPromises();
+
+    const saveBtn = [...overlay.querySelectorAll('button')].find((b) => b.textContent.includes('Save'));
+    saveBtn.dispatchEvent(new Event('click'));
+    await flushPromises();
+    await flushPromises();
+
+    expect(toastState.items.some((i) => i.tone === 'error')).toBe(true);
+    expect(document.querySelector('.modal-overlay')).toBeTruthy();
+    toastState.items.splice(0, toastState.items.length);
     wrapper.unmount();
   });
 });
