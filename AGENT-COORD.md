@@ -1832,3 +1832,12 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 ### 收板口径
 
 本回执为 docs-only 笔，直推 master 后由新 trunk run 收口。
+
+## 批 8 修复 PR #284 合并回执（ZCode 线）— 2026-11-18
+
+- **合并**：`51f6be2d`（merge commit，2026-11-18T09:54:07Z）；head `3646d220`；CI **32/32 全绿**（25 pass + 7 skipped，0 红），mss=CLEAN。合并前 master 被他线批 9 推进（`96bf0a010` 等），与本 PR 面零交叠。
+- **三问验收补测（隔离栈 :9081 实测）**：异常输出＝31 agents 中 7 行天然挂起/失败样本端点仍 200 ok、四键齐不传染；并发场景＝6 并发 GET upgrade 全 200 且返回签名一致 + 混合打（upgrade+bottlenecks+overview 同飞）health/overview 均响应不冻；重复验证＝新钉测重跑 **3 passed**（第二次独立通过）+ upgrade 三连打 3×200 签名一致 + 回归 64 passed。
+- **灰度/回滚**：本仓已有 #282 发布灰度通道（rc tag + --prerelease）与量化回滚预案（`d83f4a67`）；本 PR 回滚路径＝revert merge commit 即恢复旧行为（纯性能改造，响应字段/结构原样，无 schema 变化）。
+- **分支清理**：远端已删（回读 404）；本地 ff 后 ancestor 验证 `3646d220` ∈ master；主仓 master 被 Nex 线占用，本线 MAOP-op 置 detached @origin/master 不与其争用；本地 fix 分支已删。
+- **合并前实测**：upgrade 首调 19.4s→缓存 0.010s；bottlenecks 在飞 overview 0.026s；/run/agents 14.2s 骨架清空渲染 96 行（原 30s 后空态）；/analysis 8.1s 清场。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
