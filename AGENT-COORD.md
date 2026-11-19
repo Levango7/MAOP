@@ -1841,3 +1841,10 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **分支清理**：远端已删（回读 404）；本地 ff 后 ancestor 验证 `3646d220` ∈ master；主仓 master 被 Nex 线占用，本线 MAOP-op 置 detached @origin/master 不与其争用；本地 fix 分支已删。
 - **合并前实测**：upgrade 首调 19.4s→缓存 0.010s；bottlenecks 在飞 overview 0.026s；/run/agents 14.2s 骨架清空渲染 96 行（原 30s 后空态）；/analysis 8.1s 清场。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## 批 10 CLAIM：upgrade 请求级单飞 + bottlenecks top_memory 缓存/单飞（ZCode 线）
+
+- **承接**：批 8 两项性能边界，用户「做吧」授权。① GET /api/agent/upgrade 并发 miss 各自计算（semaphore 限总量但放大）⇒ 请求级 single-flight（共享 in-flight，冷缓存并发只算一次、失败清理）；② bottlenecks top_memory 与日期参数无关却每次重扫（切 tab 也扫）⇒ 30s TTL 缓存 + 同款单飞。
+- **方案证伪留痕**：micro-benchmark（本机 937+ 进程）full 9.2/5.8s vs no-cpu 4.8/7.5s——「去 cpu_percent 降本」无稳定差距，**不采用**；成本在全表扫描本身，故走缓存+单飞消重复，扫描固有成本如实保留。
+- **做法**：钉测（冷缓存并发只算一次/失败清理/TTL 内零扫描；扫描期间事件循环仍推进）+ 本机门 + 隔离栈实测；纯性能改造，响应结构原样。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
