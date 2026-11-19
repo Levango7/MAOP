@@ -34,6 +34,9 @@ class _SlowProcIter:
 
 def test_scan_off_event_loop(monkeypatch):
     stub = _SlowProcIter(6, 0.12)  # 扫描总耗时 ≥0.72s
+    # 批 10 引入 top_memory 缓存/单飞后，清空以防跨测试串扰
+    monkeypatch.setattr(an, "_top_memory_cache", {})
+    monkeypatch.setattr(an, "_top_memory_inflight", {})
     monkeypatch.setattr(an, "_safe_psutil", lambda: stub)
 
     ticks = {"n": 0}
