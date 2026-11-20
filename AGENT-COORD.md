@@ -1898,3 +1898,11 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **分支清理**：远端 `feat/cost-tokens-source` 已删（回读 404；tip `9619f694` 已并入 `303e8bd5`）；本地隔离 worktree MAOP-costsrc 保留。
 - **遗留登记（待裁）**：E2E job 的 10 分钟预算与冷装 8.5 分钟共享——本次根因已消解（缓存已种上），但 runner 镜像再轮换会复发；是否上调 `timeout-minutes` 10→20 属 CI 配置变更，建议另开 PR 待审。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送将起新 trunk run，其 required 四件绿为最终收口。
+
+## trunk 红诊断与 deps 处置回执（ZCode 线）— 2026-11-21
+
+- **trunk 红根因**：deps PR #280（pip minor）把 dev extra 的 ruff 抬到 0.17.5 而 ci.yml 仍 pin 0.17.4 ⇒ lint 口径漂移钉（test_lint_toolchain_pins）**全矩阵 9 平台 pytest 红**（trunk run `44745855666`）。**修法**：ci.yml ruff pin 同步抬到 0.17.5（PR **#289** 已合并 `2c228f2c3`；本机钉测 10 passed）。mypy 两侧 2.4.1 一致未动。
+- **#277（Qoder A2/A3 回执）**：用户授权代 rebase（`b880a9a2`，+32/0 纯增零删，Qoder 回执逐字保留）→ MERGEABLE + CI 绿（run `44716439288`）→ 用户再授权合并（`1741c49fc`，trunk `44742951487` 绿）。
+- **deps #280/#281**：均合并（`a5c0fa427`/`bcccceb79`），dependabot 头分支合并后被平台自动删除（回读空）；**open PR=0**。
+- **分支清理**：#277/#280/#281/#289 各分支远端删除回读 404、本地已删；本线 MAOP-op 置 detached @origin/master。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
