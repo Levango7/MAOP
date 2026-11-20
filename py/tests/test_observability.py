@@ -104,7 +104,7 @@ def test_cost_tracker_auto_record():
         model="gpt-4o",
         prompt_tokens=10, completion_tokens=20, total_tokens=30, latency_ms=500,
         session_id="sess-123", agent="claude",
-        metadata={"provider": "openai"},
+        metadata={"provider": "openai", "tokens_source": "measured"},
     )
 
     # 2: CostTracker failure does not raise
@@ -122,6 +122,72 @@ def test_cost_tracker_auto_record():
         session_id="", agent="",
         metadata={"provider": "anthropic"},
     )
+
+
+def test_usage_metadata_labels_only_provider_reported_usage():
+    """tokens_source=measured 只认 provider 上报的用量；错误响应/零 token 一律不标。"""
+    from maop.core.agent.llm_chat.llm_provider import LLMResponse, _record_cost
+
+    # 1: provider 上报了用量（正常响应）⇒ measured
+    resp = LLMResponse(
+        content="ok", model="m", provider="openai",
+        prompt_tokens=3, completion_tokens=4, total_tokens=7,
+    )
+    t1 = MagicMock()
+    t1.record_async = AsyncMock()
+    with patch("maop.core.cost_tracker.get_cost_tracker", return_value=t1):
+        asyncio.run(_record_cost(resp, {}))
+    assert t1.record_async.call_args.kwargs["metadata"] == {
+        "provider": "openai", "tokens_source": "measured",
+    }
+
+    # 2: 错误响应即便带 token 计数也绝不标 measured
+    resp_err = LLMResponse(
+        content="[LLM Error] boom", model="m", provider="openai",
+        prompt_tokens=3, completion_tokens=4, total_tokens=7, error="boom",
+    )
+    t2 = MagicMock()
+    t2.record_async = AsyncMock()
+    with patch("maop.core.cost_tracker.get_cost_tracker", return_value=t2):
+        asyncio.run(_record_cost(resp_err, {}))
+    assert t2.record_async.call_args.kwargs["metadata"] == {"provider": "openai"}
+
+    # 3: 无 usage ⇒ 不写来源键（台账按 unlabeled 呈现，不猜）
+    resp_zero = LLMResponse(content="ok", model="m", provider="anthropic")
+    t3 = MagicMock()
+    t3.record_async = AsyncMock()
+    with patch("maop.core.cost_tracker.get_cost_tracker", return_value=t3):
+        asyncio.run(_record_cost(resp_zero, {}))
+    assert t3.record_async.call_args.kwargs["metadata"] == {"provider": "anthropic"}
+
+    # 4: 无 provider 也无 usage ⇒ metadata 保持 None
+    resp_bare = LLMResponse(content="ok", model="m")
+    t4 = MagicMock()
+    t4.record_async = AsyncMock()
+    with patch("maop.core.cost_tracker.get_cost_tracker", return_value=t4):
+        asyncio.run(_record_cost(resp_bare, {}))
+    assert t4.record_async.call_args.kwargs["metadata"] is None
+
+
+def test_usage_metadata_sync_fallback_branch():
+    """tracker 无 record_async 时，同步回退分支打同一判据的标签。"""
+    from maop.core.agent.llm_chat.llm_provider import LLMResponse, _record_cost
+
+    class SyncOnlyTracker:
+        def __init__(self):
+            self.calls = []
+
+        def record(self, **kwargs):
+            self.calls.append(kwargs)
+
+    tracker = SyncOnlyTracker()
+    resp = LLMResponse(
+        content="ok", model="m", provider="openai",
+        prompt_tokens=3, completion_tokens=4, total_tokens=7,
+    )
+    with patch("maop.core.cost_tracker.get_cost_tracker", return_value=tracker):
+        asyncio.run(_record_cost(resp, {}))
+    assert tracker.calls[0]["metadata"] == {"provider": "openai", "tokens_source": "measured"}
 
 
 def test_cost_tracker_singleton():

@@ -39,6 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### LLM 直连与计费路径补 tokens_source 标签（GAP-2 审计发现 B，2026-11-20）
+
+LLM 直连路径（`llm_factory._record_cost`）此前只写 `{"provider": ...}`——provider
+上报的实测用量在台账上仍显示「未标注」；计费引擎（`BillingEngine.charge`）写
+CostTracker 时则完全没有 metadata。改动：直连路径仅在**非错误响应且 token 计数 > 0**
+（= provider 真上报了 usage）时标 `tokens_source=measured`，无 usage 不写键（保持
+未标注，不猜来源）；计费路径的 token 是调用方报数、非 provider 实测，**tokens > 0
+时标 `estimated`**，tokens=0（按次计费）不写键。同步回退分支同判据。测试更新
+`test_cost_tracker_auto_record` 的全量 metadata 断言，新增直连四态钉测（measured /
+错误不标 / 零 token 不标 / 无 provider 为 None）、同步分支钉测、计费路径两态钉测。
+
 ### 成本页明细按 tokens_source 可辨（GAP-2 审计发现 A，2026-11-14）
 
 `tokens_source`（measured/mixed/estimated）已全链写入（cost_entries.metadata

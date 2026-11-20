@@ -491,6 +491,24 @@ class TestBillingEngineCostTracker:
         assert len(entries) == 1
         assert entries[0].session_id == "sess1"
         assert entries[0].model == "gpt-4o"
+        # 调用方报数≠provider 实测 ⇒ 来源标 estimated（GAP-2 发现 B）
+        assert entries[0].metadata.get("tokens_source") == "estimated"
+
+    def test_charge_zero_tokens_leaves_source_unlabeled(
+        self,
+        engine_with_tracker: BillingEngine,
+        catalog: AgentCatalog,
+    ) -> None:
+        """tokens=0（按次计费）不写来源键，保持 unlabeled。"""
+        catalog.register(_make_descriptor("a", BillingModel.PER_CALL))
+        engine_with_tracker._quota.set_quota("a", QuotaEntry(free_quota=10000))
+        result = engine_with_tracker.charge("a", calls=1)
+        assert result.success
+        tracker = engine_with_tracker._cost_tracker
+        assert tracker is not None
+        entries = tracker.get_entries(agent="a")
+        assert len(entries) == 1
+        assert "tokens_source" not in (entries[0].metadata or {})
 
     def test_charge_without_cost_tracker(
         self,
