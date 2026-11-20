@@ -144,4 +144,27 @@ describe('Cost.vue', () => {
     expect(wrapper.find('.view-error').exists()).toBe(true);
     wrapper.unmount();
   });
+
+  it('renders tokens_source badge per entry (measured/estimated/unlabeled)', async () => {
+    mockFetch(defaultRoutes({
+      '/api/cost/entries': { entries: [
+        { id: 'c1', created_at: '2026-11-14T00:00:00Z', agent: 'a1', model: 'm1', prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cost_usd: 0.01, latency_ms: 100, metadata: { tokens_source: 'measured' } },
+        { id: 'c2', created_at: '2026-11-14T00:00:01Z', agent: 'a1', model: 'm1', prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cost_usd: 0.01, latency_ms: 100, metadata: { tokens_source: 'estimated' } },
+        { id: 'c3', created_at: '2026-11-14T00:00:02Z', agent: 'a1', model: 'm1', prompt_tokens: 10, completion_tokens: 5, total_tokens: 15, cost_usd: 0.01, latency_ms: 100, metadata: {} },
+      ] },
+    }));
+    const wrapper = await mountCost();
+    expect(wrapper.text()).toMatch(/来源|Source/);
+    const badges = wrapper.findAll('.badge');
+    const meas = badges.find((b) => /实测|measured/.test(b.text()));
+    const est = badges.find((b) => /估算|estimated/.test(b.text()));
+    const unl = badges.find((b) => /未标注|unlabeled/.test(b.text()));
+    expect(meas).toBeTruthy();
+    expect(meas.classes()).toContain('badge--success');
+    expect(est).toBeTruthy();
+    expect(est.classes()).toContain('badge--warn');
+    expect(unl).toBeTruthy();
+    expect(unl.classes()).toContain('badge--neutral');
+    wrapper.unmount();
+  });
 });

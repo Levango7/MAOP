@@ -39,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 成本页明细按 tokens_source 可辨（GAP-2 审计发现 A，2026-11-14）
+
+`tokens_source`（measured/mixed/estimated）已全链写入（cost_entries.metadata
+→ `/api/costs/entries` 透传），但成本页明细表零渲染，实测行与估算行同形。
+改动：明细表新增 Source 列（Badge 四态：实测/混合/估算/未标注——无键的历史行
+或未标注路径显示「未标注」而非谎报估算），表下加说明行。纯前端；i18n 双语
+key；Cost.test.js 新增三态 badge 断言。
+
 ### CI 抓到 11 条 EXE001：Windows 上 ruff 根本不报这条规则（2026-11-17）
 
 把 `scripts/` 纳入 lint 后，本 PR 的 `Lint (ruff + mypy)` 在 **Linux** 上红了 11 条
