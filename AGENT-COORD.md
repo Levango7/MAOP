@@ -1848,3 +1848,12 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **方案证伪留痕**：micro-benchmark（本机 937+ 进程）full 9.2/5.8s vs no-cpu 4.8/7.5s——「去 cpu_percent 降本」无稳定差距，**不采用**；成本在全表扫描本身，故走缓存+单飞消重复，扫描固有成本如实保留。
 - **做法**：钉测（冷缓存并发只算一次/失败清理/TTL 内零扫描；扫描期间事件循环仍推进）+ 本机门 + 隔离栈实测；纯性能改造，响应结构原样。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## 批 10 修复 PR #287 合并回执（ZCode 线）— 2026-11-20
+
+- **合并**：`d4ab7ed9`（merge commit，2026-11-20T04:19:21Z）；head `356f4f1f`；CI **32/32 全绿**（v3 判据：run 级全终态 + 连续两轮签名一致，非渐进视图假绿），mss=CLEAN。
+- **两子项**：① GET /api/agent/upgrade 请求级 single-flight（threading.Lock + 专用单线程 executor + wrap_future，跨 loop 安全）；② bottlenecks top_memory 30s TTL 缓存 + 同款单飞（与日期参数无关，切 tab 不重扫）。
+- **方案证伪留痕**：micro-benchmark（937+ 进程）示「去 cpu_percent」无稳定降本不采用；中途两坑实证改道（asyncio.Task 跨 loop different loop、asyncio.Lock 跨 loop 死锁 ⇒ threading.Lock + executor + wrap_future）。
+- **验证**：钉测 2 新文件 4 passed（变异敏感）+ 批 8 复测 3 passed + 回归 64 passed；本机门 ruff/mypy 622/config-drift 241==241/silent 1072/file-size 全过。隔离栈实测：冷缓存 6 并发 upgrade 全 200 同耗时同结果（单飞只算一次）；bottlenecks 二调 0.006s、切日期 0.0056s（缓存命中）；在飞 overview 4.2s 不冻。
+- **分支清理**：远端已删（回读 404）；本地 ff 后 ancestor 验证 `356f4f1f` ∈ master；本线 MAOP-op 置 detached @origin/master；本地 fix 分支已删。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
