@@ -14,7 +14,10 @@ used *here* on this module (``services.data.analysis._get_cost_tracker``).
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
+import threading
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
@@ -423,6 +426,48 @@ async def analysis_cost_breakdown(
     }
 
 
+_TOP_MEMORY_TTL_S = 30.0
+_top_memory_cache: dict[str, Any] = {}
+_top_memory_inflight: dict[str, Any] = {}
+# 批 10：与 agent_admin 同款——threading.Lock + 专用单线程 executor，
+# in-flight 用 concurrent.futures.Future（跨 loop 安全，无 asyncio.Lock/Task）。
+_top_memory_lock = threading.Lock()
+_top_memory_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+
+async def _top_memory_cached(ps: Any, top_n: int) -> list[dict[str, Any]]:
+    """top_memory 30s TTL 缓存 + 请求级 single-flight（批 10）。
+
+    top_memory 反映当前进程表，与日期参数无关——原实现每次调用（含切日期 tab）
+    都全表重扫（本机 ~5-9s）。单飞＝共享 in-flight future：冷缓存并发只扫一次，
+    其余等待同一结果（不用 asyncio.Task/Lock，避免跨 loop 问题）。
+    """
+    with _top_memory_lock:
+        now = time.monotonic()
+        cached = _top_memory_cache.get("data")
+        ts = _top_memory_cache.get("ts", 0.0)
+        fresh = cached is not None and now - ts < _TOP_MEMORY_TTL_S
+        fut = _top_memory_inflight.get("future")
+        if not fresh and fut is None:
+            fut = _top_memory_executor.submit(_scan_top_memory, ps, top_n)
+            _top_memory_inflight["future"] = fut
+    if fresh:
+        assert cached is not None
+        return cached
+    assert fut is not None  # fresh=False 时必已创建或复用 in-flight
+    try:
+        rows = await asyncio.wrap_future(fut)
+    finally:
+        # 无论成败都弹掉 in-flight（失败时外层 analysis_performance_bottlenecks
+        # 记 note；未来请求会重试）。try/finally 不新增 broad except（门禁棘轮）。
+        with _top_memory_lock:
+            _top_memory_inflight.pop("future", None)
+    with _top_memory_lock:
+        _top_memory_cache["data"] = rows
+        _top_memory_cache["ts"] = time.monotonic()
+    return rows
+
+
 def _scan_top_memory(ps: Any, top_n: int) -> list[dict[str, Any]]:
     """同步扫描进程表并按 RSS 取前 top_n。
 
@@ -510,11 +555,13 @@ async def analysis_performance_bottlenecks(
     #    批 8 修复（F2）：全进程表扫描原在事件循环内同步执行——空库实测 7.65s
     #    （同期五个分析端点均 <0.3s），期间全站冻结。扫描移入工作线程，
     #    字段与排序原样保留。
+    #    批 10：top_memory 与日期参数无关，30s TTL 缓存 + 请求级 single-flight，
+    #    切日期 tab 不再重扫。
     top_memory: list[dict[str, Any]] = []
     ps = _safe_psutil()
     if ps is not None:
         try:
-            top_memory = await asyncio.to_thread(_scan_top_memory, ps, top_n)
+            top_memory = await _top_memory_cached(ps, top_n)
         except Exception as exc:
             logger.debug("[analysis] psutil process scan failed: %s", exc)
             note = (note + "; " if note else "") + "psutil process scan failed"

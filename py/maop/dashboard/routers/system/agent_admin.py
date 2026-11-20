@@ -10,9 +10,11 @@ Endpoints:
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 import shutil
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -271,7 +273,11 @@ _VERSION_TIMEOUT_S = 3
 _PIP_SHOW_TIMEOUT_S = 5
 _AGENT_LIST_TTL_S = 60.0
 _agent_list_cache: dict[str, Any] = {}
-_agent_list_lock = asyncio.Lock()
+_agent_list_inflight: dict[str, Any] = {}
+# 批 10：单飞用 threading.Lock + 专用单线程 executor（asyncio.run 自包含新 loop）。
+# 不用 asyncio.Lock/Task——多线程 TestClient/多 worker 下会 different loop 或死锁。
+_agent_list_lock = threading.Lock()
+_agent_list_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
 
 async def _one_agent_row(
@@ -309,29 +315,48 @@ async def _one_agent_row(
         }
 
 
+async def _compute_agent_list() -> dict[str, Any]:
+    """全量扫描（仅在缓存 miss 时由单飞任务调用一次）。"""
+    from maop.config.loader import ConfigLoader
+    cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
+    sem = asyncio.Semaphore(_AGENT_SCAN_CONCURRENCY)
+    rows = await asyncio.gather(
+        *(_one_agent_row(name, ad, sem) for name, ad in cfg.agents.items())
+    )
+    return {"status": "ok", "agents": list(rows)}
+
+
 @router.get("/api/agent/upgrade")
 @handle_api_errors
 async def api_agent_upgrade_get(request: Request, agent: str = "") -> dict[str, Any]:
     require_admin(request)
     try:
-        now = time.monotonic()
-        async with _agent_list_lock:
+        with _agent_list_lock:
+            now = time.monotonic()
             cached = _agent_list_cache.get("data")
             cached_at = _agent_list_cache.get("ts", 0.0)
-        if cached is not None and now - cached_at < _AGENT_LIST_TTL_S:
+            fresh = cached is not None and now - cached_at < _AGENT_LIST_TTL_S
+            fut = _agent_list_inflight.get("future")
+            if not fresh and fut is None:
+                # 批 10：单飞——计算提交到专用单线程 executor（asyncio.run 自包含
+                # 新 loop），in-flight 用 concurrent.futures.Future 共享，各请求
+                # wrap_future 等待（跨 loop 安全；不用 asyncio.Task/Lock，避免
+                # 多线程/多 worker 下 different loop 与死锁）。
+                fut = _agent_list_executor.submit(asyncio.run, _compute_agent_list())
+                _agent_list_inflight["future"] = fut
+        if fresh:
+            assert cached is not None
             return cached
-        from maop.config.loader import ConfigLoader
-        cfg = ConfigLoader(project_root=str(_deps.MAOP_ROOT)).load()
-        sem = asyncio.Semaphore(_AGENT_SCAN_CONCURRENCY)
-        rows = await asyncio.gather(
-            *(_one_agent_row(name, ad, sem) for name, ad in cfg.agents.items())
-        )
-        result = {"status": "ok", "agents": list(rows)}
-        async with _agent_list_lock:
+        assert fut is not None  # fresh=False 时必已创建或复用 in-flight
+        result = await asyncio.wrap_future(fut)
+        with _agent_list_lock:
             _agent_list_cache["data"] = result
             _agent_list_cache["ts"] = time.monotonic()
+            _agent_list_inflight.pop("future", None)
         return result
     except Exception as exc:
+        with _agent_list_lock:
+            _agent_list_inflight.pop("future", None)
         logger.error("Agent upgrade list failed: %s", exc)
         # H1 fix: 统一错误响应——raise HTTPException 让 handle_api_errors 装饰器处理。
         raise HTTPException(
