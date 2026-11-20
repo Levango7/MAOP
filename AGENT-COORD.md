@@ -1889,3 +1889,12 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 **结论**：批 4b 修复（8215c1ea 骨架化 + f35504c8 '—' 守卫，合入 e490a7f7/#276）在 trunk 生效，A2 零回归；用户四问三问硬证据闭环，唯一点击级抽查遗留。
 **遗留**：① 10 高频页点击/拖拽/滚动反馈浏览器点击级抽查（下轮起）；② 企业版门文案显著性（措辞级）。
 **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送将起新 trunk run，其 required 四件绿为最终收口，本回执不宣称 CI 绿。
+
+## 批 11 PR #286 合并回执（Qoder 线）— 2026-11-20
+
+- **合并**：`303e8bd5`（merge commit，2026-11-20T05:14:35Z）；head `9619f694`；PR checks 25 pass + 7 skipped + 0 fail，mss=CLEAN。变更＝成本页明细新增 Source 列（`tokens_source` 四态 measured/mixed/estimated/unlabeled）+ 中英文案 + 三态 badge 钉测（GAP-2 审计发现 A：数据/API 早已带源标记、前端零渲染）。
+- **首验与归因**：push run 44679713281 首跑 E2E 因 **job 级 `timeout-minutes: 10` 与冷缓存 install 共享预算**被平台记 cancelled（Playwright 缓存键绑 runner 镜像版本，master 存量键为 11-14 旧镜像 ⇒ restore 全 miss，`playwright install --with-deps` 独占 8.5 分钟，测试步仅剩 68 秒）；CI merge gate 为聚合派生红。`rerun --failed`（attempt2）后 **30/30 全绿**，E2E success 且 Playwright 缓存已在新镜像键下保存（Post Cache success），后续不再冷装。
+- **验证**：PR CI Frontend Build 腿内实跑 eslint → design:contrast → vue-tsc → vitest → test:coverage → vite build 全过，新三态 badge 断言在 CI 真执行；本机 npm registry 不可达 ⇒ 本地前端门禁未跑，未冒充本地绿（门禁全交 PR CI）。
+- **分支清理**：远端 `feat/cost-tokens-source` 已删（回读 404；tip `9619f694` 已并入 `303e8bd5`）；本地隔离 worktree MAOP-costsrc 保留。
+- **遗留登记（待裁）**：E2E job 的 10 分钟预算与冷装 8.5 分钟共享——本次根因已消解（缓存已种上），但 runner 镜像再轮换会复发；是否上调 `timeout-minutes` 10→20 属 CI 配置变更，建议另开 PR 待审。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送将起新 trunk run，其 required 四件绿为最终收口。
