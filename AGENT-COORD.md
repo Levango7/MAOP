@@ -1906,3 +1906,11 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **deps #280/#281**：均合并（`a5c0fa427`/`bcccceb79`），dependabot 头分支合并后被平台自动删除（回读空）；**open PR=0**。
 - **分支清理**：#277/#280/#281/#289 各分支远端删除回读 404、本地已删；本线 MAOP-op 置 detached @origin/master。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## GAP-2 发现 B 修复 PR #290 合并回执（ZCode 线）— 2026-11-21
+
+- **合并**：`c46f4c14`（merge commit，2026-11-21）；head `88601d1a`；CI rerun `44827447523` success（首跑因 PR merge ref 更新被 cancel ⇒ `rerun --failed` 复绿后 required 齐，普通 merge 成功，未用 --admin 强合）。
+- **修复**：LLM 直连路径 `_record_cost` 两分支 metadata 只写 provider、计费引擎 charge 入账行无 metadata ⇒ 成本页无法按 tokens_source 区分实测/估算。补 `tokens_source="measured"`（词表 measured/estimated/mixed）；provider 标签保留兼容。附 `test_observability` 旧断言同步（期望 metadata 精确相等 {provider:...} ⇒ 改为含 tokens_source=measured，openai/anthropic 两处）。
+- **验证**：钉测 1 新文件 2 passed（两路径均标 measured）+ observability 全文件 + GAP-2 钉测 65 passed + 回归 64 passed；本机门 ruff/mypy 622/config-drift 241==241/silent 1072/file-size 全过。
+- **分支清理**：远端已删（回读 404）；本地 ff 后 ancestor 验证 `88601d1a` ∈ master；本线 MAOP-op 置 detached @origin/master；本地 feat 分支已删。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
