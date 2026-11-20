@@ -347,6 +347,12 @@ async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
     try:
         from maop.core.cost_tracker import get_cost_tracker
         tracker = get_cost_tracker()
+        # GAP-2 发现 B：LLM 直连路径的 token 来自 provider 响应（实测），
+        # 补 tokens_source=measured 标签（词表 measured/estimated/mixed，
+        # 见 cost_reconciliation / cost_tracker.record_actual_cost）。
+        metadata: dict[str, Any] = {"tokens_source": "measured"}
+        if resp.provider:
+            metadata["provider"] = resp.provider
         if hasattr(tracker, "record_async"):
             await tracker.record_async(
                 model=resp.model,
@@ -356,7 +362,7 @@ async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
                 latency_ms=resp.latency_ms,
                 session_id=str(kwargs.get("session_id", "")),
                 agent=str(kwargs.get("agent", "")),
-                metadata={"provider": resp.provider} if resp.provider else None,
+                metadata=metadata,
             )
         else:
             # Fallback: 同步调用（tracker 无 async 版本时兼容）
@@ -368,7 +374,7 @@ async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
                 latency_ms=resp.latency_ms,
                 session_id=str(kwargs.get("session_id", "")),
                 agent=str(kwargs.get("agent", "")),
-                metadata={"provider": resp.provider} if resp.provider else None,
+                metadata=metadata,
             )
     except Exception as exc:
         logger.warning("[llm_provider] CostTracker record failed: %s", exc)

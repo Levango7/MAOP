@@ -104,7 +104,7 @@ def test_cost_tracker_auto_record():
         model="gpt-4o",
         prompt_tokens=10, completion_tokens=20, total_tokens=30, latency_ms=500,
         session_id="sess-123", agent="claude",
-        metadata={"provider": "openai"},
+        metadata={"provider": "openai", "tokens_source": "measured"},
     )
 
     # 2: CostTracker failure does not raise
@@ -120,7 +120,7 @@ def test_cost_tracker_auto_record():
         model="claude-3.5-sonnet",
         prompt_tokens=0, completion_tokens=0, total_tokens=0, latency_ms=0,
         session_id="", agent="",
-        metadata={"provider": "anthropic"},
+        metadata={"provider": "anthropic", "tokens_source": "measured"},
     )
 
 
