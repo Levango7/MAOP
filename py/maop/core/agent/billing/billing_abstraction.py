@@ -193,6 +193,8 @@ class BillingEngine:
                         model=model,
                         prompt_tokens=tokens,
                         total_tokens=tokens,
+                        # GAP-2 发现 B：入账行补 tokens_source=measured 标签
+                        metadata={"tokens_source": "measured"},
                     )
                 except Exception as exc:
                     # CostTracker 失败不应影响计费主流程
