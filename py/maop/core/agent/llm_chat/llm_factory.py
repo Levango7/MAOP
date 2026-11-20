@@ -335,6 +335,21 @@ def _is_error_response(resp: LLMResponse) -> bool:
     return resp.content.startswith(("[LLM Error]", "[Claude Error]", "[Ollama Error]"))
 
 
+def _usage_metadata(resp: LLMResponse) -> dict[str, Any] | None:
+    """Build cost metadata for a direct LLM call.
+
+    只有 provider 真上报了用量（非错误响应且 token 计数 > 0）才标
+    ``tokens_source=measured``；无 usage 时不写该键，台账按 unlabeled 呈现，
+    不猜测来源（GAP-2 审计发现 B，2026-11-20）。
+    """
+    metadata: dict[str, Any] = {}
+    if resp.provider:
+        metadata["provider"] = resp.provider
+    if not resp.error and (resp.prompt_tokens or resp.completion_tokens or resp.total_tokens):
+        metadata["tokens_source"] = "measured"
+    return metadata or None
+
+
 async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
     """Auto-record LLM call metrics to CostTracker (best-effort, async).
 
@@ -347,6 +362,7 @@ async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
     try:
         from maop.core.cost_tracker import get_cost_tracker
         tracker = get_cost_tracker()
+        metadata = _usage_metadata(resp)
         if hasattr(tracker, "record_async"):
             await tracker.record_async(
                 model=resp.model,
@@ -356,7 +372,7 @@ async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
                 latency_ms=resp.latency_ms,
                 session_id=str(kwargs.get("session_id", "")),
                 agent=str(kwargs.get("agent", "")),
-                metadata={"provider": resp.provider} if resp.provider else None,
+                metadata=metadata,
             )
         else:
             # Fallback: 同步调用（tracker 无 async 版本时兼容）
@@ -368,7 +384,7 @@ async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
                 latency_ms=resp.latency_ms,
                 session_id=str(kwargs.get("session_id", "")),
                 agent=str(kwargs.get("agent", "")),
-                metadata={"provider": resp.provider} if resp.provider else None,
+                metadata=metadata,
             )
     except Exception as exc:
         logger.warning("[llm_provider] CostTracker record failed: %s", exc)

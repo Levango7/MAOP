@@ -187,12 +187,16 @@ class BillingEngine:
             # CostTracker 集成（可选）
             if self._cost_tracker is not None:
                 try:
+                    # 这里的 token 数是调用方报数而非 provider 实测，只能标
+                    # estimated；tokens=0（按次计费）不写来源键，保持 unlabeled
+                    # （GAP-2 审计发现 B，2026-11-20）。
                     self._cost_tracker.record(
                         session_id=session_id,
                         agent=agent_name,
                         model=model,
                         prompt_tokens=tokens,
                         total_tokens=tokens,
+                        metadata={"tokens_source": "estimated"} if tokens > 0 else None,
                     )
                 except Exception as exc:
                     # CostTracker 失败不应影响计费主流程
