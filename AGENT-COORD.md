@@ -1914,3 +1914,11 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **验证**：钉测 1 新文件 2 passed（两路径均标 measured）+ observability 全文件 + GAP-2 钉测 65 passed + 回归 64 passed；本机门 ruff/mypy 622/config-drift 241==241/silent 1072/file-size 全过。
 - **分支清理**：远端已删（回读 404）；本地 ff 后 ancestor 验证 `88601d1a` ∈ master；本线 MAOP-op 置 detached @origin/master；本地 feat 分支已删。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## UI 优化 PR #291 合并回执（ZCode 线）— 2026-11-22
+
+- **合并**：`1d96c819`（merge commit，2026-11-22）；head `0e747357`；CI run `round 20 completed/success`。
+- **方案与落地**：MAOP 前端已是 JetBrains New UI 风（石墨底+青绿+细描边+完整令牌层），与主流 agent 简洁风同向 ⇒ 令牌层 5 项微调（不改结构/不动路由/不改页面逻辑）：① 卡片 padding/gap 上调一档（--sp-4→--sp-5）；② section 强分组 --sp-4→--sp-7；③ 圆角 --r-lg 8→10、--r-md 6→8；④ 页头副标题 fs-sm→fs-xs + text-muted→text-faint；⑤ 表格行高 --row-h 36→44 + 数据行 padding --sp-3→--sp-4 + KPI 新增 --fs-kpi=24px。
+- **验证**：vitest 48 文件 367 tests passed、vite build 成功；/home + /operate/cost 计算样式复核全部 A→B 生效（padding 20/radius 10/KPI 24/gap 20/副标题 11/数据行 16）；1440 无横滚；对比度保持 WCAG AA。
+- **分支清理**：远端已删（回读 404）；本地 ff 后 ancestor 验证 `0e747357` ∈ master；本线 MAOP-op 置 detached @origin/master；本地 feat 分支已删。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
