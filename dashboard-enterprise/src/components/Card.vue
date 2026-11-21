@@ -68,7 +68,7 @@ const mbStyle = computed(() => {
 .card--clickable:hover { border-color: var(--brand); background: var(--surface-2); }
 .card--clickable:active { transform: scale(0.99); }
 .card--bare .card__body { padding: 0; }
-.card:not(.card--bare) .card__body { padding: var(--sp-4); }
+.card:not(.card--bare) .card__body { padding: var(--sp-5); }
 .card__head {
   display: flex;
   align-items: center;

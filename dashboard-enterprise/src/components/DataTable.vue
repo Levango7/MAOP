@@ -209,7 +209,7 @@ function formatRel(ts) {
 .dt__sort { opacity: .3; transition: opacity var(--motion) var(--ease), transform var(--motion) var(--ease); }
 .dt__sort.is-active { opacity: 1; color: var(--brand-strong); transform: rotate(180deg); }
 .dt__sort.is-active.is-desc { transform: rotate(0deg); }
-.dt tbody td { padding: var(--sp-3); border-bottom: 1px solid var(--border-subtle); color: var(--text); vertical-align: middle; }
+.dt tbody td { padding: var(--sp-4); border-bottom: 1px solid var(--border-subtle); color: var(--text); vertical-align: middle; }
 .dt--compact tbody td { padding: var(--sp-2) var(--sp-3); }
 .dt tbody tr { transition: background var(--motion) var(--ease); }
 .dt tbody tr:hover { background: var(--surface-2); }

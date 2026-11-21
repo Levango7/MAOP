@@ -55,7 +55,7 @@ const subtitleText = computed(() => props.subtitle || (meta.subtitle ? t(meta.su
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-4);
-  margin-bottom: var(--sp-4);
+  margin-bottom: var(--sp-5);
   flex-wrap: wrap;
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface);
@@ -100,8 +100,8 @@ const subtitleText = computed(() => props.subtitle || (meta.subtitle ? t(meta.su
   gap: var(--sp-2);
 }
 .page-header__sub {
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
   margin: 5px 0 0;
   line-height: 1.45;
   letter-spacing: .005em;
