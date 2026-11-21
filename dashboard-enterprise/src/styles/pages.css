@@ -44,7 +44,7 @@
  * 任意相邻两个直接子块之间都有 16px,不依赖各组件的 margin-bottom
  * 是否被纳入上面的全局选择器列表 (本次 bug 的根因就是 overview 漏了)。 */
 /* R7 修复: 合并两行重复的 .overview > * + * 选择器 */
-.overview > * + * { margin-top: var(--sp-4); margin-bottom: 0; }
+.overview > * + * { margin-top: var(--sp-5); margin-bottom: 0; }
 .stats-grid:last-child, .status-strip:last-child, .row:last-child,
 .two-col:last-child { margin-bottom: 0; }
 
@@ -57,9 +57,9 @@
 }
 
 /* ── Grids & lists (actual layout properties) ─────────────────────────── */
-.stats-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: stretch; }
-.two-col { display: grid; gap: var(--sp-4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
-.row { display: grid; gap: var(--sp-4); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+.stats-grid { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: stretch; }
+.two-col { display: grid; gap: var(--sp-5); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+.row { display: grid; gap: var(--sp-5); grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
 .row > :only-child, .grid-2 > :only-child, .two-col > :only-child { grid-column: 1 / -1; }
 .status-strip { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; padding: var(--sp-3) var(--sp-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
 .ss-sep { width: 1px; height: 16px; background: var(--border); flex-shrink: 0; }
@@ -108,7 +108,7 @@
 }
 .activity-item {
   display: flex;
-  gap: var(--sp-4);
+  gap: var(--sp-5);
   align-items: flex-start;
   position: relative;
   padding: var(--sp-3) 0;
@@ -153,17 +153,17 @@
   line-height: 1.55;
   margin: 0;
 }
-.stats-row, .stat-row { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: stretch; }
-.metric-grid, .metrics-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); align-items: stretch; }
+.stats-row, .stat-row { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: stretch; }
+.metric-grid, .metrics-grid { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); align-items: stretch; }
 .dispatch-grid, .role-grid, .tenant-grid, .skill-grid {
-  display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: stretch;
+  display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: stretch;
 }
-.skeleton-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.skeleton-grid { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 .agent-status-list, .resource-list, .entries-list, .grant-list,
 .degradation-list, .adr-list, .chip-list, .opts {
   display: flex; flex-direction: column; gap: var(--sp-3);
 }
-.feature-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.feature-grid { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 /* ── Settings page ─────────────────────────────────────────────────── */
 .settings-grid {
   display: grid;
@@ -459,7 +459,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--sp-4);
+  gap: var(--sp-5);
   padding: var(--sp-3) 0;
   border-bottom: 1px solid var(--border-subtle);
   transition: background var(--motion-fast) var(--ease);
@@ -507,8 +507,8 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 /* R7 修复: .switch-result 被 492 行完全覆盖 (border:none/background:none/padding:0),
  * 此处仅保留 .switch-form 的盒子样式, 避免对 .switch-result 写无效属性 */
 /* R11 修复: 合并两个 .switch-form 定义 */
-.switch-form { display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
-.switch-fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+.switch-form { display: flex; flex-direction: column; gap: var(--sp-5); padding: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); }
+.switch-fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5); }
 .switch-fields .field { margin-bottom: 0; }
 .switch-fields .field > label { display: block; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: var(--sp-2); }
 /* ── Global select arrow (P3: 修复 select 箭头颜色遗漏 4 处) ──────────────
@@ -575,7 +575,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   overflow: hidden;
 }
 .chat-main::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--card-hairline); pointer-events: none; }
-.chat-body { flex: 1; overflow-y: auto; padding: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-4); }
+.chat-body { flex: 1; overflow-y: auto; padding: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-5); }
 .chat-header {
   display: flex; align-items: center; gap: var(--sp-3);
   padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--border);
@@ -881,7 +881,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   display: flex; flex-direction: column; gap: var(--sp-3);
 }
 .control-panel .row-item {
-  display: flex; align-items: center; gap: var(--sp-4);
+  display: flex; align-items: center; gap: var(--sp-5);
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -971,7 +971,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
  * proper multi-column grid + compact, human-friendly card internals. */
 .agent-grid {
   display: grid;
-  gap: var(--sp-4);
+  gap: var(--sp-5);
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   align-items: stretch;
   margin-bottom: var(--sp-4);
@@ -1003,7 +1003,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .agent-actions .act-btn { flex: 1; min-width: 72px; justify-content: center; }
 
 /* Scanned-local-agents grid */
-.scanned-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.scanned-grid { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .scanned-card {
   background: var(--card-sheen), var(--surface); border: 1px solid var(--border-card);
   border-radius: var(--r-lg); padding: var(--sp-4); box-shadow: var(--shadow-surface);
@@ -1043,7 +1043,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .actions-cell { display: flex; align-items: center; gap: var(--sp-2); }
 
 /* Selected-agent detail panel */
-.detail-body { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.detail-body { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 .detail-section h4 { margin: 0 0 var(--sp-3); font-size: var(--fs-sm); font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: .04em; }
 .config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--sp-2) var(--sp-4); }
 .cfg-item { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-2) 0; border-bottom: 1px solid var(--border); }
@@ -1078,7 +1078,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .tags { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 
 /* ── ThreeLayerMemory ─────────────────────────────────────────────────── */
-.layers { display: grid; gap: var(--sp-4); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.layers { display: grid; gap: var(--sp-5); grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .layer-card--1 { border-left: 3px solid var(--info); }
 .layer-card--2 { border-left: 3px solid var(--chart-5); }
 .layer-card--3 { border-left: 3px solid var(--success); }
@@ -1147,7 +1147,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 /* ── Logs view ──────────────────────────────────────────────────────── */
 .logs-view .card { margin-bottom: var(--sp-4); }
 .analysis { display: flex; flex-direction: column; gap: var(--sp-5); }
-.section { margin-top: var(--sp-2); margin-bottom: var(--sp-4); }
+.section { margin-top: var(--sp-2); margin-bottom: var(--sp-7); }
 .section__title {
   font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: .04em; margin: 0 0 var(--sp-3);
@@ -1240,7 +1240,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .mcp-row__meta .mono { color: var(--text); }
 .mcp-row__meta .muted { color: var(--text-faint); }
 /* Tool inventory */
-.inv { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-4); }
+.inv { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-5); }
 .inv__stat { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-3) var(--sp-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); }
 .inv__num { font-family: var(--font-mono); font-size: var(--fs-xl); font-weight: 700; color: var(--text); line-height: 1; }
 .inv__lbl { font-size: var(--fs-xs); color: var(--text-muted); }
@@ -1262,7 +1262,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
   background: var(--fail-soft); border: 1px solid color-mix(in srgb, var(--fail) 30%, transparent); border-radius: var(--r-md);
 }
 /* Budget meters */
-.budget { display: flex; flex-direction: column; gap: var(--sp-4); }
+.budget { display: flex; flex-direction: column; gap: var(--sp-5); }
 .budget__row { display: grid; grid-template-columns: 64px 1fr auto; gap: var(--sp-3); align-items: center; }
 .budget__label { font-size: var(--fs-sm); color: var(--text-muted); }
 .budget__track { height: 8px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
@@ -1298,7 +1298,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .event-row.info .event-level { color: var(--brand-strong); }
 .event-row.info { color: var(--text-muted); }
 /* Maintenance action cards */
-.maint-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.maint-grid { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .maint-card {
   display: flex; flex-direction: column; gap: var(--sp-2); text-align: left;
   padding: var(--sp-5); cursor: pointer; font-family: inherit; color: inherit;
@@ -1353,7 +1353,7 @@ textarea.query-input::placeholder { color: var(--text-faint); }
 .last-updated { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* ── VectorSearch view extras ───────────────────────────────────────── */
-.stat-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); align-items: stretch; }
+.stat-grid { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); align-items: stretch; }
 .rid { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── ThreeLayerMemory view extras ───────────────────────────────────── */

@@ -80,7 +80,7 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
   background: var(--surface);
   border: 1px solid var(--border-card);
   border-radius: var(--r-lg);
-  padding: var(--sp-4);
+  padding: var(--sp-5);
   /* 2026-10-29 用户反馈修正：原注释"去常驻阴影 — 描边与明度差承担层级"，
    * 但描边仅 1.49:1、明度差仅 1.09:1，实测分不出卡片与底布。改用卡片专用
    * 描边（1.89:1）+ 一层克制阴影，仍不上浮。 */
@@ -110,7 +110,7 @@ const trendClass = (v) => (v > 0 ? 'is-up' : v < 0 ? 'is-down' : 'is-flat');
 .stat__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .stat__label { font-size: var(--fs-xs); color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
 .stat__main-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
-.stat__value { font-size: var(--fs-xl); font-weight: 700; color: var(--text); line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.stat__value { font-size: var(--fs-kpi); font-weight: 700; color: var(--text); line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 /* margin-left 3px 为视觉微调固定值 */
 .stat__unit { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); margin-left: 3px; }
 /* gap 2px 为 delta 视觉微调固定值 */
