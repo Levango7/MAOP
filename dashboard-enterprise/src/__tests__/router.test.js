@@ -148,4 +148,13 @@ describe('Router', () => {
       await router.push('/home');
     }
   });
+
+  it('enterprise guard redirect carries notice query (deep-link feedback)', async () => {
+    const store = useEditionStore();
+    // 个人版（非 enterprise）下访问企业版路由 ⇒ 弹回 /home 且带 notice query
+    store.edition = 'personal';
+    await router.push('/audit');
+    expect(router.currentRoute.value.path).toBe('/home');
+    expect(router.currentRoute.value.query.notice).toBe('enterprise_required');
+  });
 });

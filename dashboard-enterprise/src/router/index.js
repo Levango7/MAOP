@@ -236,7 +236,7 @@ router.beforeEach((to) => {
         if (available === null) st[probe.check]();
       } catch { /* ignore */ }
     }
-    if (available === false) return '/home';
+    if (available === false) return { path: '/home', query: { notice: 'enterprise_required' } };
   }
 
   if (!to.meta.requiresEnterprise) return true;
@@ -253,7 +253,7 @@ router.beforeEach((to) => {
   // 触发后端 config hydrate（不阻塞本次导航），供后续 SPA 导航使用真实 edition
   hydrateEditionFromConfig();
   // P2-7 fix: 直接重定向到 /home，避免 / → /home 的二次重定向。
-  if (editionVal !== 'enterprise') return '/home';
+  if (editionVal !== 'enterprise') return { path: '/home', query: { notice: 'enterprise_required' } };
   return true;
 });
 
