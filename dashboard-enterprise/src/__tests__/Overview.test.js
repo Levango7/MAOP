@@ -8,12 +8,31 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+import { createRouter, createMemoryHistory } from 'vue-router';
 import Overview from '../views/Overview.vue';
 import { EmptyState } from '../components/index.js';
 
-const mountOptions = {
-  global: { stubs: { PageHeader: { template: '<slot />' }, Line: true } },
-};
+// Overview.setup 顶层调 useRoute()/useRouter()，模板还用 <router-link>，
+// 因此必须挂真实 router 插件（memory history），不能 mock 模块——
+// 静态 import 先于任何 doMock 执行，组件拿到的永远是未 mock 的 vue-router。
+function makeTestRouter() {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/home', name: 'overview', component: { template: '<div />' } },
+      { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
+    ],
+  });
+}
+
+function makeMountOptions(router) {
+  return {
+    global: {
+      plugins: [router],
+      stubs: { PageHeader: { template: '<slot />' }, Line: true },
+    },
+  };
+}
 
 describe('Overview.vue', () => {
   let originalFetch;
@@ -60,8 +79,12 @@ describe('Overview.vue', () => {
     };
   }
 
-  async function mountOverview() {
-    const wrapper = mount(Overview, mountOptions);
+  async function mountOverview({ notice = false } = {}) {
+    const router = makeTestRouter();
+    await router.push(notice
+      ? { path: '/home', query: { notice: 'enterprise_required' } }
+      : '/home');
+    const wrapper = mount(Overview, makeMountOptions(router));
     await flushPromises();
     await flushPromises();
     return wrapper;
@@ -80,7 +103,9 @@ describe('Overview.vue', () => {
 
   it('shows skeleton loading state on first mount', async () => {
     mockFetch(defaultRoutes());
-    const wrapper = mount(Overview, mountOptions);
+    const router = makeTestRouter();
+    await router.push('/home');
+    const wrapper = mount(Overview, makeMountOptions(router));
     // Before flushPromises, loading is true → health skeleton visible
     expect(wrapper.find('.health-skel').exists()).toBe(true);
     await flushPromises();
@@ -151,6 +176,24 @@ describe('Overview.vue', () => {
     await flushPromises();
     await flushPromises();
     expect(global.fetch.mock.calls.length).toBeGreaterThan(callsBefore);
+    wrapper.unmount();
+  });
+
+  it('shows enterprise notice banner when query.notice=enterprise_required', async () => {
+    // 深链被拦后 Overview 显示一次性轻提示（非静默弹回）
+    mockFetch(defaultRoutes());
+    const wrapper = await mountOverview({ notice: true });
+    expect(wrapper.find('.ov-notice').exists()).toBe(true);
+    // 测试环境 i18n 默认 en；断言英文案里的关键语义（企业版专属 → 弹回首页）
+    expect(wrapper.find('.ov-notice').text()).toContain('Enterprise edition');
+    wrapper.unmount();
+  });
+
+  it('does not show the enterprise notice on a plain /home visit', async () => {
+    // 正常进首页不得误报「企业版未开放」——notice 只由被拦深链触发
+    mockFetch(defaultRoutes());
+    const wrapper = await mountOverview();
+    expect(wrapper.find('.ov-notice').exists()).toBe(false);
     wrapper.unmount();
   });
 });

@@ -18,6 +18,12 @@
       </button>
     </PageHeader>
 
+    <!-- 企业版/能力门被拦（深链）时的一次性轻提示：告知「为何被弹回首页」 -->
+    <div v-if="showEnterpriseNotice" class="ov-notice" role="note">
+      <AppIcon name="info" :size="14" />
+      <span>{{ t('view.overview.enterpriseRequiredNotice') }}</span>
+    </div>
+
     <!-- Error state -->
     <Card v-if="error" icon="alert-triangle" :title="t('view.overview.loadError')">
       <p class="muted">{{ error }}</p>
@@ -192,6 +198,7 @@ import {
 import { useApiStore } from '../stores/api.js';
 import { useEditionStore } from '../stores/edition.js';
 import { useI18n } from '../i18n';
+import { useRoute, useRouter } from 'vue-router';
 import AppIcon from '../components/AppIcon.vue';
 import PageHeader from '../components/PageHeader.vue';
 import Card from '../components/Card.vue';
@@ -210,6 +217,17 @@ ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip,
 const api = useApiStore();
 const edition = useEditionStore();
 const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
+
+// 企业版/能力门被拦（深链）时静默弹回 /home 的轻提示：
+// 让用户知道「为何被弹回」，而非无提示地落在首页。
+const showEnterpriseNotice = ref(false);
+if (route.query.notice === 'enterprise_required') {
+  showEnterpriseNotice.value = true;
+  // 清掉 query，避免刷新/分享时残留提示
+  router.replace({ query: {} });
+}
 
 const data = ref(null);
 const loading = ref(true);
@@ -435,6 +453,12 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); if (pulseTime
 .upgrade-link:hover { text-decoration: underline; }
 
 /* ── Hero strip — 全宽状态条: 描边卡片风, 与全站 workbench 语言一致 ── */
+.ov-notice {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; margin-bottom: var(--sp-4);
+  background: var(--brand-faint); border: 1px solid var(--brand-soft);
+  border-radius: var(--r-md); color: var(--text-muted); font-size: var(--fs-sm);
+}
 .ov-hero {
   display: flex;
   align-items: center;
