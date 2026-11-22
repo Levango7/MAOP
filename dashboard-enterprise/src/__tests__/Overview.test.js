@@ -196,4 +196,20 @@ describe('Overview.vue', () => {
     expect(wrapper.find('.ov-notice').exists()).toBe(false);
     wrapper.unmount();
   });
+
+  it('shows the notice when the query arrives after mount (SPA re-block)', async () => {
+    // 已在 /home 再被拦：组件不重建，必须靠 watch route.query 显示提示并清 query
+    mockFetch(defaultRoutes());
+    const router = makeTestRouter();
+    await router.push('/home');
+    const wrapper = mount(Overview, makeMountOptions(router));
+    await flushPromises();
+    await flushPromises();
+    expect(wrapper.find('.ov-notice').exists()).toBe(false);
+    await router.push({ path: '/home', query: { notice: 'enterprise_required' } });
+    await flushPromises();
+    expect(wrapper.find('.ov-notice').exists()).toBe(true);
+    expect(router.currentRoute.value.query.notice).toBeUndefined();
+    wrapper.unmount();
+  });
 });

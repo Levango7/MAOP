@@ -151,6 +151,27 @@ test.describe('Enterprise route guard', () => {
       await expect(page).toHaveTitle(/MAOP/)
       await expect(page).toHaveURL(/\/home$/)
     })
+
+    test('direct goto /audit shows a one-shot enterprise notice banner', async ({ page }) => {
+      // 2026-11-23 深链反馈：guard 弹回 /home 时带 ?notice=enterprise_required，
+      // Overview 显示一次性轻提示；query 被清掉后刷新不再出现。
+      await page.goto('/audit')
+      await expect(page).toHaveURL(/\/home$/)
+      const notice = page.locator('.ov-notice')
+      await expect(notice).toBeVisible()
+      // 文案随浏览器 locale 走（本机 zh-CN / CI en-US），双语断言
+      await expect(notice).toContainText(/Enterprise edition|企业版/)
+      // 一次性：notice query 已被 replace 清掉，reload 后不再误报
+      await page.reload()
+      await expect(page.locator('.ov-notice')).toHaveCount(0)
+    })
+
+    test('plain /home visit renders no enterprise notice', async ({ page }) => {
+      // 正常进首页不得误报「企业版未开放」——notice 只由被拦深链触发
+      await page.goto('/home')
+      await expect(page).toHaveURL(/\/home$/)
+      await expect(page.locator('.ov-notice')).toHaveCount(0)
+    })
   })
 
   test.describe('enterprise edition', () => {

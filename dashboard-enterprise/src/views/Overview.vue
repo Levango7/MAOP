@@ -190,7 +190,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { Line } from 'vue-chartjs';
 import {
   Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler,
@@ -222,12 +222,18 @@ const router = useRouter();
 
 // 企业版/能力门被拦（深链）时静默弹回 /home 的轻提示：
 // 让用户知道「为何被弹回」，而非无提示地落在首页。
+// 必须 watch 而非只查一次：已在 /home 时再次被拦（SPA 二次深链）组件不重建、
+// setup 不重跑，一次性 if 会让 query 残留且提示不更新（E2E cold-load 用例实测抓到）。
+// immediate 覆盖冷首载；清 query 后 watch 再触发（notice=undefined）不会重置
+// 已显示的提示；reload 后无 query 则不显示（一次性语义）。
 const showEnterpriseNotice = ref(false);
-if (route.query.notice === 'enterprise_required') {
-  showEnterpriseNotice.value = true;
-  // 清掉 query，避免刷新/分享时残留提示
-  router.replace({ query: {} });
-}
+watch(() => route.query.notice, (notice) => {
+  if (notice === 'enterprise_required') {
+    showEnterpriseNotice.value = true;
+    // 清掉 query，避免刷新/分享时残留提示
+    router.replace({ query: {} });
+  }
+}, { immediate: true });
 
 const data = ref(null);
 const loading = ref(true);
