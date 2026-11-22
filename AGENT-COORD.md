@@ -1922,3 +1922,13 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **验证**：vitest 48 文件 367 tests passed、vite build 成功；/home + /operate/cost 计算样式复核全部 A→B 生效（padding 20/radius 10/KPI 24/gap 20/副标题 11/数据行 16）；1440 无横滚；对比度保持 WCAG AA。
 - **分支清理**：远端已删（回读 404）；本地 ff 后 ancestor 验证 `0e747357` ∈ master；本线 MAOP-op 置 detached @origin/master；本地 feat 分支已删。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## 企业版深链提示 #292 + E2E 超时 #293 合并回执（ZCode 线）— 2026-11-23
+
+- **#293（ci/e2e-timeout）**：merge `c2717c93`；单行 timeout-minutes 10→20；自身 CI 32/32 全绿（Playwright E2E 腿在新预算内 SUCCESS）；本地/远端分支已清。
+- **#292（feat/enterprise-notice）**：merge `db2ece92`；两笔 `6fcbf13a`+`7d2cc21e`；CI 32/32 全绿、mss=CLEAN（Playwright E2E pass 3m31s 含新增用例）。
+- **行为**：个人版深链 /audit|/rbac|/tenants 被拦 ⇒ /home 一次性轻提示（中英双语，role=note），query 随即 replace 清掉；正常进首页无提示。
+- **E2E 抓到真缺陷（单测盲区）**：已在 /home 再被拦（SPA 二次深链）组件不重建 ⇒ 一次性 if 失效（query 残留+提示不更新，旧 cold-load 用例转红）⇒ 改 `watch route.query.notice (immediate)`；同用例回绿。教训=「只查一次」类 setup 逻辑必须补「同页二次导航」用例。
+- **本机验证**：单测 18/18（router 8 + Overview 10，含 SPA re-block 与反向无误报）；全量 vitest 79 文件 713 测试全过；vite build 绿；真实浏览器 guard spec 14/14（chromium，本机 zh-CN 实证中文文案；断言双语正则跨 locale）。
+- **回滚**：revert `6fcbf13a`+`7d2cc21e` 即恢复静默弹回；无 API/schema 变化。守望坑=后台 PATH 无 jq 致假 ALL_TERMINAL，改 gh pr checks 纯 grep 解析并首轮自证数字。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
