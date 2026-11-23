@@ -1932,3 +1932,12 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **本机验证**：单测 18/18（router 8 + Overview 10，含 SPA re-block 与反向无误报）；全量 vitest 79 文件 713 测试全过；vite build 绿；真实浏览器 guard spec 14/14（chromium，本机 zh-CN 实证中文文案；断言双语正则跨 locale）。
 - **回滚**：revert `6fcbf13a`+`7d2cc21e` 即恢复静默弹回；无 API/schema 变化。守望坑=后台 PATH 无 jq 致假 ALL_TERMINAL，改 gh pr checks 纯 grep 解析并首轮自证数字。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## Nex 线 CLAIM（2026-11-24）—— 接管 #295 pin 死锁 + 修 nightly `__closure__` py3.13 兼容性 + 历史 TODO 销账
+
+- **授权**：用户「台账销账 + 本地同步、接 #295 ruff pin 漂移、修 nightly __closure__ bug」三项（2026-11-24 认领）。
+- **落板前核对**：`origin/master` = `b49f5b81`；本地 master 已同步至同点、status 净。追加在 EOF，不覆盖任何他线行。
+- **分工确认（避免撞车）**：三项均不落 `dashboard-enterprise/src/**`（Qoder 领地）；`error_handler.py` 属 ZCode 后端领地，故**先落 CLAIM 再动工**，若 ZCode 已开同项立即让行（板面先到先得）。
+- **#295 死锁**：Dependabot pip PR 把 dev extra ruff 0.17.5→0.17.6，ci.yml 仍 pin 0.17.5 ⇒ `test_lint_toolchain_pins.py:117` 断言漂移、9 平台 pytest 全红 ⇒ mergeState=BLOCKED ⇒ 合不了 ⇒ master 永远拿不到 0.17.6 ⇒ 无法另开分支同步 ci.yml。经用户裁定：关 #295 + 我开等价 PR 一笔同时升 pyproject 与 ci.yml。
+- **nightly 根因**：`py/maop/dashboard/error_handler.py:173` 的 `wrapper.__closure__`，py3.13 上 `method_descriptor` 无该属性；run `45154705462` 三平台 3/3 确定性失败（非 flaky），`test_distributed_execution.py` 22 处 ERROR。
+- **收板口径**：各 PR 分笔推送；本 CLAIM 随首笔落地，最终回执带 sha 追加在 EOF。
