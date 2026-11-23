@@ -2029,3 +2029,15 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 
 **最终门禁（rebase 后 96ae0348 合并树）**：ruff 2 文件通过；pytest **71 passed**（test_router_control 68 + master 新增 test_agent_upgrade_fanout / test_bottlenecks_scan_thread）；control 套件二次复跑 68 passed（重复验证）；vitest 全量 **80 files / 716 tests passed**；eslint 7 文件 exit 0；vite build exit 0（源码 rebase 前后逐字节一致，新旧 `git show --stat` 相同）。
 **推送**：fix/q3-alert-honesty 已推 origin（用户 2026-11-18「确定没问题 再推送」条件式授权；条件＝上列全绿）。
+
+## 更正 #2 — fix/q3-alert-honesty rebase 到 b89f4147 + PR #298（2026-11-24，Qoder-CN 17ef022a）
+
+开 PR #298 后 GitHub 报 CONFLICTING；根因 master 前移（96ae0348 → b89f4147，含 ZCode/Nex 批 #286–#296）。本线已 rebase 到 b89f4147，唯一冲突＝AGENT-COORD.md（上游追加多线回执），按「上游正文 + 本线 CLAIM 重放」解，无他线覆盖。
+- 新 sha：CLAIM **bae04a3c**、代码 **c9d9c993**、DONE **2046f92d**、异常路径 **8611addc**、i18n 硬化 **edff6af2**、本节落板后见 `git log -1`。
+- 上节 sha 全部作废。
+- PR：https://github.com/Levango7/MAOP/pull/298（base master ← head fix/q3-alert-honesty；开 PR，未合并）
+**rebase 后验证（b89f4147 合并树）**：ruff 2 文件通过；control 套件 **68 passed**；vitest 全量 **80 files / 721 tests passed**；eslint 7 文件 exit 0；vite build exit 0。
+**全量 pytest 分诊**：`12432 passed, 11 failed, 108 skipped`。11 条失败均不落本批文件：
+- 9 条在干净 master（b89f4147 独立 worktree）同测同红：notifications_edition_gate×2、enterprise_n8n×3、stage3_a2a_gateway_live_transport×3、task_splitter×1 ⇒ 上游存量红，非本批引入。
+- 2 条 analysis（top_n_limit / memory_consumers_are_listed）在本批全量红、单独复跑 2/2 过、干净 master 同测 2/2 过 ⇒ 负载/顺序抖动，非内容红。
+**未做**：未跑专项渗透/依赖扫描；未部署灰度；未合并 PR。
