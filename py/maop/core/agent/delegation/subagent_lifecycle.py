@@ -511,6 +511,13 @@ class SubAgentManager(SubAgentDelegate):
 
         try:
             output = await self._invoke_llm(agent_id, config, task, context)
+            # LLM 错误响应约定（[LLM Error] / [No provider]）必须视为失败：
+            # 此前这些字符串被当正常输出写 COMPLETED（静默失败）。
+            # _invoke_llm 的错误文本约定保留（与 llm_provider fallback 一致），在此分流。
+            if isinstance(output, str) and output.startswith(
+                ("[LLM Error]", "[No provider")
+            ):
+                raise RuntimeError(f"LLM 调用失败（按 FAILED 记录）: {output}")
             duration_ms = int((time.time() - start) * 1000)
 
             with self._connect() as conn:

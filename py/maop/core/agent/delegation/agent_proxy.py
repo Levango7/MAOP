@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -178,6 +179,24 @@ class AgentProxy:
         now = time.time()
         try:
             result = adapter.execute(task, **kwargs)
+        except Exception as exc:
+            # 执行失败：error_count 记账 best-effort，记账异常不得掩盖原异常
+            try:
+                with self._connect() as conn:
+                    conn.execute(
+                        """UPDATE agent_proxy_state
+                           SET error_count = error_count + 1, updated_at = ?
+                           WHERE adapter_name = ?""",
+                        (now, name),
+                    )
+            except (sqlite3.Error, OSError) as state_exc:
+                # 记账失败不得掩盖执行异常（best-effort）
+                logger.warning("[agent_proxy] error_count 记账失败: %s", state_exc)
+            logger.error("[agent_proxy] Call failed for %s: %s", name, exc)
+            raise
+        # 执行成功：状态记账失败不得把已发生的外部副作用反转为失败
+        # （此前此处异常会让调用方以为失败而重试，副作用重复执行）。
+        try:
             with self._connect() as conn:
                 conn.execute(
                     """UPDATE agent_proxy_state
@@ -186,17 +205,12 @@ class AgentProxy:
                        WHERE adapter_name = ?""",
                     (now, now, name),
                 )
-            return result
-        except Exception as exc:
-            with self._connect() as conn:
-                conn.execute(
-                    """UPDATE agent_proxy_state
-                       SET error_count = error_count + 1, updated_at = ?
-                       WHERE adapter_name = ?""",
-                    (now, name),
-                )
-            logger.error("[agent_proxy] Call failed for %s: %s", name, exc)
-            raise
+        except (sqlite3.Error, OSError) as exc:
+            # 执行已成功，记账失败按成功返回（不诱发重试重复副作用）
+            logger.warning(
+                "[agent_proxy] %s 执行成功但状态记账失败（按成功返回）: %s", name, exc
+            )
+        return result
 
     def connect_all(self) -> dict[str, bool]:
         """Connect all registered adapters. Returns name→success map."""

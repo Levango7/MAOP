@@ -86,6 +86,10 @@ class A2ATaskState(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+# A2A 任务终态：completed/failed/canceled 一旦到达即不可再迁移（update_task 守卫）
+_TERMINAL_STATES = frozenset({"completed", "failed", "canceled"})
+
+
 class A2AManager:
     """Manages A2A agent cards, task states, and message routing.
 
@@ -101,6 +105,8 @@ class A2AManager:
         # t11: optional WorkerPool for real task execution.
         # When None, tasks/send only persists the task (legacy behavior).
         self._worker_pool: Any = worker_pool
+        # A2A task_id → WorkerPool task id 映射（tasks/cancel 需要找到底层执行任务）
+        self._worker_task_ids: dict[str, str] = {}
         self._init_db()
 
     def set_worker_pool(self, pool: Any) -> None:
@@ -202,6 +208,15 @@ class A2AManager:
         task = self._tasks.get(task_id)
         if not task:
             return None
+        # 状态机守卫：终态（completed/failed/canceled）不可再被覆盖。
+        # 修复前：dispatch 后台完成后会把用户已 cancel 的任务覆盖回 completed，
+        # 且任意非法迁移（completed→canceled 等）都被静默接受。
+        if task.status in _TERMINAL_STATES and status != task.status:
+            logger.warning(
+                "[a2a] 拒绝非法状态迁移 %s→%s（task %s 已处终态）",
+                task.status, status, task_id,
+            )
+            return None
         task.status = status
         if artifact:
             task.artifacts.append(artifact)
@@ -246,19 +261,26 @@ class A2AManager:
         self.update_task(task_id, "working")
         try:
             workdir = self._root_dir or ""
-            result = await self._worker_pool.submit(
+            worker_id = await self._worker_pool.submit(
                 message,
                 workdir=workdir,
                 agent_name=agent_name,
             )
+            # submit() 只返回 WorkerPool 任务 ID（worker_pool.py:228-260），真实
+            # 执行在后台进行。修复前直接把该 ID 当结果写 completed（任务「秒完成」）。
+            # 现在保存映射并 wait 真实结果，终态以实际执行结果为准。
+            self._worker_task_ids[task_id] = worker_id
+            result = await self._worker_pool.wait(worker_id)
             artifact = {
                 "role": "agent",
                 "agent": agent_name,
                 "result": result.model_dump() if hasattr(result, "model_dump") else result,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
-            self.update_task(task_id, "completed", artifact=artifact)
-            logger.info("[a2a] task %s completed by '%s'", task_id, agent_name)
+            if self.update_task(task_id, "completed", artifact=artifact) is None:
+                logger.info("[a2a] task %s 已处终态（用户取消），丢弃后台完成回写", task_id)
+            else:
+                logger.info("[a2a] task %s completed by '%s'", task_id, agent_name)
         except Exception as exc:
             artifact = {
                 "role": "agent",
@@ -266,8 +288,8 @@ class A2AManager:
                 "error": str(exc),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
-            self.update_task(task_id, "failed", artifact=artifact)
-            logger.warning("[a2a] task %s failed: %s", task_id, exc)
+            if self.update_task(task_id, "failed", artifact=artifact) is not None:
+                logger.warning("[a2a] task %s failed: %s", task_id, exc)
 
     def _spawn_dispatch(self, task_id: str, agent_name: str, message: str) -> None:
         """Fire-and-forget dispatch from sync ``handle_message``.
@@ -345,6 +367,14 @@ class A2AManager:
             task_id = params.get("task_id", "")
             updated = self.update_task(task_id, "canceled")
             if updated is not None:
+                # 同步取消底层 Worker 执行（此前只改状态，Worker 继续跑且完成后覆盖 canceled）
+                worker_id = self._worker_task_ids.get(task_id)
+                if worker_id and self._worker_pool is not None:
+                    try:
+                        self._worker_pool.cancel(worker_id)
+                    except (RuntimeError, AttributeError) as exc:
+                        # 底层取消失败不反转已置的 canceled 状态（best-effort）
+                        logger.warning("[a2a] 底层 Worker 取消失败（状态已置 canceled）: %s", exc)
                 return A2AResponse(
                     id=message.id, result={"task_id": updated.task_id, "status": "canceled"}
                 )
