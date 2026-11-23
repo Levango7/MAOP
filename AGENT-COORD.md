@@ -2105,3 +2105,11 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **验证**：修复前 2/20 复现；修复后 `test_agent_rate_limiter.py` 17/17 passed，目标用例 30/30 重复通过，`ruff check` 通过。
 - **回滚**：revert `0964b400` 即恢复。
 - **状态**：未删除分支；未触发 Nightly 全量复跑（PR CI 已覆盖同一条用例）。
+
+## #83 修复 CLAIM（Qoder-Desktop 会话 1973591b，2026-11-24）—— tokens_source 诚实标注
+
+- **授权**：用户「那就做吧」，批准连续处理 #83–#86；本批只修 #83，独立 PR，CI 全绿后报绿待合并指令，不合并不打 tag。
+- **落板前核对**：`origin/master` = `b89f4147b30dbcdf96ef7969cf8311af8ee29b7d`；分支 `fix/tokens-source-honesty` 基于同点，板上无同项他线 CLAIM。本条为动工后补登记，不覆盖历史行。
+- **范围**：`py/maop/core/agent/llm_chat/llm_factory.py`、`py/maop/core/agent/billing/billing_abstraction.py`、`py/tests/test_tokens_source_labels.py`、`py/tests/test_observability.py`；不碰前端、CI 配置和他线文件。
+- **根因与判据**：#290 把 provider 实测与调用方估算一律标 `measured`，且错误/空响应/零 usage 也误标；本批改为非错误、非空响应且 token 计数大于 0 才标 `measured`，调用方 token 标 `estimated`，零 token 不写来源键。
+- **收板口径**：CLAIM 与修复分笔提交；PR CI 全绿后追加 DONE 回执，合并仍待用户明确指令。
