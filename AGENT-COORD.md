@@ -1941,3 +1941,40 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **#295 死锁**：Dependabot pip PR 把 dev extra ruff 0.17.5→0.17.6，ci.yml 仍 pin 0.17.5 ⇒ `test_lint_toolchain_pins.py:117` 断言漂移、9 平台 pytest 全红 ⇒ mergeState=BLOCKED ⇒ 合不了 ⇒ master 永远拿不到 0.17.6 ⇒ 无法另开分支同步 ci.yml。经用户裁定：关 #295 + 我开等价 PR 一笔同时升 pyproject 与 ci.yml。
 - **nightly 根因**：`py/maop/dashboard/error_handler.py:173` 的 `wrapper.__closure__`，py3.13 上 `method_descriptor` 无该属性；run `45154705462` 三平台 3/3 确定性失败（非 flaky），`test_distributed_execution.py` 22 处 ERROR。
 - **收板口径**：各 PR 分笔推送；本 CLAIM 随首笔落地，最终回执带 sha 追加在 EOF。
+
+## Nex 线 TODO 销账 + nightly 根因更正（2026-11-24）
+
+### 两条历史 TODO 已闭环（台账此前未销账，现补）
+
+1. **`api.del` 识别头 + 端点处置**（L1749 曾记"待用户裁是否立项"）
+   → 已于批 9 由 **PR #283**（`1e14c700`）合入：识别头补 `del`、
+   `_VERB_ALIASES DEL→DELETE`、`DELETE /api/mcp/servers/{}` 钉进曾漏检清单。
+   本条**销账**，非未完成。
+2. **`F:/Nexus/MAOP-stripfix` 删除**（L1830 曾记"待用户裁"）
+   → 已按用户 2026-11-17「清理吧」授权删除。删前逐文件比对确认无独有内容
+   （20 个"独有"项中 4 个是 `git ls-tree` 中文路径转义假阳性、其余为缓存/db 产物）。
+   同批清理 26 个孤儿 worktree（约 7.3 万条目，独有源码均为重构前旧版本：
+   `preset_agents.py`→`9b3440c8` 拆子包、`_register_routes.py`→`dd95f0e4` 拆子包、
+   `hook.py`→`b2b407cb` 移除）。本条**销账**。
+
+### 三项自查的根因更正（主动推翻自己的初判）
+
+- **#295（ruff pin 漂移）**：初判"死锁无解"经查证为**误判**——
+  #289 先例证明可在 dependabot 合并后另开 `fix/` 分支同步；本次因 PR BLOCKED
+  才改走"关 #295 + 等价 PR #296"。#295 已关，#296 含逐字等价的 pyproject/frozen
+  升级 + ci.yml pin 同步 0.17.6，本地 ruff 0.17.6 全量 0 错、pin 守卫 10 passed、
+  变异精确转红 1 failed。#295 已关；#296 已合并 `b89f4147`，
+  PR 检查 25 pass / 7 skipping / 0 fail。
+- **nightly `__closure__` 根因**：初判指向 `error_handler.py:173` 是**错的**——
+  那是 `gh run view --log-failed` 混入的另一段日志。完整 traceback 实指
+  `fakeredis/_clients/_setup.py:25` 的 `_get_args_to_warn()` 递归遍历闭包 cell，
+  遇 C 实现 `method_descriptor` 时访问 `__closure__` 抛 AttributeError。
+  进一步**第二个初判也被推翻**：钉 `fakeredis==2.36.2` 的修复在 py3.13 全量复现
+  中未能证明有效（单文件与 2.40.0 均 63 passed），故**已撤回该 pin 改动**，
+  不以未经证实的修法交付。全量 xdist 复现曾启动，但后台任务输出因会话中断丢失，
+  未取得结论；nightly 根因仍**待验证**，不以推测交付。
+- **不虚报**：本轮不宣称 nightly 已修。若后续定位到真因，另笔落板。
+
+### 收板口径
+
+本回执 docs-only 追加在 EOF，不覆盖任何他线行；推送后由新 trunk run 收口。
