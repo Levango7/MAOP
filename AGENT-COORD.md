@@ -1978,3 +1978,14 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 ### 收板口径
 
 本回执 docs-only 追加在 EOF，不覆盖任何他线行；推送后由新 trunk run 收口。
+
+## 多厂商 swarm 审计修复 PR #300 合并回执（ZCode 线）— 2026-11-24
+
+- **合并**：`128d93a1`（merge commit）；head `7ce5239e`；CI **32/32 全绿**、mss=CLEAN。四笔：`49b80937`（F-1~F-5 修复+7 钉测）→`5308d4cb`（复审修复+6 补测）→`b269fbbb`（test_list_by_status 旧断言同步）→`7ce5239e`（E2E timeout 30min）。
+- **来源**：多厂商 swarm 首战（Codex 规划/独立审计/交叉审查 + ZCode 专项与终裁，产物 `F:/tmp/maop-swarm-1123/final-report.md`）。修复 F-1 dispatch 把 WorkerPool 任务 ID 当结果（秒完成）/F-2 LLM 错误文本写 COMPLETED/F-3 cancel 不取消 Worker+状态机无守卫/F-4 ISO「T」vs datetime()「空格」当天 expire 失效/F-5 记账失败反转为执行失败。
+- **验证**：7 钉测在旧实现 **7/7 全红**（stash 变异实证）→修复后 34 passed；复审后共 13 钉测+27 旧 a2a+test_subagent_manager 全过（50 related）；ruff/mypy 622/config-drift/silent 1072 基线/file-size 全过。CI 曾红 1 条 test_list_by_status=**F-2 预期行为变更**（无 provider 旧写 COMPLETED），stub 正常输出同步后复绿。
+- **多厂商复审**：Codex 测试与回归复审抓两真风险已修（终态任务 dispatch 零副作用、wait 3600s 有界）；其 F-4「绑定数不匹配」指控与 34 passed 实测矛盾，**判为误报**（复审结论必须实测对账）。Claude 小范围复审通过（三点核心全达标）；其深审 1800s 超时零产出 ⇒ **Claude 只宜小函数级任务**。Gemini 短探活恢复但长材料仍 403 配额 ⇒ 长任务不排编队。
+- **网络**：github.com:443 死、api.github.com 通（同 11-17 形态）⇒ push/删除全走 **SSH-443 旁路**（ssh.github.com:443 实测通）。
+- **E2E**：20min 在 apt 装依赖 17min+ 即超时被取消（非代码问题）⇒ 提 30min 后全绿（#293 的延续修正）。
+- **回滚**：revert 四笔即恢复；无 schema/API 结构变化（artifact.result 由 id 字符串变为真实结果对象属预期修正）。分支已全清（本地/远端）。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
