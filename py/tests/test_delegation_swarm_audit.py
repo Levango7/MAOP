@@ -26,12 +26,16 @@ class _SlowPool:
     def __init__(self):
         self.fut = None
         self.cancelled = False
+        self.wait_ids = []
+        self.submit_calls = 0
 
     async def submit(self, message, workdir="", agent_name=""):
+        self.submit_calls += 1
         self.fut = asyncio.get_running_loop().create_future()
         return "wt-1"
 
-    async def wait(self, task_id):
+    async def wait(self, task_id, timeout=0):
+        self.wait_ids.append(task_id)
         return await self.fut
 
     def cancel(self, task_id):
@@ -62,6 +66,7 @@ async def test_f1_dispatch_waits_real_result_not_task_id(tmp_path):
     t = mgr.get_task(task.task_id)
     assert t.status == "completed"
     assert t.artifacts[0]["result"] == {"output": "real-result"}
+    assert pool.wait_ids == ["wt-1"]  # wait 必须收到 submit 返回的真实 worker id
 
 
 @pytest.mark.asyncio
@@ -143,3 +148,93 @@ def test_f5_execute_failure_original_error_not_masked(tmp_path):
     proxy._connect = MagicMock(side_effect=sqlite3.OperationalError("db gone"))
     with pytest.raises(ValueError, match="real-cause"):
         proxy.call("ext", "task")
+
+
+# ── 复审补测（Codex 测试与回归复审建议，2026-11-24）─────────────────
+
+
+@pytest.mark.asyncio
+async def test_f1_wait_failure_marks_failed(tmp_path):
+    """新增的 wait 依赖自身的失败路径：wait 抛异常 ⇒ failed（不得写 completed）。"""
+    mgr = A2AManager(root_dir=str(tmp_path))
+    pool = MagicMock()
+
+    async def submit(message, workdir="", agent_name=""):
+        return "wt-x"
+
+    async def wait(task_id, timeout=0):
+        raise RuntimeError("worker boom")
+
+    pool.submit = submit
+    pool.wait = wait
+    mgr.set_worker_pool(pool)
+    task = mgr.create_task("coder", "do work")
+    await mgr.dispatch_task(task.task_id, "coder", "do work")
+    t = mgr.get_task(task.task_id)
+    assert t.status == "failed"
+    assert "worker boom" in t.artifacts[0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_f1_terminal_task_dispatch_has_no_side_effect(tmp_path):
+    """已处终态的任务再次 dispatch：不得执行副作用（submit 零调用）。"""
+    mgr = A2AManager(root_dir=str(tmp_path))
+    pool = _SlowPool()
+    mgr.set_worker_pool(pool)
+    task = mgr.create_task("coder", "do work")
+    assert mgr.update_task(task.task_id, "completed") is not None
+    await mgr.dispatch_task(task.task_id, "coder", "do work")
+    assert pool.submit_calls == 0
+    assert mgr.get_task(task.task_id).status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_f2_normal_output_stays_completed(tmp_path):
+    """防误伤：正常字符串输出不得被错误标记逻辑误判为 FAILED。"""
+    mgr = SubAgentManager(root_dir=tmp_path)
+
+    async def fake_invoke(agent_id, config, task, context):
+        return "这是一段正常的 LLM 输出"
+
+    mgr._invoke_llm = fake_invoke  # type: ignore[attr-defined]
+    result = await mgr._execute_agent("agent-ok", AgentConfig(name="a"), "task", {})
+    assert result.status == AgentStatus.COMPLETED
+    assert result.output == "这是一段正常的 LLM 输出"
+
+
+@pytest.mark.asyncio
+async def test_f2_failure_persisted_to_db(tmp_path):
+    """F-2 的修复目标是「持久化为 FAILED」——除返回值外，查库验证状态列。"""
+    mgr = SubAgentManager(root_dir=tmp_path)
+    with mgr._connect() as conn:
+        conn.execute(
+            "INSERT INTO subagents (id,name,role,model,task,context,status,config,created_at,started_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?)",
+            ("agent-db", "a", "leaf", "m", "task", "{}", "running", "{}", "0", 0),
+        )
+
+    async def fake_invoke(agent_id, config, task, context):
+        return "[LLM Error] quota"
+
+    mgr._invoke_llm = fake_invoke  # type: ignore[attr-defined]
+    await mgr._execute_agent("agent-db", AgentConfig(name="a"), "task", {})
+    with mgr._connect() as conn:
+        row = conn.execute(
+            "SELECT status FROM subagents WHERE id='agent-db'"
+        ).fetchone()
+    assert row[0] == AgentStatus.FAILED.value
+
+
+@pytest.mark.asyncio
+async def test_f3_worker_cancel_false_still_canceled(tmp_path):
+    """底层 cancel 返回 False（任务已结束/未知）：A2A 状态仍保持 canceled。"""
+    mgr = A2AManager(root_dir=str(tmp_path))
+    pool = _SlowPool()
+    mgr.set_worker_pool(pool)
+    pool.cancel = lambda task_id: False
+    task = mgr.create_task("coder", "do work")
+    resp = mgr.handle_message(
+        A2AMessage(method="tasks/cancel", params={"task_id": task.task_id})
+    )
+    assert resp.result["status"] == "canceled"
+    assert mgr.get_task(task.task_id).status == "canceled"

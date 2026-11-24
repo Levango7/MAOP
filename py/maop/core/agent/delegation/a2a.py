@@ -88,6 +88,8 @@ class A2ATaskState(BaseModel):
 
 # A2A 任务终态：completed/failed/canceled 一旦到达即不可再迁移（update_task 守卫）
 _TERMINAL_STATES = frozenset({"completed", "failed", "canceled"})
+# dispatch 等待真实执行结果的上界（秒）：worker 卡死时必须有界失败，不得永久挂起
+_DISPATCH_WAIT_TIMEOUT_S = 3600.0
 
 
 class A2AManager:
@@ -258,7 +260,11 @@ class A2AManager:
         if self._worker_pool is None:
             logger.warning("[a2a] dispatch_task called without a worker pool")
             return
-        self.update_task(task_id, "working")
+        if self.update_task(task_id, "working") is None:
+            # 任务不存在或已处终态（含重复 dispatch/已取消）：不得再执行副作用
+            # （此前会 submit 执行 worker，最终回写又被终态守卫丢弃=副作用与状态脱节）
+            logger.warning("[a2a] task %s 不存在或已处终态，拒绝 dispatch（不执行副作用）", task_id)
+            return
         try:
             workdir = self._root_dir or ""
             worker_id = await self._worker_pool.submit(
@@ -270,7 +276,7 @@ class A2AManager:
             # 执行在后台进行。修复前直接把该 ID 当结果写 completed（任务「秒完成」）。
             # 现在保存映射并 wait 真实结果，终态以实际执行结果为准。
             self._worker_task_ids[task_id] = worker_id
-            result = await self._worker_pool.wait(worker_id)
+            result = await self._worker_pool.wait(worker_id, timeout=_DISPATCH_WAIT_TIMEOUT_S)
             artifact = {
                 "role": "agent",
                 "agent": agent_name,
