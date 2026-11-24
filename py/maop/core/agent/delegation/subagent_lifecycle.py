@@ -189,6 +189,12 @@ class SubAgentDelegate:
             child_depth = parent_depth + 1
             if child_depth > max_depth:
                 raise ValueError(f"Max subagent depth ({max_depth}) exceeded: {parent} → {agent}")
+            # 无 call_chain 时也要 enforce 自引用上限（此前只在 call_chain 分支检查，
+            # parent == agent 可绕过 max_self_ref_depth 连续自派生）
+            if parent == agent and child_depth > max_self_ref_depth:
+                raise ValueError(
+                    f"Self-reference limit ({max_self_ref_depth}) exceeded for '{agent}': {parent} → {agent}"
+                )
 
         sa_id = f"sa-{uuid.uuid4().hex[:8]}"
         now = datetime.now(timezone.utc).isoformat()
@@ -458,7 +464,15 @@ class SubAgentManager(SubAgentDelegate):
         """Cancel a running sub-agent."""
         atask = self._running.get(agent_id)
         if atask is not None and not atask.done():
-            atask.cancel()
+            # Task.cancel() 非线程安全：跨线程/跨 loop 调用时经 call_soon_threadsafe
+            try:
+                running_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                running_loop = None
+            if running_loop is atask.get_loop():
+                atask.cancel()
+            else:
+                atask.get_loop().call_soon_threadsafe(atask.cancel)
             self._update_status(agent_id, AgentStatus.CANCELLED)
             self._append_transcript(agent_id, "cancelled", {})
             return True
@@ -507,9 +521,10 @@ class SubAgentManager(SubAgentDelegate):
     ) -> AgentResult:
         """Execute a sub-agent task via ``_invoke_llm``, then persist its terminal status."""
         start = time.time()
-        self._append_transcript(agent_id, "started", {"task": task})
-
         try:
+            # started transcript 纳入 try：其写库失败时 finally 必须清理 _running
+            # （此前在 try/finally 之外，失败留下悬挂条目且异常无人 retrieve）
+            self._append_transcript(agent_id, "started", {"task": task})
             output = await self._invoke_llm(agent_id, config, task, context)
             # LLM 错误响应约定（[LLM Error] / [No provider]）必须视为失败：
             # 此前这些字符串被当正常输出写 COMPLETED（静默失败）。

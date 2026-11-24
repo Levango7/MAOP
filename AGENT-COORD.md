@@ -1989,6 +1989,16 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **E2E**：20min 在 apt 装依赖 17min+ 即超时被取消（非代码问题）⇒ 提 30min 后全绿（#293 的延续修正）。
 - **回滚**：revert 四笔即恢复；无 schema/API 结构变化（artifact.result 由 id 字符串变为真实结果对象属预期修正）。分支已全清（本地/远端）。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## P2 批修复 PR #301 合并回执（ZCode 线）— 2026-11-24
+
+- **合并**：`c40e7405`（merge commit）；head `93ade3c1`；CI **32/32 全绿**、mss=CLEAN。
+- **修复（swarm 报告 P2 批 + Claude 边缘）**：F-6 pending 改 SQL 内优先级排序（治 critical 饿死）/F-7 started transcript 入 try（finally 必清 _running）/F-8 cancel 跨线程 call_soon_threadsafe/F-9 call 自动连接（connect False 抛 ConnectionError）/F-10 resolved_by 列+PRAGMA 存量迁移/F-11 无 call_chain 自引用上限/dispatch working 防重+CancelledError 落 canceled。
+- **验证**：8 新钉测在旧实现 **7/8 转红**（F-8 属防护性改进两实现均绿）→59 相关用例全过；ruff/mypy 622/config-drift/silent 1072/file-size 全过。变异验证初版撞「旧实现 duplicate_dispatch 永久挂起」超时致 stash 未 pop（已恢复）⇒ 改进=排除挂起用例+`;` 保证 pop 必执行（挂起本身即缺陷证据）。
+- **复审**：Codex 撞代理 429 ⇒ Claude 小复审**四项全成立**（F-6/F-10 兼容、F-8 loop 判定、F-9/F-11 不误伤、dispatch 防重兜底）；**新发现=Claude 的 Read 权限边界在仓内**（F:/tmp 读不到，此前大任务超时打转的真因）⇒ diff 置仓内审完即删。附三条非阻断 P3：F-9 execute 失败不剔除连接态（不自动重连）/CancelledError 兜底未调 pool.cancel（worker 孤儿）/跨 loop 判重非原子。
+- **回滚**：revert `93ade3c1` 即恢复；resolved_by 迁移为加列向后兼容。分支已全清（本地/远端）。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
 ## CLAIM — fix/q3-alert-honesty:Q3 重做(缺陷1/3)+ A 批前端诚实化(告警规则契约对齐 + WS 告警 toast + 删 #4 死接线)(Qoder-CN 17ef022a)— 2026-11-18
 
 **事故背景(如实登记)**:11-15 16:37 主仓 F:/Nexus/MAOP 的 .git 被清空(见 ccd1de25 登记);原 worktree F:/Nexus/MAOP-q3fix 的分支 fix/q3-click-audit @ ff8ef0c9 未推送,随旧 .git 一并丢失,对象已不在新仓;MAOP-ent17 板面仓同为连坐损失(Q3 DONE 回执 4a5eb9e2 不可恢复)。本批为**重做**,内容以会话内原始 diff 为准,重新验证,旧 sha 作废。
@@ -2054,3 +2064,8 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **落地**：`AlertRules.vue` 从 `/api/notifications/channels` 读取并仅展示启用的 Webhook 通道；不再请求 `/api/hooks`。新建保存 canonical `action_config.channel_id`，编辑回填兼容旧 `webhook_id`。
 - **验证**：AlertRules Vitest **13 passed**；改动文件 ESLint、typecheck、production build 均通过；真实 Chrome（mock API）验证选项、保存 payload、编辑回填、无可用通道时阻止保存，页面无 exception。
 - **状态**：仅本地工作树修改，未提交、未推送、未更新 PR #298、未合并、未部署。
+
+## 协调板冲突合并回执 — fix/q3-alert-honesty 对最新 master（2026-11-25，Qoder-CN 17ef022a）
+
+- 最新 `master` @ `bfef0f16` 与本分支仅本板 EOF 冲突；按上游全文 + 本线 CLAIM/DONE 原样重放，未覆盖他线记录。
+- Webhook 通道收口已提交并推送为 `dbc4e6ec`，PR #298 已更新；本次仅解协调板冲突，合并提交 sha 见 `git log -1`，未合并 PR、未部署。
