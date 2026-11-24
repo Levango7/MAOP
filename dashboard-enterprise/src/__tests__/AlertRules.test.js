@@ -23,7 +23,7 @@ describe('AlertRules.vue', () => {
     document.body.replaceChildren();
   });
 
-  function mockFetch() {
+  function mockFetch(ruleOverrides = {}) {
     return vi.fn((url) => {
       const u = String(url);
       let body = {};
@@ -36,6 +36,7 @@ describe('AlertRules.vue', () => {
             action: 'email', action_config: { email: 'ops@example.com' },
             severity: 'warning', tenant_id: '', created_at: 1763000000,
             updated_at: 1763000000, created_by: 'alice',
+            ...ruleOverrides,
           }],
           count: 1,
         };
@@ -50,8 +51,12 @@ describe('AlertRules.vue', () => {
           }],
           count: 1,
         };
-      } else if (u === '/api/hooks') {
-        body = { hooks: [{ id: 'h1', name: 'notify' }], count: 1 };
+      } else if (u === '/api/notifications/channels') {
+        body = { channels: [
+          { channel_id: 'ch-ok', name: 'Ops webhook', type: 'webhook', enabled: true },
+          { channel_id: 'ch-off', name: 'Disabled webhook', type: 'webhook', enabled: false },
+          { channel_id: 'ch-mail', name: 'Mail channel', type: 'email', enabled: true },
+        ], count: 3 };
       }
       return Promise.resolve({
         ok: true, status: 200,
@@ -61,7 +66,7 @@ describe('AlertRules.vue', () => {
     });
   }
 
-  it('offers hooks returned under the backend hooks key as webhook targets', async () => {
+  it('offers only enabled notification webhook channels as targets', async () => {
     global.fetch = mockFetch();
     const wrapper = mount(AlertRules);
     await flushPromises();
@@ -82,8 +87,10 @@ describe('AlertRules.vue', () => {
     await flushPromises();
 
     const webhookSelect = [...overlay.querySelectorAll('select')]
-      .find((s) => [...s.options].some((o) => o.textContent === 'notify'));
+      .find((s) => [...s.options].some((o) => o.textContent === 'Ops webhook'));
     expect(webhookSelect).toBeTruthy();
+    expect([...webhookSelect.options].map((o) => o.value)).toEqual(['', 'ch-ok']);
+    expect(global.fetch.mock.calls.some(([url]) => String(url) === '/api/hooks')).toBe(false);
     wrapper.unmount();
   });
 
@@ -236,7 +243,9 @@ describe('AlertRules.vue', () => {
       let body = {};
       if (u === '/api/audit/alert/rules') body = { rules: [], count: 0 };
       else if (u.startsWith('/api/audit/alert/history')) body = { alerts: [], count: 0 };
-      else if (u === '/api/hooks') body = { hooks: [], count: 0 };
+      else if (u === '/api/notifications/channels') body = { channels: [
+        { channel_id: 'ch-ok', name: 'Ops webhook', type: 'webhook', enabled: true },
+      ], count: 1 };
       return Promise.resolve({
         ok: true, status: 200,
         json: () => Promise.resolve(body),
@@ -256,6 +265,41 @@ describe('AlertRules.vue', () => {
     await flushPromises();
     return inputs;
   }
+
+  it('saves the selected notification channel id in action_config', async () => {
+    const posts = [];
+    mockSave(posts);
+    const wrapper = mount(AlertRules);
+    await flushPromises();
+    await flushPromises();
+
+    const createBtn = wrapper.findAll('button').find((b) => b.text().includes('New Rule'));
+    await createBtn.trigger('click');
+    await flushPromises();
+
+    const overlay = document.querySelector('.modal-overlay');
+    await openCreateAndFill(overlay);
+    const selects = [...overlay.querySelectorAll('select')];
+    const channelSelect = selects.find((s) => [...s.options].some((o) => o.value === 'webhook'));
+    channelSelect.value = 'webhook';
+    channelSelect.dispatchEvent(new Event('change'));
+    await flushPromises();
+    const webhookSelect = [...overlay.querySelectorAll('select')]
+      .find((s) => [...s.options].some((o) => o.value === 'ch-ok'));
+    webhookSelect.value = 'ch-ok';
+    webhookSelect.dispatchEvent(new Event('change'));
+    await flushPromises();
+
+    const saveBtn = [...overlay.querySelectorAll('button')].find((b) => b.textContent.includes('Save'));
+    saveBtn.dispatchEvent(new Event('click'));
+    await flushPromises();
+    await flushPromises();
+
+    expect(posts).toHaveLength(1);
+    expect(posts[0].action).toBe('webhook');
+    expect(posts[0].action_config).toEqual({ channel_id: 'ch-ok' });
+    wrapper.unmount();
+  });
 
   it('saves a rule in the backend condition-dict shape with email in action_config', async () => {
     // Q3 缺陷3(重做):condition 必须是 {op, value, window_s, filter} 对象且带
@@ -349,6 +393,24 @@ describe('AlertRules.vue', () => {
     wrapper.unmount();
   });
 
+  it('prefills the notification channel id when editing a webhook rule', async () => {
+    global.fetch = mockFetch({ action: 'webhook', action_config: { channel_id: 'ch-ok' } });
+    const wrapper = mount(AlertRules);
+    await flushPromises();
+    await flushPromises();
+
+    const editBtn = wrapper.findAll('button').find((b) => b.attributes('title') === 'Edit');
+    await editBtn.trigger('click');
+    await flushPromises();
+
+    const overlay = document.querySelector('.modal-overlay');
+    const webhookSelect = [...overlay.querySelectorAll('select')]
+      .find((s) => [...s.options].some((o) => o.value === 'ch-ok'));
+    expect(webhookSelect).toBeTruthy();
+    expect(webhookSelect.value).toBe('ch-ok');
+    wrapper.unmount();
+  });
+
   it('surfaces a save failure as an error toast and keeps the modal open', async () => {
     // 异常输出面：后端 4xx/5xx 时 toast.error 且模态保持打开——不假装成功。
     toastState.items.splice(0, toastState.items.length);
@@ -364,7 +426,9 @@ describe('AlertRules.vue', () => {
       let body = {};
       if (u === '/api/audit/alert/rules') body = { rules: [], count: 0 };
       else if (u.startsWith('/api/audit/alert/history')) body = { alerts: [], count: 0 };
-      else if (u === '/api/hooks') body = { hooks: [], count: 0 };
+      else if (u === '/api/notifications/channels') body = { channels: [
+        { channel_id: 'ch-ok', name: 'Ops webhook', type: 'webhook', enabled: true },
+      ], count: 1 };
       return Promise.resolve({
         ok: true, status: 200,
         json: () => Promise.resolve(body),

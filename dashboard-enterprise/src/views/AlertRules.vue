@@ -186,7 +186,7 @@
             <span>{{ t('view.alerts.fieldWebhook') }}</span>
             <select v-model="form.webhook_id" class="input">
               <option value="">{{ t('view.alerts.fieldWebhook') }}…</option>
-              <option v-for="w in webhooks" :key="w.id" :value="w.id">{{ w.name }}</option>
+              <option v-for="w in webhooks" :key="w.channel_id" :value="w.channel_id">{{ w.name }}</option>
             </select>
           </label>
           <label class="form-label form-label--inline">
@@ -363,17 +363,12 @@ async function loadAll() {
     ]);
     rules.value = normalizeRules(rulesData);
     // stats 可能从 history 端点或独立 stats 端点返回
-    if (statsData) {
-      stats.value = statsData.stats || statsData.summary || null;
-      // 若 history 端点也返回了 webhooks 列表(供表单选择), 则保存
-      if (statsData.webhooks) webhooks.value = statsData.webhooks;
-    }
-    // 加载 webhook 列表供渠道选择(失败不阻塞)
+    if (statsData) stats.value = statsData.stats || statsData.summary || null;
     try {
-      const wh = await api.get('/api/hooks');
-      // 后端返回 {hooks, count}；保留旧字段兜底以免其他部署形态空列表。
-      webhooks.value = Array.isArray(wh) ? wh : (wh.hooks || wh.items || wh.webhooks || wh.data || []);
-    } catch { /* webhook 列表可选 */ }
+      const channelData = await api.get('/api/notifications/channels');
+      const channels = Array.isArray(channelData) ? channelData : (channelData.channels || []);
+      webhooks.value = channels.filter((channel) => channel.type === 'webhook' && channel.enabled !== false);
+    } catch { /* 无可用通道时保留空列表，由保存校验拦截 */ }
   } catch (e) {
     // 个人版没有企业版规则 API（404），那不是页面故障：当成"这里没有规则"，
     // 让下面的 Alertmanager 入站告警照常渲染。企业版下仍然报真错误。
@@ -464,7 +459,7 @@ function openEdit(r) {
     threshold: r.threshold,
     channel: r.channel || 'notify',
     email: (r.action_config && r.action_config.email) || '',
-    webhook_id: (r.action_config && r.action_config.webhook_id) || '',
+    webhook_id: (r.action_config && (r.action_config.channel_id || r.action_config.webhook_id)) || '',
     enabled: r.enabled !== false,
   };
   showForm.value = true;
@@ -510,7 +505,7 @@ async function save() {
     // action 取引擎枚举 notify/webhook/email/log,前端「应用内」即 notify。
     let actionConfig = {};
     if (form.value.channel === 'email') actionConfig = { email: form.value.email.trim() };
-    else if (form.value.channel === 'webhook') actionConfig = { webhook_id: form.value.webhook_id };
+    else if (form.value.channel === 'webhook') actionConfig = { channel_id: form.value.webhook_id };
     // 后端契约(maop/enterprise/audit_enhanced.py 的 AuditAlertRuleCreate/Update):
     // condition 必须是 {op, value, window_s, filter} 对象、op 取引擎 _apply_op 集合
     // (>=,>,<=,<,==,!=);旧代码发字符串 + 无 condition_type → 422,规则从未落库。

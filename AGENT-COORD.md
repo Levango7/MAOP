@@ -2041,3 +2041,16 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - 9 条在干净 master（b89f4147 独立 worktree）同测同红：notifications_edition_gate×2、enterprise_n8n×3、stage3_a2a_gateway_live_transport×3、task_splitter×1 ⇒ 上游存量红，非本批引入。
 - 2 条 analysis（top_n_limit / memory_consumers_are_listed）在本批全量红、单独复跑 2/2 过、干净 master 同测 2/2 过 ⇒ 负载/顺序抖动，非内容红。
 **未做**：未跑专项渗透/依赖扫描；未部署灰度；未合并 PR。
+
+## CLAIM — A 批告警规则 Webhook 选择器收口（Qoder-CN 17ef022a，2026-11-24）
+
+- **基线**：`fix/q3-alert-honesty` @ `73606003`；仅本地修改，不提交、不推送、不改 PR #298。
+- **领地**：`dashboard-enterprise/src/views/AlertRules.vue`、`dashboard-enterprise/src/__tests__/AlertRules.test.js`、本板追加段。
+- **依据**：`AlertRules.vue` 仍从 `/api/hooks` 取生命周期 Hook 的 `id`；MAOS `notification.models.ChannelResponse` 与 `/api/notifications/channels` 返回的是 `channel_id/type/enabled`，告警引擎按通知通道 ID 解析。
+- **处置**：选择器改为仅列启用 Webhook 通知通道，保存到 `action_config.channel_id`；编辑兼容已有的 `webhook_id`。先加公开页面行为回归，再实现；验证 Vitest、eslint、build 与浏览器交互。
+
+## Qoder A 批 DONE（2026-11-25）—— 告警规则 Webhook 通道选择收口
+
+- **落地**：`AlertRules.vue` 从 `/api/notifications/channels` 读取并仅展示启用的 Webhook 通道；不再请求 `/api/hooks`。新建保存 canonical `action_config.channel_id`，编辑回填兼容旧 `webhook_id`。
+- **验证**：AlertRules Vitest **13 passed**；改动文件 ESLint、typecheck、production build 均通过；真实 Chrome（mock API）验证选项、保存 payload、编辑回填、无可用通道时阻止保存，页面无 exception。
+- **状态**：仅本地工作树修改，未提交、未推送、未更新 PR #298、未合并、未部署。
