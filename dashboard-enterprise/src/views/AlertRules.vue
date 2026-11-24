@@ -57,7 +57,6 @@
         <div class="al-table" role="table" :aria-label="t('view.alerts.subtitle')">
           <div class="al-row al-row--head" role="row">
             <div class="al-cell al-cell--name" role="columnheader">{{ t('view.alerts.colName') }}</div>
-            <div class="al-cell al-cell--metric" role="columnheader">{{ t('view.alerts.colMetric') }}</div>
             <div class="al-cell al-cell--cond" role="columnheader">{{ t('view.alerts.colCondition') }}</div>
             <div class="al-cell al-cell--threshold" role="columnheader">{{ t('view.alerts.colThreshold') }}</div>
             <div class="al-cell al-cell--channel" role="columnheader">{{ t('view.alerts.colChannel') }}</div>
@@ -67,9 +66,6 @@
           <div v-for="r in rules" :key="r.id" class="al-row" role="row">
             <div class="al-cell al-cell--name" role="cell">
               <span class="al-name">{{ r.name }}</span>
-            </div>
-            <div class="al-cell al-cell--metric" role="cell">
-              <span class="al-text">{{ metricLabel(r.metric) }}</span>
             </div>
             <div class="al-cell al-cell--cond" role="cell">
               <code class="al-mono">{{ conditionLabel(r.condition) }}</code>
@@ -159,24 +155,17 @@
             <span>{{ t('view.alerts.fieldDescription') }}</span>
             <input v-model="form.description" class="input" type="text" :placeholder="t('view.alerts.fieldDescription')" />
           </label>
-          <div class="form-row">
-            <label class="form-label">
-              <span>{{ t('view.alerts.fieldMetric') }}</span>
-              <select v-model="form.metric" class="input">
-                <option v-for="m in METRICS" :key="m" :value="m">{{ metricLabel(m) }}</option>
-              </select>
-            </label>
-            <label class="form-label">
-              <span>{{ t('view.alerts.fieldCondition') }}</span>
-              <select v-model="form.condition" class="input">
-                <option value=">">{{ t('view.alerts.condGt') }}</option>
-                <option value="<">{{ t('view.alerts.condLt') }}</option>
-                <option value=">=">{{ t('view.alerts.condGte') }}</option>
-                <option value="<=">{{ t('view.alerts.condLte') }}</option>
-                <option value="=">{{ t('view.alerts.condEq') }}</option>
-              </select>
-            </label>
-          </div>
+          <label class="form-label">
+            <span>{{ t('view.alerts.fieldCondition') }}</span>
+            <select v-model="form.condition" class="input">
+              <option value=">">{{ t('view.alerts.condGt') }}</option>
+              <option value="<">{{ t('view.alerts.condLt') }}</option>
+              <option value=">=">{{ t('view.alerts.condGte') }}</option>
+              <option value="<=">{{ t('view.alerts.condLte') }}</option>
+              <option value="==">{{ t('view.alerts.condEq') }}</option>
+              <option value="!=">{{ t('view.alerts.condNe') }}</option>
+            </select>
+          </label>
           <label class="form-label">
             <span>{{ t('view.alerts.fieldThreshold') }}</span>
             <input v-model="form.threshold" class="input" type="number" step="any" :placeholder="t('view.alerts.placeholderThreshold')" />
@@ -186,7 +175,7 @@
             <select v-model="form.channel" class="input">
               <option value="email">{{ t('view.alerts.channelEmail') }}</option>
               <option value="webhook">{{ t('view.alerts.channelWebhook') }}</option>
-              <option value="inline">{{ t('view.alerts.channelInline') }}</option>
+              <option value="notify">{{ t('view.alerts.channelNotify') }}</option>
             </select>
           </label>
           <label v-if="form.channel === 'email'" class="form-label">
@@ -197,12 +186,8 @@
             <span>{{ t('view.alerts.fieldWebhook') }}</span>
             <select v-model="form.webhook_id" class="input">
               <option value="">{{ t('view.alerts.fieldWebhook') }}…</option>
-              <option v-for="w in webhooks" :key="w.id" :value="w.id">{{ w.name }}</option>
+              <option v-for="w in webhooks" :key="w.channel_id" :value="w.channel_id">{{ w.name }}</option>
             </select>
-          </label>
-          <label class="form-label">
-            <span>{{ t('view.alerts.fieldCooldown') }}</span>
-            <input v-model.number="form.cooldown_s" class="input" type="number" min="0" placeholder="300" />
           </label>
           <label class="form-label form-label--inline">
             <input v-model="form.enabled" type="checkbox" />
@@ -227,7 +212,6 @@
           <p class="detail-value">{{ historyRule.name }}</p>
           <h4 class="detail-section__title">{{ t('view.alerts.colCondition') }}</h4>
           <p class="detail-value">
-            {{ metricLabel(historyRule.metric) }}
             {{ conditionLabel(historyRule.condition) }}
             {{ historyRule.threshold }}
           </p>
@@ -278,17 +262,6 @@ const { showConfirm } = useConfirm();
 // 判断一致。
 const requiresEnterprise = computed(() => !edition.isEnterprise);
 
-// 可选指标
-const METRICS = [
-  'cpu_usage',
-  'memory_usage',
-  'latency',
-  'error_rate',
-  'cost_daily',
-  'task_queue',
-  'agent_offline',
-];
-
 // ── 列表状态 ──
 const rules = ref([]);
 const webhooks = ref([]);
@@ -317,13 +290,11 @@ function defaultForm() {
   return {
     name: '',
     description: '',
-    metric: 'cpu_usage',
     condition: '>',
     threshold: '',
     channel: 'email',
     email: '',
     webhook_id: '',
-    cooldown_s: 300,
     enabled: true,
   };
 }
@@ -351,26 +322,14 @@ const statFalsePositiveRate = computed(() => {
 });
 
 // ── 工具函数 ──
-function metricLabel(m) {
-  const map = {
-    cpu_usage: t('view.alerts.metricCpuUsage'),
-    memory_usage: t('view.alerts.metricMemoryUsage'),
-    latency: t('view.alerts.metricLatency'),
-    error_rate: t('view.alerts.metricErrorRate'),
-    cost_daily: t('view.alerts.metricCostDaily'),
-    task_queue: t('view.alerts.metricTaskQueue'),
-    agent_offline: t('view.alerts.metricAgentOffline'),
-  };
-  return map[m] || m;
-}
-
 function conditionLabel(c) {
   const map = {
     '>': t('view.alerts.condGt'),
     '<': t('view.alerts.condLt'),
     '>=': t('view.alerts.condGte'),
     '<=': t('view.alerts.condLte'),
-    '=': t('view.alerts.condEq'),
+    '==': t('view.alerts.condEq'),
+    '!=': t('view.alerts.condNe'),
   };
   return map[c] || c;
 }
@@ -379,7 +338,7 @@ function channelLabel(ch) {
   const map = {
     email: t('view.alerts.channelEmail'),
     webhook: t('view.alerts.channelWebhook'),
-    inline: t('view.alerts.channelInline'),
+    notify: t('view.alerts.channelNotify'),
   };
   return map[ch] || ch;
 }
@@ -404,17 +363,12 @@ async function loadAll() {
     ]);
     rules.value = normalizeRules(rulesData);
     // stats 可能从 history 端点或独立 stats 端点返回
-    if (statsData) {
-      stats.value = statsData.stats || statsData.summary || null;
-      // 若 history 端点也返回了 webhooks 列表(供表单选择), 则保存
-      if (statsData.webhooks) webhooks.value = statsData.webhooks;
-    }
-    // 加载 webhook 列表供渠道选择(失败不阻塞)
+    if (statsData) stats.value = statsData.stats || statsData.summary || null;
     try {
-      const wh = await api.get('/api/hooks');
-      // 后端返回 {hooks, count}；保留旧字段兜底以免其他部署形态空列表。
-      webhooks.value = Array.isArray(wh) ? wh : (wh.hooks || wh.items || wh.webhooks || wh.data || []);
-    } catch { /* webhook 列表可选 */ }
+      const channelData = await api.get('/api/notifications/channels');
+      const channels = Array.isArray(channelData) ? channelData : (channelData.channels || []);
+      webhooks.value = channels.filter((channel) => channel.type === 'webhook' && channel.enabled !== false);
+    } catch { /* 无可用通道时保留空列表，由保存校验拦截 */ }
   } catch (e) {
     // 个人版没有企业版规则 API（404），那不是页面故障：当成"这里没有规则"，
     // 让下面的 Alertmanager 入站告警照常渲染。企业版下仍然报真错误。
@@ -478,15 +432,13 @@ function normalizeRules(d) {
     id: r.rule_id,
     name: r.name || '',
     description: r.description || '',
-    metric: r.metric || '',
     // The engine keeps the operator and the value inside `condition`
     // ({op, value, window_s, filter}), not as flat columns.
     condition: (r.condition && r.condition.op) || '>=',
     threshold: r.condition ? r.condition.value : undefined,
-    channel: r.channel || 'email',
-    email: r.email || '',
-    webhook_id: r.webhook_id || '',
-    cooldown_s: r.cooldown_s || 0,
+    channel: r.action || 'notify',
+    // 渠道专属配置(收件人/webhook id)后端无顶层字段,存于 action_config(JSONB)。
+    action_config: r.action_config || {},
     enabled: r.enabled !== false,
   }));
 }
@@ -503,13 +455,11 @@ function openEdit(r) {
   form.value = {
     name: r.name || '',
     description: r.description || '',
-    metric: r.metric || 'cpu_usage',
-    condition: r.condition || '>',
+    condition: r.condition || '>=',
     threshold: r.threshold,
-    channel: r.channel || 'email',
-    email: r.email || '',
-    webhook_id: r.webhook_id || '',
-    cooldown_s: r.cooldown_s || 0,
+    channel: r.channel || 'notify',
+    email: (r.action_config && r.action_config.email) || '',
+    webhook_id: (r.action_config && (r.action_config.channel_id || r.action_config.webhook_id)) || '',
     enabled: r.enabled !== false,
   };
   showForm.value = true;
@@ -551,18 +501,29 @@ async function save() {
   if (!validate()) return;
   saving.value = true;
   try {
+    // 渠道专属配置(收件人/webhook id)后端无顶层字段,按通道进 action_config(JSONB 持久化);
+    // action 取引擎枚举 notify/webhook/email/log,前端「应用内」即 notify。
+    let actionConfig = {};
+    if (form.value.channel === 'email') actionConfig = { email: form.value.email.trim() };
+    else if (form.value.channel === 'webhook') actionConfig = { channel_id: form.value.webhook_id };
+    // 后端契约(maop/enterprise/audit_enhanced.py 的 AuditAlertRuleCreate/Update):
+    // condition 必须是 {op, value, window_s, filter} 对象、op 取引擎 _apply_op 集合
+    // (>=,>,<=,<,==,!=);旧代码发字符串 + 无 condition_type → 422,规则从未落库。
     const payload = {
       name: form.value.name.trim(),
       description: form.value.description.trim(),
-      metric: form.value.metric,
-      condition: form.value.condition,
-      threshold: Number(form.value.threshold),
-      channel: form.value.channel,
-      cooldown_s: Number(form.value.cooldown_s) || 0,
+      condition_type: 'threshold',
+      condition: {
+        op: form.value.condition,
+        value: Number(form.value.threshold),
+        window_s: 300,
+        filter: {},
+      },
+      action: form.value.channel,
+      action_config: actionConfig,
+      severity: 'warning',
       enabled: form.value.enabled,
     };
-    if (form.value.channel === 'email') payload.email = form.value.email.trim();
-    if (form.value.channel === 'webhook') payload.webhook_id = form.value.webhook_id;
 
     if (editingId.value) {
       await api.put(`/api/audit/alert/rules/${encodeURIComponent(editingId.value)}`, payload);
@@ -686,7 +647,7 @@ onMounted(() => {
 }
 .al-row {
   display: grid;
-  grid-template-columns: 1.3fr 1.2fr 0.6fr 0.8fr 0.9fr 0.8fr 110px;
+  grid-template-columns: 1.3fr 0.6fr 0.8fr 0.9fr 0.8fr 110px;
   align-items: center;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
@@ -781,7 +742,7 @@ onMounted(() => {
 
 @media (max-width: 900px) {
   .al-row { grid-template-columns: 1fr 1fr 0.6fr 0.8fr 100px; }
-  .al-cell--metric, .al-cell--channel { display: none; }
+  .al-cell--channel { display: none; }
   .form-row { grid-template-columns: 1fr; }
   /* 入站表：先藏实例与接收时间，保留"哪条告警/什么级别/是否还在烧/说了什么" */
   .ai-row { grid-template-columns: 1.2fr 0.7fr 0.7fr 1.6fr; }

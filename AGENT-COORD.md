@@ -1998,3 +1998,74 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **复审**：Codex 撞代理 429 ⇒ Claude 小复审**四项全成立**（F-6/F-10 兼容、F-8 loop 判定、F-9/F-11 不误伤、dispatch 防重兜底）；**新发现=Claude 的 Read 权限边界在仓内**（F:/tmp 读不到，此前大任务超时打转的真因）⇒ diff 置仓内审完即删。附三条非阻断 P3：F-9 execute 失败不剔除连接态（不自动重连）/CancelledError 兜底未调 pool.cancel（worker 孤儿）/跨 loop 判重非原子。
 - **回滚**：revert `93ade3c1` 即恢复；resolved_by 迁移为加列向后兼容。分支已全清（本地/远端）。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## CLAIM — fix/q3-alert-honesty:Q3 重做(缺陷1/3)+ A 批前端诚实化(告警规则契约对齐 + WS 告警 toast + 删 #4 死接线)(Qoder-CN 17ef022a)— 2026-11-18
+
+**事故背景(如实登记)**:11-15 16:37 主仓 F:/Nexus/MAOP 的 .git 被清空(见 ccd1de25 登记);原 worktree F:/Nexus/MAOP-q3fix 的分支 fix/q3-click-audit @ ff8ef0c9 未推送,随旧 .git 一并丢失,对象已不在新仓;MAOP-ent17 板面仓同为连坐损失(Q3 DONE 回执 4a5eb9e2 不可恢复)。本批为**重做**,内容以会话内原始 diff 为准,重新验证,旧 sha 作废。
+**授权**:用户 2026-11-16 收尾追问(「总不能搁置在这里吧」+「?」)放行 A 批;2026-11-18 追问后继续。B 批(后端引擎→通知通道接线,MAOS 领地)仅登记不动。
+**领地说明**:dashboard-enterprise/src/** 属 Examples/Nex 默认领地,本批只动前端最小面 + 回归测试;py/** 只重做 control_schemas 的 int 计数修复 + 测试。
+**基线**:fix/q3-alert-honesty @ master 96bf0a01(origin/master 同点;fetch 因代理 502/curl 56 失败,以本地已知同步点为准,落 DONE 前重核)。
+**处置**:
+① **缺陷1 重做**:control_schemas.py ControlPause/Resume/StopResponse 的 paused/resumed/stopped bool→int(照 system_service 返回的计数写实;旧 bool 声明下 ≥2 触发 ResponseValidationError(bool_parsing)→500);回归=2 作业 int 计数测试。
+② **缺陷3 + A 批**:AlertRules.vue 对齐真实契约:condition dict 已修(重做),inline 选项 value 直发 notify(标签「应用内」)、删 metric 下拉/列/回填键与 cooldown_s、email/webhook_id 进 action_config(JSONB 持久化,编辑回填读 action_config)。
+③ **A 批 WS toast**:realtime.js 接告警广播(broadcaster 原样 send_json alert.model_dump(),以 alert_id+rule_id 识别)→ store 型 toast。
+④ **A 批 #4**:删事件型 useToast(useMaopEffects.js)+ MaopToast.vue + App.vue 挂载 + maop-motion.css 规则。
+⑤ **缺陷2 不重复做**:upgrade 无界挂起由 ZCode 线 fix/dashboard-upgrade-fanout @ 3646d220 以「有界并发+缓存」实现(agent_admin.py + 2 新测试),与本批目标文件零交集;本批只在 DONE 回执引用登记。
+**门禁**:ruff(改动的 py 文件)+ 针对性 pytest + eslint + vitest 全量 + vite build;dist-enterprise 重建。回执带新 sha 落板;未推送(无授权)。
+
+## DONE — fix/q3-alert-honesty：Q3 重做 + A 批前端诚实化回执（@ 4d703c64）— 2026-11-18（Qoder-CN 17ef022a）
+
+**授权**：用户 2026-11-16/18 收尾追问后按已陈述方案执行（CLAIM 见上）；B 批仅登记。
+**提交**：393ba9f3（CLAIM）+ 4d703c64（代码，11 files，+277/−343，显式路径 add；工作树净；未推送——无推送授权）。
+**事故重做说明**：原 fix/q3-click-audit@ff8ef0c9 随 11-15 主仓 .git 清空丢失（未推送、对象已不在库，不可恢复；见 ccd1de25 事故登记）；本批在新 worktree（主仓 worktree add，基于 master 96bf0a01）重做并重新验证，旧 sha 与旧 DONE 回执（4a5eb9e2，随 MAOP-ent17 目录同失）作废。
+**缺陷1 pause/resume/stop 500**：control_schemas.py 三字段 bool→int（照 system_service 计数写实）；回归 3 条（2 作业必 ≥2 触发旧 bool_parsing）；tests/test_router_control.py = **68 passed**。
+**缺陷3 + A 批契约对齐**：AlertRules.vue save() 发 {condition_type:'threshold', condition:{op,value,window_s,filter}, action, action_config}；inline 选项改后端枚举 notify（标签「应用内」）；删 metric 下拉/表格列/回填键与 cooldown_s（引擎按事件计数、指标无数据源；窗口内 _last_alert_ts 去重已覆盖冷却语义）；email/webhook_id 进 action_config（JSONB 持久化）并在编辑时回填（不再恒默认）；conditionLabel 对齐引擎 op 集合（==/!=，新增 condNe 词条）。
+**A 批 WS 告警 toast**：realtime.js 新增 alertToastFromMessage（alert_id+rule_id 双键识别；快照 type:'snapshot' 排除）→ store 型 toast（severity→tone）；通知链路 notify 名正言顺。
+**A 批 #4 删死接线**：useMaopEffects.js 事件型 useToast + MaopToast.vue + App.vue 挂载/导入 + maop-motion.css toast 规则全删（store 通道 37 视图在用，事件链零调用方，见 Q3 登记第 4 条）。
+**门禁**：ruff 2 文件通过；pytest 68 passed；eslint 7 文件 exit 0；vitest 定向 42 passed + 全量 **80 files / 715 tests passed**（i18n 覆盖首跑 5s 冷缓存超时、单跑 4/4 通过＝环境红非内容红）；vite build exit 0（dist-enterprise 已重建，gitignored）。
+**缺陷2 引用登记（不重复实现）**：upgrade 无界挂起由 ZCode 线 fix/dashboard-upgrade-fanout@3646d220 以「有界并发+缓存」（agent_admin.py + 2 新测试）修复，与本批目标文件零交集。
+**语义缺口（登记，不扩面）**：① email/webhook 投递引擎侧无消费方——通道实现（SMTP/Webhook/InApp+加密存储）已在 MAOS notification 包，缺「引擎命中→通道」接线，属 B 批（MAOS 领地，未授权未动）；② action_config 键契约本批定为 email→{email}、webhook→{webhook_id}，供 B 批消费；③ pytest 运行需 PYTHONPATH 指 worktree（editable 安装现指向主仓 master，验证面须显式覆盖）。
+**未触碰**：master、他线 branch/PR（MAOP-op @ fix/dashboard-upgrade-fanout）、CI/CD、推送；F:/tmp 下探针/日志为仓外副产物。
+
+## 更正 — fix/q3-alert-honesty rebase 后 sha 与最终门禁（2026-11-18，Qoder-CN 17ef022a）
+
+为满足「最新基全绿再推」，master 前移（96bf0a01 → 96ae0348，ZCode 批 8 PR #284 合入）后本线已 rebase；rebase 改写了 sha，上节回执内引用作废，以本节为准：
+- CLAIM = **5182d92a**（原 393ba9f3）
+- 代码 = **d4d0a76b**（原 4d703c64；`git show --stat` 新旧逐项相同＝11 files +277/−343，仅换基）
+- DONE 回执本体 = **a27d22bf**
+- 告警保存失败异常路径回归（toast.error + 模态保持）= **6c467dfc**
+- i18n 覆盖扫描超时硬化（describe 级 5s→30s）= **2c42f5a8**（负载机必现环境红：并发 58s 跑时全树同步扫描超 5s；断言本身未变）
+板面合并：本线 CLAIM/DONE 块与 ZCode PR #284 回执块同文件 EOF 并存，无覆盖。
+
+**最终门禁（rebase 后 96ae0348 合并树）**：ruff 2 文件通过；pytest **71 passed**（test_router_control 68 + master 新增 test_agent_upgrade_fanout / test_bottlenecks_scan_thread）；control 套件二次复跑 68 passed（重复验证）；vitest 全量 **80 files / 716 tests passed**；eslint 7 文件 exit 0；vite build exit 0（源码 rebase 前后逐字节一致，新旧 `git show --stat` 相同）。
+**推送**：fix/q3-alert-honesty 已推 origin（用户 2026-11-18「确定没问题 再推送」条件式授权；条件＝上列全绿）。
+
+## 更正 #2 — fix/q3-alert-honesty rebase 到 b89f4147 + PR #298（2026-11-24，Qoder-CN 17ef022a）
+
+开 PR #298 后 GitHub 报 CONFLICTING；根因 master 前移（96ae0348 → b89f4147，含 ZCode/Nex 批 #286–#296）。本线已 rebase 到 b89f4147，唯一冲突＝AGENT-COORD.md（上游追加多线回执），按「上游正文 + 本线 CLAIM 重放」解，无他线覆盖。
+- 新 sha：CLAIM **bae04a3c**、代码 **c9d9c993**、DONE **2046f92d**、异常路径 **8611addc**、i18n 硬化 **edff6af2**、本节落板后见 `git log -1`。
+- 上节 sha 全部作废。
+- PR：https://github.com/Levango7/MAOP/pull/298（base master ← head fix/q3-alert-honesty；开 PR，未合并）
+**rebase 后验证（b89f4147 合并树）**：ruff 2 文件通过；control 套件 **68 passed**；vitest 全量 **80 files / 721 tests passed**；eslint 7 文件 exit 0；vite build exit 0。
+**全量 pytest 分诊**：`12432 passed, 11 failed, 108 skipped`。11 条失败均不落本批文件：
+- 9 条在干净 master（b89f4147 独立 worktree）同测同红：notifications_edition_gate×2、enterprise_n8n×3、stage3_a2a_gateway_live_transport×3、task_splitter×1 ⇒ 上游存量红，非本批引入。
+- 2 条 analysis（top_n_limit / memory_consumers_are_listed）在本批全量红、单独复跑 2/2 过、干净 master 同测 2/2 过 ⇒ 负载/顺序抖动，非内容红。
+**未做**：未跑专项渗透/依赖扫描；未部署灰度；未合并 PR。
+
+## CLAIM — A 批告警规则 Webhook 选择器收口（Qoder-CN 17ef022a，2026-11-24）
+
+- **基线**：`fix/q3-alert-honesty` @ `73606003`；仅本地修改，不提交、不推送、不改 PR #298。
+- **领地**：`dashboard-enterprise/src/views/AlertRules.vue`、`dashboard-enterprise/src/__tests__/AlertRules.test.js`、本板追加段。
+- **依据**：`AlertRules.vue` 仍从 `/api/hooks` 取生命周期 Hook 的 `id`；MAOS `notification.models.ChannelResponse` 与 `/api/notifications/channels` 返回的是 `channel_id/type/enabled`，告警引擎按通知通道 ID 解析。
+- **处置**：选择器改为仅列启用 Webhook 通知通道，保存到 `action_config.channel_id`；编辑兼容已有的 `webhook_id`。先加公开页面行为回归，再实现；验证 Vitest、eslint、build 与浏览器交互。
+
+## Qoder A 批 DONE（2026-11-25）—— 告警规则 Webhook 通道选择收口
+
+- **落地**：`AlertRules.vue` 从 `/api/notifications/channels` 读取并仅展示启用的 Webhook 通道；不再请求 `/api/hooks`。新建保存 canonical `action_config.channel_id`，编辑回填兼容旧 `webhook_id`。
+- **验证**：AlertRules Vitest **13 passed**；改动文件 ESLint、typecheck、production build 均通过；真实 Chrome（mock API）验证选项、保存 payload、编辑回填、无可用通道时阻止保存，页面无 exception。
+- **状态**：仅本地工作树修改，未提交、未推送、未更新 PR #298、未合并、未部署。
+
+## 协调板冲突合并回执 — fix/q3-alert-honesty 对最新 master（2026-11-25，Qoder-CN 17ef022a）
+
+- 最新 `master` @ `bfef0f16` 与本分支仅本板 EOF 冲突；按上游全文 + 本线 CLAIM/DONE 原样重放，未覆盖他线记录。
+- Webhook 通道收口已提交并推送为 `dbc4e6ec`，PR #298 已更新；本次仅解协调板冲突，合并提交 sha 见 `git log -1`，未合并 PR、未部署。

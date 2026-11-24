@@ -224,6 +224,17 @@ class TestControlPause:
         assert data["action"] == "pause"
         assert (temp_maop_root / "logs" / ".maop_pause").exists()
 
+    def test_pause_returns_int_count_for_multiple_jobs(self, client, temp_maop_root, clean_jobs):
+        # Q3 修复重做回归：旧 bool 声明下 0/1 静默强转、2 个作业必触发
+        # ResponseValidationError(bool_parsing) → 500。
+        for jid in ("j1", "j2"):
+            clean_jobs[jid] = {"action": "run", "status": "running", "process": _fake_proc(returncode=None)}
+        resp = client.post("/api/control/pause")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["paused"] == 2
+        assert isinstance(data["paused"], int) and not isinstance(data["paused"], bool)
+
 
 # ── POST /api/control/resume ──────────────────────────────────────
 class TestControlResume:
@@ -234,6 +245,16 @@ class TestControlResume:
         assert resp.status_code == 200
         assert resp.json()["action"] == "resume"
         assert not pause_file.exists()
+
+    def test_resume_returns_int_count_for_multiple_paused(self, client, temp_maop_root, clean_jobs):
+        # 同 pause 回归：resumed 旧声明 bool，≥2 时 bool_parsing → 500。
+        for jid in ("j1", "j2"):
+            clean_jobs[jid] = {"action": "run", "status": "paused", "process": _fake_proc(returncode=None)}
+        resp = client.post("/api/control/resume")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["resumed"] == 2
+        assert isinstance(data["resumed"], int) and not isinstance(data["resumed"], bool)
 
 
 # ── POST /api/control/stop ────────────────────────────────────────
@@ -251,6 +272,19 @@ class TestControlStop:
         data = resp.json()
         assert data["stopped"] == 1
         proc.terminate.assert_called_once()
+
+    def test_stop_returns_int_count_for_multiple_running(self, client, temp_maop_root, clean_jobs):
+        # 同 pause 回归：stopped 旧声明 bool，≥2 时 bool_parsing → 500。
+        procs = [_fake_proc(returncode=None), _fake_proc(returncode=None)]
+        for i, proc in enumerate(procs, start=1):
+            clean_jobs[f"j{i}"] = {"action": "run", "status": "running", "process": proc}
+        resp = client.post("/api/control/stop")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["stopped"] == 2
+        assert isinstance(data["stopped"], int) and not isinstance(data["stopped"], bool)
+        for proc in procs:
+            proc.terminate.assert_called_once()
 
 
 # ── POST /api/control/validate ────────────────────────────────────
