@@ -106,6 +106,12 @@ class TestListAgents:
 
     @pytest.mark.asyncio
     async def test_list_by_status(self, mgr):
+        # F-2 行为变更：无 provider 的 LLM 输出现在写 FAILED（此前写 COMPLETED）。
+        # 本用例目的是 completed 状态过滤，stub 正常输出让 agent 真实成功。
+        async def _ok_invoke(agent_id, config, task, context):
+            return "normal output"
+
+        mgr._invoke_llm = _ok_invoke
         agent_id = await mgr.spawn(_config(), task="Status test")
         await mgr.wait(agent_id, timeout=10)
         completed = mgr.list_agents(status=AgentStatus.COMPLETED)
