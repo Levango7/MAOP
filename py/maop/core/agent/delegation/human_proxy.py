@@ -205,8 +205,11 @@ class HumanProxy:
         cutoff = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
             cursor = conn.execute(
+                # julianday 归一化比较：created 是 ISO「T+时区」格式，此前直接与
+                # datetime() 的空格分隔文本比较，同一日历日内 'T'(0x54) > ' '(0x20)
+                # 导致 created < cutoff 恒 false（当天永不 expire）。
                 "UPDATE approval_requests SET status='expired', resolved=? "
-                "WHERE status='pending' AND created < datetime(?, ?)",
+                "WHERE status='pending' AND julianday(created) < julianday(?, ?)",
                 (cutoff, "now", f"-{expire_hours} hours"),
             )
             if cursor.rowcount > 0:
