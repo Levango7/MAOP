@@ -1989,3 +1989,12 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **E2E**：20min 在 apt 装依赖 17min+ 即超时被取消（非代码问题）⇒ 提 30min 后全绿（#293 的延续修正）。
 - **回滚**：revert 四笔即恢复；无 schema/API 结构变化（artifact.result 由 id 字符串变为真实结果对象属预期修正）。分支已全清（本地/远端）。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## P2 批修复 PR #301 合并回执（ZCode 线）— 2026-11-24
+
+- **合并**：`c40e7405`（merge commit）；head `93ade3c1`；CI **32/32 全绿**、mss=CLEAN。
+- **修复（swarm 报告 P2 批 + Claude 边缘）**：F-6 pending 改 SQL 内优先级排序（治 critical 饿死）/F-7 started transcript 入 try（finally 必清 _running）/F-8 cancel 跨线程 call_soon_threadsafe/F-9 call 自动连接（connect False 抛 ConnectionError）/F-10 resolved_by 列+PRAGMA 存量迁移/F-11 无 call_chain 自引用上限/dispatch working 防重+CancelledError 落 canceled。
+- **验证**：8 新钉测在旧实现 **7/8 转红**（F-8 属防护性改进两实现均绿）→59 相关用例全过；ruff/mypy 622/config-drift/silent 1072/file-size 全过。变异验证初版撞「旧实现 duplicate_dispatch 永久挂起」超时致 stash 未 pop（已恢复）⇒ 改进=排除挂起用例+`;` 保证 pop 必执行（挂起本身即缺陷证据）。
+- **复审**：Codex 撞代理 429 ⇒ Claude 小复审**四项全成立**（F-6/F-10 兼容、F-8 loop 判定、F-9/F-11 不误伤、dispatch 防重兜底）；**新发现=Claude 的 Read 权限边界在仓内**（F:/tmp 读不到，此前大任务超时打转的真因）⇒ diff 置仓内审完即删。附三条非阻断 P3：F-9 execute 失败不剔除连接态（不自动重连）/CancelledError 兜底未调 pool.cancel（worker 孤儿）/跨 loop 判重非原子。
+- **回滚**：revert `93ade3c1` 即恢复；resolved_by 迁移为加列向后兼容。分支已全清（本地/远端）。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
