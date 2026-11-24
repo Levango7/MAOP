@@ -590,7 +590,9 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20min 仍不够慢 runner：apt 装浏览器依赖实测 17min+（镜像换代缓存失配时），
+    # 用例未跑即超时被取消（run 45302151137）。30min = 安装 17min + 三浏览器用例 ~4min + 余量。
+    timeout-minutes: 30
     needs: frontend
     defaults:
       run:
