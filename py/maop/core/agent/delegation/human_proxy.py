@@ -39,6 +39,7 @@ class ApprovalRequest(BaseModel):
     status: str = "pending"  # pending | approved | rejected | expired
     created: str = ""
     resolved: str | None = None
+    resolved_by: str = ""  # 审批决议的操作者（此前 resolver 参数未持久化，审计链不可归属）
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -83,6 +84,7 @@ class HumanProxy:
                     status TEXT DEFAULT 'pending',
                     created TEXT NOT NULL,
                     resolved TEXT,
+                    resolved_by TEXT DEFAULT '',
                     metadata TEXT DEFAULT '{}'
                 )
             """)
@@ -90,6 +92,10 @@ class HumanProxy:
                 CREATE INDEX IF NOT EXISTS idx_approval_status
                 ON approval_requests(status, priority)
             """)
+            # 存量库补列：resolved_by（审批人）。CREATE TABLE IF NOT EXISTS 不会给旧表加列
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(approval_requests)").fetchall()}
+            if "resolved_by" not in cols:
+                conn.execute("ALTER TABLE approval_requests ADD COLUMN resolved_by TEXT DEFAULT ''")
 
     def _connect(self):
         return sqlite_connect(self._db_path, foreign_keys=False)
@@ -130,8 +136,8 @@ class HumanProxy:
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
             cursor = conn.execute(
-                "UPDATE approval_requests SET status='approved', resolved=? WHERE id=? AND status='pending'",
-                (now, request_id),
+                "UPDATE approval_requests SET status='approved', resolved=?, resolved_by=? WHERE id=? AND status='pending'",
+                (now, resolver, request_id),
             )
             if cursor.rowcount == 0:
                 logger.warning("Approve failed: %s not found or not pending", request_id)
@@ -144,8 +150,8 @@ class HumanProxy:
         now = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
             cursor = conn.execute(
-                "UPDATE approval_requests SET status='rejected', resolved=?, reason=? WHERE id=? AND status='pending'",
-                (now, reason or "rejected", request_id),
+                "UPDATE approval_requests SET status='rejected', resolved=?, resolved_by=?, reason=? WHERE id=? AND status='pending'",
+                (now, resolver, reason or "rejected", request_id),
             )
             if cursor.rowcount == 0:
                 return False
@@ -154,16 +160,18 @@ class HumanProxy:
 
     def pending(self, limit: int = 50) -> list[ApprovalRequest]:
         """List all pending requests, sorted by priority."""
-        priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
         with self._connect() as conn:
+            # SQL 内直接按优先级+时间排序（修复：先按时间截断再内存排序会让
+            # 积压超过 limit*2 时较旧的 critical 请求被挤出候选集而饿死）。
             rows = conn.execute(
-                "SELECT * FROM approval_requests WHERE status='pending' ORDER BY created DESC LIMIT ?",
-                (limit * 2,),  # fetch extra for priority sort
+                "SELECT * FROM approval_requests WHERE status='pending' "
+                "ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 "
+                "WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, created DESC LIMIT ?",
+                (limit,),
             ).fetchall()
 
         results = [self._row_to_request(r) for r in rows]
-        results.sort(key=lambda r: priority_order.get(r.priority, 99))
-        return results[:limit]
+        return results
 
     def list_all(self, status: str = "", limit: int = 100) -> list[ApprovalRequest]:
         """List requests, optionally filtered by status."""
@@ -240,5 +248,6 @@ class HumanProxy:
             status=row["status"],
             created=row["created"],
             resolved=row["resolved"],
+            resolved_by=row["resolved_by"],
             metadata=meta,
         )

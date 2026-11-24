@@ -122,6 +122,8 @@ class AgentProxy:
         self._data_dir.mkdir(parents=True, exist_ok=True)
         self._db_path = get_db_path("agent_proxy")
         self._adapters: dict[str, AgentAdapter] = {}
+        # 已建立连接的适配器名（call 的自动连接依据；connect_all/call 成功时登记）
+        self._connected_names: set[str] = set()
         self._init_db()
 
     def _init_db(self) -> None:
@@ -148,6 +150,7 @@ class AgentProxy:
     def unregister(self, name: str) -> None:
         """Unregister an agent adapter and disconnect it."""
         adapter = self._adapters.pop(name, None)
+        self._connected_names.discard(name)
         if adapter is not None:
             try:
                 adapter.disconnect()
@@ -175,6 +178,14 @@ class AgentProxy:
         adapter = self._adapters.get(name)
         if adapter is None:
             raise KeyError(f"Adapter not registered: {name}")
+
+        # docstring 承诺的自动连接：未连接时先 connect（此前直接 execute，
+        # 需要先建立连接的适配器会在未 connect_all 时立即失败）。
+        if name not in self._connected_names:
+            ok = adapter.connect()
+            if not ok:
+                raise ConnectionError(f"Adapter '{name}' connect() returned False")
+            self._connected_names.add(name)
 
         now = time.time()
         try:
@@ -219,6 +230,10 @@ class AgentProxy:
             try:
                 ok = adapter.connect()
                 results[name] = ok
+                if ok:
+                    self._connected_names.add(name)
+                else:
+                    self._connected_names.discard(name)
                 with self._connect() as conn:
                     conn.execute(
                         "UPDATE agent_proxy_state SET connected = ?, updated_at = ? WHERE adapter_name = ?",
