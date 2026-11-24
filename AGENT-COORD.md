@@ -2069,3 +2069,14 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 
 - 最新 `master` @ `bfef0f16` 与本分支仅本板 EOF 冲突；按上游全文 + 本线 CLAIM/DONE 原样重放，未覆盖他线记录。
 - Webhook 通道收口已提交并推送为 `dbc4e6ec`，PR #298 已更新；本次仅解协调板冲突，合并提交 sha 见 `git log -1`，未合并 PR、未部署。
+
+## P3 批 + 生产试点演练 PR #302 合并回执（ZCode 线）— 2026-11-25
+
+- **合并**：`f876879f`（merge commit）；head `816c7fdf`；CI **32/32 全绿**、mss=CLEAN。
+- **P3 修复（Claude 复审附记三项）**：F-9 execute 失败剔除连接态（下次 call 自动重连）/dispatch CancelledError 兜底同步取消底层 worker（防孤儿）/判重+update_task(working) 以 RLock 原子化（跨线程/跨 loop 不双 submit）。
+- **验证**：3 新钉测 + 62 相关全过；ruff/mypy 622/config-drift/silent 基线/file-size 全过。测试硬化两则=①ThreadPoolExecutor shutdown 前先 set_result 防死锁 ②asyncio.Future 跨线程必须 call_soon_threadsafe 结算（否则 wait 不唤醒）。
+- **pip-audit 复核**：本机全环境 411 条/44 包，**MAOP frozen 相关仅 4 包 22 条且 lock 已全部修复版**（anyio 4.16.0/certifi 2026.10.23/otel-api 1.45.2/pyjwt 2.15.1）⇒ 漏洞在本机陈旧安装而非项目声明；本机四包已升级对齐 lock，Mimosa「1 条 advisory 无明细」由在线 OSV 报告闭环。
+- **生产试点三演练全 PASS**（隔离栈 9079）：①备份恢复=建库→备份 8KB→破坏→恢复原值 original；②认证开启=health 200/无 token 401/login JWT 200/错 token 401/错密码 401；③告警=webhook 无 secret 头 401、正确 secret stored=1、GET /api/alerts 见 DrillAlert firing（fail-closed secret 门实证）。
+- **48h soak 幂等启动**（soak_run 内建逐轮 JSONL 落盘+按轮续跑+连续失败即停，out-dir /f/tmp/maop-soak-48h），进度按轮数观察。
+- **回滚**：revert `816c7fdf` 即恢复。分支已全清（本地/远端）。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
