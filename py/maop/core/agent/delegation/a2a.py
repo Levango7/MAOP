@@ -260,6 +260,11 @@ class A2AManager:
         if self._worker_pool is None:
             logger.warning("[a2a] dispatch_task called without a worker pool")
             return
+        import asyncio  # 局部导入（与 _spawn_dispatch 同惯例），CancelledError 兜底用
+        existing = self._tasks.get(task_id)
+        if existing is not None and existing.status == "working":
+            logger.warning("[a2a] task %s 已在 working，拒绝重复 dispatch（防止二次 submit 覆盖 worker 映射）", task_id)
+            return
         if self.update_task(task_id, "working") is None:
             # 任务不存在或已处终态（含重复 dispatch/已取消）：不得再执行副作用
             # （此前会 submit 执行 worker，最终回写又被终态守卫丢弃=副作用与状态脱节）
@@ -287,6 +292,10 @@ class A2AManager:
                 logger.info("[a2a] task %s 已处终态（用户取消），丢弃后台完成回写", task_id)
             else:
                 logger.info("[a2a] task %s completed by '%s'", task_id, agent_name)
+        except asyncio.CancelledError:
+            # dispatch 协程自身被取消：任务落 canceled 而非永挂 working
+            self.update_task(task_id, "canceled")
+            raise
         except Exception as exc:
             artifact = {
                 "role": "agent",
