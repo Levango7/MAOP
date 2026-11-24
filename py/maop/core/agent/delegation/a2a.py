@@ -109,6 +109,10 @@ class A2AManager:
         self._worker_pool: Any = worker_pool
         # A2A task_id → WorkerPool task id 映射（tasks/cancel 需要找到底层执行任务）
         self._worker_task_ids: dict[str, str] = {}
+        # 状态读改写与 dispatch 判重的互斥锁（RLock 可重入）：跨线程/跨 loop 并发下
+        # 「判重 + update_task(working)」必须原子，否则双 submit 覆盖 worker 映射
+        import threading
+        self._state_lock = threading.RLock()
         self._init_db()
 
     def set_worker_pool(self, pool: Any) -> None:
@@ -207,30 +211,31 @@ class A2AManager:
     def update_task(
         self, task_id: str, status: str, artifact: dict[str, Any] | None = None
     ) -> A2ATaskState | None:
-        task = self._tasks.get(task_id)
-        if not task:
-            return None
-        # 状态机守卫：终态（completed/failed/canceled）不可再被覆盖。
-        # 修复前：dispatch 后台完成后会把用户已 cancel 的任务覆盖回 completed，
-        # 且任意非法迁移（completed→canceled 等）都被静默接受。
-        if task.status in _TERMINAL_STATES and status != task.status:
-            logger.warning(
-                "[a2a] 拒绝非法状态迁移 %s→%s（task %s 已处终态）",
-                task.status, status, task_id,
+        with self._state_lock:
+            task = self._tasks.get(task_id)
+            if not task:
+                return None
+            # 状态机守卫：终态（completed/failed/canceled）不可再被覆盖。
+            # 修复前：dispatch 后台完成后会把用户已 cancel 的任务覆盖回 completed，
+            # 且任意非法迁移（completed→canceled 等）都被静默接受。
+            if task.status in _TERMINAL_STATES and status != task.status:
+                logger.warning(
+                    "[a2a] 拒绝非法状态迁移 %s→%s（task %s 已处终态）",
+                    task.status, status, task_id,
+                )
+                return None
+            task.status = status
+            if artifact:
+                task.artifacts.append(artifact)
+            task.history.append(
+                {
+                    "role": "agent",
+                    "status": status,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
             )
-            return None
-        task.status = status
-        if artifact:
-            task.artifacts.append(artifact)
-        task.history.append(
-            {
-                "role": "agent",
-                "status": status,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-        self._persist_task(task)
-        return task
+            self._persist_task(task)
+            return task
 
     def get_task(self, task_id: str) -> A2ATaskState | None:
         return self._tasks.get(task_id)
@@ -261,15 +266,16 @@ class A2AManager:
             logger.warning("[a2a] dispatch_task called without a worker pool")
             return
         import asyncio  # 局部导入（与 _spawn_dispatch 同惯例），CancelledError 兜底用
-        existing = self._tasks.get(task_id)
-        if existing is not None and existing.status == "working":
-            logger.warning("[a2a] task %s 已在 working，拒绝重复 dispatch（防止二次 submit 覆盖 worker 映射）", task_id)
-            return
-        if self.update_task(task_id, "working") is None:
-            # 任务不存在或已处终态（含重复 dispatch/已取消）：不得再执行副作用
-            # （此前会 submit 执行 worker，最终回写又被终态守卫丢弃=副作用与状态脱节）
-            logger.warning("[a2a] task %s 不存在或已处终态，拒绝 dispatch（不执行副作用）", task_id)
-            return
+        with self._state_lock:
+            existing = self._tasks.get(task_id)
+            if existing is not None and existing.status == "working":
+                logger.warning("[a2a] task %s 已在 working，拒绝重复 dispatch（防止二次 submit 覆盖 worker 映射）", task_id)
+                return
+            if self.update_task(task_id, "working") is None:
+                # 任务不存在或已处终态（含重复 dispatch/已取消）：不得再执行副作用
+                # （此前会 submit 执行 worker，最终回写又被终态守卫丢弃=副作用与状态脱节）
+                logger.warning("[a2a] task %s 不存在或已处终态，拒绝 dispatch（不执行副作用）", task_id)
+                return
         try:
             workdir = self._root_dir or ""
             worker_id = await self._worker_pool.submit(
@@ -293,8 +299,15 @@ class A2AManager:
             else:
                 logger.info("[a2a] task %s completed by '%s'", task_id, agent_name)
         except asyncio.CancelledError:
-            # dispatch 协程自身被取消：任务落 canceled 而非永挂 working
+            # dispatch 协程自身被取消：任务落 canceled 而非永挂 working；
+            # 同步取消已 submit 的底层 worker（防孤儿执行）
             self.update_task(task_id, "canceled")
+            worker_id = self._worker_task_ids.get(task_id)
+            if worker_id and self._worker_pool is not None:
+                try:
+                    self._worker_pool.cancel(worker_id)
+                except (RuntimeError, AttributeError) as cancel_exc:
+                    logger.warning("[a2a] CancelledError 兜底取消 worker 失败: %s", cancel_exc)
             raise
         except Exception as exc:
             artifact = {

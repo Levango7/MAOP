@@ -191,6 +191,8 @@ class AgentProxy:
         try:
             result = adapter.execute(task, **kwargs)
         except Exception as exc:
+            # 执行失败剔除连接态：连接已失效，下次 call 必须重新 connect
+            self._connected_names.discard(name)
             # 执行失败：error_count 记账 best-effort，记账异常不得掩盖原异常
             try:
                 with self._connect() as conn:
