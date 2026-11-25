@@ -228,7 +228,7 @@ class ProviderHealthChecker:
         )
         out: list[HealthResult] = []
         for p, r in zip(providers, results):
-            if isinstance(r, Exception):
+            if isinstance(r, BaseException):
                 out.append(HealthResult(
                     provider=p.get("name", "?"), healthy=False,
                     error=str(r), checked_at=now,
