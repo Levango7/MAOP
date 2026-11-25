@@ -2122,3 +2122,10 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **TDD**：初始反向用例 6 failed / 2 passed，补负数 usage 后 1 failed / 8 passed；修复后定向与相邻回归全绿。
 - **状态**：代码已就绪待用户合并指令；未合并、未打 tag、未删除分支。
 - **收板口径**：本 DONE 行为 docs-only 追加，提交后由新 run 复核 docs-only 收口，不覆盖任何他线行。
+
+## #83 rebase 校正与复验（Qoder-Desktop 会话 1973591b，2026-11-25）—— tokens_source 诚实标注
+
+- **换基原因**：master 从 `0c285848` 前进到 `ef7b2784` 后，PR #299 的旧全绿树不再代表当前可合并状态。上节 PR/CI 行仅保留历史，最终证据以 PR 当前 head 与本轮新 run 为准。
+- **冲突处置**：唯一冲突为 `AGENT-COORD.md` EOF 追加；上游各线回执全文保留，本线 CLAIM 原样重放。`git range-diff` 证实代码与测试补丁逐笔等价，未改实现。
+- **换基后本机**：相关计费/成本/LLM/可观测性回归 **202 passed**；`ruff==0.17.6` 全 `py/` check 通过；`mypy==2.4.1` 两个改动生产模块零问题。
+- **状态**：已换基，等待本轮 PR CI；未合并、未打 tag、未删除分支，也未开始 #84–#86。
