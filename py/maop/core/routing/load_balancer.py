@@ -189,6 +189,8 @@ class LoadBalancer:
             else:
                 self._agents[name].weight = weight
                 self._agents[name].effective_weight = weight
+                # 权重变更后重置 WRR 的 current_weight（此前需多轮收敛、短期分布偏差）
+                self._agents[name].current_weight = 0
 
     def unregister(self, name: str) -> None:
         """Remove an agent from the pool."""
@@ -251,16 +253,25 @@ class LoadBalancer:
             if self._sticky_sessions and session_id:
                 sticky_agent = self._lookup_sticky(session_id)
                 if sticky_agent is not None:
-                    sticky_hit = True
-                    _set_lb_span_attrs(_span, algo_name, 1, sticky_agent,
-                                       sticky_hit, session_id)
-                    _record_lb_decision(
-                        trace_id=trace_id, algorithm=algo_name,
-                        candidate_count=1, selected=sticky_agent,
-                        sticky_hit=sticky_hit, session_id=session_id,
-                        duration_ms=(time.monotonic() - _start) * 1000.0,
-                    )
-                    return sticky_agent
+                    # sticky 命中不得绕过排除/候选过滤（此前直接 return，fallback 失效）：
+                    # agent 必须仍注册、未被 exclude、且在 candidates（若指定）内
+                    if sticky_agent in self._agents and (
+                        not exclude or sticky_agent not in exclude
+                    ) and (not candidates or sticky_agent in candidates):
+                        sticky_hit = True
+                        self._total_selections += 1  # sticky 命中也计入总选择数（此前漏计）
+                        _set_lb_span_attrs(_span, algo_name, 1, sticky_agent,
+                                           sticky_hit, session_id)
+                        _record_lb_decision(
+                            trace_id=trace_id, algorithm=algo_name,
+                            candidate_count=1, selected=sticky_agent,
+                            sticky_hit=sticky_hit, session_id=session_id,
+                            duration_ms=(time.monotonic() - _start) * 1000.0,
+                        )
+                        return sticky_agent
+                    # sticky 指向失效/被排除 agent：视为 miss 并清理后继续主选择
+                    with self._lock:
+                        self._sticky_map.pop(session_id, None)
 
             with self._lock:
                 # Auto-register candidates not yet known
@@ -482,9 +493,11 @@ class LoadBalancer:
         """Record that a task has started on an agent."""
         with self._lock:
             if agent in self._active_tasks:
+                is_new = task_id not in self._active_tasks[agent]
                 self._active_tasks[agent].add(task_id)
-            if agent in self._agents:
-                self._agents[agent].active_tasks += 1
+                if agent in self._agents and is_new:
+                    # 重复 task_id 只记一次（此前 set 不增但计数器 +1 ⇒ 口径漂移）
+                    self._agents[agent].active_tasks += 1
 
     def record_finish(
         self,
@@ -497,10 +510,12 @@ class LoadBalancer:
         """Record that a task has finished on an agent."""
         with self._lock:
             if agent in self._active_tasks:
+                was_present = task_id in self._active_tasks[agent]
                 self._active_tasks[agent].discard(task_id)
             if agent in self._agents:
                 m = self._agents[agent]
-                m.active_tasks = max(0, m.active_tasks - 1)
+                if was_present:
+                    m.active_tasks = max(0, m.active_tasks - 1)
                 m.total_requests += 1
                 m.total_latency_ms += duration_ms
                 if success:
@@ -565,13 +580,17 @@ class LoadBalancer:
 # ── Global singleton ───────────────────────────────────────────
 
 _global_lb: LoadBalancer | None = None
+_global_lb_lock = threading.Lock()
 
 
 def get_load_balancer(algorithm: LBAlgorithm = LBAlgorithm.ADAPTIVE) -> LoadBalancer:
     """Get or create the global load balancer singleton."""
     global _global_lb
+    # 双重检查锁（此前 check-then-act 竞态：并发首调多实例、丢失的实例带走指标）
     if _global_lb is None:
-        _global_lb = LoadBalancer(algorithm=algorithm)
+        with _global_lb_lock:
+            if _global_lb is None:
+                _global_lb = LoadBalancer(algorithm=algorithm)
     return _global_lb
 
 
