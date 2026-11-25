@@ -51,6 +51,7 @@ _MAX_COOLDOWN_ENTRIES = 200
 # simple clear-on-full eviction. Stale entries from old config versions are
 # naturally ignored because the config _version is part of the cache key.
 _score_cache: dict[tuple, tuple[float, str]] = {}
+_score_cache_lock = threading.Lock()
 _SCORE_CACHE_MAX = 256
 
 
@@ -95,6 +96,7 @@ class RouteScorer:
     def __init__(self, config: MaopConfig | None = None) -> None:
         self.config = config
         self._cooldowns: dict[str, _AgentCooldown] = {}
+        self._cooldown_lock = threading.Lock()
 
     # ── Public API ───────────────────────────────────────────
 
@@ -162,8 +164,7 @@ class RouteScorer:
             # Record the routing-decision mode for observability (Phase γ-3).
             try:
                 from maop.core.monitoring.monitoring import MAOP_ROUTE_DECISION_MODE
-                MAOP_ROUTE_DECISION_MODE.set(
-                    0.0,
+                MAOP_ROUTE_DECISION_MODE.inc(
                     labels={"mode": "weighted_sum"},
                 )
             except Exception as e:
@@ -201,26 +202,28 @@ class RouteScorer:
 
     def mark_agent_failed(self, agent: str) -> None:
         """Record an agent failure for cooldown tracking."""
-        now = time.time()
-        if agent in self._cooldowns:
-            self._cooldowns[agent].fail_count += 1
-            self._cooldowns[agent].last_fail_ts = now
-        else:
-            self._cooldowns[agent] = _AgentCooldown(
-                agent=agent, last_fail_ts=now, fail_count=1
-            )
+        with self._cooldown_lock:
+            now = time.time()
+            if agent in self._cooldowns:
+                self._cooldowns[agent].fail_count += 1
+                self._cooldowns[agent].last_fail_ts = now
+            else:
+                self._cooldowns[agent] = _AgentCooldown(
+                    agent=agent, last_fail_ts=now, fail_count=1
+                )
 
-        # Prune old entries
-        if len(self._cooldowns) > _MAX_COOLDOWN_ENTRIES:
-            cutoff = now - _COOLDOWN_SEC * 4
-            self._cooldowns = {
-                a: c for a, c in self._cooldowns.items()
-                if c.last_fail_ts > cutoff
-            }
+            # Prune old entries
+            if len(self._cooldowns) > _MAX_COOLDOWN_ENTRIES:
+                cutoff = now - _COOLDOWN_SEC * 4
+                self._cooldowns = {
+                    a: c for a, c in self._cooldowns.items()
+                    if c.last_fail_ts > cutoff
+                }
 
     def mark_agent_success(self, agent: str) -> None:
         """Clear cooldown for an agent after successful execution."""
-        self._cooldowns.pop(agent, None)
+        with self._cooldown_lock:
+            self._cooldowns.pop(agent, None)
 
     def is_agent_in_cooldown(self, agent: str) -> bool:
         """Check if an agent is currently in cooldown (recently failed).
@@ -228,33 +231,35 @@ class RouteScorer:
         Multiple failures extend cooldown: fail_count=1 -> 1x, 2 -> 1.5x,
         3 -> 2x, 4+ -> 2.5x of _COOLDOWN_SEC.
         """
-        cd = self._cooldowns.get(agent)
-        if cd is None:
-            return False
-        elapsed = time.time() - cd.last_fail_ts
-        # Compute extended cooldown FIRST, then check (B-P0-1 fix: was checked
-        # against base _COOLDOWN_SEC, making extension logic unreachable)
-        extended = _COOLDOWN_SEC * (1 + min(cd.fail_count - 1, 3) * 0.5)
-        if elapsed > extended:
-            # Cooldown (with extension) expired
-            del self._cooldowns[agent]
-            return False
-        return True
+        with self._cooldown_lock:
+            cd = self._cooldowns.get(agent)
+            if cd is None:
+                return False
+            elapsed = time.time() - cd.last_fail_ts
+            # Compute extended cooldown FIRST, then check (B-P0-1 fix: was checked
+            # against base _COOLDOWN_SEC, making extension logic unreachable)
+            extended = _COOLDOWN_SEC * (1 + min(cd.fail_count - 1, 3) * 0.5)
+            if elapsed > extended:
+                # Cooldown (with extension) expired
+                del self._cooldowns[agent]
+                return False
+            return True
 
     def get_cooldown_status(self) -> list[dict[str, Any]]:
         """Get current cooldown status for all agents (for dashboard)."""
-        now = time.time()
-        result = []
-        for agent, cd in self._cooldowns.items():
-            elapsed = now - cd.last_fail_ts
-            extended = _COOLDOWN_SEC * (1 + min(cd.fail_count - 1, 3) * 0.5)
-            remaining = max(0, extended - elapsed)
-            if remaining > 0:
-                result.append({
-                    "agent": agent,
-                    "fail_count": cd.fail_count,
-                    "remaining_s": round(remaining),
-                })
+        with self._cooldown_lock:
+            now = time.time()
+            result = []
+            for agent, cd in self._cooldowns.items():
+                elapsed = now - cd.last_fail_ts
+                extended = _COOLDOWN_SEC * (1 + min(cd.fail_count - 1, 3) * 0.5)
+                remaining = max(0, extended - elapsed)
+                if remaining > 0:
+                    result.append({
+                        "agent": agent,
+                        "fail_count": cd.fail_count,
+                        "remaining_s": round(remaining),
+                    })
         return result
 
     # ── Internal: Route Scoring ──────────────────────────────
@@ -305,17 +310,18 @@ class RouteScorer:
         config_version = getattr(self.config, "_version", 0) if self.config else 0
         cache_key = (
             task_lower, routing_key, route.match,
-            tuple(route.keywords), route.primary, config_version,
+            tuple(route.keywords), route.primary, config_version, id(self.config),
         )
-        cached = _score_cache.get(cache_key)
-        if cached is not None:
-            return cached
+        with _score_cache_lock:
+            cached = _score_cache.get(cache_key)
+            if cached is not None:
+                return cached
 
-        result = self._compute_score(task_lower, routing_key, route)
-        if len(_score_cache) >= _SCORE_CACHE_MAX:
-            _score_cache.clear()
-        _score_cache[cache_key] = result
-        return result
+            result = self._compute_score(task_lower, routing_key, route)
+            if len(_score_cache) >= _SCORE_CACHE_MAX:
+                _score_cache.clear()
+            _score_cache[cache_key] = result
+            return result
 
     def _compute_score(
         self, task_lower: str, routing_key: str, route: RouteEntry
@@ -398,9 +404,9 @@ class RouteScorer:
         3. Tertiary agent (if fallback also in cooldown)
         4. Primary anyway (if all in cooldown — better than nothing)
         """
-        candidates = [
+        candidates = list(dict.fromkeys(
             a for a in [route.primary, route.fallback, route.tertiary] if a
-        ]
+        ))
         if not candidates:
             return "claude"
 
@@ -518,7 +524,9 @@ def get_route_scorer(config: MaopConfig | None = None) -> RouteScorer:
             with _singleton_lock:
                 # Re-check inside the lock to avoid duplicate reinit
                 cur_ver = getattr(_instance.config, "_version", 0)
-                if new_ver != cur_ver:
+                # 锁内同时判定对象身份变化：不同 config 对象同 _version 时
+                # 此前被静默忽略（config_changed=True 但 new_ver==cur_ver 不 reinit）
+                if (config is not _instance.config) or (new_ver != cur_ver):
                     logger.info(
                         "RouteScorer config reload: version %s -> %s",
                         cur_ver, new_ver,

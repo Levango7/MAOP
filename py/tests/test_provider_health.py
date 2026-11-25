@@ -125,8 +125,10 @@ class TestProviderHealthChecker:
         vault.retrieve.return_value = "sk-vault-key"
         checker = ProviderHealthChecker(registry=registry, vault=vault)
         result = await checker.check("vault_prov")
-        assert result.healthy is True
-        assert result.error == ""
+        # R-1 行为变更：有 key 但未验证不再标 healthy（此前 healthy=True + error=""）
+        assert result.healthy is False
+        assert "unverified" in result.error
+        vault.retrieve.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_check_all_empty(self):

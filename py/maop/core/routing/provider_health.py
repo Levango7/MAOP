@@ -116,20 +116,21 @@ class ProviderHealthChecker:
                 check_url = f"{base_url}/models" if base_url else ""
 
         if not check_url:
-            has_key = bool(api_key)
+            # 「有 key 未验证」不得与健康通过同义（此前 healthy=has_key 无验证，
+            # 且被 model/selector 消费 ⇒ 未验证 provider 被当健康选中）
             return HealthResult(
-                provider=provider_name, healthy=has_key,
-                latency_ms=0, error="" if has_key else "No health check URL",
+                provider=provider_name, healthy=False,
+                latency_ms=0, error="No health check URL configured (unverified)",
                 checked_at=now,
             )
 
         try:
             import httpx
         except ImportError:
-            has_key = bool(api_key)
+            # httpx 缺失时同样不得按「有 key 即 healthy」放行（未验证）
             return HealthResult(
-                provider=provider_name, healthy=has_key,
-                error="httpx not installed, key-only check",
+                provider=provider_name, healthy=False,
+                error="httpx not installed, unverified key-only",
                 checked_at=now,
             )
 
@@ -187,7 +188,7 @@ class ProviderHealthChecker:
                     provider=provider_name, healthy=False,
                     latency_ms=latency_ms, error=error, checked_at=now,
                 )
-        except asyncio.TimeoutError:
+        except (asyncio.TimeoutError, httpx.TimeoutException):
             latency_ms = int((time.monotonic() - start) * 1000)
             self._registry.providers.mark_unhealthy(provider_name, "timeout")
             return HealthResult(
@@ -206,8 +207,35 @@ class ProviderHealthChecker:
         if self._registry is None:
             return []
         providers = self._registry.providers.list_providers()
-        tasks = [self.check(p["name"]) for p in providers]
-        return await asyncio.gather(*tasks)
+        # return_exceptions=True：任一 provider 异常不再拖垮整批；
+        # Semaphore(6)：限制并发（此前 gather 无界）
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        sem = asyncio.Semaphore(6)
+
+        async def _one(p):
+            async with sem:
+                try:
+                    return await self.check(p["name"])
+                except (KeyError, AttributeError, TypeError, OSError, RuntimeError) as exc:
+                    return HealthResult(
+                        provider=p.get("name", "?"), healthy=False,
+                        error=str(exc), checked_at=now,
+                    )
+
+        results = await asyncio.gather(
+            *[_one(p) for p in providers], return_exceptions=True,
+        )
+        out: list[HealthResult] = []
+        for p, r in zip(providers, results):
+            if isinstance(r, Exception):
+                out.append(HealthResult(
+                    provider=p.get("name", "?"), healthy=False,
+                    error=str(r), checked_at=now,
+                ))
+            else:
+                out.append(r)
+        return out
 
     def _resolve_key(self, provider_name: str, pdef: Any) -> str | None:
         if self._vault:

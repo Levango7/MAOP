@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -392,6 +393,7 @@ def get_active_span_context() -> tuple[str, str, str | None]:
 
 
 _store_instance: RoutingDecisionStore | None = None
+_store_lock = threading.Lock()
 
 
 def get_routing_decision_store() -> RoutingDecisionStore:
@@ -404,8 +406,11 @@ def get_routing_decision_store() -> RoutingDecisionStore:
     rather than calling this helper.
     """
     global _store_instance
+    # 双重检查锁（此前 check-then-act 竞态：并发首调多实例、重复 DDL）
     if _store_instance is None:
-        _store_instance = RoutingDecisionStore()
+        with _store_lock:
+            if _store_instance is None:
+                _store_instance = RoutingDecisionStore()
     return _store_instance
 
 
