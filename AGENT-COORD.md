@@ -2080,3 +2080,11 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **48h soak 幂等启动**（soak_run 内建逐轮 JSONL 落盘+按轮续跑+连续失败即停，out-dir /f/tmp/maop-soak-48h），进度按轮数观察。
 - **回滚**：revert `816c7fdf` 即恢复。分支已全清（本地/远端）。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## routing swarm 审计修复 PR #303 合并回执（ZCode 线）— 2026-11-25
+
+- **合并**：`f041ca33`（merge commit）；head `bb285ec4`；CI **32/32 全绿**、mss=CLEAN。
+- **修复（新编队 kilo+cline+Claude 审计 R-1~R-14）**：R-1 无 check_url/httpx 缺失时「有 key 未验证」不再标 healthy（被 model/selector 消费）/R-2 sticky 命中加注册+exclude+candidates 校验（不绕过 fallback）/R-3+R-9 两单例双检锁/R-4 热重载加对象身份判定/R-5 cooldown 锁/R-6 score_cache 锁+身份 key/R-7 候选去重/R-8 check_all 容错+Semaphore(6)/R-10 计数口径一致/R-11 sticky 计入总选择数/R-12 register 权重更新重置 current_weight/R-13 捕 httpx.TimeoutException/R-14 gauge 改 inc。
+- **验证**：12 新钉测 + 72 相关全过；两 adaptive 测试因 m 作用域修正复绿（was_present 仅作用于 active_tasks 递减，m 赋值保持原层）；vault 旧断言按新「未验证不标健康」契约同步；ruff/mypy 622/config-drift/silent 基线/file-size 全过。**CI Lint mypy 抓 `isinstance(r, Exception)` 不能收窄 `HealthResult | BaseException` ⇒ 改 `BaseException`**（本机 mypy 版本与 CI 判据差，CI 为准），第二笔 `bb285ec4` 后全绿。
+- **回滚**：revert `c1ea7229`+`bb285ec4` 即恢复。分支已全清（本地/远端）。
+- **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
