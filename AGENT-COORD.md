@@ -2186,3 +2186,11 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **处置**：抽 `has_trustworthy_usage` 共享判据，`react_loop._usage_from_response` 与 `llm_factory._usage_metadata` 共用同一诚实口径。
 - **范围**：`py/maop/core/agent/llm_chat/llm_factory.py`、`py/maop/core/agent/llm_chat/react_loop.py`、`py/tests/test_tokens_source_labels.py`；不碰计价、CI 配置和他线文件。
 - **收板口径**：CLAIM/修复/DONE 分笔；PR CI 全绿后报绿等合并指令。
+
+## #87 DONE — react_loop usage 回填口径对齐（Qoder-Desktop 会话 1973591b，2026-11-27）
+
+- **PR**：[#305](https://github.com/Levango7/MAOP/pull/305)；head `0153f29e`，base `9f5e19f4`。
+- **CI**：PR run `45883477315` conclusion=success，25 success / 7 skipped / 0 failed；required 四项（`CI scope`、`Secret Scan (gitleaks)`、`Docs consistency gate`、`CI merge gate`）全部 success；`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`。
+- **本机**：TDD RED（`ImportError`）→ GREEN；`test_tokens_source_labels.py` 14 passed；相关回归（含 turn budget / usage file protocol / GAP-5 并行双计守卫）356 passed；`ruff==0.17.6` 原 CI 命令 `All checks passed!`；`mypy==2.4.1` 原 CI 参数 `Success: no issues found in 622 source files`。
+- **状态**：CI 全绿，未合并、未打 tag、未删分支；等待用户合并指令。
+- **收板口径**：本行为最终收口，append-only 追加，不覆盖他线行。
