@@ -2178,3 +2178,11 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **澄清**：verify「没正文」的剩余原因=cline 输出含 [thinking] 过程日志（输出后处理=后续优化，非数据流）；模板语法={{step_id}} 双花括号（单括号不替换=首次 payload 用法错误非缺陷）；**演练栈禁用 python -I**（.pth 主仓注入旧码，须核 maop.engine_utils.__file__）。
 - **后续**：CLI 长任务 stdin 传递/dispatcher 输出后处理/qwen 充值/codex ModelScope 或 Agnes 实名/claude 终端对照。
 - **trunk 终态（补记）**：run `46087683486` 全绿（TRUNK_ALL_GREEN），#308 超集坐实。
+
+## #87 CLAIM — react_loop usage 回填口径对齐（Qoder-Desktop 会话 1973591b，2026-11-27）
+
+- **授权**：用户「行吧，补吧」「做吧」（2026-11-27），批准 react_loop 回填口径与 llm_factory 诚实判据对齐，独立 PR。
+- **根因**：`react_loop.py` 的 `MaopResult.usage` 回填判据宽于 `llm_factory._usage_metadata`——错误响应/空响应/负数 usage 仍回填 usage，导致 loop 对账、done 事件、`LoopResult.tokens_source` 标 `measured` 而台账不标（同一响应两个口径并存）。
+- **处置**：抽 `has_trustworthy_usage` 共享判据，`react_loop._usage_from_response` 与 `llm_factory._usage_metadata` 共用同一诚实口径。
+- **范围**：`py/maop/core/agent/llm_chat/llm_factory.py`、`py/maop/core/agent/llm_chat/react_loop.py`、`py/tests/test_tokens_source_labels.py`；不碰计价、CI 配置和他线文件。
+- **收板口径**：CLAIM/修复/DONE 分笔；PR CI 全绿后报绿等合并指令。
