@@ -335,14 +335,23 @@ def _is_error_response(resp: LLMResponse) -> bool:
     return resp.content.startswith(("[LLM Error]", "[Claude Error]", "[Ollama Error]"))
 
 
+def has_trustworthy_usage(resp: LLMResponse) -> bool:
+    """Provider usage is trustworthy only for a non-error response whose
+    token counts are positive. Shared by the cost-recording path and the
+    ``MaopResult.usage`` backfill so both label the same response alike."""
+    if resp.error or _is_error_response(resp):
+        return False
+    return any(
+        count > 0
+        for count in (resp.prompt_tokens, resp.completion_tokens, resp.total_tokens)
+    )
+
+
 def _usage_metadata(resp: LLMResponse) -> dict[str, Any] | None:
     metadata: dict[str, Any] = {}
     if resp.provider:
         metadata["provider"] = resp.provider
-    has_usage = any(
-        count > 0 for count in (resp.prompt_tokens, resp.completion_tokens, resp.total_tokens)
-    )
-    if has_usage and not resp.error and not _is_error_response(resp):
+    if has_trustworthy_usage(resp):
         metadata["tokens_source"] = "measured"
     return metadata or None
 

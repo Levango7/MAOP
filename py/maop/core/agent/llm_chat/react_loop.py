@@ -46,12 +46,30 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
+from maop.core.agent.llm_chat.llm_factory import has_trustworthy_usage
+from maop.core.agent.llm_chat.llm_models import LLMResponse
 from maop.core.reliability.error_schema import MaopResult, new_result
 
 if TYPE_CHECKING:
     from maop.core.agent.llm_chat.llm_provider import LLMProviderFactory
 
 logger = logging.getLogger(__name__)
+
+
+def _usage_from_response(resp: LLMResponse) -> dict[str, int] | None:
+    """Backfill provider usage into ``MaopResult.usage`` only when trustworthy.
+
+    Mirrors ``llm_factory.has_trustworthy_usage``: error responses, empty
+    responses and non-positive token counts are not real measured usage,
+    so they backfill ``None`` and the cost side falls back to estimated.
+    """
+    if not has_trustworthy_usage(resp):
+        return None
+    return {
+        "prompt_tokens": resp.prompt_tokens,
+        "completion_tokens": resp.completion_tokens,
+        "total_tokens": resp.total_tokens,
+    }
 
 
 class ReactPhase(str, Enum):
@@ -267,13 +285,7 @@ class ReactLoop:
             # M3.1: 回填实测 token 用量——provider 已解析 usage（此前在此处被
             # 丢弃，成本侧只能走启发式估算并告警 UNKNOWN）。
             resp = fb_result.response
-            usage: dict[str, int] | None = None
-            if resp.total_tokens or resp.prompt_tokens or resp.completion_tokens:
-                usage = {
-                    "prompt_tokens": resp.prompt_tokens,
-                    "completion_tokens": resp.completion_tokens,
-                    "total_tokens": resp.total_tokens,
-                }
+            usage = _usage_from_response(resp)
             return new_result(
                 agent="", task="",
                 exit_code=0, stdout=content,
