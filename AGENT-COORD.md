@@ -2096,3 +2096,12 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **依据**：Nightly `45598993020` Windows/py3.12 第 2 轮唯一失败 `TestRateLimiterWindowExpiry::test_custom_window_seconds`；该用例 `window_seconds=0.05` 但只 `sleep(0.06)`，10ms 余量小于 Windows `GetTickCount64()` 15.625ms 分辨率。同文件 `test_get_current_rate_evicts_expired`/`test_cleanup_removes_expired` 已在 `4c43d37e` 改用 3 倍窗口，此用例漏修。
 - **处置**：最小时序余量修复，`sleep(0.06)` → `sleep(0.15)`；不修改 `RateLimiter` 产品行为。
 - **验证**：修复前本机 20 次重复失败 2 次；修复后该文件 17/17 passed，目标用例 30/30 repeated passed（0 失败），ruff 通过。
+
+## DONE — Nightly #75 限流器时序用例修复（Qoder-CN 17ef022a，2026-11-26）
+
+- **PR**：https://github.com/Levango7/MAOP/pull/304
+- **合并**：`0964b400cfd63c3505b6d401db447b746b59bb58`（squash merge）
+- **CI**：PR #304 全绿（25 success / 7 skipping / 0 failure）；required 四项 `CI scope`、`Secret Scan (gitleaks)`、`Docs consistency gate`、`CI merge gate` 均 success；`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`。
+- **验证**：修复前 2/20 复现；修复后 `test_agent_rate_limiter.py` 17/17 passed，目标用例 30/30 重复通过，`ruff check` 通过。
+- **回滚**：revert `0964b400` 即恢复。
+- **状态**：未删除分支；未触发 Nightly 全量复跑（PR CI 已覆盖同一条用例）。
