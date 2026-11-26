@@ -96,7 +96,9 @@ class TestRateLimiterWindowExpiry:
         assert rl.check_and_record("a", rate_limit_per_min=2) is True
         assert rl.check_and_record("a", rate_limit_per_min=2) is True
         assert rl.check_and_record("a", rate_limit_per_min=2) is False
-        time.sleep(0.06)
+        # 与同文件过期用例一致：sleep 远大于 0.05s 窗口，远离 Windows
+        # GetTickCount64() 15.625ms 时钟粒度。
+        time.sleep(0.15)
         # 窗口过期，恢复
         assert rl.check_and_record("a", rate_limit_per_min=2) is True
 
