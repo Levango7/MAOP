@@ -2088,3 +2088,11 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **验证**：12 新钉测 + 72 相关全过；两 adaptive 测试因 m 作用域修正复绿（was_present 仅作用于 active_tasks 递减，m 赋值保持原层）；vault 旧断言按新「未验证不标健康」契约同步；ruff/mypy 622/config-drift/silent 基线/file-size 全过。**CI Lint mypy 抓 `isinstance(r, Exception)` 不能收窄 `HealthResult | BaseException` ⇒ 改 `BaseException`**（本机 mypy 版本与 CI 判据差，CI 为准），第二笔 `bb285ec4` 后全绿。
 - **回滚**：revert `c1ea7229`+`bb285ec4` 即恢复。分支已全清（本地/远端）。
 - **收板口径**：本追加在 EOF、不覆盖任何他线行；docs-only 推送起新 trunk run 为其收口。
+
+## CLAIM — Nightly #75 限流器时序用例修复（Qoder-CN 17ef022a，2026-11-26）
+
+- **基线**：`ef7b2784`（干净 detached worktree `F:/Nexus/MAOP-nightly-ef7b2784`）；分支 `fix/nightly-rate-limiter-window-margin`。
+- **领地**：`py/tests/test_agent_rate_limiter.py`、本板追加段。
+- **依据**：Nightly `45598993020` Windows/py3.12 第 2 轮唯一失败 `TestRateLimiterWindowExpiry::test_custom_window_seconds`；该用例 `window_seconds=0.05` 但只 `sleep(0.06)`，10ms 余量小于 Windows `GetTickCount64()` 15.625ms 分辨率。同文件 `test_get_current_rate_evicts_expired`/`test_cleanup_removes_expired` 已在 `4c43d37e` 改用 3 倍窗口，此用例漏修。
+- **处置**：最小时序余量修复，`sleep(0.06)` → `sleep(0.15)`；不修改 `RateLimiter` 产品行为。
+- **验证**：修复前本机 20 次重复失败 2 次；修复后该文件 17/17 passed，目标用例 30/30 repeated passed（0 失败），ruff 通过。
