@@ -2138,3 +2138,11 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **合并**：用户「确定没问题再合并」后 squash 合入 master，merge commit `eb5005fa7cccf698fe1d78693283dd4f0f17f3d1`（5 文件 +139/−48）；master push run `45862387216` conclusion=success。
 - **状态**：已合并、未打 tag、未删除分支（`fix/tokens-source-honesty` 留档）；未开始 #84–#86。
 - **收板口径**：本行为最终收口，取代上文 DONE 行的旧 run/sha 数字；append-only 追加，不覆盖他线行。
+
+## 主干代码链落定 — Nightly #75 修复（Qoder-CN 17ef022a，2026-11-27）
+
+- **背景**：合并 commit `0964b400` 的 push run `45821978237` 被 DONE 板面 docs-only 推送取消（老坑：文档收尾推送让代码腿 skip），代码链一度无主干绿证。
+- **重跑**：`gh run rerun 45821978237`（attempt 2，head `0964b400`）completed / **success**，updated_at `2026-11-26T16:24:35Z`。
+- **结果**：31 jobs = 27 success / 4 skipped / 0 failed / 0 cancelled；required 四项 `CI scope`、`Secret Scan (gitleaks)`、`Docs consistency gate`、`CI merge gate` 均 success；此前被取消的 4 条 Windows pytest 腿本次全部 success。
+- **口径**：该绿证覆盖 `0964b400`（Nightly #75 修复合并 commit）。本板追加时 master 已前进到 `9f5e19f4`（#83 tokens_source 诚实标注收口，含代码变更），`0964b400` 不再等于当前 tip；#83 自带 master push run `45862387216` conclusion=success（见上方 #83 合并收口行）。
+- **副作用**：Docker build success（重跑前已确认授权）；Publish to PyPI / Release Assets / Publish tag 仍为 manual/skipped。
