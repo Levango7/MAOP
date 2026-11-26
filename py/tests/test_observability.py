@@ -120,7 +120,7 @@ def test_cost_tracker_auto_record():
         model="claude-3.5-sonnet",
         prompt_tokens=0, completion_tokens=0, total_tokens=0, latency_ms=0,
         session_id="", agent="",
-        metadata={"provider": "anthropic", "tokens_source": "measured"},
+        metadata={"provider": "anthropic"},
     )
 
 

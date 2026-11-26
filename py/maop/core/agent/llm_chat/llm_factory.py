@@ -335,6 +335,18 @@ def _is_error_response(resp: LLMResponse) -> bool:
     return resp.content.startswith(("[LLM Error]", "[Claude Error]", "[Ollama Error]"))
 
 
+def _usage_metadata(resp: LLMResponse) -> dict[str, Any] | None:
+    metadata: dict[str, Any] = {}
+    if resp.provider:
+        metadata["provider"] = resp.provider
+    has_usage = any(
+        count > 0 for count in (resp.prompt_tokens, resp.completion_tokens, resp.total_tokens)
+    )
+    if has_usage and not resp.error and not _is_error_response(resp):
+        metadata["tokens_source"] = "measured"
+    return metadata or None
+
+
 async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
     """Auto-record LLM call metrics to CostTracker (best-effort, async).
 
@@ -347,12 +359,7 @@ async def _record_cost(resp: LLMResponse, kwargs: dict[str, Any]) -> None:
     try:
         from maop.core.cost_tracker import get_cost_tracker
         tracker = get_cost_tracker()
-        # GAP-2 发现 B：LLM 直连路径的 token 来自 provider 响应（实测），
-        # 补 tokens_source=measured 标签（词表 measured/estimated/mixed，
-        # 见 cost_reconciliation / cost_tracker.record_actual_cost）。
-        metadata: dict[str, Any] = {"tokens_source": "measured"}
-        if resp.provider:
-            metadata["provider"] = resp.provider
+        metadata = _usage_metadata(resp)
         if hasattr(tracker, "record_async"):
             await tracker.record_async(
                 model=resp.model,
