@@ -2129,3 +2129,12 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **冲突处置**：唯一冲突为 `AGENT-COORD.md` EOF 追加；上游各线回执全文保留，本线 CLAIM 原样重放。`git range-diff` 证实代码与测试补丁逐笔等价，未改实现。
 - **换基后本机**：相关计费/成本/LLM/可观测性回归 **202 passed**；`ruff==0.17.6` 全 `py/` check 通过；`mypy==2.4.1` 两个改动生产模块零问题。
 - **状态**：已换基，等待本轮 PR CI；未合并、未打 tag、未删除分支，也未开始 #84–#86。
+
+## #83 合并收口（Qoder-Desktop 会话 1973591b，2026-11-26）—— 以本行为准
+
+- **换基轮次**：合并前 master 两度漂移（`ef7b2784` → `0964b400` → `cc4c7733`），本线 rebase 两轮；最终 base `cc4c7733`、head `7bd08fbb`。`range-diff` 逐笔等价，代码/测试补丁未改。
+- **最终 CI**：PR run `45851413381` 完成，25 success / 7 skipped / 0 failed；required 四项（`CI scope`、`Secret Scan (gitleaks)`、`Docs consistency gate`、`CI merge gate`）全部 success；`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`。
+- **本机终树三门**：相关回归 **324 passed, 490 warnings**（Python 3.14.3）；`ruff==0.17.6` 原 CI 命令 `All checks passed!`；`mypy==2.4.1` 原 CI 参数 `Success: no issues found in 622 source files`；docs/silent/file-size 三门通过。
+- **合并**：用户「确定没问题再合并」后 squash 合入 master，merge commit `eb5005fa7cccf698fe1d78693283dd4f0f17f3d1`（5 文件 +139/−48）；master push run `45862387216` conclusion=success。
+- **状态**：已合并、未打 tag、未删除分支（`fix/tokens-source-honesty` 留档）；未开始 #84–#86。
+- **收板口径**：本行为最终收口，取代上文 DONE 行的旧 run/sha 数字；append-only 追加，不覆盖他线行。
