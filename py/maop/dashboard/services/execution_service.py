@@ -70,6 +70,40 @@ async def auto_split(
     return result
 
 
+async def _default_step_executor(step, context, workdir, trace_id):
+    """Default step executor using Dispatcher to run agent/tool steps.
+
+    提升为模块级（原 execute_dag 嵌套闭包）：供 engine_router 的
+    _get_engine(step_executor=...) 注入，使 /api/engine/run-distributed
+    的 agent step 真正可跑（此前 engine 无执行器，agent step 全部 failed）。
+    """
+    from types import SimpleNamespace
+
+    from maop.config.loader import ConfigLoader
+    from maop.delegate.dispatch_core import Dispatcher
+    # 必须传入加载后的 config：Dispatcher() 空配置会导致所有 agent not found
+    dispatcher = Dispatcher(ConfigLoader().load())
+    try:
+        dr = await dispatcher.dispatch(
+            agent=step.agent,
+            task=step.task,
+            workdir=str(workdir) if workdir else "",
+            trace_id=trace_id or "",
+        )
+        return SimpleNamespace(
+            output=dr.result.stdout,
+            exit_code=dr.result.exit_code,
+            error=dr.result.error or ("" if dr.result.ok else dr.result.stderr),
+        )
+    except Exception as exc:
+        logger.warning("[dag/execute] step executor error: %s", exc)
+        return SimpleNamespace(
+            output="",
+            exit_code=1,
+            error="Step execution failed",
+        )
+
+
 async def execute_dag(
     *, nodes: list[dict[str, Any]], edges: list[dict[str, Any]],
     tenant_id: str = "",
@@ -136,32 +170,6 @@ async def execute_dag(
                 depends_on=depends.get(nid, []),
             )
         )
-
-    from types import SimpleNamespace
-
-    async def _default_step_executor(step, context, workdir, trace_id):
-        """Default step executor using Dispatcher to run agent/tool steps."""
-        from maop.delegate.dispatch_core import Dispatcher
-        dispatcher = Dispatcher()
-        try:
-            dr = await dispatcher.dispatch(
-                agent=step.agent,
-                task=step.task,
-                workdir=str(workdir) if workdir else "",
-                trace_id=trace_id or "",
-            )
-            return SimpleNamespace(
-                output=dr.result.stdout,
-                exit_code=dr.result.exit_code,
-                error=dr.result.error or ("" if dr.result.ok else dr.result.stderr),
-            )
-        except Exception as exc:
-            logger.warning("[dag/execute] step executor error: %s", exc)
-            return SimpleNamespace(
-                output="",
-                exit_code=1,
-                error="Step execution failed",
-            )
 
     from maop.core.tenant.context import tenant_context
 
