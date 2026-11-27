@@ -2146,3 +2146,22 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **结果**：31 jobs = 27 success / 4 skipped / 0 failed / 0 cancelled；required 四项 `CI scope`、`Secret Scan (gitleaks)`、`Docs consistency gate`、`CI merge gate` 均 success；此前被取消的 4 条 Windows pytest 腿本次全部 success。
 - **口径**：该绿证覆盖 `0964b400`（Nightly #75 修复合并 commit）。本板追加时 master 已前进到 `9f5e19f4`（#83 tokens_source 诚实标注收口，含代码变更），`0964b400` 不再等于当前 tip；#83 自带 master push run `45862387216` conclusion=success（见上方 #83 合并收口行）。
 - **副作用**：Docker build success（重跑前已确认授权）；Publish to PyPI / Release Assets / Publish tag 仍为 manual/skipped。
+
+## A 编排产品化接线 — PR #306 合并收口（ZCode，2026-11-27）
+
+- **实证**：隔离栈真实四步 DAG（plan(kilo) → exec-claude / exec-kilo → verify-cline）22.5 分钟真实执行；plan / exec-kilo / verify-cline 全 success，结果落盘归档 F:/tmp/dag-artifacts/。exec-claude 因本机 claude 代理 ECONNREFUSED 失败（非编排缺陷，E 账号治理跟进）。
+- **修复**：engine 两端点注入 step_executor（_default_step_executor 提升为模块级）；Dispatcher(ConfigLoader().load()) 修空配置；agents.yaml 新增 claude、kilo/cline 实测参数并入原注册项（消除重复 YAML 键，total_agents=32）。
+- **测试**：新接线钉测 4 + 既有 engine 套件 12/12；CI 首轮 5 腿红=test_dag_tenant_attribution 的 _RecordingDispatcher 无 __init__ 撞 Dispatcher(config) 新契约（TypeError 被 executor 吞掉 → never ran），适配后 22/22 绿；五门全过。
+- **合并**：CI 23 项全绿（pass/skip）后 merge commit `69f14adb`，head `e7a5b271`；trunk run `46026557604` 代码腿 25 success 后被 #307 push 取消（后置 Docker 腿 cancelled，按第三态口径），继任超集 run `46033039278` 守候中。
+- **verify 语义待调优**：verify-cline 未审内联报告而转审仓内历史文档（产物已归档未入仓）；后续编排模板须写明「报告已内联、只读、不得探索其他文档」。
+
+## P0 API key 租户隔离 — PR #307 合并收口（ZCode，2026-11-27）
+
+- **战果来源**：#306 DAG 的 kilo 审计步独立发现，核源码属实：ApiKeyValidationResult 缺 tenant_id 字段 ⇒ _auth 中间件 getattr(result,'tenant_id','') 永远空串 ⇒ API key 认证的配额/RBAC/合规租户隔离从未生效（中间件注释谎称「P0-1 fix」只写消费端；表 schema 本有 tenant_id 列、get_key 已传播，唯独 validate_key 断链）。
+- **修复**：结果模型加 tenant_id 字段 + validate_key 全返回路径（成功/IP 拒绝/scope 不足/限流）传播该列；中间件零改动。
+- **测试**：3 钉测（2 真实 manager 临时库 + 1 真实 AuthMiddleware 端到端 X-API-Key→request.state.tenant_id）；变异验证=旧实现 2 红（AttributeError）→ 修复后 51/51 全绿；五门全过。
+- **合并**：CI 全绿后 merge commit `ebd29eeb`，head `2a05a2c9`；trunk run `46033039278`（超集，覆盖 #306+#307）守候中，终态后补记。
+- **soak 收官（D 项一部分）**：637 轮 23.3h（11-25 04:32→11-26 03:50 机器休眠终止）；剔除 round 112 两轮编辑中间态（route_scorer 修复中的语法错误被栈加载）后 635/635 全 ok、对账 100% match、2328 步成功；未跑满 48h 且续跑脚本未归档=待补。
+- **后续**：C 扩大审计（core/security 首轮 kilo 已产 11 条候选待分诊：byok._key_cache 无锁 / guardrail._config 竞态 / api_key_vault.rotate_master_key 无锁交换 / auth._save_revoked 异常路径 NameError 等）；D=TLS 自签+真实故障演练；E=claude 代理/codex 429/dsh/qoder 登录。
+- **kilo 11 条候选分诊（ZCode 逐条读上下文定性）**：#9 tenant_id=真 P0（#307 已修）；#11 _save_revoked NameError=误报（内层 except 吞掉 NameError，warning 仍打原异常）；#1 byok._key_cache「并发破坏 OrderedDict」不成立（resolve 内 dict 操作段无 await 穿插，单 event loop 原子；多线程共享须先证线程模型）；#8 双时钟=设计内近似（_hydrate_window 即 wall→monotonic 换算，docstring 声明软限流精度可接受）；#7 validate/record 分离 TOCTOU=声明的软限流语义（check 不消费 slot），硬限流须产品决策。**不开修复 PR，避免给 async 代码乱加锁的过度修复**。
+- **trunk 终态（补记）**：run `46033039278` = **27 success + 4 skipped / 0 failed / 0 cancelled（TRUNK_ALL_GREEN）**，#306+#307 超集坐实；本回执 docs-only 推送在代码 run 终态之后才发（避开「文档推送取消在跑代码 run」老坑）。
