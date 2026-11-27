@@ -38,6 +38,12 @@ class _RecordingDispatcher:
 
     seen: ClassVar[list[dict[str, Any]]] = []
 
+    def __init__(self, config: Any = None) -> None:
+        # 新契约：_default_step_executor 以 Dispatcher(ConfigLoader().load())
+        # 构造（空配置会让所有 agent not found）。替身须接受该位置参数，
+        # 否则 TypeError 被 executor 的 except 吞掉，表现为 never ran。
+        self.config = config
+
     async def dispatch(self, **kwargs: Any) -> Any:
         _RecordingDispatcher.seen.append(
             {"tenant": current_tenant(), "kwargs": kwargs}
