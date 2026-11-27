@@ -107,6 +107,27 @@ class TestValidation:
         assert v.name == "svc"
         assert "read" in v.scopes
 
+    def test_validate_key_propagates_tenant(self, manager: ApiKeyManager):
+        """validate_key 必须把 api_keys.tenant_id 传播进结果（真实 DB 路径）。
+
+        回归缺陷（DAG swarm 审计发现）：结果模型此前没有 tenant_id 字段，
+        _auth 中间件 getattr(result, 'tenant_id', '') 永远拿到空串——
+        注释声称的 P0-1 租户隔离修复只写了消费端，生产端从未接线，
+        API key 请求的配额/RBAC/合规租户隔离从未生效。
+        本用例走真实 manager + 临时库，不做 stub，确保链路端到端成立。
+        """
+        result = manager.create_key(ApiKeyCreate(name="svc", tenant_id="acme"))
+        v = manager.validate_key(result.plaintext_key)
+        assert v.valid is True
+        assert v.tenant_id == "acme"
+
+    def test_validate_key_without_tenant_defaults_empty(self, manager: ApiKeyManager):
+        """未分配租户的存量 key：tenant_id 退化为空串而非报错。"""
+        result = manager.create_key(ApiKeyCreate(name="legacy"))
+        v = manager.validate_key(result.plaintext_key)
+        assert v.valid is True
+        assert v.tenant_id == ""
+
     def test_invalid_format(self, manager: ApiKeyManager):
         v = manager.validate_key("not-a-maop-key")
         assert v.valid is False
@@ -467,6 +488,31 @@ class TestRouter:
         assert data["key"]["ip_whitelist"] == ["10.0.0.0/24"]
         assert data["key"]["tenant_id"] == "t1"
         assert data["key"]["expires_at"] is not None
+
+
+# ── Middleware integration（真实 manager，非 stub）────────────────────
+
+
+class TestMiddlewareTenantIntegration:
+    def test_api_key_request_injects_tenant(self, manager: ApiKeyManager):
+        """端到端：X-API-Key 请求经 AuthMiddleware 后 request.state.tenant_id
+        必须等于 key 的租户。旧实现结果模型缺 tenant_id，本用例拿到空串而红。
+        """
+        from maop.core.security.middleware._auth import AuthMiddleware
+
+        app = FastAPI()
+        app.state.api_key_manager = manager
+        app.add_middleware(AuthMiddleware, enabled=True)
+
+        @app.get("/api/echo-tenant")
+        async def echo(request: Request):
+            return {"tenant_id": getattr(request.state, "tenant_id", "")}
+
+        created = manager.create_key(ApiKeyCreate(name="svc", tenant_id="acme"))
+        client = TestClient(app)
+        resp = client.get("/api/echo-tenant", headers={"X-API-Key": created.plaintext_key})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["tenant_id"] == "acme"
 
 
 # ── Pydantic models ───────────────────────────────────────────────
