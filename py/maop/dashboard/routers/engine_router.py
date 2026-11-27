@@ -138,7 +138,8 @@ async def api_engine_run(
     Wraps the step in a single-node DAG and executes it locally.
     """
     require_admin(request)
-    engine = _get_engine()
+    from maop.dashboard.services.execution_service import _default_step_executor
+    engine = _get_engine(step_executor=_default_step_executor)
 
     # 单节点 DAG 里任何依赖都不可能满足：宁可拒绝，也不要静默丢掉后跑出一个
     # "看起来执行了但其实没等依赖"的结果。
@@ -190,7 +191,8 @@ async def api_engine_run_distributed(
     the endpoint falls back to local execution and logs a warning.
     """
     require_admin(request)
-    engine = _get_engine()
+    from maop.dashboard.services.execution_service import _default_step_executor
+    engine = _get_engine(step_executor=_default_step_executor)
 
     from maop.engine_types import StepType, WorkflowStep
     steps = []

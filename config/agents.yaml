@@ -57,11 +57,11 @@ agents:
     - fileops
     category: general
     cli: cline
-    cli_args: --print '{task}'
-    description: Cline CLI v3.0.46 (headless, ~1.5s)
+    cli_args: '{task}'
+    description: Cline CLI v3.0.75 (headless, English prompt)
     driver: cli
     model: auto
-    timeout_s: 120
+    timeout_s: 600
     # T2.1: instruction-based dry-run (agentic CLI). Declaration
     # = eligible for the preamble; the verify gate arbitrates.
     dry_run_supported: true
@@ -291,17 +291,16 @@ agents:
   kilo:
     capabilities:
     - codegen
-    - chat
-    - quickfix
+    - search
+    - review
     - explain
-    category: specialized
+    category: general
     cli: kilo
-    cli_args: run --prompt {task}
-    description: Kilo CLI v7.4.11 (OpenCode, free model, ~2.5s)
+    cli_args: run '{task}'
+    description: Kilo CLI v7.8.32 (OpenCode, reflection/beam-free)
     driver: cli
-    model: deepseek-v4-flash-free
-    model_display: opencode/deepseek-v4-flash-free (默认)
-    timeout_s: 60
+    model: auto
+    timeout_s: 600
   kimi:
     capabilities:
     - codegen
@@ -532,6 +531,20 @@ agents:
     driver: cli
     model: deepseek-v4-flash-free
     timeout_s: 120
+  claude:
+    capabilities:
+    - codegen
+    - search
+    - review
+    - planning
+    - explain
+    category: general
+    cli: claude
+    cli_args: -p '{task}'
+    description: Claude Code CLI v2.1.330 (Anthropic, headless -p)
+    driver: cli
+    model: auto
+    timeout_s: 900
 loops:
   iterative:
     backoff_ms: 2000
