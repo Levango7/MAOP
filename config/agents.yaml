@@ -90,11 +90,11 @@ agents:
     - chat
     category: specialized
     cli: codebuddy
-    cli_args: --print '{task}'
-    description: CodeBuddy v2.123.1 (腾讯, fastest cold-start ~123ms)
+    cli_args: -p --model hy4flash-free '{task}'
+    description: CodeBuddy CLI v2.187.0 (腾讯, hy4flash-free 免费模型实测可用, headless -p)
     driver: cli
-    model: minimax-m2.7
-    timeout_s: 60
+    model: auto
+    timeout_s: 600
   codewhale:
     capabilities:
     - codegen
@@ -246,15 +246,15 @@ agents:
     category: general
     cli: gemini
     cli_args: --skip-trust -p '{task}'
-    description: Gemini CLI（一号用户本机实测 2026-08-31；headless 需 --skip-trust 信任工作区，否则新版
-      CLI 拒绝运行）
+    description: Gemini CLI v0.71.1 (agnes-3.0-flash via AgnesAI 2026-11-27 实测恢复; headless
+      需 --skip-trust 信任工作区，否则新版 CLI 拒绝运行）
     driver: cli
     enabled: true
     extracts_queries: false
     model: auto
     results_merge: false
     supports_regeneration: false
-    timeout_s: 120
+    timeout_s: 600
   goose:
     capabilities:
     - codegen
@@ -457,10 +457,10 @@ agents:
     category: general
     cli: opencode
     cli_args: run '{task}'
-    description: OpenCode v1.18.4 (MiniMax, ~0.5s)
+    description: OpenCode CLI v2.4.2 (seaglass-alpha-free 实测 2026-11-27, headless run)
     driver: cli
     model: auto
-    timeout_s: 120
+    timeout_s: 600
   pi:
     capabilities:
     - codegen
@@ -470,10 +470,10 @@ agents:
     category: specialized
     cli: pi
     cli_args: '-p "{task}"'
-    description: Pi v0.81.1 (Earendil Works, ~12s cold start)
+    description: Pi CLI v1.7.0 (Earendil Works, 实测 2026-11-27 headless -p 可用)
     driver: cli
     model: auto
-    timeout_s: 60
+    timeout_s: 600
   qoder:
     capabilities:
     - codegen
@@ -506,15 +506,13 @@ agents:
     - chat
     category: general
     cli: qwen
-    cli_args: -p '{{safePrompt}}' -o json --safe-mode
-    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
-      driver migrated powershell -> cli per ADR-009. 计划启用：安装 qwen CLI 到 PATH 后启用（M7
-      修复评估）'
+    cli_args: -p '{task}'
+    description: Qwen Code CLI v0.27.3 (headless -p; 配置已修为 dashscope qwen-plus，
+      但 2026-11-27 实测账号 Arrearage 欠费——仅极小请求可过，正常负载需充值后可用)
     driver: cli
-    enabled: false
-    model: qwen3.5-plus
-    model_display: qwen/qwen3.5-plus (built-in)
-    timeout_s: 120
+    enabled: true
+    model: auto
+    timeout_s: 600
   qwenpaw:
     capabilities:
     - codegen

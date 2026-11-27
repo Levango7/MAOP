@@ -145,6 +145,11 @@ async def execute_step_helper(
 
     # Resolve templates in task
     resolved_task = _resolve_template(step.task, context)
+    if resolved_task != step.task:
+        # AGENT/PLAN 原子执行路径也必须使用替换后的 task：此前仅 PLAN
+        # 分解分支消费 resolved_task，普通 agent step 的 {{step_id}}
+        # 占位符从未替换（verify 步骤收不到上游报告=数据流断）。
+        step = step.model_copy(update={"task": resolved_task})
 
     sr: StepResult | None = None
     try:
