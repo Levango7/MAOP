@@ -60,7 +60,8 @@ def test_real_tree_clean():
 
 def test_reference_census_pinned():
     """agents.yaml model 引用 census 钉死（批 7 CLAIM 口径）：
-    14 distinct = 4 控制值 + 5 已定价引用 + 4 未核登记 + 1 agnes 豁免。"""
+    13 distinct（2026-11-27 编队实测更新：codebuddy 改 hy4flash-free 走
+    cli_args，model 归一为 auto ⇒ minimax-m2.7 引用退出 census）。"""
     data = yaml.safe_load((REPO / "config" / "agents.yaml").read_text(encoding="utf-8"))
     refs = set()
     for group in ("agents", "workflows"):
@@ -70,7 +71,7 @@ def test_reference_census_pinned():
     assert refs == {
         "auto", "native", "built-in", "n/a",
         "step-3.7-flash", "qwen3.5-plus", "yi-large", "gpt-5.4", "MiniMax-M3",
-        "deepseek-v4-flash-free", "omniroute-auto-coding", "minimax-m2.7",
+        "deepseek-v4-flash-free", "omniroute-auto-coding",
         "mimo-v2.5", "agnes-2.0-flash",
     }
 
