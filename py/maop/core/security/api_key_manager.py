@@ -135,6 +135,10 @@ class ApiKeyValidationResult(BaseModel):
     roles: list[str] = Field(default_factory=list)
     error: str = ""
     rate_limit_exceeded: bool = False
+    # 必须真实传播 api_keys.tenant_id：_auth 中间件把它注入
+    # request.state.tenant_id；缺字段时 getattr 兜底永远为空串，
+    # API key 请求的配额/RBAC/合规租户隔离随之空转。
+    tenant_id: str = ""
 
 
 # ── Constants ──────────────────────────────────────────────────────
@@ -500,6 +504,7 @@ class ApiKeyManager:
             return ApiKeyValidationResult(valid=False, error="API key expired", key_id=row["key_id"] or "")
 
         key_id = row["key_id"] or ""
+        tenant_id = row["tenant_id"] or ""
         scopes = json.loads(row["scopes"] or "[]")
         roles = json.loads(row["roles"] or "[]")
 
@@ -507,7 +512,8 @@ class ApiKeyManager:
         ip_list = json.loads(row["ip_whitelist"] or "[]")
         if ip_list and client_ip and not self._ip_allowed(client_ip, ip_list):
             return ApiKeyValidationResult(
-                valid=False, error="IP not allowed", key_id=key_id, scopes=scopes, roles=roles
+                valid=False, error="IP not allowed", key_id=key_id, scopes=scopes, roles=roles,
+                tenant_id=tenant_id,
             )
 
         # Scope check (supports "*" wildcard via check_scope)
@@ -518,6 +524,7 @@ class ApiKeyManager:
                 key_id=key_id,
                 scopes=scopes,
                 roles=roles,
+                tenant_id=tenant_id,
             )
 
         # Rate limit (sliding window)
@@ -530,10 +537,12 @@ class ApiKeyManager:
                 scopes=scopes,
                 roles=roles,
                 rate_limit_exceeded=True,
+                tenant_id=tenant_id,
             )
 
         return ApiKeyValidationResult(
-            valid=True, key_id=key_id, name=row["name"], scopes=scopes, roles=roles
+            valid=True, key_id=key_id, name=row["name"], scopes=scopes, roles=roles,
+            tenant_id=tenant_id,
         )
 
     @staticmethod
