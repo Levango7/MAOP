@@ -94,6 +94,18 @@ MAOP 使用 YAML 配置文件，默认位于 `config/` 目录：
 
 租户不靠 YAML 配置：由企业版 TenantManager 管理，经 `/api/tenants/*` 端点增删查，状态持久化在 SQLite。
 
+#### 3.2.1 CLI 原生 usage 出口（`usage_format`）
+
+每个 agent 条目可声明 `usage_format`，与 `cli_args` 中的 `{usage_file}` 占位符**成对**出现，用于读取 CLI 自己的机器可读 usage 出口（而非 MAOP 自定义的 `[USAGE]` 协议行）。
+
+- **已注册格式**：当前仅 `copilot`（GitHub Copilot CLI 的 `--usage-output-file`，解析 `tokenDetails`）。其余 CLI（codex/cline/cursor 等）无原生 usage 出口接线，不声明即不启用。
+- **取值链**（权威口径）：原生 usage 文件（实测）→ `[USAGE]` 协议行（agent 自报）→ CJK 文本启发式（估算，成本侧标 `tokens_source=estimated`）。
+- **契约**：
+  - 有 `{usage_file}` 无 `usage_format` → 启动 WARN，占位符原样传给 CLI（不静默替换成空路径）。
+  - 有 `usage_format` 无 `{usage_file}` → 当前无 warning，格式不生效。
+  - 格式名必须对应已注册解析器；未注册格式解析返回空，退回协议行/启发式路径。
+- **新增格式步骤**：在 `py/maop/core/agent/usage_protocol.py` 的 `_USAGE_FILE_PARSERS` 注册解析器，并在 `config/agents.yaml` 声明 `usage_format`、在 `cli_args` 加入 `{usage_file}`。成对契约与解析器存在性由 `py/tests/test_usage_config_contract.py` 守。
+
 ### 3.3 多租户配置
 
 代码示例：创建租户（Python）
