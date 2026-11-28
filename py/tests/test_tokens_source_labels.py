@@ -10,6 +10,7 @@ import pytest
 from maop.core.agent.billing.billing_abstraction import BillingEngine
 from maop.core.agent.llm_chat import llm_factory
 from maop.core.agent.llm_chat.llm_models import LLMResponse
+from maop.core.agent.llm_chat.react_loop import _usage_from_response
 from maop.core.agent.registry.agent_catalog import BillingModel
 
 
@@ -126,3 +127,48 @@ def test_billing_without_tokens_has_no_source_label(tmp_path):
     assert result.success
     assert len(tracker.calls) == 1
     assert tracker.calls[0]["metadata"] is None
+
+
+# ── 回填口径（react_loop → MaopResult.usage）必须与入账口径同判据 ──
+
+
+@pytest.mark.parametrize(
+    "resp",
+    [
+        LLMResponse(
+            content="[LLM Error] boom",
+            model="m1",
+            provider="openai",
+            error="boom",
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+        ),
+        LLMResponse(content="", model="m1", provider="openai", total_tokens=15),
+        LLMResponse(content="ok", model="m1", provider="openai"),
+        LLMResponse(content="ok", model="m1", provider="openai", total_tokens=-1),
+    ],
+    ids=["structured-error", "empty-error-response", "missing-usage", "negative-usage"],
+)
+def test_react_loop_backfill_ignores_untrustworthy_usage(resp):
+    """与 llm_factory._usage_metadata 同一判据：不诚实响应不回填 usage。"""
+    assert llm_factory.has_trustworthy_usage(resp) is False
+    assert _usage_from_response(resp) is None
+
+
+def test_react_loop_backfill_keeps_trustworthy_usage():
+    resp = LLMResponse(
+        content="ok",
+        model="m1",
+        provider="openai",
+        prompt_tokens=10,
+        completion_tokens=5,
+        total_tokens=15,
+    )
+
+    assert llm_factory.has_trustworthy_usage(resp) is True
+    assert _usage_from_response(resp) == {
+        "prompt_tokens": 10,
+        "completion_tokens": 5,
+        "total_tokens": 15,
+    }
