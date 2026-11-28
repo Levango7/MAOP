@@ -2194,3 +2194,16 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **本机**：TDD RED（`ImportError`）→ GREEN；`test_tokens_source_labels.py` 14 passed；相关回归（含 turn budget / usage file protocol / GAP-5 并行双计守卫）356 passed；`ruff==0.17.6` 原 CI 命令 `All checks passed!`；`mypy==2.4.1` 原 CI 参数 `Success: no issues found in 622 source files`。
 - **状态**：CI 全绿，未合并、未打 tag、未删分支；等待用户合并指令。
 - **收板口径**：本行为最终收口，append-only 追加，不覆盖他线行。
+
+## 清理收费无免费额度 provider — PR #309 合并收口（ZCode，2026-11-28）
+
+- **用户指令**：清理需要收费、没有免费额度的 provider，尤其云厂商（阿里/腾讯/华为/火山/百度）。
+- **删除 16 项**：云厂商（qwen=dashscope 欠费实证/qoder/meoo）+ 付费代理（codex/kimi/openclaw=StepFun；hermes/goose/gemini/claude=Agnes 预扣费充值制无免费额度——gemini/claude 虽前批刚修好也按原则清理）+ 付费订阅/模型（copilot/cursor/mmx/deepcode/langcli/mimo）。
+- **保留 16 项全有免费通道或未实证收费**：codebuddy=hy4flash-free、kilo=reflection/beam-free、opencode=seaglass-alpha-free、qwenpaw=deepseek-v4-flash-free、cline=cline-free/nemotron-3.5-super-vl（官方免费，providers.json 实证）、pi=NIM 免费层+kilo 免费网关、autoclaw=built-in、cloudbase（腾讯云开发工具非 LLM 计费）、crush/forge/lh/nanobot/codewhale/omniroute/doc-pipeline/MAOP。
+- **CI 首轮 5 平台红根因两条**：① routing/workflows 23 处 fallback 链指向被删 agent（mmx/copilot/kimi/hermes/cursor/codex）⇒ 按能力重接 kilo/cline/opencode；② copilot 是 usage_file 协议唯一实现者，删除后契约测试「判据空转」⇒ 改 fixture 声明保底（机制判据保留、不绑死生产必须有 copilot）。**另证**：notifications/memory/top_n 的本机红在 master 上同样存在（Windows 环境敏感既存），与本 PR 无关。
+- **配套**：census 引用集合 13→6；M1 变异电池锚点改现存 deepseek-v4-flash-free（豁免测试先注入引用保持绑定语义）；README 计数 31→16（14 第三方+1 自研+1 自引用）。
+- **验证**：719/719 宽口径批 + 95/95 契约批 + 五门 + docs 门 --gate 全过。
+- **合并**：CI 25 pass + 7 skipping 全绿后 merge commit `21b2e454`，head `9ae900a6`；trunk run `46138016290` 守候中，终态后补记。
+- **边界**：仅 MAOP 注册表，本机 CLI 本体与配置不动；models.yaml 定价表不动（引用减少不触发 M1）。
+- **trunk 取消说明（补记）**：#309 的 trunk run `46138016290` 被他线 #305（fix(llm-chat)）push 取消（15 cancelled + CI merge gate 级联 failure，属「cancelled≠failed」第三态，非代码红）。按「继任超集 run 绿才坐实」口径，守候 #305 的超集 run `46139023430`（含 #309 全部改动）。
+- **trunk 终态（补记）**：#305 超集 run `46139023430` 全绿（TRUNK_ALL_GREEN），#309 全部改动随超集坐实。
