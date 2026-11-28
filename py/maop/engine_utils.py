@@ -192,6 +192,26 @@ def safe_eval(expr: str, context: dict) -> Any:
 # whitespace or braces (step ids may contain dashes).
 _TEMPLATE_RE = re.compile(r"\{\{\s*([^{}\s]+)\s*\}\}")
 
+# 模板注入的上下文预算：上游输出经 CLI argv 交给下游 agent 时，
+# Windows CreateProcess 命令行上限约 32K（实测 10KB 双报告即撞
+# 「The command line is too long」）。单值超预算时保留头+尾（结论
+# 通常在尾部），中部以省略标记替换。彻底解=CLI 改 stdin 传递（后续项）。
+_TEMPLATE_VALUE_MAX = 6000
+_TEMPLATE_HEAD = 3500
+_TEMPLATE_TAIL = 2000
+
+
+def _truncate_template_value(text: str) -> str:
+    """Bound one substituted value to the template-injection budget."""
+    if len(text) <= _TEMPLATE_VALUE_MAX:
+        return text
+    omitted = len(text) - _TEMPLATE_HEAD - _TEMPLATE_TAIL
+    return (
+        text[:_TEMPLATE_HEAD]
+        + f"\n...[truncated {omitted} chars]...\n"
+        + text[-_TEMPLATE_TAIL:]
+    )
+
 
 def _resolve_template(template: str, context: dict[str, Any]) -> str:
     """Replace {{ key }} placeholders with context values.
@@ -203,13 +223,14 @@ def _resolve_template(template: str, context: dict[str, Any]) -> str:
     (second-order injection). ``re.sub`` visits each
     placeholder once; substituted values are never
     re-expanded. Placeholders whose key is not in the
-    context are left untouched (old behaviour).
+    context are left untouched (old behaviour). Oversized
+    values are truncated head+tail (CLI argv budget).
     """
     if not template:
         return template
     return _TEMPLATE_RE.sub(
         lambda m: (
-            str(context[m.group(1)])
+            _truncate_template_value(str(context[m.group(1)]))
             if m.group(1) in context
             else m.group(0)
         ),
