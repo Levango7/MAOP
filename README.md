@@ -3,9 +3,9 @@
 > Python-first agent orchestration framework with Plan-Execute-Verify loop,
 > model management, control plane, and real-time dashboard.
 
-> **定位说明**：MAOP 是**多 Agent 编排与治理层**——通过 Plan-Execute-Verify 循环编排**外部 CLI agent**（`config/agents.yaml` 共 31 个条目：23 个开箱可派发的第三方 CLI 适配器 + 5 个需先配置 + 1 个自研适配器 + 1 个自引用），而非自研 agent 运行时。内置 LLM provider 用于对话、分析与建议生成，不承担 agent 执行引擎角色。
+> **定位说明**：MAOP 是**多 Agent 编排与治理层**——通过 Plan-Execute-Verify 循环编排**外部 CLI agent**（`config/agents.yaml` 共 16 个条目：14 个开箱可派发的第三方 CLI 适配器 + 1 个自研适配器 + 1 个自引用），而非自研 agent 运行时。内置 LLM provider 用于对话、分析与建议生成，不承担 agent 执行引擎角色。
 >
-> **适配器计数口径**（2026-09-26 用脚本核对 `config/agents.yaml`）：顶层共 **31** 个条目 = **23 个开箱可派发的第三方 CLI 适配器** + **5 个需额外配置**（`enabled: false`：deepcode/langcli/mimo/qoder/qwen，需注册账号或配 API key）+ **1 个自研适配器**（`doc-pipeline`，`driver: python`，不是第三方 CLI）+ **1 个 MAOP 自引用**（`max_self_ref_depth=3` 防递归）。另注意 `omniroute` 虽 `enabled: true` 但 `cli: ''`，派发时直接返回 `exit_code=-1`，故不计入"开箱可用"。本段此前写作"第三方 30 个 / 25 个开箱可用"，并把 "claude 系" 列为适配器之一——经核**不存在 claude 适配器条目**（"Claude" 只出现在 copilot/cursor 条目的描述文字里），两处口径均已更正。能力矩阵/超时/SLA 见该文件。
+> **适配器计数口径**（2026-11-28 用脚本核对 `config/agents.yaml`）：顶层共 **16** 个条目 = **14 个开箱可派发的第三方 CLI 适配器** + **1 个自研适配器**（`doc-pipeline`，`driver: python`，不是第三方 CLI）+ **1 个 MAOP 自引用**（`max_self_ref_depth=3` 防递归）。另注意 `omniroute` 虽 `enabled: true` 但 `cli: ''`，派发时直接返回 `exit_code=-1`，故不计入"开箱可用"。**2026-11-28 清理 16 个「需收费且无免费额度」的 provider**：云厂商（qwen/qoder/meoo）、付费代理（codex/kimi/openclaw/hermes/goose/gemini/claude）、付费订阅/模型（copilot/cursor/mmx/deepcode/langcli/mimo）——保留项全部有免费通道或未实证收费（codebuddy=hy4flash-free、kilo=reflection/beam-free、opencode=seaglass-alpha-free、qwenpaw=deepseek-v4-flash-free、cline=cline-free 官方免费、pi=NIM 免费层等）。能力矩阵/超时/SLA 见该文件。
 
 ## Architecture
 
@@ -60,7 +60,7 @@ MAOP 自 2026-07-20 起采用 **单一代码库 + 运行时 Edition 检测** 的
 | 通知中心 (Email/Webhook/InApp + WS 实时推送) | ✗ | ✓ |
 | Vue Dashboard 企业版路由 | ✗ | ✓ |
 
-> 编排外部 CLI agent（口径：31 个顶层条目 = 23 开箱可派发第三方 + 5 需配置 + 1 自研 + 1 自引用，已用脚本核实，见上方"适配器计数口径"）。非自研运行时。
+> 编排外部 CLI agent（口径：16 个顶层条目 = 14 开箱可派发第三方 + 1 自研 + 1 自引用，已用脚本核实，见上方"适配器计数口径"）。非自研运行时。
 
 > Enterprise = Personal ∪ Enterprise 独占能力；企业版包含所有功能。
 

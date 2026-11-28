@@ -111,42 +111,6 @@ agents:
     # = eligible for the preamble; the verify gate arbitrates.
     dry_run_supported: true
 
-  codex:
-    capabilities:
-    - codegen
-    - search
-    - review
-    - planning
-    - explain
-    category: general
-    cli: codex
-    cli_args: exec {task}
-    description: Codex CLI v0.144.6 + StepFun proxy
-    driver: cli
-    extracts_queries: false
-    model: qwen3.5-plus
-    results_merge: false
-    supports_regeneration: true
-    timeout_s: 120
-  copilot:
-    capabilities:
-    - codegen
-    - chat
-    - explain
-    - search
-    - review
-    - planning
-    - refactor
-    - quickfix
-    category: general
-    cli: copilot
-    cli_args: --usage-output-file "{usage_file}" --allow-all-tools -p "{task}"
-    usage_format: copilot
-    description: GitHub Copilot CLI v1.0.73 (GPT-5.4/Claude, requires GitHub auth)
-    driver: cli
-    model: gpt-5.4
-    model_display: auto (GitHub Copilot, GPT-5.4 default)
-    timeout_s: 120
   crush:
     capabilities:
     - codegen
@@ -160,47 +124,7 @@ agents:
     driver: cli
     model: auto
     timeout_s: 120
-  cursor:
-    capabilities:
-    - codegen
-    - quickfix
-    - fileops
-    - search
-    - chat
-    category: general
-    cli: agent
-    cli_args: -p {task}
-    description: Cursor Agent CLI v3.12.17
-    driver: cli
-    model: auto
-    model_display: auto (Cursor Agent CLI, GPT-5.5/Claude on upgrade)
-    timeout_s: 120
-    # ── 桌面应用调度示例（取消注释即可启用 desktop_app driver）──
-    # 切换后优先 CLI，CLI 不可用时回退 IPC / 本地 HTTP：
-    # driver: desktop_app
-    # process_name: "Cursor.exe"       # Windows 进程名（用于检测应用是否运行）
-    # ipc_path: "\\\.\\pipe\\cursor"   # IPC Named Pipe（Windows）/ Unix Socket（Linux）
-    # http_url: "http://localhost:3456" # 本地 HTTP 端口
-    # fallback_order: ["cli", "ipc", "http"]  # 通信方式回退顺序
-    # T2.1: instruction-based dry-run (agentic CLI). Declaration
-    # = eligible for the preamble; the verify gate arbitrates.
-    dry_run_supported: true
 
-  deepcode:
-    capabilities:
-    - codegen
-    - search
-    - review
-    - explain
-    category: specialized
-    cli: deepcode
-    cli_args: -p {task}
-    description: 'DISABLED: not registered / no auth (2026-07-22). 计划启用：用户注册 deepcode
-      账号并配置 API key 后启用（M7 修复评估）'
-    driver: cli
-    enabled: false
-    model: yi-large
-    timeout_s: 120
   doc-pipeline:
     capabilities:
     - docgen
@@ -234,60 +158,6 @@ agents:
     driver: cli
     model: auto
     timeout_s: 120
-  gemini:
-    capabilities:
-    - codegen
-    - chat
-    - search
-    - review
-    - explain
-    - vision
-    - multimodal
-    category: general
-    cli: gemini
-    cli_args: --skip-trust -p '{task}'
-    description: Gemini CLI v0.71.1 (agnes-3.0-flash via AgnesAI 2026-11-27 实测恢复; headless
-      需 --skip-trust 信任工作区，否则新版 CLI 拒绝运行）
-    driver: cli
-    enabled: true
-    extracts_queries: false
-    model: auto
-    results_merge: false
-    supports_regeneration: false
-    timeout_s: 600
-  goose:
-    capabilities:
-    - codegen
-    - refactor
-    - explain
-    - search
-    - review
-    - fileops
-    category: general
-    cli: goose
-    cli_args: run --no-session -q -t '{task}'
-    description: Goose v1.43.0 (agnes-2.0-flash via custom_agnes provider, ~1.3s)
-    driver: cli
-    model: agnes-2.0-flash
-    model_display: AgnesAI agnes-2.0-flash (via Goose)
-    timeout_s: 120
-  hermes:
-    capabilities:
-    - codegen
-    - chat
-    - search
-    - mcp
-    - planning
-    - review
-    - explain
-    category: general
-    cli: hermes
-    cli_args: -z {task}
-    description: Hermes CLI v0.19.0 (AgnesAI backend, ~1.3s)
-    driver: cli
-    model: step-3.7-flash
-    model_display: AgnesAI agnes-2.0-flash
-    timeout_s: 120
   kilo:
     capabilities:
     - codegen
@@ -301,36 +171,6 @@ agents:
     driver: cli
     model: auto
     timeout_s: 600
-  kimi:
-    capabilities:
-    - codegen
-    - search
-    - review
-    - planning
-    category: specialized
-    cli: kimi
-    cli_args: --print -p {task}
-    description: Kimi CLI v1.48.0 + StepFun step-3.7-flash
-    driver: cli
-    model: step-3.7-flash
-    model_display: step-3.7-flash (via StepFun OpenAI)
-    timeout_s: 120
-  langcli:
-    capabilities:
-    - codegen
-    - refactor
-    - explain
-    - search
-    - review
-    category: specialized
-    cli: langcli
-    cli_args: -p "{task}"
-    description: 'DISABLED: no Anthropic API key, no VPN (2026-07-22). 计划启用：配置 Anthropic
-      API key 与 VPN 后启用（M7 修复评估）'
-    driver: cli
-    enabled: false
-    model: auto
-    timeout_s: 120
   lh:
     capabilities:
     - codegen
@@ -343,50 +183,6 @@ agents:
     description: LobeHub CLI v0.0.45 (~0.8s)
     driver: cli
     model: auto
-    timeout_s: 120
-  meoo:
-    capabilities:
-    - codegen
-    - chat
-    - quickfix
-    category: specialized
-    cli: meoo
-    cli_args: '{task}'
-    description: Meoo v0.3.4 (阿里秒悟, ~2s)
-    driver: cli
-    model: auto
-    timeout_s: 60
-  mimo:
-    capabilities:
-    - codegen
-    - chat
-    - quickfix
-    category: specialized
-    cli: mimo
-    cli_args: --print {task}
-    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
-      driver migrated powershell -> cli per ADR-009. 计划启用：安装 mimo CLI 到 PATH 后启用（M7
-      修复评估）'
-    driver: cli
-    enabled: false
-    model: mimo-v2.5
-    model_display: MiMo-V2.5 (built-in)
-    timeout_s: 60
-  mmx:
-    capabilities:
-    - codegen
-    - chat
-    - planning
-    - search
-    - review
-    - explain
-    category: general
-    cli: mmx
-    cli_args: text chat --non-interactive --output text --message "{task}"
-    description: MiniMax CLI v1.0.18 (mmx, authenticated, global region)
-    driver: cli
-    model: MiniMax-M3
-    model_display: MiniMax-M3 (via mmx text chat)
     timeout_s: 120
   nanobot:
     capabilities:
@@ -421,32 +217,6 @@ agents:
     results_merge: false
     supports_regeneration: false
     timeout_s: 120
-  openclaw:
-    capabilities:
-    - codegen
-    - planning
-    - search
-    - review
-    - chat
-    - mcp
-    - skills
-    - techdoc
-    - verify
-    - docgen
-    - pipeline
-    - refactor
-    - explain
-    - quickfix
-    - fileops
-    - memory
-    category: general
-    cli: openclaw
-    cli_args: agent --json -m {task}
-    description: OpenClaw v2026.7.1 (StepFun backend, ~0.2s, requires Node >=22.22.3)
-    driver: cli
-    model: step-3.7-flash
-    model_display: StepFun step-3.7-flash
-    timeout_s: 120
   opencode:
     capabilities:
     - codegen
@@ -474,45 +244,6 @@ agents:
     driver: cli
     model: auto
     timeout_s: 600
-  qoder:
-    capabilities:
-    - codegen
-    - search
-    - fileops
-    - review
-    - planning
-    - explain
-    - chat
-    - refactor
-    category: general
-    cli: qoderclicn
-    cli_args: -p {task}
-    description: 'DISABLED: CLI not found in PATH (2026-07-22 health check); T3-7:
-      driver migrated powershell -> cli per ADR-009. 计划启用：安装 qoderclicn 到 PATH 后启用（M7
-      修复评估）'
-    driver: cli
-    enabled: false
-    model: auto
-    model_display: auto (QoderCN built-in)
-    timeout_s: 60
-  qwen:
-    capabilities:
-    - codegen
-    - search
-    - fileops
-    - planning
-    - review
-    - explain
-    - chat
-    category: general
-    cli: qwen
-    cli_args: -p '{task}'
-    description: Qwen Code CLI v0.27.3 (headless -p; 配置已修为 dashscope qwen-plus，
-      但 2026-11-27 实测账号 Arrearage 欠费——仅极小请求可过，正常负载需充值后可用)
-    driver: cli
-    enabled: true
-    model: auto
-    timeout_s: 600
   qwenpaw:
     capabilities:
     - codegen
@@ -529,20 +260,6 @@ agents:
     driver: cli
     model: deepseek-v4-flash-free
     timeout_s: 120
-  claude:
-    capabilities:
-    - codegen
-    - search
-    - review
-    - planning
-    - explain
-    category: general
-    cli: claude
-    cli_args: -p '{task}'
-    description: Claude Code CLI v2.1.330 (Anthropic, headless -p)
-    driver: cli
-    model: auto
-    timeout_s: 900
 loops:
   iterative:
     backoff_ms: 2000

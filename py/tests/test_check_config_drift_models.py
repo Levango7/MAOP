@@ -60,8 +60,10 @@ def test_real_tree_clean():
 
 def test_reference_census_pinned():
     """agents.yaml model 引用 census 钉死（批 7 CLAIM 口径）：
-    13 distinct（2026-11-27 编队实测更新：codebuddy 改 hy4flash-free 走
-    cli_args，model 归一为 auto ⇒ minimax-m2.7 引用退出 census）。"""
+    6 distinct（2026-11-28 清理「收费且无免费额度」provider：云厂商
+    （qwen/qoder/meoo）+ 付费代理（codex/kimi/openclaw/hermes/goose/
+    gemini/claude）+ 付费订阅（copilot/cursor/mmx/deepcode/langcli/mimo）
+    共 16 项退出 ⇒ 仅余免费通道与控制值）。"""
     data = yaml.safe_load((REPO / "config" / "agents.yaml").read_text(encoding="utf-8"))
     refs = set()
     for group in ("agents", "workflows"):
@@ -70,9 +72,7 @@ def test_reference_census_pinned():
                 refs.add(str(entry["model"]))
     assert refs == {
         "auto", "native", "built-in", "n/a",
-        "step-3.7-flash", "qwen3.5-plus", "yi-large", "gpt-5.4", "MiniMax-M3",
         "deepseek-v4-flash-free", "omniroute-auto-coding",
-        "mimo-v2.5", "agnes-2.0-flash",
     }
 
 
@@ -81,26 +81,31 @@ def test_reference_census_pinned():
 
 def test_m1_unregistered_ref_fires(tmp_path):
     root = _sandbox(tmp_path)
-    _edit(root / "config" / "agents.yaml", "    model: agnes-2.0-flash\n", "    model: ghost-model-x\n")
+    _edit(root / "config" / "agents.yaml", "    model: deepseek-v4-flash-free\n", "    model: ghost-model-x\n")
     assert any(p.startswith("M1") and "ghost-model-x" in p for p in _problems(root))
 
 
 def test_m1_control_values_pass(tmp_path):
     for i, cv in enumerate(drift.CONTROL_MODEL_VALUES):
         root = _sandbox(tmp_path / f"ctrl{i}")
-        _edit(root / "config" / "agents.yaml", "    model: agnes-2.0-flash\n", f"    model: {cv}\n")
+        _edit(root / "config" / "agents.yaml", "    model: deepseek-v4-flash-free\n", f"    model: {cv}\n")
         assert _problems(root) == []
 
 
 def test_m1_registered_unpriced_passes(tmp_path):
     root = _sandbox(tmp_path)
-    _edit(root / "config" / "agents.yaml", "    model: agnes-2.0-flash\n", "    model: minimax-m2.7\n")
+    _edit(root / "config" / "agents.yaml", "    model: deepseek-v4-flash-free\n", "    model: minimax-m2.7\n")
     assert _problems(root) == []
 
 
 def test_m1_exemption_line_removed_fires(tmp_path):
-    """豁免登记行是 agnes-2.0-flash 的唯一放行依据：删行即红（绑定段级注释形态）。"""
+    """豁免登记行是 agnes-2.0-flash 的唯一放行依据：删行即红（绑定段级注释形态）。
+
+    2026-11-28 清理付费 provider 后 agnes-2.0-flash 已不被 agents.yaml 引用，
+    故先向副本注入一处引用（qwenpaw 位）再删豁免行，保持本钉测的绑定语义。
+    """
     root = _sandbox(tmp_path)
+    _edit(root / "config" / "agents.yaml", "    model: deepseek-v4-flash-free\n", "    model: agnes-2.0-flash\n")
     _edit(
         root / "config" / "models.yaml",
         "  # agnes-2.0-flash：agnes 族未计价保留（早前用户裁定），agents.yaml:271 引用\n"
