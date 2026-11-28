@@ -2165,3 +2165,16 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **后续**：C 扩大审计（core/security 首轮 kilo 已产 11 条候选待分诊：byok._key_cache 无锁 / guardrail._config 竞态 / api_key_vault.rotate_master_key 无锁交换 / auth._save_revoked 异常路径 NameError 等）；D=TLS 自签+真实故障演练；E=claude 代理/codex 429/dsh/qoder 登录。
 - **kilo 11 条候选分诊（ZCode 逐条读上下文定性）**：#9 tenant_id=真 P0（#307 已修）；#11 _save_revoked NameError=误报（内层 except 吞掉 NameError，warning 仍打原异常）；#1 byok._key_cache「并发破坏 OrderedDict」不成立（resolve 内 dict 操作段无 await 穿插，单 event loop 原子；多线程共享须先证线程模型）；#8 双时钟=设计内近似（_hydrate_window 即 wall→monotonic 换算，docstring 声明软限流精度可接受）；#7 validate/record 分离 TOCTOU=声明的软限流语义（check 不消费 slot），硬限流须产品决策。**不开修复 PR，避免给 async 代码乱加锁的过度修复**。
 - **trunk 终态（补记）**：run `46033039278` = **27 success + 4 skipped / 0 failed / 0 cancelled（TRUNK_ALL_GREEN）**，#306+#307 超集坐实；本回执 docs-only 推送在代码 run 终态之后才发（避开「文档推送取消在跑代码 run」老坑）。
+
+## 本机 CLI 全量盘点 + 编队小白鼠双战果 — PR #308 合并收口（ZCode，2026-11-28）
+
+- **盘点**：30 家 agent CLI 全扫（PATH+版本+最小真任务探活+provider 直连交叉验证），总表 F:/tmp/agent-inventory-1127.md。健康可用 7 家（kilo/cline/opencode/pi/gemini/codebuddy/qwen-欠费受限）。修复备份全在 F:/tmp/（gemini/qwen/codex/hermes/claude-config-backup-1127.*）。
+- **账号动作（不可本机修）**：qwen=dashscope Arrearage 欠费（curl max_tokens=8 过/2000 拒坐实）；codex=ModelScope 余额尽+Agnes /responses 429（实名）+codex 0.172 禁 wire_api=chat；grok/qoder/dsh/crush/omp/hermes/kimi 各有定性；claude=CLI 本体挂死（Agnes 双协议直连 200 正常，版本/配置/stdin/cmd/MCP 全排除）。
+- **战果一（P1）**：DAG 模板数据流断裂——_execute_step 的 resolved_task 只有 PLAN 分解分支消费，AGENT 分支仍用原始 step.task ⇒ {{step_id}} 对普通 agent step 从不替换（#306 verify-cline 翻文件、本轮 pi「没正文」全因此）。修=model_copy 统一走 resolved task。
+- **战果二（二级放大）**：~10KB 内联报告撞 Windows CreateProcess 命令行上限（The command line is too long）⇒ 模板注入加 6000 字符头尾截断预算。彻底解=CLI 长任务 stdin 传递（后续项）。
+- **测试**：4 钉测先红（2 红）后绿（71/71 含 engine 回归）；spy 端到端实证=verify 的 task 完整包含上游真实输出。CI 首轮 macOS 红=census 基线（codebuddy 改 auto 后 minimax-m2.7 引用退出）已同步 `10f6a20c`。
+- **agents.yaml**：qwen 启用（描述如实标注欠费）+codebuddy/gemini/opencode/pi 参数更新（全部 headless 实测）；total=32、enabled=28、无重复键。
+- **合并**：CI 23 项全绿后 merge commit `b014b13c`；trunk run `46087683486` 守候中，终态后补记。
+- **澄清**：verify「没正文」的剩余原因=cline 输出含 [thinking] 过程日志（输出后处理=后续优化，非数据流）；模板语法={{step_id}} 双花括号（单括号不替换=首次 payload 用法错误非缺陷）；**演练栈禁用 python -I**（.pth 主仓注入旧码，须核 maop.engine_utils.__file__）。
+- **后续**：CLI 长任务 stdin 传递/dispatcher 输出后处理/qwen 充值/codex ModelScope 或 Agnes 实名/claude 终端对照。
+- **trunk 终态（补记）**：run `46087683486` 全绿（TRUNK_ALL_GREEN），#308 超集坐实。
