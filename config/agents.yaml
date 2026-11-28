@@ -286,8 +286,8 @@ routing:
     - hey
     - 在吗
     - 介绍一下
-    primary: mmx
-    tertiary: copilot
+    primary: cline
+    tertiary: opencode
   codegen:
     fallback: omniroute
     keywords:
@@ -316,8 +316,8 @@ routing:
     - 类
     - 模块
     - 项目
-    primary: mmx
-    tertiary: copilot
+    primary: kilo
+    tertiary: opencode
   docgen:
     fallback: omniroute
     keywords:
@@ -331,7 +331,7 @@ routing:
     - api文档
     match: (?:document|doc|readme|guide|comment)
     primary: doc-pipeline
-    tertiary: copilot
+    tertiary: opencode
   fileops:
     fallback: cline
     keywords:
@@ -346,7 +346,7 @@ routing:
     - 复制
     primary: qwenpaw
   mcp:
-    fallback: copilot
+    fallback: cline
     keywords:
     - mcp
     - 工具调用
@@ -354,7 +354,7 @@ routing:
     - MCP
     - tool call
     - function call
-    primary: hermes
+    primary: kilo
   memory:
     fallback: cline
     keywords:
@@ -388,7 +388,7 @@ routing:
     - 调度
     match: (?:orchestrat|编排|协调|compose|调度)
     primary: MAOP
-    tertiary: copilot
+    tertiary: opencode
   pipeline:
     fallback: MAOP
     keywords:
@@ -415,8 +415,8 @@ routing:
     - 策略
     - strategy
     match: (?:plan|architect|design|blueprint|strategy)
-    primary: kimi
-    tertiary: copilot
+    primary: kilo
+    tertiary: cline
   quickfix:
     fallback: omniroute
     keywords:
@@ -431,7 +431,7 @@ routing:
     - patch
     - 问题
     match: (?:fix|bug|error|hotfix|patch|quick\s*fix)
-    primary: cursor
+    primary: kilo
     tertiary: autoclaw
   refactor:
     fallback: omniroute
@@ -445,7 +445,7 @@ routing:
     - 优化结构
     match: (?:refactor|rewrite|restructure|clean\s+up)
     primary: cline
-    tertiary: kimi
+    tertiary: cline
   review:
     fallback: omniroute
     keywords:
@@ -455,10 +455,10 @@ routing:
     - code review
     - 评审
     - 检查代码
-    primary: kimi
-    tertiary: copilot
+    primary: kilo
+    tertiary: opencode
   search:
-    fallback: codex
+    fallback: cline
     keywords:
     - 搜索
     - 检索
@@ -470,8 +470,8 @@ routing:
     - 查询
     - look up
     - 资料
-    primary: kimi
-    tertiary: hermes
+    primary: kilo
+    tertiary: opencode
   techdoc:
     fallback: omniroute
     keywords:
@@ -484,7 +484,7 @@ routing:
     - 架构文档
     - 白皮书
     primary: doc-pipeline
-    tertiary: copilot
+    tertiary: opencode
   verify:
     fallback: omniroute
     keywords:
@@ -497,8 +497,8 @@ routing:
     - assert
     - 断言
     match: (?:verify|test|assert|spec|unit\s+test|integration)
-    primary: kimi
-    tertiary: kimi
+    primary: kilo
+    tertiary: cline
   vision:
     fallback: crush
     keywords:
@@ -530,14 +530,14 @@ workflows:
   m0-demo:
     description: 'M-X2 M0 acceptance DAG: planner -> (worker-a || worker-b).'
     steps:
-    - agent: codex
+    - agent: kilo
       task: '节点 0（规划）：拆解任务并产出两路分支'
       timeout_s: 120
-    - agent: codex
+    - agent: kilo
       task: '节点 1（分支 A）：输出冒烟结论'
       depends_on: ['0']
       timeout_s: 120
-    - agent: codex
+    - agent: kilo
       task: '节点 2（分支 B）：输出验收清单'
       depends_on: ['0']
       timeout_s: 120
