@@ -56,7 +56,12 @@ def test_declared_usage_format_actually_parses(tmp_path: Path):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     declared = {n: d.usage_format for n, d in _agents().items() if d.usage_format}
-    assert declared, "没有任何 agent 声明 usage_format —— 判据失去被测对象"
+    if not declared:
+        # 2026-11-28：唯一实现 usage_file 落盘协议的 copilot 已随「收费且无
+        # 免费额度」清理退出注册表。该机制的可选用途可以为零——用 fixture
+        # 声明保底，使判据继续钉住「格式名必须可解析」，而不是绑死生产
+        # 配置必须永远有某一家在用（那属于产品选型，不是契约）。
+        declared = {"__fixture_copilot__": "copilot"}
 
     broken = []
     for name, fmt in declared.items():
@@ -68,8 +73,16 @@ def test_declared_usage_format_actually_parses(tmp_path: Path):
 
 def test_usage_file_placeholder_precedes_the_task_placeholder():
     """``{usage_file}`` 必须排在 task 占位符之前（cmd.exe 的换行分词）。"""
+    agents = dict(_agents())
+    if not any("{usage_file}" in (d.cli_args or "") for d in agents.values()):
+        # 同上：copilot 退出后无生产者，注入 copilot 形态的 fixture 声明，
+        # 保住「usage_file 先于 task」这条 Windows 分词陷阱判据。
+        from types import SimpleNamespace
+        agents["__fixture_copilot__"] = SimpleNamespace(
+            cli_args='--usage-output-file "{usage_file}" --allow-all-tools -p "{task}"'
+        )
     checked = 0
-    for name, d in _agents().items():
+    for name, d in agents.items():
         args = d.cli_args or ""
         if "{usage_file}" not in args:
             continue
