@@ -2194,3 +2194,20 @@ API 建出的 tree `b13fa559…` 与本地 `git rev-parse 9c8f6857^{tree}` **完
 - **本机**：TDD RED（`ImportError`）→ GREEN；`test_tokens_source_labels.py` 14 passed；相关回归（含 turn budget / usage file protocol / GAP-5 并行双计守卫）356 passed；`ruff==0.17.6` 原 CI 命令 `All checks passed!`；`mypy==2.4.1` 原 CI 参数 `Success: no issues found in 622 source files`。
 - **状态**：CI 全绿，未合并、未打 tag、未删分支；等待用户合并指令。
 - **收板口径**：本行为最终收口，append-only 追加，不覆盖他线行。
+
+## #85 CLAIM — 文档化 usage_format 支持边界（Qoder-Desktop 会话 1973591b，2026-11-27）
+
+- **授权**：用户「可以，做吧」（2026-11-27），批准 #85 先开（纯文档），#84 待数据源裁决。
+- **落板前核对**：分支 `docs/usage-format-boundary` 基于当时 master。
+- **范围**：`docs/user-guide.md` §3.2.1 新增「CLI 原生 usage 出口（usage_format）」小节；`AGENT-COORD.md` 本 CLAIM。不改代码、不改配置、不改测试。
+- **边界内容**：字段位置（agents.yaml 每 agent）、与 `{usage_file}` 成对契约、当前仅 `copilot` 注册格式、取值链（原生文件→协议行→CJK 启发式）、不成对/未注册格式的行为、新增格式接线步骤。
+- **收板口径**：CLAIM 与文档分笔提交；docs-only 推送起新 trunk run 为其收口。
+
+## #85 DONE — 文档化 usage_format 支持边界（Qoder-Desktop 会话 1973591b，2026-11-28）
+
+- **PR**：[#310](https://github.com/Levango7/MAOP/pull/310)；最终 head `c0fd22a2`，base `90d9343a`。
+- **变基**：#305 合入 master 后共享板面发生 EOF 冲突；保留 #87 全文并追加本线 #85，只删除冲突标记，未覆盖他线账本。
+- **CI**：PR run `46141971306` conclusion=success，6 success / 18 skipped / 0 failed；required 四项（`CI scope (code vs docs-only)`、`Secret Scan (gitleaks)`、`Docs consistency gate`、`CI merge gate`）全部 success；`mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`。
+- **本机**：`test_usage_config_contract.py` + `test_usage_file_protocol.py` 19 passed；CI 原命令 `python scripts/check_docs_consistency.py --gate` 通过；silent handlers 0 / baseline 0；oversize files 0。
+- **状态**：CI 全绿，未合并、未打 tag、未删分支；等待用户合并指令。本 DONE 回执提交后需再跑 docs-only CI，以其终态为最终收口。
+- **收板口径**：append-only 追加，不覆盖他线行。
